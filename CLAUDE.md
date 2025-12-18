@@ -1,8 +1,8 @@
-# inv4m Project Refactoring Guide
+# inv4m Project Guide
 
 **Last Updated:** 2025-12-18
-**Status:** Phase 1 - Path Standardization (In Progress)
-**Current Focus:** Phosphorus Paper Rmd Files
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Not Started
+**Version:** v1.0.0
 
 ---
 
@@ -10,8 +10,8 @@
 
 The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its effects on phosphorus stress response. The codebase contains R/Rmarkdown analysis scripts for two planned papers:
 
-1. **Inversion Paper** - Characterizes Inv4m effects across field environments
-2. **Phosphorus Paper** - Analyzes phosphorus stress response and Inv4m interactions
+1. **Inversion Paper** - Characterizes Inv4m effects across field environments (not started)
+2. **Phosphorus Paper** - Analyzes phosphorus stress response and Inv4m interactions ✅
 
 ### Repository Structure
 
@@ -19,260 +19,100 @@ The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its eff
 inv4m/
 ├── scripts/
 │   ├── 00_agent_work/           # AI agent sandbox (git-ignored)
-│   ├── 01_hpc_pipelines/        # LSF/HPC processing scripts
-│   ├── 02_genomics_foundation/  # Mapping and synteny
-│   ├── inversion_paper/         # Paper 1 analysis notebooks
-│   ├── phosphorus_paper/        # Paper 2 analysis notebooks
+│   ├── phosphorus_paper/        # Paper 2 analysis notebooks ✅
+│   ├── inversion_paper/         # Paper 1 analysis notebooks (future)
 │   ├── shared_paper/            # Foundation scripts used by BOTH papers
 │   └── utils/                   # Shared R utilities
-├── data/                        # Raw data and annotations (git-ignored)
+├── data/                        # Raw data and annotations (git-ignored, symlink)
 ├── results/                     # All outputs (git-ignored)
 └── .gitignore                   # Configured for large data/results
 ```
 
 ---
 
-## Current State (2025-12-18)
+## Phosphorus Paper - Complete ✅
 
-### Problem Statement
-
-**The codebase is not reproducible or portable.** All 11 Rmd files in `scripts/phosphorus_paper/` use hard-coded desktop paths:
-
-- **100% hard-coded paths** like `~/Desktop/predictor_effects_leaf_interaction_model.csv`
-- **20+ input files** scattered on Desktop in various subdirectories
-- **No project-relative pathing** - breaks on any other machine
-- **Mix of path styles** - `~/Desktop/`, `/Users/fvrodriguez/Desktop/`, `../data/`
-- **Outputs to Desktop** - figures, tables, RDS objects all saved to `~/Desktop/figure_panels/`
-
-**Messiness Score:** 8/10 (VERY MESSY)
-
-### What Exists Now
-
-#### Scripts (11 Rmd files in `scripts/phosphorus_paper/`)
+### Scripts (11 Rmd files in `scripts/phosphorus_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `GO_Enrichment_Analysis_of_DEGs.Rmd` | GO term enrichment | Uses desktop paths |
-| `KEGG_Pathway_Enrichment_Analysis_of_DEGs.Rmd` | KEGG pathway enrichment | Uses desktop paths |
-| `LION_Lipid_Enrichment_Analysis.Rmd` | Lipid enrichment analysis | Uses desktop paths |
-| `PSU2022_Build_ photosynthesis_sensescencc_indices.Rmd` | Photosynthesis indices | Uses desktop paths |
-| `PSU2022_growthcurves.Rmd` | Growth curve analysis | Uses desktop paths |
-| `PSU2022_ionome.Rmd` | Ionome analysis | Uses desktop paths |
-| `PSU2022_make_transcription_indices.Rmd` | Transcription indices | Uses desktop paths |
-| `PSU2022_phenotype_marginal_means.Rmd` | Phenotype marginal means | Uses desktop paths |
-| `PSU_pheno_phosohorus.Rmd` | Phosphorus phenotypes | Uses desktop paths |
-| `differential_lipid_analysis_leaf_treatment_interaction_model.Rmd` | Differential lipid analysis | Uses desktop paths |
-| `volcano_plot_analysis.Rmd` | Volcano plots | Uses desktop paths |
+| `spatial_correction_for_INV4MXP.Rmd` | Spatial correction for phenotypes | ✅ |
+| `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
+| `differential_lipid_analysis_leaf_treatment_interaction_model.Rmd` | Differential lipid analysis | ✅ |
+| `PSU2022_growthcurves.Rmd` | Growth curve analysis | ✅ |
+| `PSU2022_ionome.Rmd` | Ionome analysis | ✅ |
+| `PSU2022_make_transcription_indices.Rmd` | Transcription indices | ✅ |
+| `PSU2022_phenotype_marginal_means.Rmd` | Phenotype marginal means | ✅ |
+| `GO_Enrichment_Analysis_of_DEGs.Rmd` | GO term enrichment | ✅ |
+| `KEGG_Pathway_Enrichment_Analysis_of_DEGs.Rmd` | KEGG pathway enrichment | ✅ |
+| `LION_Lipid_Enrichment_Analysis.Rmd` | Lipid enrichment analysis | ✅ |
+| `volcano_plot_analysis.Rmd` | Volcano plots | ✅ |
 
-#### Current Data Organization
+### Generated Outputs
 
-**Flat `data/` directory** with ~30 files at root level:
-- RNA-seq expression matrices
-- Phenotype CSVs
-- Gene annotations
-- MS-Dial lipid data
-- Metadata files
-
-**Existing `results/` structure:**
 ```
-results/
-├── phosphorus_paper/
-│   ├── intermediate/      # Some files exist
-│   └── reports/           # Knitted HTML outputs
-└── inversion_paper/
-    ├── intermediate/
-    └── reports/
+results/phosphorus_paper/
+├── intermediate/    # 29 CSV files (processed data)
+├── figures/         # 28 files (PDF, PNG, SVG)
+├── tables/          # 11 .tex files (LaTeX only)
+└── reports/         # 11 HTML reports
 ```
 
-#### Infrastructure Already in Place
+### Infrastructure
 
-✅ **render_notebook.R** - Generic rendering utility that:
-- Takes any Rmd path as argument
-- Auto-detects paper folder from path
-- Outputs to `results/{paper}/reports/`
-- Creates directories if needed
+✅ **setup_paths.R** - Path configuration utility providing:
+- `paths$data` - Input data (symlinked)
+- `paths$intermediate` - Processed CSV/RDS files
+- `paths$figures` - Publication figures
+- `paths$tables` - LaTeX tables only
+- `paths$reports` - Rendered notebooks
 
-✅ **.gitignore** - Properly configured to:
-- Ignore `data/` and `results/` directories
-- Ignore large binary files (RDS, RData, CSV, PDF, PNG)
-- Ignore agent sandbox (`scripts/00_agent_work/`)
-- Track only source code (Rmd, R, sh scripts)
+✅ **render_notebook.R** - Generic rendering utility
+
+✅ **.gitignore** - Properly configured
 
 ---
 
-## Refactoring Goals
+## Success Criteria (All Met ✅)
 
-### Primary Objective
+- [x] Zero hard-coded paths (`~/Desktop/`, `/Users/fvrodriguez/`) in any Rmd file
+- [x] All files use `here::here()` for path construction
+- [x] All notebooks render successfully from project root
+- [x] Clear separation: raw data → `data/`, intermediates → `results/*/intermediate/`, reports → `results/*/reports/`
+- [x] Project runs on any machine without path modifications
+- [x] `grep -r "~/Desktop" scripts/phosphorus_paper/*.Rmd` returns nothing
 
-**Make the phosphorus paper analysis fully reproducible** by implementing project-root-relative paths using `here::here()`.
+### Future Work
 
-### Success Criteria
-
-- [ ] Zero hard-coded paths (`~/Desktop/`, `/Users/fvrodriguez/`) in any Rmd file
-- [ ] All files use `here::here()` for path construction
-- [ ] All notebooks render successfully from project root
-- [ ] Clear separation: raw data → `data/`, intermediates → `results/*/intermediate/`, reports → `results/*/reports/`
-- [ ] Project runs on any machine without path modifications
-- [ ] `grep -r "~/Desktop" scripts/phosphorus_paper/*.Rmd` returns nothing
-
-### Non-Goals (Out of Scope)
-
-- ❌ Refactoring inversion_paper scripts (separate phase)
-- ❌ Optimizing analysis code or adding features
-- ❌ Changing statistical methods or adding documentation
-- ❌ Over-engineering with unnecessary subdirectories
+- ⏳ Refactor inversion_paper scripts (separate phase)
 
 ---
 
-## Planned Directory Structure
+## Directory Structure
 
-### Critical Constraint: data/ is a Symlink
+### Data Directory (Symlink)
 
-**IMPORTANT:** `data/` is a symbolic link to `../inv4mRNA/data` (shared across projects).
-- ❌ **Cannot** create subdirectories in `data/`
-- ✅ **Can** read files from flat `data/` structure
-- ✅ **Can** organize `results/` however we want
+`data/` is a symbolic link to `../inv4mRNA/data` (shared across projects).
+- Flat structure with ~40 files at root level
+- Read-only - do not create subdirectories
 
-### Actual Structure
+### Results Directory
 
 ```
-data/  → ../inv4mRNA/data (symlink, flat structure, ~30 files)
-├── 22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv
-├── inv4mRNAseq_gene_sample_exp.csv
-├── PSU-PHO22_Metadata.csv
-├── B73v4_to_B73v5.tsv
-└── ... (all files at root level)
-
 results/
 ├── phosphorus_paper/
-│   ├── intermediate/         # Generated data (normalized_expression, DEG effects, etc.)
-│   ├── figures/              # Publication figures (PDF, PNG, SVG)
-│   ├── tables/               # Publication tables (LaTeX)
-│   └── reports/              # Knitted HTML/PDF notebooks
+│   ├── intermediate/    # CSV/RDS processed data files
+│   ├── figures/         # PDF, PNG, SVG publication figures
+│   ├── tables/          # LaTeX tables ONLY (.tex files)
+│   └── reports/         # Rendered HTML notebooks
 ├── inversion_paper/
 │   └── [same structure]
 └── shared_paper/
-    ├── intermediate/
-    └── reports/
+    └── [same structure]
 ```
 
-**Design Philosophy:**
-- **Flat `data/` folder** - read-only, shared across projects
-- **Organized `results/`** - paper-specific subdirectories with clear output types
-- **Clear data flow** - `data/` (input) → `results/*/intermediate/` (processed) → `results/*/reports/` (final)
+**Key Convention:** `tables/` contains LaTeX (.tex) files only. All CSV outputs go to `intermediate/`.
 
----
-
-## Implementation Strategy
-
-### Phase 1: Setup & File Migration (Current Phase)
-
-**Focus:** phosphorus_paper only
-
-1. **Create directory structure**
-   - `results/phosphorus_paper/{intermediate,figures,tables}/` (reports/ already exists)
-   - Note: Cannot modify `data/` (it's a symlink to shared directory)
-
-2. **Audit and migrate Desktop files**
-   - Identify 20+ files currently referenced from `~/Desktop/` in Rmds
-   - Copy missing files to flat `data/` directory (if they don't already exist)
-   - Backup Desktop before migration: `tar -czf ~/Desktop_backup_$(date +%F).tar.gz ~/Desktop/`
-   - Work with existing flat structure (no subdirectories)
-
-3. **Create path configuration utility**
-   - `scripts/utils/setup_paths.R` with `setup_project_paths()` function
-   - Returns named list of standardized paths using `here::here()`
-   - Points to flat `data/` structure
-   - Every Rmd sources this at the top
-
-### Phase 2: Rmd Refactoring
-
-**Pattern:**
-
-**BEFORE:**
-```r
-effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
-TERM2GENE <- readRDS("/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE.rds")
-ggsave("~/Desktop/figure_panels/go_panel.pdf", plot = p)
-```
-
-**AFTER:**
-```r
-library(here)
-source(here("scripts", "utils", "setup_paths.R"))
-paths <- setup_project_paths("phosphorus_paper")
-
-# All data files referenced from flat data/ directory
-effects_df <- read.csv(file.path(paths$data, "predictor_effects_leaf_interaction_model.csv"))
-TERM2GENE <- readRDS(file.path(paths$data, "GOMAP_TERM2GENE.rds"))
-
-# Outputs organized in results/
-ggsave(file.path(paths$figures, "go_panel.pdf"), plot = p)
-```
-
-**Refactor order** (by dependency):
-1. Standalone files (enrichment analyses, volcano plots)
-2. Phenotype analyses (growthcurves, ionome)
-3. Expression index calculations
-4. Differential lipid analysis
-
-### Phase 3: Validation
-
-1. Test render each Rmd individually
-2. Verify outputs land in correct `results/` subdirectories
-3. Check no hard-coded paths remain
-4. Test on clean repository clone
-5. Update documentation
-
----
-
-## File Classification (Phosphorus Paper)
-
-### Input Files (Flat `data/` directory)
-
-**Files that should exist in `data/`** (copied from Desktop if missing):
-- `predictor_effects_leaf_interaction_model.csv` - DEG analysis results
-- `selected_DEGs_curated_locus_label_2.csv` - Curated gene annotations ✅ (already exists)
-- `selected_DEGs_leaf_interaction_model.csv` - Final DEG list
-- `DEG_effects.csv` - Effect sizes
-- `normalized_expression_logCPM.rda` - Normalized expression matrix
-- `PSU2022_spatially_corrected_both_treatments.csv` - Phenotypes
-- `22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv` - Field data ✅ (already exists)
-- `PSU_RawData_MSDial_NewStdInt_240422.csv` - MS-Dial lipid data ✅ (already exists)
-- `LION-enrichment_LowPVSHighP.csv` - LION enrichment
-- `inv4mRNAseq_metadata.csv` - RNA-seq metadata ✅ (already exists)
-- `PSU-PHO22_ms_order.csv` - MS injection order ✅ (already exists)
-
-**Annotation files** (flat in `data/`, rename if needed):
-- `TERM2NAME.rds` - GO term names (from Desktop GOMAP folder)
-- `TERM2GENE.rds` - GO mappings (from Desktop GOMAP folder)
-- `B73v3_to_B73v5.tsv` - Gene version mapping
-- `B73v4_to_B73v5.tsv` - Gene version mapping ✅ (already exists)
-- `corncyc_pathways.txt` - CornCyc pathways
-- `slim_to_plot.csv` - GO slim filter
-- `SAG_orthologs.csv` - Senescence genes
-- `staygreen_network_sekhon2019.csv` - Staygreen genes
-- `natural_senescence.csv` - Natural senescence genes
-
-### Intermediate Files (Generated by notebooks)
-
-**To be written to** `results/phosphorus_paper/intermediate/`
-- Normalized expression objects (RDS)
-- Statistical model results (CSV)
-- Filtered gene lists (CSV)
-- Cached plot objects (RDS)
-- Processed data frames (CSV)
-
-### Final Outputs
-
-**Figures** → `results/phosphorus_paper/figures/`
-- PDF, PNG, SVG publication figures
-
-**Tables** → `results/phosphorus_paper/tables/`
-- CSV summaries, LaTeX tables
-
-**Reports** → `results/phosphorus_paper/reports/`
-- Knitted HTML/PDF notebooks (already configured)
 
 ---
 
@@ -397,54 +237,41 @@ git push origin main
 
 ## Progress Tracking
 
-### Completed ✅
+### Phosphorus Paper ✅ Complete
 - [x] Audit all hard-coded paths (172 paths identified)
 - [x] Map file dependencies (180+ files classified)
 - [x] Create execution roadmap (3 batches defined)
 - [x] Configure .gitignore properly
 - [x] Create render_notebook.R utility
-
-### In Progress 🚧
-- [ ] Create directory structure (Phase 1)
-- [ ] Migrate Desktop files to data/ (Phase 1)
-- [ ] Create setup_paths.R utility (Phase 1)
-- [ ] Refactor phosphorus_paper Rmds (Phase 2)
+- [x] Create directory structure
+- [x] Migrate Desktop files to data/
+- [x] Create setup_paths.R utility
+- [x] Refactor all 11 phosphorus_paper Rmds
+- [x] Test rendering all notebooks
+- [x] Validate outputs in correct directories
+- [x] Tag release v1.0.0
 
 ### Not Started ⏳
-- [ ] Test rendering all notebooks (Phase 3)
-- [ ] Validate outputs (Phase 3)
-- [ ] Update project README (Phase 3)
 - [ ] Refactor inversion_paper scripts (Future phase)
 
 ---
 
 ## Notes for AI Assistants
 
-### Key Principles
+### Key Conventions
 
-1. **Simplicity over complexity** - Use flat paper-level folders, not deep nesting
-2. **Mirror script structure** - `scripts/phosphorus_paper/` ↔ `data/phosphorus_paper/`
-3. **Preserve git history** - Don't delete files, refactor paths in place
-4. **Test incrementally** - Refactor one file at a time, test immediately
-5. **Focus on phosphorus_paper** - Don't touch inversion_paper scripts yet
+1. **Output routing:**
+   - CSV files → `paths$intermediate`
+   - LaTeX tables → `paths$tables`
+   - Figures → `paths$figures`
+   - Reports auto-routed by render_notebook.R
 
-### Where to Work
+2. **Path management:** All scripts use `setup_paths.R` utility with `here::here()`
 
-- **Agent sandbox:** `scripts/00_agent_work/` - Temporary work, git-ignored
-- **Main scripts:** `scripts/phosphorus_paper/` - Refactor these in place
-- **Utilities:** `scripts/utils/` - Add shared path configuration here
+3. **Agent sandbox:** `scripts/00_agent_work/` - Temporary work, git-ignored
 
 ### What to Avoid
 
-- ❌ Don't create semantic subdirectories (no `data/phosphorus_paper/differential_expression/`)
-- ❌ Don't over-engineer with unnecessary abstraction
-- ❌ Don't modify analysis logic, only paths
-- ❌ Don't add comments/docstrings unless code logic is unclear
-- ❌ Don't touch inversion_paper scripts (out of scope)
-
----
-
-**For questions or clarification, refer to:**
-- This document (CLAUDE.md)
-- `scripts/00_agent_work/PHOSPHORUS_PAPER_PATH_REFACTOR_PLAN.md` (detailed plan)
-- Previous audit files in `scripts/00_agent_work/` (context only, not executable)
+- ❌ Don't put CSV files in `tables/` (LaTeX only)
+- ❌ Don't create subdirectories in `data/` (it's a symlink)
+- ❌ Don't modify analysis logic without explicit request
