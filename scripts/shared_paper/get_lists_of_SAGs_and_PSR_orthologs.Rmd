@@ -1,0 +1,277 @@
+---
+title: "Senescence and Phosphate Starvation Ortholog Mapping"
+author: "Fausto"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Ortholog Identification for Senescence and Phosphate Starvation
+
+**Purpose**: Map Arabidopsis genes from GO:0010150 (leaf senescence) and GO:0016036 (cellular response to phosphate starvation) to maize orthologs using Ensembl BioMart.
+
+**Approach**: Query TAIR gene lists against Ensembl Plants for maize orthologs, then join with differential expression data.
+
+**Expected outcome**: Two data frames linking Arabidopsis genes to their maize orthologs with expression effects.
+
+## Load Required Libraries
+```{r setup, message=FALSE}
+library(tidyverse)
+library(biomaRt)
+library(janitor)
+```
+
+## Load TAIR Gene Lists
+```{r load_data}
+# Berardini TZ et al. (2015). The Arabidopsis information resource. 
+# Genesis 53(8):474-85. doi: 10.1002/dvg.22877
+
+terms <- c(
+  "cellular response to phosphate starvation" = "GO:0016036",
+  "leaf senescence"                           = "GO:0010150"
+)
+
+sag_tair11 <- read.table(
+  "~/Desktop/leaf_sensecence_tair11.tsv",
+  sep = "\t",
+  quote = "",
+  header = TRUE,
+  fill = TRUE
+) %>%
+  clean_names()
+
+psr_tair11 <- read.table(
+  "~/Desktop/cellular_response_to_phosphate_starvation_tair11.tsv",
+  sep = "\t",
+  quote = "",
+  header = TRUE,
+  fill = TRUE
+) %>%
+  clean_names()
+
+cat("TAIR senescence genes:", nrow(sag_tair11), "\n")
+cat("TAIR phosphate starvation genes:", nrow(psr_tair11), "\n")
+```
+
+## Connect to Ensembl BioMart
+```{r connect_biomart}
+# Durinck S et al. (2009). Mapping identifiers for genomic integration.
+# Nature Protocols 4:1184-1191
+# Durinck S et al. (2005). BioMart and Bioconductor. 
+# Bioinformatics 21:3439-3440
+
+tair <- useMart(
+  "plants_mart",
+  host = "http://plants.ensembl.org",
+  port = 80,
+  path = "/biomart/martservice",
+  dataset = "athaliana_eg_gene"
+)
+```
+
+## Query Senescence Orthologs
+```{r query_senescence}
+homology_sag <- getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "zmays_eg_homolog_associated_gene_name",
+    "zmays_eg_homolog_ensembl_gene"
+  ),
+  filters = "tair_locus",
+  values = sag_tair11$locus,
+  mart = tair
+) %>%
+  clean_names()
+
+# Filter for genes with maize orthologs and join with TAIR metadata
+sag_orthologs <- homology_sag %>%
+  filter(zmays_eg_homolog_ensembl_gene != "") %>%
+  left_join(
+    sag_tair11 %>% dplyr::select(locus, gene_type, other_name_type),
+    by = c("ensembl_gene_id" = "locus")
+  ) %>%
+  mutate(
+    homologous_gene_in_arabidopsis = ensembl_gene_id,
+    reference_s = "TAIR"
+  )
+
+cat("SAG orthologs identified:", nrow(sag_orthologs), "\n")
+```
+
+## Query Phosphate Starvation Orthologs
+```{r query_psr}
+homology_psr <- getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "zmays_eg_homolog_associated_gene_name",
+    "zmays_eg_homolog_ensembl_gene"
+  ),
+  filters = "tair_locus",
+  values = psr_tair11$locus,
+  mart = tair
+) %>%
+  clean_names()
+
+# Filter for genes with maize orthologs and join with TAIR metadata
+psr_orthologs <- homology_psr %>%
+  filter(zmays_eg_homolog_ensembl_gene != "") %>%
+  left_join(
+    psr_tair11 %>% dplyr::select(locus, gene_type, other_name_type),
+    by = c("ensembl_gene_id" = "locus")
+  ) %>%
+  mutate(
+    homologous_gene_in_arabidopsis = ensembl_gene_id,
+    reference_s = "TAIR"
+  )
+
+cat("PSR orthologs identified:", nrow(psr_orthologs), "\n")
+```
+
+## Summary Statistics
+```{r summary}
+cat("\n=== Mapping Summary ===\n")
+cat("Senescence:\n")
+cat("  Input genes:", nrow(sag_tair11), "\n")
+cat("  Unique Arabidopsis genes with orthologs:", 
+    n_distinct(sag_orthologs$ensembl_gene_id), "\n")
+cat("  Unique maize orthologs:", 
+    n_distinct(sag_orthologs$zmays_eg_homolog_ensembl_gene), "\n")
+cat("  Total ortholog pairs:", nrow(sag_orthologs), "\n")
+cat("  Mapping rate:", 
+    round(100 * n_distinct(sag_orthologs$ensembl_gene_id) / nrow(sag_tair11), 1), 
+    "%\n\n")
+
+cat("Phosphate starvation response:\n")
+cat("  Input genes:", nrow(psr_tair11), "\n")
+cat("  Unique Arabidopsis genes with orthologs:", 
+    n_distinct(psr_orthologs$ensembl_gene_id), "\n")
+cat("  Unique maize orthologs:", 
+    n_distinct(psr_orthologs$zmays_eg_homolog_ensembl_gene), "\n")
+cat("  Total ortholog pairs:", nrow(psr_orthologs), "\n")
+cat("  Mapping rate:", 
+    round(100 * n_distinct(psr_orthologs$ensembl_gene_id) / nrow(psr_tair11), 1), 
+    "%\n")
+```
+
+## Gene Type Distribution
+```{r gene_type_tables}
+cat("\n=== Senescence Gene Types ===\n")
+cat("Before filtering (TAIR input):\n")
+print(table(sag_tair11$gene_type))
+
+cat("\nAfter filtering (with maize orthologs):\n")
+print(table(sag_orthologs$gene_type))
+
+cat("\n=== Phosphate Starvation Gene Types ===\n")
+cat("Before filtering (TAIR input):\n")
+print(table(psr_tair11$gene_type))
+
+cat("\nAfter filtering (with maize orthologs):\n")
+print(table(psr_orthologs$gene_type))
+```
+
+## Load and Prepare Differential Expression Data
+```{r load_effects}
+# Load differential expression results
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+# Calculate neglogFDR
+effects_df <- effects_df %>%
+  mutate(neglogFDR = -log10(adj.P.Val))
+
+# Load curated labels
+curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+  dplyr::select(gene, locus_label)
+
+effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
+
+# Update only the locus_label using curated values
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_new")) %>%
+  mutate(locus_label = coalesce(locus_label_new, locus_label)) %>%
+  dplyr::select(-locus_label_new)
+
+# Additional curated updates
+curated_updates <- tibble::tribble(
+  ~gene,              ~locus_label,
+  "Zm00001eb144680",  "rns",
+  "Zm00001eb339870",  "pld16",
+  "Zm00001eb289800",  "pah1",
+  "Zm00001eb297970",  "sqd2",
+  "Zm00001eb154650",  "ppa1",
+  "Zm00001eb430590",  "nrx3",
+  "Zm00001eb335670",  "sqd3",
+  "Zm00001eb258130",  "mgd3",
+  "Zm00001eb280120",  "pfk1",
+  "Zm00001eb151650",  "pap1",
+  "Zm00001eb130570",  "sag21",
+  "Zm00001eb369590",  "nrx1",
+  "Zm00001eb048730",  "spx2",
+  "Zm00001eb238670",  "pep2",
+  "Zm00001eb239700",  "ppa2",
+  "Zm00001eb386270",  "spx6",
+  "Zm00001eb370610",  "rfk1",
+  "Zm00001eb247580",  "ppck3",
+  "Zm00001eb277280",  "gst19",
+  "Zm00001eb361620",  "ppa2"
+)
+
+effects_df <- effects_df %>%
+  left_join(curated_updates, by = "gene", suffix = c("", "_new")) %>%
+  mutate(locus_label = coalesce(locus_label_new, locus_label)) %>%
+  dplyr::select(-locus_label_new)
+```
+
+## Join Orthologs with Expression Data
+```{r join_expression}
+# Prepare effects data for joining - filter for high confidence DEGs
+effects_leaf <- effects_df %>%
+  filter(is_hiconf_DEG == TRUE, predictor %in% c("Leaf", "Leaf:-P")) %>%
+  dplyr::select(
+    gene,
+    predictor, 
+    regulation, 
+    locus_label, 
+    desc_merged, 
+    logFC, 
+    neglogFDR
+  )
+
+effects_psr <- effects_df %>%
+  filter(is_hiconf_DEG == TRUE, predictor %in% c("-P", "Leaf:-P")) %>%
+  dplyr::select(
+    gene,
+    predictor, 
+    regulation, 
+    locus_label, 
+    desc_merged, 
+    logFC, 
+    neglogFDR
+  )
+
+# Join senescence orthologs with Leaf expression data
+sag_with_effects <- sag_orthologs %>%
+  left_join(
+    effects_leaf,
+    by = c("zmays_eg_homolog_ensembl_gene" = "gene")
+  )
+
+# Join PSR orthologs with -P expression data
+psr_with_effects <- psr_orthologs %>%
+  left_join(
+    effects_psr,
+    by = c("zmays_eg_homolog_ensembl_gene" = "gene")
+  )
+
+cat("Senescence orthologs with Leaf expression data:", 
+    sum(!is.na(sag_with_effects$predictor)), "/", nrow(sag_with_effects), "\n")
+cat("PSR orthologs with -P expression data:", 
+    sum(!is.na(psr_with_effects$predictor)), "/", nrow(psr_with_effects), "\n")
+```
+
+## Save Outputs
+```{r save_results}
+write_csv(sag_orthologs, "~/Desktop/senescence_orthologs.csv")
+write_csv(psr_orthologs, "~/Desktop/psr_orthologs.csv")
+write_csv(sag_with_effects, "~/Desktop/senescence_orthologs_with_effects.csv")
+write_csv(psr_with_effects, "~/Desktop/psr_orthologs_with_effects.csv")
+```

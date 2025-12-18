@@ -1,0 +1,998 @@
+---
+title: "PSU 2022 Inv4m Phenotype Analysis: Treatment and Genotype Effects"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+## Overview
+
+This analysis uses **spatially corrected phenotype data** from the SpATS analysis 
+to examine treatment effects (phosphorus limitation) and genotype × treatment 
+interactions for the *Inv4m* inversion in maize.
+
+**Analysis workflow:**
+
+1. Load spatially corrected data
+2. Fit linear models: Phenotype ~ Genotype × Treatment
+3. Identify significant treatment and interaction effects (FDR < 0.05)
+4. **Visualize treatment effects**: Pairwise comparisons of +P vs -P within each genotype
+5. Export statistical results and summaries
+
+**Focus:** This analysis emphasizes **treatment comparisons** (phosphorus stress 
+response) and how the *Inv4m* genotype modifies this response (genotype × treatment 
+interactions). All visualizations show treatment effects faceted by genotype.
+
+---
+
+## 1. Setup and Data Loading
+
+### Load libraries
+
+```{r load_libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggtext)
+library(ggfx)
+library(ggpubr)
+library(ggbeeswarm)
+library(rstatix)
+library(knitr)
+```
+
+### Define aesthetic constants
+
+```{r aesthetics}
+# Color palette: gold for CTRL, purple for Inv4m
+pal <- c("gold", "purple4")
+
+# Base theme for plots
+pheno_theme <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 20, 
+      angle = 45, 
+      hjust = 1
+    ),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 25),
+    legend.position = "none"
+  )
+
+# Theme for treatment comparison plots
+pheno_theme2 <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = element_markdown(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 25, face = "bold", color = "black"),
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 20),
+    legend.position = "none"
+  )
+
+# Theme for time-series plots
+pheno_theme3 <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(color = "black", size = 20),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 20),
+    legend.position = "none"
+  )
+```
+
+### Load spatially corrected data
+
+```{r load_corrected_data}
+# Load the spatially corrected data from the SpATS analysis
+sp_corrected_file <- "PSU2022_spatially_corrected_both_treatments.csv"
+
+sp_corrected_combined <- read.csv(sp_corrected_file) %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("+P", "-P")),
+    genotype = factor(genotype, levels = c("CTRL", "Inv4m"))
+  )
+
+cat("Spatially corrected data dimensions:", dim(sp_corrected_combined), "\n")
+cat("Treatment levels:", levels(sp_corrected_combined$Treatment), "\n")
+cat("Genotype levels:", levels(sp_corrected_combined$genotype), "\n")
+cat("\nTreatment × Genotype combinations:\n")
+print(table(sp_corrected_combined$Treatment, sp_corrected_combined$genotype))
+```
+
+### Prepare plotting data
+
+```{r prepare_plotting_data}
+# Filter to NIL genotypes only (CTRL and Inv4m)
+pheno <- sp_corrected_combined %>%
+  filter(genotype %in% c("CTRL", "Inv4m")) %>%
+  mutate(
+    genotype = factor(genotype, levels = c("CTRL", "Inv4m"))
+  ) %>%
+  droplevels()
+
+# Rename genotype column for consistency
+pheno <- pheno %>%
+  rename(Genotype = genotype)
+
+# Create formatted genotype labels with CTRL as reference
+pheno <- pheno %>%
+  mutate(
+    Genotype_label = case_when(
+      Genotype == "CTRL" ~ "CTRL",
+      Genotype == "Inv4m" ~ "<i>Inv4m</i>",
+      TRUE ~ as.character(Genotype)
+    ),
+    Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
+
+cat("Analysis data dimensions:", dim(pheno), "\n")
+cat("Genotype levels:", levels(pheno$Genotype), "\n")
+cat("Genotype_label levels:", levels(pheno$Genotype_label), "\n")
+```
+
+---
+
+## 2. Statistical Analysis
+
+### Identify phenotype variables
+
+```{r identify_phenotypes}
+# Define phenotype groups
+base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
+ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
+
+# Check which phenotypes are available in the spatially corrected data
+available_phenos <- intersect(
+  c(base_phenotypes, ear_phenotypes),
+  colnames(pheno)
+)
+
+cat("Available phenotypes for analysis:\n")
+cat(paste(available_phenos, collapse = ", "), "\n")
+
+vars <- available_phenos
+```
+
+### Fit linear models for all phenotypes
+
+Since the data is already spatially corrected, we can use simple linear models 
+without spatial correlation terms.
+
+```{r fit_models}
+# Fit models and extract effects
+effects <- lapply(vars, FUN = function(x) {
+  # Check if there's enough data
+  n_obs <- sum(!is.na(pheno[[x]]))
+  
+  if (n_obs < 20) {
+    message("Skipping ", x, " - insufficient data (n=", n_obs, ")")
+    return(NULL)
+  }
+  
+  # Fit linear model: phenotype ~ Genotype * Treatment
+  form <- paste(x, "~ Genotype * Treatment")
+  
+  model <- tryCatch(
+    lm(as.formula(form), data = pheno),
+    error = function(e) {
+      message("Model failed for ", x, ": ", e$message)
+      return(NULL)
+    }
+  )
+  
+  if (is.null(model)) return(NULL)
+  
+  # Extract coefficients
+  out <- coef(summary(model)) %>% 
+    as.data.frame() %>% 
+    tibble::rownames_to_column("predictor")
+  
+  colnames(out)[3] <- "Std.Error"
+  colnames(out)[5] <- "p.value"
+  out$response <- x
+  out %>% select(response, everything())
+}) %>% 
+  bind_rows() %>%
+  mutate(p.adjust = p.adjust(p.value, method = "fdr")) %>% 
+  arrange(p.adjust)
+
+
+cat("\n=== Model Summary ===\n")
+cat("Total models fitted:", length(unique(effects$response)), "\n")
+cat("Total effects tested:", nrow(effects), "\n")
+```
+
+### Identify significant effects
+
+```{r significant_effects}
+# Filter for significant effects (FDR < 0.05)
+significant <- effects %>%
+  filter(
+    p.adjust < 0.05, 
+    !grepl("Intercept", predictor)
+  ) %>%
+  arrange(p.adjust)
+
+# Recode predictor names for plotting
+significant <- significant %>%
+  mutate(
+    predictor = case_when(
+      predictor == "Treatment-P" ~ "-P",
+      predictor == "GenotypeInv4m" ~ "Inv4m",
+      predictor == "GenotypeInv4m:Treatment-P" ~ "Inv4m:-P",
+      TRUE ~ predictor
+    ),
+    predictor = factor(predictor, levels = c("-P", "Inv4m", "Inv4m:-P"))
+  )
+
+# Calculate reference means for each response
+reference_means <- effects %>%
+  filter(grepl("Intercept|Treatment-P|GenotypeInv4m", predictor)) %>%
+  select(response, predictor, Estimate) %>%
+  pivot_wider(
+    names_from = predictor,
+    values_from = Estimate
+  ) %>%
+  rename(
+    intercept = `(Intercept)`,
+    treatment_effect = `Treatment-P`,
+    genotype_effect = GenotypeInv4m,
+    interaction_effect = `GenotypeInv4m:Treatment-P`
+  ) %>%
+  mutate(
+    # +P marginal mean = (CTRL+P + Inv4m+P) / 2
+    plus_p_marginal_mean = intercept + (genotype_effect / 2),
+    
+    # CTRL marginal mean = (CTRL+P + CTRL-P) / 2
+    ctrl_marginal_mean = intercept + (treatment_effect / 2),
+    
+    # CTRL-P mean (not marginal, just this cell)
+    ctrl_minus_p_mean = intercept + treatment_effect
+  ) %>%
+  select(
+    response, 
+    plus_p_marginal_mean, 
+    ctrl_marginal_mean, 
+    ctrl_minus_p_mean
+  )
+
+# Join and calculate percentages with appropriate denominator
+significant <- significant %>%
+  left_join(reference_means, by = "response") %>%
+  mutate(
+    reference_mean = case_when(
+      predictor == "-P" ~ plus_p_marginal_mean,
+      predictor == "Inv4m" ~ ctrl_marginal_mean,
+      predictor == "Inv4m:-P" ~ ctrl_minus_p_mean,
+      TRUE ~ NA_real_
+    ),
+    Estimate_pct = (Estimate / reference_mean) * 100
+  ) %>%
+  select(
+    response, 
+    predictor, 
+    reference_mean,
+    Estimate, 
+    Estimate_pct,
+    p.value,
+    p.adjust,
+) %>%
+  arrange(predictor, response)
+
+
+
+cat("\n=== Significant Effects (FDR < 0.05) ===\n")
+print(significant)
+
+# Count by effect type
+cat("\n=== Summary by Effect Type ===\n")
+print(table(significant$predictor))
+```
+
+---
+
+## 3. Pairwise Treatment Comparisons
+
+### Prepare t-test results
+
+We focus on comparing phosphorus treatments (+P vs -P) within each genotype.
+This captures both main treatment effects and genotype × treatment interactions.
+
+```{r prepare_ttests}
+# Prepare long format data for t-tests
+to_t_test <- pheno %>%
+  select(plotId, Genotype, Treatment, all_of(vars)) %>%
+  pivot_longer(
+    cols = all_of(vars), 
+    names_to = "trait", 
+    values_to = "value"
+  ) %>%
+  filter(trait %in% significant$response)
+
+# Identify traits with treatment effects OR interactions
+treatment_and_interaction <- significant %>%
+  filter(predictor %in% c("-P", "Inv4m:-P")) %>%
+  pull(response) %>%
+  unique()
+
+cat("Traits with treatment effects or interactions:", 
+    length(treatment_and_interaction), "\n")
+cat(paste(treatment_and_interaction, collapse = ", "), "\n\n")
+
+# Perform pairwise t-tests: compare treatments within each genotype
+if (length(treatment_and_interaction) > 0) {
+  treatment_pairwise <- to_t_test %>%
+    filter(trait %in% treatment_and_interaction) %>%
+    group_by(Genotype, trait) %>%
+    t_test(value ~ Treatment, ref.group = "+P") %>%
+    add_significance() %>%
+    add_x_position(x = "Treatment") %>%
+    add_y_position(scales = "free") %>%
+    mutate(
+      Genotype_label = factor(
+        case_when(
+          Genotype == "CTRL" ~ "CTRL",
+          Genotype == "Inv4m" ~ "<i>Inv4m</i>",
+          TRUE ~ as.character(Genotype)
+        ),
+        levels = c("CTRL", "<i>Inv4m</i>")
+      )
+    )
+  
+  cat("Pairwise t-tests completed for", 
+      length(treatment_and_interaction), "traits\n")
+  
+  # Show summary
+  print(treatment_pairwise %>% 
+        select(trait, Genotype, statistic, p, p.signif) %>%
+        head(10))
+} else {
+  treatment_pairwise <- NULL
+  cat("No significant treatment or interaction effects found\n")
+}
+```
+
+---
+
+## 4. Phenotype Visualization
+
+### Create plotting function
+
+```{r plot_function}
+# Function to create treatment comparison plots
+plot_treatment_effect <- function(trait_name, 
+                                   trait_title, 
+                                   trait_ylab,
+                                   y_limits = NULL,
+                                   y_breaks = NULL,
+                                   bracket_nudge = 0.05) {  # Fraction of y-range (0-1)
+  
+  # Get t-test results for this trait
+  t_test_data <- NULL
+  if (!is.null(treatment_pairwise)) {
+    t_test_data <- treatment_pairwise %>%
+      filter(trait == trait_name)
+    
+    # Adjust bracket position RELATIVE to visible plotting area
+    # This solves the issue of brackets being in absolute units
+    # while coord_cartesian() shows only a portion of the range
+    if (!is.null(t_test_data) && nrow(t_test_data) > 0) {
+      if (!is.null(y_limits)) {
+        # Use specified y-axis limits
+        y_range <- diff(y_limits)
+        y_max <- y_limits[2]
+        
+        # Position brackets as: top - (nudge_fraction × visible_range)
+        t_test_data <- t_test_data %>%
+          mutate(y.position = y_max - (bracket_nudge * y_range))
+      } else {
+        # If no limits specified, use actual data range
+        data_range <- pheno %>%
+          filter(!is.na(.data[[trait_name]])) %>%
+          pull(.data[[trait_name]]) %>%
+          range()
+        
+        y_range <- diff(data_range)
+        y_max <- max(data_range)
+        
+        # Position brackets above data
+        t_test_data <- t_test_data %>%
+          mutate(y.position = y_max + (bracket_nudge * y_range))
+      }
+    }
+  }
+  
+  # Create base plot
+  p <- pheno %>%
+    ggplot(aes(x = Treatment, y = .data[[trait_name]], col = Treatment)) +
+    ggtitle(trait_title) +
+    ylab(trait_ylab) +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>% 
+      with_shadow(
+        colour = "black",
+        x_offset = 0,
+        y_offset = 0,
+        sigma = 1
+      ) +
+    geom_quasirandom(size = 2) %>% 
+      with_shadow(
+        colour = "black",
+        x_offset = 0,
+        y_offset = 0,
+        sigma = 1
+      ) +
+    scale_color_manual(values = pal) +
+    facet_wrap(. ~ Genotype_label) +
+    pheno_theme2 +
+    theme(strip.text = element_markdown())
+  
+  # Add significance brackets if available
+  if (!is.null(t_test_data) && nrow(t_test_data) > 0) {
+    p <- p + stat_pvalue_manual(
+      t_test_data,
+      size = 10,
+      bracket.size = 0.8,
+      hide.ns = FALSE
+    )
+  }
+  
+  # Add y-axis limits if specified
+  if (!is.null(y_limits)) {
+    p <- p + coord_cartesian(ylim = y_limits)
+  }
+  
+  # Add y-axis breaks if specified
+  if (!is.null(y_breaks)) {
+    p <- p + scale_y_continuous(breaks = y_breaks)
+  }
+  
+  return(p)
+}
+```
+
+
+### Days to Anthesis
+
+```{r plot_dta, fig.width=10, fig.height=6}
+if ("DTA" %in% treatment_and_interaction) {
+  dta_plot <- plot_treatment_effect(
+    trait_name = "DTA",
+    trait_title = "Anthesis",
+    trait_ylab = "Days",
+    y_limits = c(68, 80),
+    y_breaks = 68:80,
+    bracket_nudge = 0.08
+  )
+  print(dta_plot)
+}
+```
+
+
+### Days to Silking
+
+```{r plot_dts, fig.width=10, fig.height=6}
+if ("DTS" %in% treatment_and_interaction) {
+  dts_plot <- plot_treatment_effect(
+    trait_name = "DTS",
+    trait_title = "Silking",
+    trait_ylab = "Days",
+    y_limits = c(68, 80),
+    y_breaks = 68:80,
+    bracket_nudge = 0
+  )
+  print(dts_plot)
+}
+```
+
+### Plant Height
+```{r plot_ph, fig.width=10, fig.height=6}
+if ("PH" %in% treatment_and_interaction) {
+  ph_plot <- plot_treatment_effect(
+    trait_name = "PH",
+    trait_title = "Plant Height",
+    trait_ylab = "cm",
+    y_limits = c(140, 190),
+    y_breaks = seq(140, 190, by = 10),
+    bracket_nudge = 0.08
+  )
+  print(ph_plot)
+}
+```
+
+### Cob Diameter
+
+```{r plot_cd, fig.width=10, fig.height=6}
+if ("CD" %in% treatment_and_interaction) {
+  cd_plot <- plot_treatment_effect(
+    trait_name = "CD",
+    trait_title = "Cob Diameter",
+    trait_ylab = "cm",
+    y_limits = c(21, 31),
+    y_breaks = 21:31,
+    bracket_nudge = 0.08
+  )
+  print(cd_plot)
+}
+```
+
+### 50 Kernel Weight
+
+```{r plot_kw50, fig.width=10, fig.height=6}
+if ("KW50" %in% treatment_and_interaction) {
+  kw50_plot <- plot_treatment_effect(
+    trait_name = "KW50",
+    trait_title = "50 Kernel Weight",
+    trait_ylab = "g",
+    y_limits = c(5, 17),
+    y_breaks = 5:17,
+    bracket_nudge = 0.08
+  )
+  print(kw50_plot)
+}
+```
+
+
+### Stover Weight at 40 DAP
+
+```{r plot_stw40, fig.width=10, fig.height=6}
+if ("STW40" %in% treatment_and_interaction) {
+  stw40_plot <- plot_treatment_effect(
+    trait_name = "STW40",
+    trait_title = "Stover Weight <br> at 40 DAP",
+    trait_ylab = "g",
+    bracket_nudge = 0.08
+  )
+  print(stw40_plot)
+}
+```
+
+### Stover Weight at 50 DAP
+
+```{r plot_stw50, fig.width=10, fig.height=6}
+if ("STW50" %in% treatment_and_interaction) {
+  stw50_plot <- plot_treatment_effect(
+    trait_name = "STW50",
+    trait_title = "Stover Weight <br> at 50 DAP",
+    trait_ylab = "g",
+    bracket_nudge = 0.08
+  )
+  print(stw50_plot)
+}
+```
+
+### Stover Weight at 60 DAP
+
+```{r plot_stw60, fig.width=10, fig.height=6}
+if ("STW60" %in% treatment_and_interaction) {
+  stw60_plot <- plot_treatment_effect(
+    trait_name = "STW60",
+    trait_title = "Stover Weight <br> at 60 DAP",
+    trait_ylab = "g",
+    bracket_nudge = 0.08
+  )
+  print(stw60_plot)
+}
+```
+
+
+### Stover Weight at Harvest
+
+```{r plot_stwhv, fig.width=10, fig.height=6}
+if ("STWHV" %in% treatment_and_interaction) {
+  stwhv_plot <- plot_treatment_effect(
+    trait_name = "STWHV",
+    trait_title = "Stover Dry Weight <br> at Harvest",
+    trait_ylab = "g",
+    y_limits = c(50, 175),
+    bracket_nudge = 0.08
+  )
+  print(stwhv_plot)
+}
+```
+
+---
+
+## 5. Stover Dry Weight Time Course
+
+### Prepare time-series data
+
+```{r prepare_timeseries}
+# Create long-format data with all time points
+dw_raw <- pheno %>%
+  mutate(STW121 = STWHV) %>%
+  select(
+    plotId, 
+    Genotype, 
+    Genotype_label,
+    Treatment, 
+    starts_with("STW")
+  ) %>%
+  pivot_longer(
+    cols = c("STW40", "STW50", "STW60", "STW121"),
+    names_to = "DAP_string",
+    values_to = "STW"
+  ) %>%
+  mutate(
+    DAP = as.integer(gsub("STW", "", DAP_string)),
+    # Ensure factor levels are maintained
+    Genotype = factor(Genotype, levels = c("CTRL", "Inv4m")),
+    Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))
+  ) %>%
+  filter(!is.na(STW)) %>%
+  droplevels()
+
+cat("Time-series data dimensions:", dim(dw_raw), "\n")
+cat("Time points:", sort(unique(dw_raw$DAP)), "\n")
+cat("Genotype_label levels:", levels(dw_raw$Genotype_label), "\n")
+```
+
+### Time-point specific t-tests
+
+```{r timeseries_ttests}
+# Perform t-tests at each time point within each genotype
+treatment_timeseries_test <- dw_raw %>%
+  ungroup() %>%
+  filter(DAP > 1) %>%
+  mutate(DAP = as.factor(DAP)) %>%
+  group_by(Genotype, DAP) %>%
+  t_test(STW ~ Treatment, ref.group = "+P") %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance() %>%
+  add_y_position(scales = "free_y") %>%
+  add_x_position(x = "DAP", group = NULL, dodge = 1) %>%
+  mutate(
+    Genotype_label = factor(
+      case_when(
+        Genotype == "CTRL" ~ "CTRL",
+        Genotype == "Inv4m" ~ "<i>Inv4m</i>",
+        TRUE ~ as.character(Genotype)
+      ),
+      levels = c("CTRL", "<i>Inv4m</i>")
+    )
+  )
+
+# Adjust bracket positions relative to data range (not absolute units)
+data_range <- range(dw_raw$STW[dw_raw$DAP > 1], na.rm = TRUE)
+y_range <- diff(data_range)
+
+treatment_timeseries_test <- treatment_timeseries_test %>%
+  mutate(y.position = y.position + 0.02 * y_range)  # 8% of data range
+
+cat("\n=== Time-series t-test summary ===\n")
+print(treatment_timeseries_test %>% 
+      select(Genotype, DAP, statistic, p, p.adj, p.adj.signif))
+```
+
+### Visualize stover weight trajectory
+
+```{r plot_timeseries, fig.width=12, fig.height=7}
+pd <- position_dodge(1)
+
+p_dw <- dw_raw %>%
+  ungroup() %>%
+  filter(DAP > 1) %>%
+  ggplot(aes(x = as.factor(DAP), y = STW, col = Treatment)) +
+  ggtitle("Stover Dry Weight") +
+  ylab("g") +
+  xlab("Days After Planting") +
+  geom_boxplot(
+    width = 0.25, 
+    linewidth = 1, 
+    alpha = 0, 
+    position = pd
+  ) %>% 
+    with_shadow(
+      colour = "black",
+      x_offset = 0,
+      y_offset = 0,
+      sigma = 1
+    ) +
+  geom_quasirandom(
+    size = 2, 
+    width = 0.25, 
+    dodge.width = 1
+  ) %>% 
+    with_shadow(
+      colour = "black",
+      x_offset = 0,
+      y_offset = 0,
+      sigma = 1
+    ) +
+  facet_wrap(. ~ Genotype_label) +
+  stat_pvalue_manual(
+    treatment_timeseries_test,
+    size = 10,
+    bracket.size = 0.8,
+    tip.length = 0.01,
+    hide.ns = TRUE
+  ) +
+  scale_color_manual(values = pal) +
+  scale_y_continuous(breaks = seq(0,150,25),
+                    expand = expansion(mult = c(0.05, 0.1))) +
+  pheno_theme3 +
+  theme(
+    legend.position = c(0.12, 0.7),
+    strip.text = element_markdown()
+  )
+
+print(p_dw)
+```
+
+```{r plot_dw_effects_time, fig.width=12, fig.height=7}
+# Extract Inv4m genotype effects for all stover weight traits with CIs
+# Extract both Inv4m genotype effects and -P treatment effects for stover weights
+stover_effects <- effects %>%
+  filter(
+    predictor %in% c("GenotypeInv4m", "Treatment-P"),
+    grepl("^STW", response)
+  ) %>%
+  # Calculate reference means
+  left_join(
+    effects %>%
+      filter(grepl("Intercept|Treatment-P|GenotypeInv4m", predictor)) %>%
+      select(response, predictor, Estimate) %>%
+      pivot_wider(names_from = predictor, values_from = Estimate) %>%
+      rename(
+        intercept = `(Intercept)`,
+        treatment_effect = `Treatment-P`,
+        genotype_effect = GenotypeInv4m
+      ) %>%
+      mutate(
+        # +P marginal mean for treatment effects
+        plus_p_marginal_mean = intercept + (genotype_effect / 2),
+        # CTRL marginal mean for genotype effects
+        ctrl_marginal_mean = intercept + (treatment_effect / 2)
+      ) %>%
+      select(response, plus_p_marginal_mean, ctrl_marginal_mean),
+    by = "response"
+  ) %>%
+  mutate(
+    # Use appropriate denominator based on effect type
+    reference_mean = if_else(
+      predictor == "Treatment-P",
+      plus_p_marginal_mean,
+      ctrl_marginal_mean
+    ),
+    
+    # Calculate 95% CI
+    ci_lower = Estimate - 1.96 * Std.Error,
+    ci_upper = Estimate + 1.96 * Std.Error,
+    
+    # Calculate percentage and its CI
+    estimate_pct = (Estimate / reference_mean) * 100,
+    pct_ci_lower = (ci_lower / reference_mean) * 100,
+    pct_ci_upper = (ci_upper / reference_mean) * 100,
+    
+    # Extract time point
+    DAP = case_when(
+      response == "STW40" ~ "40",
+      response == "STW50" ~ "50",
+      response == "STW60" ~ "60",
+      response == "STWHV" ~ "121",
+      TRUE ~ NA_character_
+    ),
+    DAP = factor(DAP, levels = c("40", "50", "60", "121")),
+    
+    # Clean predictor names
+    effect_type = case_when(
+      predictor == "GenotypeInv4m" ~ "Inv4m",
+      predictor == "Treatment-P" ~ "-P",
+      TRUE ~ predictor
+    ),
+    effect_type = factor(effect_type, levels = c("Inv4m", "-P")),
+    
+    significant = p.adjust < 0.05
+  ) %>%
+  arrange(DAP, effect_type)
+
+# Fit regression for -P data
+minus_p_data <- stover_effects %>%
+  filter(effect_type == "-P") %>%
+  mutate(DAP_numeric = as.numeric(as.character(DAP)))
+
+lm_minus_p <- lm(estimate_pct ~ DAP_numeric, data = minus_p_data)
+r_squared_minus_p <- summary(lm_minus_p)$r.squared
+p_value_minus_p <- summary(lm_minus_p)$coefficients[2, 4]
+
+# Fit regression for Inv4m data
+inv4m_data <- stover_effects %>%
+  filter(effect_type == "Inv4m") %>%
+  mutate(DAP_numeric = as.numeric(as.character(DAP)))
+
+lm_inv4m <- lm(estimate_pct ~ DAP_numeric, data = inv4m_data)
+r_squared_inv4m <- summary(lm_inv4m)$r.squared
+p_value_inv4m <- summary(lm_inv4m)$coefficients[2, 4]
+
+# Create annotation text for both
+regression_label_minus_p <- sprintf(
+  "italic(R)^2 == %.3f~~italic(p) == %.3f",
+  r_squared_minus_p,
+  p_value_minus_p
+)
+
+regression_label_inv4m <- sprintf(
+  "italic(R)^2 == %.3f~~italic(p) == %.3f",
+  r_squared_inv4m,
+  p_value_inv4m
+)
+
+# Create plot comparing both effects
+p_biomass_comparison <- stover_effects %>%
+  mutate(DAP_numeric = as.numeric(as.character(DAP))) %>%
+  ggplot(aes(x = DAP_numeric, y = -estimate_pct, group = effect_type)) +
+  # Add regression line for -P
+  geom_smooth(
+    data = minus_p_data,
+    method = "lm",
+    se = FALSE,
+    linewidth = 1,
+    linetype = "dashed",
+    color = "black"
+  ) +
+  # Add regression line for Inv4m
+  geom_smooth(
+    data = inv4m_data,
+    method = "lm",
+    se = FALSE,
+    linewidth = 1,
+    linetype = "dotted",
+    color = "black"
+  ) +
+  geom_pointrange(
+    aes(ymin = -pct_ci_lower, ymax = -pct_ci_upper, 
+        shape = effect_type),
+    color = "black",
+    size = 1,
+    linewidth = 1,
+    fatten = 5,
+    position = position_dodge(width = 3)
+  ) +
+  # Add R² and p-value annotation for -P
+  annotate(
+    "text",
+    x = 80,
+    y = 45,
+    label = regression_label_minus_p,
+    parse = TRUE,
+    size = 6,
+    hjust = 0
+  ) +
+  # Add R² and p-value annotation for Inv4m
+  annotate(
+    "text",
+    x = 80,
+    y = 5,
+    label = regression_label_inv4m,
+    parse = TRUE,
+    size = 6,
+    hjust = 0
+  ) +
+  scale_x_continuous(
+    breaks = c(40, 50, 60, 121),
+    labels = c("40", "50", "60", "121")
+  ) +
+  scale_shape_manual(
+    values = c(18, 16),
+    labels = c("<i>Inv4m</i>", "-P")
+  ) + 
+  guides(shape = guide_legend(reverse = TRUE)) +
+  labs(
+    title = "Relative Stover Biomass Reduction",
+    x = "Days After Planting",
+    y = "% reference mean",
+    shape = "Predictor"
+  ) +
+  theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(color = "black", size = 18),
+    legend.position = c(0.8, 0.8),
+    legend.text = element_markdown(size = 20)
+  )
+
+print(p_biomass_comparison)
+
+
+p_stw <- ggarrange(
+  p_dw,
+  p_biomass_comparison,
+  nrow = 1,
+  ncol = 2,
+  labels = c("E", "F"),
+  font.label = list(size = 30)
+)
+
+p_stw
+```
+---
+
+## 6. Combined Panels
+
+### Main phenotype panel
+
+```{r combined_panel, fig.width=15, fig.height=12}
+# Create list of key phenotype plots
+plot_list <- list()
+
+# Add plots if they exist
+if (exists("dta_plot")) plot_list$dta <- dta_plot
+if (exists("dts_plot")) plot_list$dts <- dts_plot
+if (exists("kw50_plot")) plot_list$kw50 <- kw50_plot
+if (exists("cd_plot")) plot_list$cd <- cd_plot
+
+# Create combined panel if we have plots
+if (length(plot_list) >= 4) {
+  # Select first 8 plots for main panel
+  main_plots <- plot_list[1:min(8, length(plot_list))]
+  
+  combined_plot <- ggarrange(
+    plotlist = main_plots,
+    ncol = 4,
+    nrow = 1,
+    labels = LETTERS[1:length(main_plots)],
+    font.label = list(size = 30)
+  )
+  
+  print(combined_plot)
+} else if (length(plot_list) > 0) {
+  # If fewer than 4 plots, arrange in rows
+  combined_plot <- ggarrange(
+    plotlist = plot_list,
+    ncol = 2,
+    nrow = ceiling(length(plot_list) / 2),
+    labels = LETTERS[1:length(plot_list)],
+    font.label = list(size = 30)
+  )
+  
+  print(combined_plot)
+}
+```
+
+### Combined figure with time series
+
+```{r combined_with_timeseries, fig.width=15, fig.height=15}
+# Create comprehensive figure including time series
+if (exists("combined_plot") && exists("p_stw")) {
+  full_figure <- ggarrange(
+    combined_plot,
+    p_stw,
+    ncol = 1,
+    nrow = 2,
+    # heights = c(1, 1.2),
+    labels = c("", "E"),
+    font.label = list(size = 30)
+  )
+  
+  print(full_figure)
+}
+```
+
+---
+
+## Session Info
+
+```{r session_info}
+sessionInfo()
+```

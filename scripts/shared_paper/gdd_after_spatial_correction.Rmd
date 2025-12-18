@@ -1,0 +1,121 @@
+---
+title: "Growing Degree Days Analysis for Maize Environments"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r load-libraries}
+library(tidyverse)
+library(lubridate)
+library(ggrepel)
+```
+
+
+## Define Environments
+
+```{r environment-setup}
+environments <- tibble(
+  environment = c("PSU2025", "CLY2025", "PSU2022"),
+  planting_date = mdy(c("5/20/2025", "4/04/2025", "5/26/2022")),
+  # temp_file = c(
+  #   "~/Desktop/POWER_PSU2025.csv",
+  #   "~/Desktop/POWER_CLY2025.csv",
+  #   "~/Desktop/POWER_PSU2022.csv"
+  # ),
+  pheno_file = c(
+    "PSU2025_spatially_corrected_phenotypes.csv",
+    "CLY2025_spatially_corrected_phenotypes.csv",
+    "PSU2022_spatially_corrected_phenotypes.csv"
+  )
+)
+```
+
+## Load Phenotype Data
+
+```{r load-phenotypes}
+phenotypes <- map2_dfr(
+  environments$pheno_file,
+  environments$environment,
+  function(file, env) {
+    df <- read_csv(file, show_col_types = FALSE) %>%
+      mutate(environment = env)
+    
+    if (env == "PSU2022" && !"donor" %in% names(df)) {
+      df <- df %>% mutate(donor = "MI21")
+    }
+    
+    return(df)
+  }
+) %>%
+  inner_join(
+    environments %>% select(environment, planting_date),
+    by = "environment"
+  ) %>%
+  filter(donor == "MI21")
+```
+
+
+## Summary Statistics
+
+```{r summary-stats}
+pheno_with_gdd <- phenotypes
+gdd_summary <- pheno_with_gdd %>%
+  group_by(environment, donor) %>%
+  summarise(
+    mean_dta = mean(DTA, na.rm = TRUE),
+    mean_gdda = mean(GDDA, na.rm = TRUE),
+    sd_gdda = sd(GDDA, na.rm = TRUE),
+    mean_dts = mean(DTS, na.rm = TRUE),
+    mean_gdds = mean(GDDS, na.rm = TRUE),
+    sd_gdds = sd(GDDS, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+print(gdd_summary)
+```
+
+## Visualizations
+
+```{r plot-gdd-vs-dta}
+ggplot(pheno_with_gdd, aes(x = DTA, y = GDDA,group =environment, col = environment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  xlim(70,80)+
+  labs(
+    title = "GDD to Anthesis vs Days to Anthesis",
+    x = "Days to Anthesis",
+    y = "GDDA (°C)",
+    color = "Donor"
+  ) +
+  theme_minimal()
+```
+
+
+```{r plot-gdd-vs-dts}
+ggplot(pheno_with_gdd, aes(x = DTS, y = GDDS,group =environment, col = environment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  xlim(70,80)+
+  labs(
+    title = "GDD to Silking vs Days to Anthesis",
+    x = "Days to Silking",
+    y = "GDDS (°C)",
+    color = "Donor"
+  ) +
+  theme_minimal()
+```
+
+
+
+## Export Results
+
+```{r export-data}
+pheno_with_gdd %>%
+  select(environment, plotId, GDDA, GDDS) %>%
+  write_csv("Inv4m_GDD.csv")
+write_csv(gdd_summary, "gdd_summary_statistics.csv")
+```

@@ -1,0 +1,478 @@
+---
+title: "KEGG Pathway Enrichment Analysis of DEGs"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+This analysis performs KEGG pathway enrichment on differentially expressed genes 
+(DEGs) identified across three experimental predictors:
+
+- **Leaf**: Leaf development/senescence (FC threshold: ±0.7)
+- **-P**: Phosphorus deficiency (FC threshold: ±2)
+- **inv4m**: Inversion 4m genotype (FC threshold: ±2)
+
+KEGG enrichment identifies metabolic and signaling pathways that are 
+over-represented among DEGs in each condition and regulation direction.
+
+# Libraries
+
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(clusterProfiler)
+library(tidyr)
+library(forcats)
+```
+
+# Data Import and Processing
+
+## Load Gene ID Mapping
+
+```{r load_id_mapping}
+# Load gene ID cross-reference for KEGG analysis
+id_map <- read.csv(
+  "/Users/fvrodriguez/Desktop/Gene_xRef.csv",
+  header = FALSE
+)
+
+colnames(id_map) <- c("gene", "v5")
+
+cat("Loaded", nrow(id_map), "gene ID mappings\n")
+```
+
+## Load and Process DEG Data
+
+```{r load_degs}
+# Define predictor order for consistent plotting
+effect_order <- c("Leaf", "-P","Leaf:-P","Inv4m", "Inv4m:Leaf")
+
+# Load differential expression results and apply predictor-specific thresholds
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv") 
+```
+
+## DEG Summary Statistics
+
+```{r deg_summary}
+# Summary table of regulation status by predictor
+deg_table <- with(effects_df, table(predictor, regulation))
+print(deg_table)
+```
+
+## Prepare DEG Gene Lists
+
+```{r prepare_deg_lists}
+# Create named list of DEG sets for enrichment analysis
+# Gene IDs are in numeric format for KEGG
+redundant_DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+  list(
+    Leaf.Down = gene[predictor == "Leaf" & regulation == "Downregulated"],
+    Leaf.Up = gene[predictor == "Leaf" & regulation == "Upregulated"],
+    `-P.Down` = gene[predictor == "-P" & regulation == "Downregulated"],
+    `-P.Up` = gene[predictor == "-P" & regulation == "Upregulated"],
+    `Leaf:-P.Down` = gene[predictor == "Leaf:-P" & regulation == "Downregulated"],
+       `Leaf:-P.Up` = gene[predictor == "Leaf:-P" & regulation == "Upregulated"],
+    Inv4m.Down = gene[predictor == "Inv4m" & regulation == "Downregulated"],
+    Inv4m.Up = gene[predictor == "Inv4m" & regulation == "Upregulated"]
+  )
+})
+
+DEGs <- lapply(redundant_DEGs, unique)
+n_genes <- lapply(DEGs, length) %>% unlist()
+
+# Display gene counts per category
+n_genes <- lapply(DEGs, length) %>% unlist()
+print(n_genes)
+```
+
+# KEGG Pathway Enrichment Analysis
+## Filter and validate genes with NCBI IDs
+```{r,filter_KEGG}
+# Filter and validate genes with NCBI IDs
+filter_valid_kegg_genes <- function(gene_list, id_mapping) {
+  # gene_list contains Zm IDs, need to convert to NCBI IDs
+  ncbi_ids <- id_mapping %>%
+    filter(v5 %in% gene_list) %>%
+    pull(gene) %>%
+    unique() %>%
+    na.omit()
+  
+  as.character(ncbi_ids)
+}
+
+# Apply to all DEG lists
+DEGs_kegg <- lapply(DEGs, filter_valid_kegg_genes, id_mapping = id_map)
+
+# Check conversion success
+n_genes_original <- sapply(DEGs, length)
+n_genes_kegg <- sapply(DEGs_kegg, length)
+
+conversion_summary <- data.frame(
+  DEG_set = names(DEGs),
+  original = n_genes_original,
+  with_ncbi = n_genes_kegg,
+  pct_converted = round(100 * n_genes_kegg / n_genes_original, 1)
+)
+print(conversion_summary)
+
+```
+
+## Run KEGG Enrichment
+
+KEGG enrichment is performed separately for each DEG list using the 
+`enrichKEGG` function with organism code 'zma' (Zea mays).
+
+```{r run_kegg_enrichment}
+# Perform KEGG enrichment for each DEG set
+compKEGG <- lapply(DEGs_kegg, FUN = function(x) {
+  enrichKEGG(
+    gene = x,
+    organism = 'zma',
+    pvalueCutoff = 0.05
+  )
+})
+
+# Extract and combine results from all enrichment tests
+cluster_result <- lapply(names(compKEGG), FUN = function(x) {
+  result <- compKEGG[[x]]@result
+  result %>%
+    filter(p.adjust < 0.05) %>%
+    mutate(Cluster = x) %>%
+    select(Cluster, everything())
+}) %>%
+  bind_rows()
+
+cat("\nTotal enriched pathways:", nrow(cluster_result), "\n")
+```
+
+## Enrichment Results Summary
+
+```{r enrichment_summary}
+# Count enriched pathways per cluster
+enrichment_summary <- cluster_result %>%
+  group_by(Cluster) %>%
+  summarise(
+    n_pathways = n(),
+    mean_count = mean(Count),
+    min_pvalue = min(p.adjust)
+  )
+
+print(enrichment_summary)
+```
+
+# Visualization Preparation
+
+## Select Top Pathways
+
+Select the top 20 most significant pathways per cluster for visualization.
+
+```{r select_top_pathways}
+cluster_order <- names(DEGs)
+
+# Select top 20 pathways per cluster by adjusted p-value
+sorted_by_p <- cluster_result %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  droplevels() %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  slice(1:7) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+top_terms <- levels(sorted_by_p$Description)
+
+cat("Selected", length(top_terms), "unique pathways for visualization\n")
+```
+
+## Prepare Plot Data
+
+```{r prepare_plot_data}
+# Prepare data for plotting with proper factor ordering
+to_plot <- cluster_result %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  filter(Description %in% top_terms) %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  mutate(Description = factor(Description, levels = top_terms)) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+# Format cluster labels with gene counts
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n", "(", n_genes, ")"
+) %>% 
+  gsub("Leaf:-P.Down","Negative\nLeaf × -P",.) %>%
+  gsub("Leaf:-P.Up","Positive\nLeaf × -P",.)
+names(labels) <- names(n_genes)
+```
+
+## Prepare Gene Symbol Annotations
+
+Extract gene symbols for the most significant gene in each pathway (by 
+Mahalanobis distance).
+
+```{r prepare_annotations}
+# Prepare gene-level data
+effects_gene_label <- effects_df %>%
+  dplyr::rename(v5 = gene) %>%  # Rename Zm IDs to v5 for join
+  left_join(id_map, by = "v5") %>%  # Get NCBI IDs
+  mutate(Cluster = case_when(
+    regulation == "Upregulated" ~ paste(predictor, "Up", sep = "."),
+    regulation == "Downregulated" ~ paste(predictor, "Down", sep = ".")
+  )) %>%
+  select(
+    Cluster, v5, gene, locus_label, locus_symbol, 
+    locus_name, logFC, P = adj.P.Val, mahalanobis
+  )  %>%
+  filter(!is.na(locus_label) & !is.na(locus_symbol) & !is.na(Cluster)) %>%
+  mutate(neglogPG = -log10(P))
+
+# Verify join success
+cat("Genes with NCBI IDs:", sum(!is.na(effects_gene_label$gene)), 
+    "out of", nrow(effects_gene_label), "\n")
+
+cluster_order <-cluster_order[!grepl("Inv4m",cluster_order)]
+to_plot <- to_plot %>%
+  filter(!grepl(Cluster,"Inv4m")) %>%
+  droplevels() %>%
+  mutate(Cluster=factor(Cluster,levels=cluster_order))
+
+# Join pathways with gene symbols
+term2gene_label <- to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  mutate(gene = as.integer(gene)) %>%
+  inner_join(effects_gene_label, by = c("Cluster", "gene")) %>%
+  select(
+    Cluster, gene,locus_label,locus_symbol, ID, Description,
+    p.adjust, Count, mahalanobis, logFC, P, neglogPG
+  ) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, -mahalanobis) %>%
+  slice(1)
+
+is_diox <-term2gene_label$gene=="100272845"
+term2gene_label$locus_label[is_diox] <-"fba2"
+
+cat("Annotated", nrow(term2symbol), "pathway-cluster combinations\n")
+```
+
+# Full Plot: All Three Predictors
+
+```{r plot_all_predictors, fig.width=12, fig.height=8}
+# Create base plot with KEGG enrichment results
+bg <- to_plot %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("KEGG Pathway Annotation of DEGs") +
+  scale_fill_continuous(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(limits = rev(levels(to_plot$Description))) +
+  scale_x_discrete(labels = labels, drop = FALSE) +
+  geom_point(shape = 21) +
+  scale_size(range = c(2, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 12) +
+  theme(
+   # legend.position = c(0.87, 0.6),
+  # legend.box = "horizontal",
+    axis.text.x = element_text(vjust = 0.5)
+  )
+
+# Add gene symbol annotations
+annotation_plot <- bg +
+  geom_text(
+    data = term2gene_label,
+    position = position_nudge(0.1),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    mapping = aes(x = Cluster, y = Description, label = locus_label),
+    inherit.aes = FALSE
+  )
+
+ggsave(
+  filename = "~/Desktop/HC_DEG_KEGG_annotation.svg",
+  plot = annotation_plot,
+  height = 7,
+  width = 12,
+  units = "in",
+  dpi = 150
+)
+
+print(annotation_plot)
+```
+
+# Focused Analysis: Leaf and -P Only
+
+Since inv4m shows limited pathway enrichment, we create a focused visualization
+excluding inv4m to better display enrichment patterns in Leaf and -P conditions.
+
+## Prepare Data Excluding inv4m
+
+```{r prepare_leaf_p_data}
+# Filter DEG lists to exclude inv4m
+DEGs_leaf_p <- DEGs[!grepl("inv4m", names(DEGs))]
+
+# Get gene counts for Leaf and -P only
+n_genes_leaf_p <- lapply(DEGs_leaf_p, length) %>% unlist()
+print(n_genes_leaf_p)
+
+# Filter cluster order
+cluster_order_leaf_p <- cluster_order[!grepl("inv4m", cluster_order)]
+
+# Filter plotting data to exclude inv4m
+to_plot_leaf_p <- to_plot %>%
+  filter(!grepl("inv4m", Cluster)) %>%
+  mutate(Cluster = factor(
+    Cluster,
+    levels = cluster_order_leaf_p
+  )) %>%
+  droplevels()
+
+# Filter gene symbol annotations
+term2symbol_leaf_p <- term2symbol %>%
+  filter(!grepl("inv4m", Cluster)) %>%
+  mutate(Cluster = factor(
+    Cluster,
+    levels = cluster_order_leaf_p
+  )) %>%
+  droplevels()
+
+# Verify filtering
+cat("\nClusters in Leaf/-P plot:\n")
+print(levels(to_plot_leaf_p$Cluster))
+cat("\nPathways in Leaf/-P plot:", 
+    length(unique(to_plot_leaf_p$Description)), "\n")
+```
+
+## Create Plot for Leaf and -P Only
+
+```{r plot_leaf_p_only, fig.width=10, fig.height=5}
+# Create cluster labels for Leaf and -P
+labels_leaf_p <- paste0(
+  gsub(".", " ", cluster_order_leaf_p, fixed = TRUE),
+  "\n", "(", n_genes_leaf_p, ")"
+)
+names(labels_leaf_p) <- names(n_genes_leaf_p)
+
+# Create base plot for Leaf and -P
+bg_leaf_p <- to_plot_leaf_p %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("KEGG Pathway Annotation") +
+  scale_fill_continuous(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(limits = rev(levels(to_plot_leaf_p$Description))) +
+  scale_x_discrete(labels = labels_leaf_p, drop = FALSE) +
+  geom_point(shape = 21) +
+  scale_size(range = c(2, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 12) +
+  theme(
+    legend.position = c(0.15, 0.3),
+    legend.box = "horizontal",
+    axis.text.x = element_text(vjust = 0.5)
+  )
+
+# Add gene symbol annotations
+annotation_plot_leaf_p <- bg_leaf_p +
+  geom_text(
+    data = term2symbol_leaf_p,
+    position = position_nudge(0.1),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    mapping = aes(x = Cluster, y = Description, label = SYMBOL),
+    inherit.aes = FALSE
+  )
+
+print(annotation_plot_leaf_p)
+```
+
+# Export Plots
+
+```{r export_plots, eval=FALSE}
+# Save full plot as RDS (for combining with GO plot)
+saveRDS(
+  annotation_plot_leaf_p,
+  file = "~/Desktop/FC_kegg_plot.RDS"
+)
+
+# Save full plot as image
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/FC_kegg_plot_all.svg",
+  height = 6.75,
+  width = 12
+)
+
+# Save Leaf/-P only plot
+ggsave(
+  annotation_plot_leaf_p,
+  file = "~/Desktop/FC_kegg_plot_leaf_P.svg",
+  height = 6.75,
+  width = 10
+)
+```
+
+# Pathway Details
+
+## Examine Specific Pathways
+
+Example: Examining genes in a specific pathway of interest.
+
+```{r examine_pathway, eval=FALSE}
+# Example: Extract genes from a specific pathway
+# Replace "zma00196" with pathway ID of interest
+pathway_genes <- to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(geneID = "gene") %>%
+  mutate(gene = as.integer(gene)) %>%
+  inner_join(effects_symbol) %>%
+  select(
+    Cluster, v5, gene, SYMBOL, ID, Description,
+    p.adjust, Count, mahalanobis, logFC, P, neglogPG
+  ) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, -mahalanobis) %>%
+  filter(ID == "zma00196")
+
+print(pathway_genes)
+```
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```

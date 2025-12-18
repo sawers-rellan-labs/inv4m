@@ -1,0 +1,805 @@
+---
+title: "GO Enrichment Analysis: Inv4m Trans Co-expression Network"
+author: "Fausto Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+**Purpose**: Perform Gene Ontology enrichment analysis on the validated 
+trans-regulatory network to identify biological processes associated with genes 
+in different genomic regions.
+
+**Approach**:
+1. Load trans network gene sets from MaizeNetome analysis (high-confidence DEGs: FDR < 0.05, |log2FC| > 1.5)
+2. Define background (all analyzed genes)
+3. Perform GO enrichment separately for complete, flanking, and Inv4m networks
+4. Compare enrichment across network subsets
+5. Validate with Top DEGs subset (|log2FC| > 2)
+
+**Expected outcomes**:
+- Identification of enriched biological processes in trans-regulated genes
+- Comparison of functional categories across network regions
+- Visualization of GO terms with representative gene examples
+
+---
+
+# Setup and Dependencies
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(clusterProfiler)
+library(forcats)
+library(DOSE)
+```
+
+---
+
+# Load Data
+
+## Trans Co-expression Network Gene Sets
+
+**Purpose**: Load gene sets exported from trans-regulatory network analysis.
+
+```{r load_network_genes}
+# Load network gene sets
+trans_regulators <- read.csv("~/Desktop/trans_network_regulators.csv")
+trans_targets <- read.csv("~/Desktop/trans_network_targets.csv")
+trans_network_all <- read.csv("~/Desktop/trans_network_all_genes.csv")
+trans_edges <- read.csv("~/Desktop/trans_network_edges_annotated.csv")
+
+cat("Network composition:\n")
+cat("  Regulators:", nrow(trans_regulators), "\n")
+cat("  Targets:", nrow(trans_targets), "\n")
+cat("  Total genes:", nrow(trans_network_all), "\n")
+cat("  Edges:", nrow(trans_edges), "\n")
+```
+
+## Load Effects Table for Background
+
+**Purpose**: Define universe of analyzed genes as background for enrichment.
+
+```{r load_effects}
+effects_df <- read.csv(
+  "~/Desktop/predictor_effects_leaf_interaction_model.csv"
+) %>%
+  filter(predictor == "Inv4m") %>%
+  group_by(gene) %>%
+  arrange(adj.P.Val) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+# Background: all genes analyzed for Inv4m effect
+background <- effects_df %>%
+  pull(gene) %>%
+  sort() %>%
+  unique()
+
+cat("Background genes:", length(background), "\n")
+cat("DEGs:", sum(effects_df$is_DEG), "\n")
+cat("High confidence DEGs:", sum(effects_df$is_hiconf_DEG), "\n")
+```
+
+## Load GO Annotation
+
+**Purpose**: Load maize B73 NAM5 GO annotations from GOMAP.
+
+```{r load_go_annotation}
+TERM2NAME <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2NAME.rds"
+)
+
+TERM2GENE <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
+)
+
+cat("GO annotation loaded:\n")
+cat("  Biological Process terms:", 
+    length(unique(TERM2NAME$BP$go_id)), "\n")
+cat("  Gene-term associations:", nrow(TERM2GENE), "\n")
+```
+
+---
+
+# Define Gene Sets for Enrichment
+
+## Network-based Gene Sets
+
+**Purpose**: Create gene lists for complete, flanking, and Inv4m networks.
+
+```{r define_gene_sets}
+# Check what columns we have
+cat("Columns in trans_network_all:\n")
+print(colnames(trans_network_all))
+
+# trans_network_all already has logFC, so use it directly
+# Define gene sets by network region AND direction of regulation
+network_gene_sets <- list(
+  `flank.Up` = trans_network_all %>%
+    filter(
+      !is.na(logFC),
+      logFC > 0,
+      region == "flanking" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "flanking"])
+    ) %>%
+    pull(gene),
+  
+  `flank.Down` = trans_network_all %>%
+    filter(
+      !is.na(logFC),
+      logFC < 0,
+      region == "flanking" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "flanking"])
+    ) %>%
+    pull(gene),
+  
+  `Inv4m.Up` = trans_network_all %>%
+    filter(
+      !is.na(logFC),
+      logFC > 0,
+      region == "inv4m" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "inv4m"])
+    ) %>%
+    pull(gene),
+  
+  `Inv4m.Down` = trans_network_all %>%
+    filter(
+      !is.na(logFC),
+      logFC < 0,
+      region == "inv4m" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "inv4m"])
+    ) %>%
+    pull(gene)
+)
+
+n_genes <- sapply(network_gene_sets, length)
+
+cat("Gene set sizes by region and direction:\n")
+print(n_genes)
+
+# Summary statistics
+cat("\nSummary:\n")
+cat("  Flanking total:", 
+    n_genes["flank.Up"] + n_genes["flank.Down"], "\n")
+cat("    Upregulated:", n_genes["flank.Up"], "\n")
+cat("    Downregulated:", n_genes["flank.Down"], "\n")
+cat("  Inv4m total:", 
+    n_genes["Inv4m.Up"] + n_genes["Inv4m.Down"], "\n")
+cat("    Upregulated:", n_genes["Inv4m.Up"], "\n")
+cat("    Downregulated:", n_genes["Inv4m.Down"], "\n")
+```
+
+
+---
+
+# GO Enrichment Analysis
+
+## Define Enrichment Function
+
+**Purpose**: Wrapper for clusterProfiler enrichment with consistent parameters.
+
+```{r enrichment_function}
+#' Perform GO enrichment analysis
+#'
+#' Wrapper around clusterProfiler::enricher with standardized parameters
+#' for maize GO annotation.
+#'
+#' @param x Character vector of gene IDs
+#' @param ontology GO ontology: "BP", "MF", or "CC"
+#' @param universe Character vector of background genes
+#'
+#' @return enrichResult object from clusterProfiler
+ego <- function(x, ontology = "BP", universe = NULL) {
+  n_genes <- length(x)
+  cat("Calculating enrichment for:", n_genes, "genes\n")
+  
+  enricher(
+    gene = x,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "none",
+    universe = universe,
+    minGSSize = 10,
+    maxGSSize = 500,
+    qvalueCutoff = 0.2,
+    TERM2GENE = TERM2GENE[TERM2GENE$GO %in% TERM2NAME[[ontology]]$go_id, ],
+    TERM2NAME = TERM2NAME[[ontology]]
+  )
+}
+```
+
+## Compare Networks: Biological Process
+
+**Purpose**: Identify enriched GO Biological Process terms across network 
+subsets.
+
+```{r compare_networks_bp}
+compGO_BP <- compareCluster(
+  geneCluster = network_gene_sets,
+  fun = function(x) {
+    ego(x, ontology = "BP", universe = background)
+  }
+)
+
+cat("\nEnrichment results by network:\n")
+print(table(compGO_BP@compareClusterResult$Cluster))
+```
+
+---
+
+# Filter and Process Results
+
+## Remove Redundant and Low-Count Terms
+
+**Purpose**: Filter GO results to reduce semantic redundancy and focus on 
+well-supported terms.
+
+```{r filter_results}
+slim_comp <- compGO_BP
+
+# Filter criteria:
+# - Count > 1: Require multiple genes per term
+# - Remove specific artifacts (PCNA2 DNA methylation annotations)
+# - Keep one term per gene set to reduce redundancy
+slim_comp@compareClusterResult <- compGO_BP@compareClusterResult %>%
+  filter(Count > 1) %>%
+  filter(!ID %in% c("GO:0006305", "GO:0006306", "GO:0006304")) %>%
+  group_by(Cluster, geneID) %>%
+  arrange(p.adjust, .by_group = TRUE) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("Filtered results:\n")
+print(table(slim_comp@compareClusterResult$Cluster))
+```
+
+## Identify Terms with Known Genes
+
+**Purpose**: Focus on GO terms that include genes with characterized symbols.
+
+```{r identify_known_genes}
+# Get effects with gene symbols
+effects_symbol <- effects_df %>%
+  filter(is_DEG) %>%
+  select(gene, SYMBOL = locus_symbol, locus_name, logFC, 
+         adj.P.Val, mahalanobis) %>%
+  filter(!is.na(SYMBOL) & !is.na(locus_name)) %>%
+  mutate(neglogP = -log10(adj.P.Val))
+
+# Find terms with at least one known gene
+with_known_gene <- slim_comp@compareClusterResult %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  inner_join(
+    effects_symbol %>% select(gene, SYMBOL, locus_name),
+    relationship = "many-to-many"
+  ) %>%
+  pull(ID) %>%
+  sort() %>%
+  unique()
+
+cat("GO terms with known genes:", length(with_known_gene), "\n")
+```
+
+---
+
+# Visualize Enrichment Results
+
+## Dotplot: All Networks
+
+**Purpose**: Overview of enriched GO terms across network subsets.
+
+```{r dotplot_all, fig.height=10, fig.width=12}
+cluster_order <- names(network_gene_sets)
+levels(slim_comp@compareClusterResult$Cluster) <- cluster_order
+
+dotplot(slim_comp, size = "Count", showCategory = 10) +
+  ggtitle("GO Biological Process Annotation\nInv4m Trans Co-expression Network") +
+  scale_size(range = c(4, 8), breaks = 1:4) +
+  scale_x_discrete(drop = FALSE) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## Prepare Data for Detailed Plot
+
+**Purpose**: Select top terms per cluster and prepare for visualization with 
+gene symbols.
+
+```{r prepare_plot_data}
+# Sort by p-value within each cluster
+sorted_by_p <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(
+    neglogP = -log10(p.adjust),
+    Cluster = factor(Cluster, levels = cluster_order)
+  ) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  dplyr::slice(1:10) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = forcats::fct_reorder(Description, label_order))
+
+top_terms <- levels(sorted_by_p$Description)
+
+# Prepare full plot data
+to_plot <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  filter(Description %in% top_terms) %>%
+  mutate(
+    neglogP = -log10(p.adjust),
+    Description = factor(Description, levels = top_terms)
+  ) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  mutate(
+    label_order = 1:n(),
+    Description = forcats::fct_reorder(Description, label_order)
+  )
+
+# Select representative gene per term (highest Mahalanobis distance)
+term2symbol <- to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  inner_join(effects_symbol, relationship = "many-to-many") %>%
+  select(Cluster, gene, SYMBOL, ID, Description, p.adjust, 
+         Count, logFC, adj.P.Val, neglogP) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, adj.P.Val) %>%
+  dplyr::slice(1)
+```
+
+## Bubble Plot with Gene Annotations
+
+**Purpose**: Detailed visualization showing enriched GO terms with representative 
+gene symbols.
+
+```{r bubble_plot_annotated, fig.height=8, fig.width=12}
+# Create labels with gene counts
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n(", n_genes, ")"
+)
+names(labels) <- names(n_genes)
+
+# Base bubble plot
+bg <- to_plot %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("GO Biological Process Annotation\nInv4m Trans Co-expression Network DEGs") +
+  scale_fill_gradient(
+    low = "dodgerblue", 
+    high = "tomato", 
+    name = "-log10(FDR)",
+    limits = c(1, 4), 
+    breaks = 1:4
+  ) +
+  scale_y_discrete(
+    labels = scales::wrap_format(60),
+    limits = rev(levels(to_plot$Description))
+  ) +
+  scale_x_discrete(labels = labels, drop = FALSE) +
+  geom_point(shape = 21) +
+  scale_size(range = c(6, 9), breaks = 2:4) +
+  ylab(NULL) +
+  xlab(NULL) +
+  theme_dose(font.size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    legend.position = c(0.25, 0.3),
+    legend.box = "horizontal",
+    axis.text.x = element_text(vjust = 0.5)
+  )
+
+# Add gene symbol annotations
+annotation_plot <- bg +
+  geom_text(
+    data = term2symbol,
+    position = position_nudge(0.1),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    mapping = aes(x = Cluster, y = Description, label = SYMBOL),
+    inherit.aes = FALSE
+  )
+
+annotation_plot
+```
+
+---
+
+# Validation: Top DEGs Subset
+
+**Purpose**: Confirm enrichment patterns using only Top DEGs (|log2FC| > 2).
+
+## Define Top DEG Gene Sets
+
+```{r define_top_sets}
+# Add is_topDEG column for |log2FC| > 2
+effects_df <- effects_df %>%
+  mutate(is_topDEG = is_DEG & abs(logFC) > 2)
+
+cat("DEG categories:\n")
+cat("  High-confidence DEGs (is_hiconf_DEG):", sum(effects_df$is_hiconf_DEG), "\n")
+cat("  Top DEGs (is_topDEG, |log2FC| > 2):", sum(effects_df$is_topDEG), "\n")
+
+# Filter for Top DEGs (|log2FC| > 2)
+top_network_all <- trans_network_all %>%
+  inner_join(
+    effects_df %>% 
+      filter(is_topDEG) %>% 
+      select(gene),
+    by = "gene"
+  )
+
+# Top DEG gene sets - directional only
+top_gene_sets <- list(
+  `Flank.Up` = top_network_all %>%
+    filter(
+      logFC > 0,
+      region == "flanking" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "flanking"])
+    ) %>%
+    pull(gene),
+  
+  `Flank.Down` = top_network_all %>%
+    filter(
+      logFC < 0,
+      region == "flanking" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "flanking"])
+    ) %>%
+    pull(gene),
+  
+  `Inv4m.Up` = top_network_all %>%
+    filter(
+      logFC > 0,
+      region == "inv4m" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "inv4m"])
+    ) %>%
+    pull(gene),
+  
+  `Inv4m.Down` = top_network_all %>%
+    filter(
+      logFC < 0,
+      region == "inv4m" | 
+      (node_type == "target" & 
+       gene %in% trans_edges$to[trans_edges$regulator_region == "inv4m"])
+    ) %>%
+    pull(gene)
+)
+
+n_genes_top <- sapply(top_gene_sets, length)
+
+cat("\nTop DEG gene set sizes:\n")
+print(n_genes_top)
+
+# Summary statistics
+cat("\nSummary:\n")
+cat("  Flanking total:", 
+    n_genes_top["Flank.Up"] + n_genes_top["Flank.Down"], "\n")
+cat("    Upregulated:", n_genes_top["Flank.Up"], "\n")
+cat("    Downregulated:", n_genes_top["Flank.Down"], "\n")
+cat("  Inv4m total:", 
+    n_genes_top["Inv4m.Up"] + n_genes_top["Inv4m.Down"], "\n")
+cat("    Upregulated:", n_genes_top["Inv4m.Up"], "\n")
+cat("    Downregulated:", n_genes_top["Inv4m.Down"], "\n")
+```
+
+## Enrichment: Top DEGs
+
+```{r enrich_top}
+compGO_BP_top <- compareCluster(
+  geneCluster = top_gene_sets,
+  fun = function(x) {
+    ego(x, ontology = "BP", universe = background)
+  }
+)
+
+cat("\nTop DEG enrichment results:\n")
+print(table(compGO_BP_top@compareClusterResult$Cluster))
+```
+
+## Filter Top DEG Results
+
+```{r filter_top}
+slim_top <- compGO_BP_top
+
+# slim_top@compareClusterResult <- compGO_BP_top@compareClusterResult %>%
+#   filter(Count > 1) %>%
+#   filter(!ID %in% c("GO:0006305", "GO:0006306", "GO:0006304")) %>%
+#   group_by(Cluster, geneID) %>%
+#   arrange(p.adjust, .by_group = TRUE) %>%
+#   dplyr::slice(1) %>%
+#   ungroup()
+
+cat("Filtered Top DEG results:\n")
+print(table(slim_top@compareClusterResult$Cluster))
+```
+
+## Visualize Top DEG Enrichment
+
+# Identify Terms with Known Genes
+
+**Purpose**: Filter to GO terms that include genes with characterized symbols for annotation.
+```{r identify_known_genes}
+# Get effects with gene symbols for labeling
+effects_symbol <- effects_df %>%
+  filter(is_DEG) %>%
+  select(gene, SYMBOL = locus_symbol, locus_label, 
+         locus_name, logFC, adj.P.Val) %>%
+  filter(!is.na(SYMBOL) & !is.na(locus_name)) %>%
+  mutate(neglogP = -log10(adj.P.Val))
+
+# Find terms with at least one known gene
+with_known_gene <- slim_comp@compareClusterResult %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  inner_join(
+    effects_symbol %>% select(gene, SYMBOL, locus_name),
+    relationship = "many-to-many"
+  ) %>%
+  pull(ID) %>%
+  sort() %>%
+  unique()
+
+cat("GO terms with known genes:", length(with_known_gene), "\n")
+```
+
+---
+
+# Select Top Terms and Prepare Plot Data
+
+**Purpose**: Select top terms per cluster and identify representative genes for annotation.
+```{r prepare_annotated_plot_data}
+# Select top terms by p-value within each cluster
+sorted_by_p <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(
+    neglogP = -log10(p.adjust),
+    Cluster = factor(Cluster, levels = cluster_order)
+  ) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  dplyr::slice(1:10) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+top_terms <- levels(sorted_by_p$Description)
+
+# Prepare full plot data
+to_plot <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  filter(Description %in% top_terms) %>%
+  mutate(
+    neglogP = -log10(p.adjust),
+    Description = factor(Description, levels = top_terms)
+  ) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  mutate(
+    label_order = 1:n(),
+    Description = fct_reorder(Description, label_order)
+  )
+
+# Select representative gene per term (by smallest p-value)
+term2symbol <- to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  inner_join(effects_symbol, relationship = "many-to-many") %>%
+  select(Cluster, gene, SYMBOL, locus_label, ID, Description, 
+         p.adjust, Count, logFC, adj.P.Val, neglogP) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, adj.P.Val) %>%  # Use adj.P.Val for gene ranking
+  dplyr::slice(1) %>%
+  ungroup()
+
+# Use locus_label if available, otherwise SYMBOL
+term2symbol <- term2symbol %>%
+  mutate(gene_label = ifelse(!is.na(locus_label) & locus_label != "", 
+                             locus_label, SYMBOL))
+
+cat("\nTerms with gene labels:", nrow(term2symbol), "\n")
+```
+
+---
+
+# Annotated Bubble Plot
+
+**Purpose**: Visualization of enriched GO terms with representative gene symbols.
+```{r bubble_plot_with_genes, fig.height=10, fig.width=14}
+# Format cluster labels
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n(", n_genes, ")"
+)
+names(labels) <- names(n_genes)
+
+# Replace special characters for cleaner display
+labels <- gsub("Flank", "Flanking", labels)
+
+# Base bubble plot
+bg <- to_plot %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("GO Biological Process Annotation\nInv4m Trans Co-expression Network") +
+  scale_fill_gradient(
+    low = "dodgerblue", 
+    high = "tomato", 
+    name = "-log10(FDR)",
+    limits = c(1, max(to_plot$neglogP, na.rm = TRUE)),
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(
+    labels = scales::wrap_format(60),
+    limits = rev(levels(to_plot$Description))
+  ) +
+  scale_x_discrete(
+    labels = labels, 
+    drop = FALSE,
+    expand = expansion(add = c(0.5, 1))
+  ) +
+  geom_point(shape = 21) +
+  scale_size(range = c(4, 10), breaks = c(2, 4, 6, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 16) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    legend.position = "right",
+    axis.text.x = element_text(vjust = 0.5, angle = 0, hjust = 0.5)
+  )
+
+# Add gene symbol annotations
+annotation_plot <- bg +
+  geom_text(
+    data = term2symbol,
+    position = position_nudge(0.15),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    size = 5,
+    mapping = aes(x = Cluster, y = Description, label = gene_label),
+    inherit.aes = FALSE
+  )
+
+print(annotation_plot)
+```
+
+---
+
+# Export Annotated Plot
+```{r export_annotated_plot}
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/GO_trans_network_annotated.svg",
+  height = 10,
+  width = 14
+)
+
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/GO_trans_network_annotated.pdf",
+  height = 10,
+  width = 14
+)
+
+cat("Annotated GO plot exported\n")
+```
+
+---
+
+# Compare High-Confidence vs Top DEGs
+
+**Purpose**: Compare enrichment patterns between high-confidence network DEGs 
+(|log2FC| > 1.5) and Top DEGs (|log2FC| > 2).
+
+```{r compare_hiconf_vs_top}
+# Common terms
+hiconf_terms <- slim_comp@compareClusterResult$ID
+top_terms <- slim_top@compareClusterResult$ID
+
+common_terms <- intersect(hiconf_terms, top_terms)
+hiconf_only <- setdiff(hiconf_terms, top_terms)
+top_only <- setdiff(top_terms, hiconf_terms)
+
+cat("Enrichment comparison:\n")
+cat("  Terms in high-confidence DEGs:", length(hiconf_terms), "\n")
+cat("  Terms in Top DEGs:", length(top_terms), "\n")
+cat("  Common terms:", length(common_terms), "\n")
+cat("  High-confidence only:", length(hiconf_only), "\n")
+cat("  Top DEGs only:", length(top_only), "\n")
+
+if (length(common_terms) > 0) {
+  cat("\nCommon enriched terms:\n")
+  common_descriptions <- slim_comp@compareClusterResult %>%
+    filter(ID %in% common_terms) %>%
+    select(Description) %>%
+    distinct() %>%
+    pull(Description)
+  print(head(common_descriptions, 10))
+}
+```
+
+---
+
+# Export Results
+
+**Purpose**: Save enrichment results and visualizations.
+
+```{r export_results}
+# Save full enrichment results
+write.csv(
+  slim_comp@compareClusterResult,
+  file = "~/Desktop/GO_enrichment_trans_network_all.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  slim_top@compareClusterResult,
+  file = "~/Desktop/GO_enrichment_trans_network_topDEGs.csv",
+  row.names = FALSE
+)
+
+# Save detailed gene-term associations
+gene_term_associations <- to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  left_join(effects_symbol, relationship = "many-to-many") %>%
+  select(Cluster, gene, SYMBOL, locus_name, ID, Description, 
+         p.adjust, Count, logFC, adj.P.Val)
+
+write.csv(
+  gene_term_associations,
+  file = "~/Desktop/GO_gene_term_associations.csv",
+  row.names = FALSE
+)
+
+# Save visualization
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/Network_GO_annotation_plot.svg",
+  height = 8,
+  width = 12
+)
+
+cat("\nFiles exported:\n")
+cat("  ~/Desktop/GO_enrichment_trans_network_all.csv\n")
+cat("  ~/Desktop/GO_enrichment_trans_network_topDEGs.csv\n")
+cat("  ~/Desktop/GO_gene_term_associations.csv\n")
+cat("  ~/Desktop/Network_GO_annotation_plot.svg\n")
+```
+
+---
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```

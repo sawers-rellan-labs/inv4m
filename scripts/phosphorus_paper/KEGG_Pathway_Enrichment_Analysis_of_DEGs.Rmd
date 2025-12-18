@@ -1,0 +1,330 @@
+---
+title: "KEGG Pathway Enrichment Analysis of DEGs"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+KEGG pathway enrichment on differentially expressed genes across Leaf development and Phosphorus deficiency.
+
+**Predictors**:
+- **Leaf**: Leaf development/senescence (FC threshold: ±0.7)
+- **-P**: Phosphorus deficiency (FC threshold: ±2)
+- **Leaf:-P**: Interaction term
+
+# Libraries
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(clusterProfiler)
+library(tidyr)
+library(forcats)
+```
+
+# Data Import
+```{r load_data}
+# Load gene ID cross-reference
+id_map <- read.csv(
+  "/Users/fvrodriguez/Desktop/Gene_xRef.csv",
+  header = FALSE
+)
+colnames(id_map) <- c("gene", "v5")
+
+# Load differential expression results
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+cat("Loaded", nrow(id_map), "gene ID mappings\n")
+```
+
+# Prepare DEG Lists
+```{r prepare_deg_lists}
+# Extract gene lists
+redundant_DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+  list(
+    Leaf.Down = gene[predictor == "Leaf" & regulation == "Downregulated"],
+    Leaf.Up = gene[predictor == "Leaf" & regulation == "Upregulated"],
+    `-P.Down` = gene[predictor == "-P" & regulation == "Downregulated"],
+    `-P.Up` = gene[predictor == "-P" & regulation == "Upregulated"],
+    `Leaf:-P.Down` = gene[predictor == "Leaf:-P" & regulation == "Downregulated"],
+    `Leaf:-P.Up` = gene[predictor == "Leaf:-P" & regulation == "Upregulated"]
+  )
+})
+
+DEGs <- lapply(redundant_DEGs, unique)
+n_genes <- sapply(DEGs, length)
+
+print(n_genes)
+```
+
+# Convert to NCBI IDs
+```{r filter_kegg}
+#' Filter and convert gene IDs to NCBI format
+#'
+#' @param gene_list Character vector of Zm gene IDs
+#' @param id_mapping Data frame with v5 (Zm IDs) and gene (NCBI IDs)
+#' @return Character vector of NCBI IDs
+filter_valid_kegg_genes <- function(gene_list, id_mapping) {
+  ncbi_ids <- id_mapping %>%
+    filter(v5 %in% gene_list) %>%
+    pull(gene) %>%
+    unique() %>%
+    na.omit()
+  
+  as.character(ncbi_ids)
+}
+
+# Convert all DEG lists
+DEGs_kegg <- lapply(DEGs, filter_valid_kegg_genes, id_mapping = id_map)
+
+# Conversion summary
+conversion_summary <- data.frame(
+  DEG_set = names(DEGs),
+  original = sapply(DEGs, length),
+  with_ncbi = sapply(DEGs_kegg, length),
+  pct_converted = round(100 * sapply(DEGs_kegg, length) / sapply(DEGs, length), 1)
+)
+
+print(conversion_summary)
+```
+
+# KEGG Enrichment
+```{r run_kegg_enrichment}
+# Run enrichment for each DEG set
+compKEGG <- lapply(DEGs_kegg, function(x) {
+  if (length(x) < 5) return(NULL)
+  
+  enrichKEGG(
+    gene = x,
+    organism = "zma",
+    pvalueCutoff = 0.05,
+    keyType = "ncbi-geneid"
+  )
+})
+
+# Extract results
+cluster_result <- lapply(names(compKEGG), function(x) {
+  if (is.null(compKEGG[[x]])) return(NULL)
+  
+  result <- compKEGG[[x]]@result
+  if (nrow(result) == 0) return(NULL)
+  
+  result %>%
+    filter(p.adjust < 0.05) %>%
+    mutate(Cluster = x) %>%
+    select(Cluster, everything())
+}) %>%
+  bind_rows()
+
+cat("Total enriched pathways:", nrow(cluster_result), "\n")
+
+# Summary by cluster
+enrichment_summary <- cluster_result %>%
+  group_by(Cluster) %>%
+  summarise(
+    n_pathways = n(),
+    mean_count = mean(Count),
+    min_pvalue = min(p.adjust)
+  )
+
+print(enrichment_summary)
+```
+
+# Visualization
+```{r select_top_pathways}
+cluster_order <- names(DEGs)
+
+# Select top 7 pathways per cluster
+sorted_by_p <- cluster_result %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  droplevels() %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  slice(1:4) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+top_terms <- levels(sorted_by_p$Description)
+
+cat("Selected", length(top_terms), "pathways\n")
+```
+```{r prepare_plot_data}
+# Prepare plotting data
+to_plot <- cluster_result %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  filter(Description %in% top_terms) %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  mutate(Description = factor(Description, levels = top_terms)) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+```
+```{r prepare_annotations}
+# Prepare gene-level data
+effects_gene_label <- effects_df %>%
+  rename(v5 = gene) %>%
+  left_join(id_map, by = "v5") %>%
+  mutate(Cluster = case_when(
+    regulation == "Upregulated" ~ paste(predictor, "Up", sep = "."),
+    regulation == "Downregulated" ~ paste(predictor, "Down", sep = ".")
+  )) %>%
+  select(
+    Cluster, v5, gene, locus_label, locus_symbol,
+    locus_name, logFC, P = adj.P.Val, mahalanobis
+  ) %>%
+  filter(!is.na(locus_label) & !is.na(locus_symbol) & !is.na(Cluster)) %>%
+  mutate(neglogPG = -log10(P))
+
+cat("Genes with NCBI IDs:", sum(!is.na(effects_gene_label$gene)), "\n")
+
+# Filter to Leaf/-P only
+cluster_order <- cluster_order[!grepl("Inv4m", cluster_order)]
+
+to_plot <- to_plot %>%
+  filter(!grepl("Inv4m", Cluster)) %>%
+  droplevels() %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order))
+
+with_label <-to_plot %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = geneID) %>%
+  mutate(gene = as.integer(gene)) %>%
+  inner_join(effects_gene_label, by = c("Cluster", "gene"))
+
+# Map top gene per pathway
+term2gene_label <- with_label %>%
+  select(
+    Cluster, gene, locus_label, locus_symbol, ID, Description,
+    p.adjust, Count, mahalanobis, logFC, P, neglogPG
+  ) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, -mahalanobis) %>%
+  slice(1)
+
+# Manual fix for specific gene
+is_diox <- term2gene_label$gene == 100272845
+term2gene_label$locus_label[is_diox] <- "fba2"
+
+cat("Annotated", nrow(term2gene_label), "pathway-cluster combinations\n")
+```
+```{r create_plot, fig.width=12, fig.height=7}
+# Format labels
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n(", n_genes, ")"
+) %>%
+  gsub("Leaf:-P.Down", "Negative\nLeaf × -P", .) %>%
+  gsub("Leaf:-P.Up", "Positive\nLeaf × -P", .)
+
+names(labels) <- names(n_genes)
+
+# Create plot
+annotation_plot <- to_plot %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("KEGG Pathways") +
+  scale_fill_continuous(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(limits = rev(levels(to_plot$Description))) +
+  scale_x_discrete(
+    labels = labels,
+    drop = FALSE,
+    expand = expansion(add = c(0.5, 1))
+    ) +
+  geom_point(shape = 21) +
+  geom_text(
+    data = term2gene_label,
+    position = position_nudge(0.1),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    size = 7,
+    mapping = aes(x = Cluster, y = Description, label = locus_label),
+    inherit.aes = FALSE
+  ) +
+  scale_size(range = c(2, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 20) +
+  theme(
+    plot.title = element_text( size = 25),
+    axis.text.x = element_text(face = "bold", size =20)
+  )
+
+
+print(annotation_plot)
+```
+
+# Export Plot Data
+```{r export_plot_data, eval=FALSE}
+# Export data used to generate the KEGG plot
+kegg_plot_data <- to_plot %>%
+  left_join(
+    term2gene_label %>%
+      select(Cluster, ID, locus_label),
+    by = c("Cluster", "ID")
+  ) %>%
+  select(
+    Cluster, ID, Description, GeneRatio, BgRatio,
+    pvalue, p.adjust, qvalue, geneID, Count,
+    neglogP, locus_label
+  )
+
+write.csv(
+  kegg_plot_data,
+  file = "~/Desktop/figure_panels/kegg_plot_input_data.csv",
+  row.names = FALSE
+)
+
+cat("Exported", nrow(kegg_plot_data), "KEGG pathways\n")
+```
+
+# Export
+```{r export_plots, eval=FALSE}
+# Save for figure assembly
+saveRDS(
+  annotation_plot,
+  file = "~/Desktop/figure_panels/kegg_panel.rds"
+)
+
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/figure_panels/kegg_panel.pdf",
+  height = 7,
+  width = 16
+)
+
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/HC_DEG_KEGG_annotation.svg",
+  height = 7,
+  width = 12,
+  dpi = 150
+)
+```
+
+# Session Info
+```{r session_info}
+sessionInfo()
+```

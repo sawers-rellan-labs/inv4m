@@ -1,0 +1,980 @@
+---
+title: "PSU 2022 Spatial Analysis: SpATS Spatial Correction for Both P Treatments"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      fig.width = 12, fig.height = 8)
+```
+
+## Overview
+
+This notebook fits a SpATS PSANOVA surface **per phenotype and treatment** and returns spatially-corrected plot-level values for each phenotype. The approach uses `statgenHTP::fitModels()` (which wraps SpATS when provided a TimePoints object) and `getCorrected()` to extract corrected plot-level observations. The workflow:
+
+1. Load and clean data
+2. Create `plot_data` (plot-level means)
+3. Build TimePoints objects for both +P and -P treatments
+4. Loop over usable phenotypes and apply `fitModels()` → `getCorrected()` for each treatment
+5. Merge corrected values from both treatments into a combined dataset
+6. Perform second-stage treatment × genotype analysis
+7. Save corrected table for downstream analyses
+
+**Warning:** fitting many SpATS models can be computationally intensive. Run interactively on a machine with sufficient RAM/CPU.
+
+## 1. Load libraries
+
+```{r load-libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggtext)
+library(ggfx)
+library(nlme)          # Mixed-effects models (if needed)
+library(gstat)         # Variograms
+library(rstatix)
+library(ggpubr)
+library(VIM)
+library(knitr)
+library(SpATS)         # SpATS package (used internally by statgenHTP)
+library(statgenHTP)    # Provides fitModels() and getCorrected()
+```
+
+## 2. Load and prepare data
+
+```{r load-data}
+DATA_DIR <- "/Users/fvrodriguez/Desktop/inv4mHighland/data"
+plant_csv <- file.path(DATA_DIR, "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv")
+ear_csv <- file.path(DATA_DIR, "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field_ear_pheno.csv")
+
+field_data_raw <- read.csv(plant_csv, na.strings = c("", "#N/A", "NA"))
+ear_data_raw <- read.csv(ear_csv, na.strings = c("", "n/a", "NA"), skip = 1)
+
+field_data <- field_data_raw %>%
+  filter(P22. >= 3004, P22. <= 4192) %>%
+  rename(
+    rowid = P22.,
+    Genotype = Who.What,
+    PH = Height_Anthesis,
+    STW40 = X40_DAP_dw,
+    STW50 = X50_DAP_dw, 
+    STW60 = X60_DAP_dw,
+    STWHV = harvest_dw
+  ) %>%
+  mutate(
+    # Set +P as reference level (first level)
+    Treatment = factor(Treatment, levels = c("HighP", "LowP")),
+    Genotype = factor(Genotype),
+    Rep = as.factor(Rep)
+  ) %>%
+  mutate(
+    Treatment = fct_recode(Treatment, "+P" = "HighP", "-P" = "LowP"),
+    # Set CTRL as reference genotype
+    Genotype = fct_recode(Genotype, "Inv4m" = "INV4M"),
+    Genotype = fct_relevel(Genotype, "CTRL")
+  )
+
+ear_data <- ear_data_raw %>%
+  select(-description, -RK, -CC, -NIR, ear_rep = rep) %>%
+  rename(rowid = row) %>%
+  arrange(rowid) %>%
+  group_by(rowid) %>%
+  select(-ear_rep) %>%
+  summarise_all(mean, na.rm = TRUE) %>%
+  droplevels()
+
+field_data_complete <- field_data %>%
+  left_join(ear_data, by = "rowid") %>%
+  mutate(HI = TKW / STWHV) %>%
+  mutate(
+    Plot_Column = case_when(
+      Plot == "PlotVIII" ~ Plot_Column + 10,
+      Plot == "PlotVI" ~ Plot_Column,
+      TRUE ~ Plot_Column
+    )
+  ) %>%
+  filter(!is.na(PH)) %>%
+  droplevels()
+
+# Define phenotypes
+base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
+ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
+all_phenotypes <- unique(c(base_phenotypes, ear_phenotypes))
+
+plot_data <- field_data_complete %>%
+  group_by(rowid, Rep, Plot_Row, Plot_Column, Genotype, Treatment) %>%
+  summarise(
+    across(all_of(all_phenotypes), ~ mean(.x, na.rm = TRUE)),
+    n_plants = n(),
+    .groups = 'drop'
+  ) %>%
+  mutate(across(all_of(all_phenotypes), ~ ifelse(is.nan(.x), NA, .x)))
+
+plot_data$Plot_Row <- as.numeric(plot_data$Plot_Row)
+plot_data$Plot_Column <- as.numeric(plot_data$Plot_Column)
+plot_data$Rep <- as.factor(plot_data$Rep)
+
+cat("Plot-level summary dimensions:", dim(plot_data), "\n")
+cat("Average plants per plot:", round(mean(plot_data$n_plants, na.rm = TRUE), 1), "\n")
+```
+
+## 3. Identify usable phenotypes (<50% missing)
+
+```{r missing-summary}
+missing_summary <- plot_data %>%
+  select(all_of(all_phenotypes)) %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "phenotype", values_to = "missing_count") %>%
+  mutate(
+    total_obs = nrow(plot_data),
+    missing_pct = round(missing_count / total_obs * 100, 1),
+    available_n = total_obs - missing_count
+  ) %>%
+  arrange(missing_pct)
+
+print(missing_summary)
+
+usable_phenotypes <- missing_summary %>%
+  filter(missing_pct < 50) %>%
+  pull(phenotype)
+
+cat("Usable phenotypes (<50% missing):", paste(usable_phenotypes, collapse = ", "), "\n")
+```
+
+## 4. Spatial correction for +P treatment
+
+```{r spatial-correction-plus-p, results='hide'}
+# Prepare data for TimePoints
+single_time <- plot_data %>%
+  mutate(
+    Genotype = as.character(Genotype),
+    Treatment = as.character(Treatment),
+    Rep = as.character(Rep),
+    Plot_Row = as.numeric(Plot_Row),
+    Plot_Column = as.numeric(Plot_Column)
+  ) %>%
+  mutate(time = as.POSIXct("2022-05-22 10:00:00"))
+
+# Create TimePoints object for +P treatment
+tp_data_plus_p <- createTimePoints(
+  dat = single_time %>% filter(Treatment == "+P"),
+  experimentName = "PSU2022_PlusP",
+  genotype = "Genotype",
+  timePoint = "time",
+  plotId = "rowid",
+  repId = "Rep",
+  rowNum = "Plot_Row",
+  colNum = "Plot_Column",
+  checkGenotypes = c("NUE", "B73"),
+  addCheck = TRUE
+)
+
+summary(tp_data_plus_p)
+
+# Initialize lists for +P treatment
+corrected_list_plus_p <- list()
+fit_info_plus_p <- list()
+all_models_plus_p <- list()
+
+for (phen in usable_phenotypes) {
+  message("Fitting SpATS model for +P treatment, phenotype: ", phen)
+  
+  # Check data availability
+  no_nas_plus_p <- single_time %>%
+    filter(Treatment == "+P", !is.na(.data[[phen]]))
+  
+  if (nrow(no_nas_plus_p) < 10) {
+    message("Insufficient data for ", phen, " in +P treatment (n=", nrow(no_nas_plus_p), ")")
+    next
+  }
+  
+  # Fit model
+  fit_try <- try(
+    fitModels(
+      TP = tp_data_plus_p,
+      trait = phen,
+      timePoints = 1,
+      what = "fixed"
+    ),
+    silent = TRUE
+  )
+  
+  if (inherits(fit_try, "try-error")) {
+    message("Fit failed for ", phen, " in +P treatment: ", fit_try)
+    next
+  }
+  
+  all_models_plus_p[[phen]] <- fit_try
+  
+  # Extract corrected values
+  corr <- try(getCorrected(fit_try), silent = TRUE)
+  if (inherits(corr, "try-error") || is.null(corr)) {
+    message("getCorrected() failed for ", phen, " in +P treatment")
+    next
+  } 
+  
+  corr <- corr %>% select(-phen) 
+  corrected_list_plus_p[[phen]] <- corr
+  fit_info_plus_p[[phen]] <- list(n_obs = nrow(no_nas_plus_p), status = "success")
+}
+
+# Combine all corrected data for +P treatment
+sp_corrected_plus_p <- lapply(
+  corrected_list_plus_p,
+  function(corr_df) {
+    corr_df %>%
+      select(timeNumber, timePoint, genotype, rowId, colId, plotId) 
+  }
+) %>%
+  bind_rows() %>%
+  arrange(plotId) %>%
+  distinct()  
+
+# Join each corrected phenotype for +P
+for (phen in names(corrected_list_plus_p)) {
+  phen_corr <- paste0(phen, "_corr")
+  corr_df <- corrected_list_plus_p[[phen]] %>%
+    select(plotId, all_of(phen_corr))
+  sp_corrected_plus_p <- left_join(
+    sp_corrected_plus_p,
+    corr_df,
+    by = "plotId"
+  )
+}
+
+# Clean column names (remove _corr suffix)
+colnames(sp_corrected_plus_p) <- gsub(
+  "_corr", "", 
+  colnames(sp_corrected_plus_p)
+)
+
+# Add treatment information
+sp_corrected_plus_p <- sp_corrected_plus_p %>% 
+  inner_join(
+    tp_data_plus_p[[1]] %>% select(plotId, Treatment),
+    by = "plotId"
+  ) %>%
+  select(timeNumber:genotype, Treatment, everything())
+
+cat("Final sp_corrected_plus_p dimensions:", dim(sp_corrected_plus_p), "\n")
+```
+
+## 5. Spatial correction for -P treatment
+
+```{r spatial-correction-minus-p, results='hide'}
+# Create TimePoints object for -P treatment
+tp_data_minus_p <- createTimePoints(
+  dat = single_time %>% filter(Treatment == "-P"),
+  experimentName = "PSU2022_MinusP",
+  genotype = "Genotype",
+  timePoint = "time",
+  plotId = "rowid",
+  repId = "Rep",
+  rowNum = "Plot_Row",
+  colNum = "Plot_Column",
+  checkGenotypes = c("NUE", "B73"),
+  addCheck = TRUE
+)
+
+summary(tp_data_minus_p)
+
+# Initialize lists for -P treatment
+corrected_list_minus_p <- list()
+fit_info_minus_p <- list()
+all_models_minus_p <- list()
+
+for (phen in usable_phenotypes) {
+  message("Fitting SpATS model for -P treatment, phenotype: ", phen)
+  
+  # Check if we have enough data for this phenotype in -P
+  no_nas_minus_p <- single_time %>%
+    filter(Treatment == "-P", !is.na(.data[[phen]]))
+  
+  if (nrow(no_nas_minus_p) < 10) {
+    message("Insufficient data for ", phen, " in -P treatment (n=", nrow(no_nas_minus_p), ")")
+    next
+  }
+  
+  # Fit model
+  fit_try <- try(
+    fitModels(
+      TP = tp_data_minus_p,
+      trait = phen,
+      timePoints = 1,
+      what = "fixed"
+    ),
+    silent = TRUE
+  )
+  
+  if (inherits(fit_try, "try-error")) {
+    message("Fit failed for ", phen, " in -P treatment: ", fit_try)
+    next
+  }
+  
+  all_models_minus_p[[phen]] <- fit_try
+  
+  # Extract corrected values
+  corr <- try(getCorrected(fit_try), silent = TRUE)
+  if (inherits(corr, "try-error") || is.null(corr)) {
+    message("getCorrected() failed for ", phen, " in -P treatment")
+    next
+  } 
+  
+  corr <- corr %>% select(-phen) 
+  corrected_list_minus_p[[phen]] <- corr
+  fit_info_minus_p[[phen]] <- list(n_obs = nrow(no_nas_minus_p), status = "success")
+}
+
+# Combine all corrected data for -P treatment
+sp_corrected_minus_p <- lapply(
+  corrected_list_minus_p,
+  function(corr_df) {
+    corr_df %>%
+      select(timeNumber, timePoint, genotype, rowId, colId, plotId) 
+  }
+) %>%
+  bind_rows() %>%
+  arrange(plotId) %>%
+  distinct()  
+
+# Join each corrected phenotype for -P
+for (phen in names(corrected_list_minus_p)) {
+  phen_corr <- paste0(phen, "_corr")
+  corr_df <- corrected_list_minus_p[[phen]] %>%
+    select(plotId, all_of(phen_corr))
+  sp_corrected_minus_p <- left_join(
+    sp_corrected_minus_p,
+    corr_df,
+    by = "plotId"
+  )
+}
+
+# Clean column names (remove _corr suffix)
+colnames(sp_corrected_minus_p) <- gsub(
+  "_corr", "", 
+  colnames(sp_corrected_minus_p)
+)
+
+# Add treatment information
+sp_corrected_minus_p <- sp_corrected_minus_p %>% 
+  inner_join(
+    tp_data_minus_p[[1]] %>% select(plotId, Treatment),
+    by = "plotId"
+  ) %>%
+  select(timeNumber:genotype, Treatment, everything())
+
+cat("Final sp_corrected_minus_p dimensions:", dim(sp_corrected_minus_p), "\n")
+```
+
+## 6. Merge both spatially corrected datasets
+
+```{r merge-treatments}
+# Combine +P and -P corrected data
+sp_corrected_combined <- bind_rows(
+  sp_corrected_plus_p,    # +P treatment
+  sp_corrected_minus_p    # -P treatment
+) %>%
+  arrange(plotId)
+
+cat("Combined sp_corrected dimensions:", dim(sp_corrected_combined), "\n")
+cat("Treatment distribution:\n")
+table(sp_corrected_combined$Treatment)
+
+# Verify we have data for both treatments
+treatment_summary <- sp_corrected_combined %>%
+  group_by(Treatment) %>%
+  summarise(
+    n_plots = n(),
+    n_genotypes = n_distinct(genotype),
+    .groups = "drop"
+  )
+
+print(treatment_summary)
+
+# Check for overlapping phenotypes between treatments
+plus_p_phenos <- names(sp_corrected_plus_p)[!names(sp_corrected_plus_p) %in% 
+                                            c("timeNumber", "timePoint", "genotype", 
+                                              "rowId", "colId", "plotId", "Treatment")]
+minus_p_phenos <- names(sp_corrected_minus_p)[!names(sp_corrected_minus_p) %in% 
+                                             c("timeNumber", "timePoint", "genotype", 
+                                               "rowId", "colId", "plotId", "Treatment")]
+
+common_phenos <- intersect(plus_p_phenos, minus_p_phenos)
+cat("Phenotypes corrected in both treatments:", paste(common_phenos, collapse = ", "), "\n")
+```
+
+## 7. Spatial correction diagnostic plots
+
+```{r spatial-diagnostics}
+# Example spatial diagnostic plots for key phenotypes
+key_phenotypes <- intersect(c("PH", "HI", "DTS", "TKW"), common_phenos)
+
+for (phen in key_phenotypes[1:2]) {  # Limit to first 2 to avoid too many plots
+  if (phen %in% names(all_models_plus_p)) {
+    cat("\n### +P Treatment:", phen, "\n")
+    plot(all_models_plus_p[[phen]], timePoints = 1)
+    plot(all_models_plus_p[[phen]], timePoints = 1, plotType = "spatial", spaTrend = "raw")
+  }
+  
+  if (phen %in% names(all_models_minus_p)) {
+    cat("\n### -P Treatment:", phen, "\n")
+    plot(all_models_minus_p[[phen]], timePoints = 1)
+    plot(all_models_minus_p[[phen]], timePoints = 1, plotType = "spatial", spaTrend = "raw")
+  }
+}
+```
+
+## 8. Second-stage analysis: Treatment and Genotype × Treatment effects
+
+```{r second-stage-analysis}
+# Filter to NILs for treatment × genotype analysis
+nil_corrected_combined <- sp_corrected_combined %>%
+  filter(genotype %in% c("Inv4m", "CTRL")) %>%
+  mutate(
+    # Ensure proper factor levels with +P and CTRL as references
+    Treatment = factor(Treatment, levels = c("+P", "-P")),
+    genotype = factor(genotype, levels = c("CTRL", "Inv4m"))
+  ) %>%
+  droplevels()
+
+cat("NIL data dimensions:", dim(nil_corrected_combined), "\n")
+cat("Treatment × Genotype combinations:\n")
+table(nil_corrected_combined$Treatment, nil_corrected_combined$genotype)
+
+# Extract model coefficients for all common phenotypes
+model_coefficients <- list()
+
+cat("\n=== Treatment and Genotype × Treatment Models ===\n")
+
+for (phen in common_phenos) {
+  if (sum(!is.na(nil_corrected_combined[[phen]])) < 20) {
+    message("Skipping ", phen, " - insufficient data")
+    next
+  }
+  
+  model_formula <- as.formula(paste(phen, "~ genotype * Treatment"))
+  
+  lm_result <- try(
+    lm(model_formula, data = nil_corrected_combined),
+    silent = TRUE
+  )
+  
+  if (!inherits(lm_result, "try-error")) {
+    # Extract coefficients
+    coef_summary <- summary(lm_result)$coefficients
+    coef_df <- data.frame(
+      trait = phen,
+      term = rownames(coef_summary),
+      estimate = coef_summary[, "Estimate"],
+      std_error = coef_summary[, "Std. Error"],
+      t_value = coef_summary[, "t value"],
+      p_value = coef_summary[, "Pr(>|t|)"],
+      stringsAsFactors = FALSE
+    )
+    
+    model_coefficients[[phen]] <- coef_df
+    
+    cat("\n=== ", phen, " ===\n")
+    print(summary(lm_result))
+  }
+}
+
+# Combine all coefficients into single data frame
+if (length(model_coefficients) > 0) {
+  all_coefficients <- bind_rows(model_coefficients) %>%
+    mutate(
+      term = case_when(
+        term == "(Intercept)" ~ "Intercept (CTRL, +P)",
+        term == "genotypeInv4m" ~ "Genotype Effect (Inv4m vs CTRL)",
+        term == "Treatment-P" ~ "Treatment Effect (-P vs +P)",
+        term == "genotypeInv4m:Treatment-P" ~ "Inv4m:-P",
+        TRUE ~ term
+      )
+    )
+  
+  # Apply FDR correction within each term type
+  all_coefficients <- all_coefficients %>%
+    group_by(term) %>%
+    mutate(
+      p_adj_fdr = p.adjust(p_value, method = "fdr")
+    ) %>%
+    ungroup()
+  
+  cat("\n=== All Model Coefficients ===\n")
+  print(all_coefficients %>% filter(grepl("Interaction",term)) %>% arrange(p_value))
+}
+```
+
+## 9. Effect tables: Treatment effects and Genotype × Treatment interactions
+
+```{r effect-tables}
+if (exists("all_coefficients") && nrow(all_coefficients) > 0) {
+  
+  # Treatment effects table (main effect of -P vs +P)
+  treatment_effects <- all_coefficients %>%
+    filter(term == "Treatment Effect (-P vs +P)") %>%
+    arrange(p_value) %>%
+    mutate(
+      significance = case_when(
+        p_adj_fdr < 0.001 ~ "***",
+        p_adj_fdr < 0.01 ~ "**", 
+        p_adj_fdr < 0.05 ~ "*",
+        p_adj_fdr < 0.1 ~ ".",
+        TRUE ~ ""
+      )
+    )
+  
+  cat("\n=== Treatment Effects: -P vs +P (Reference) ===\n")
+  cat("Negative estimates indicate reduction under -P treatment\n")
+  cat("Positive estimates indicate increase under -P treatment\n\n")
+  
+  print(treatment_effects %>%
+        select(trait, estimate, std_error, t_value, p_value, p_adj_fdr, significance) %>%
+        mutate(across(where(is.numeric), ~ round(.x, 4))))
+  
+  # Genotype × Treatment interaction effects table
+  interaction_effects <- all_coefficients %>%
+    filter(term == "Inv4m:-P") %>%
+    arrange(p_value) %>%
+    mutate(
+      significance = case_when(
+        p_adj_fdr < 0.001 ~ "***",
+        p_adj_fdr < 0.01 ~ "**", 
+        p_adj_fdr < 0.05 ~ "*",
+        p_adj_fdr < 0.1 ~ ".",
+        TRUE ~ ""
+      )
+    )
+  
+  cat("\n=== Inv4m:-P Effects ===\n")
+  cat("Tests whether Inv4m responds differently to -P vs +P compared to CTRL\n")
+  cat("Negative estimates: Inv4m shows greater reduction under -P than CTRL\n")
+  cat("Positive estimates: Inv4m shows less reduction (or greater increase) under -P than CTRL\n\n")
+  
+  print(interaction_effects %>%
+        select(trait, estimate, std_error, t_value, p_value, p_adj_fdr, significance) %>%
+        mutate(across(where(is.numeric), ~ round(.x, 4))))
+  
+  # Genotype main effects table
+  genotype_effects <- all_coefficients %>%
+    filter(term == "Genotype Effect (Inv4m vs CTRL)") %>%
+    arrange(p_value) %>%
+    mutate(
+      significance = case_when(
+        p_adj_fdr < 0.001 ~ "***",
+        p_adj_fdr < 0.01 ~ "**", 
+        p_adj_fdr < 0.05 ~ "*",
+        p_adj_fdr < 0.1 ~ ".",
+        TRUE ~ ""
+      )
+    )
+  
+  cat("\n=== Genotype Effects: Inv4m vs CTRL (at +P reference level) ===\n")
+  print(genotype_effects %>%
+        select(trait, estimate, std_error, t_value, p_value, p_adj_fdr, significance) %>%
+        mutate(across(where(is.numeric), ~ round(.x, 4))))
+  
+  # Summary counts
+  cat("\n=== Summary of Significant Effects (FDR < 0.05) ===\n")
+  cat("Treatment effects:", sum(treatment_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(treatment_effects), "\n")
+  cat("Interaction effects:", sum(interaction_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(interaction_effects), "\n")
+  cat("Genotype effects:", sum(genotype_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(genotype_effects), "\n")
+}
+```
+
+## 10. Visualization: Treatment and Genotype × Treatment effects
+
+```{r treatment-genotype-plots}
+# Define plotting theme
+pheno_theme2 <- ggpubr::theme_classic2(base_size = 16) +
+  ggplot2::theme(
+    plot.title = ggtext::element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = ggtext::element_markdown(),
+    axis.title.x = element_text(face = "bold"),
+    axis.text.x = element_text(size = 14, face = "bold", color = "black"),
+    strip.background = element_blank(),
+    strip.text = ggtext::element_markdown(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 12)
+  )
+
+if (length(common_phenos) > 0 && exists("all_coefficients")) {
+  
+  # Prepare data for plotting
+  plot_data_combined <- nil_corrected_combined %>%
+    pivot_longer(
+      cols = all_of(common_phenos),
+      names_to = "trait",
+      values_to = "value"
+    ) %>%
+    filter(!is.na(value)) %>%
+    mutate(trait = as.character(trait))
+  
+  # Treatment × Genotype interaction plot (emphasizing treatment effect first)
+  interaction_plot <- ggplot(
+    plot_data_combined, 
+    aes(x = Treatment, y = value, color = genotype, group = genotype)
+  ) +
+    stat_summary(
+      fun = mean, 
+      geom = "point", 
+      size = 4
+    ) +
+    stat_summary(
+      fun = mean, 
+      geom = "line", 
+      linewidth = 1.5
+    ) +
+    stat_summary(
+      fun.data = mean_se, 
+      geom = "errorbar", 
+      width = 0.1,
+      linewidth = 1
+    ) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    scale_x_discrete(labels = c("+P" = "+P\n(Reference)", "-P" = "-P\n(Low P)")) +
+    labs(
+      title = "Treatment Effects and Inv4m:-Ps",
+      subtitle = "+P is reference treatment; Lines show genotype-specific responses",
+      y = "Spatially Corrected Value",
+      x = "Phosphorus Treatment",
+      color = "Genotype"
+    ) +
+    facet_wrap(~ trait, scales = "free_y", ncol = 4) +
+    pheno_theme2
+  
+  print(interaction_plot)
+  
+  # Focus on significant treatment effects
+  if (exists("treatment_effects")) {
+    sig_treatment_traits <- treatment_effects %>%
+      filter(p_adj_fdr < 0.05) %>%
+      pull(trait)
+    
+    if (length(sig_treatment_traits) > 0) {
+      treatment_plot_data <- plot_data_combined %>%
+        filter(trait %in% sig_treatment_traits)
+      
+      treatment_plot <- ggplot(
+        treatment_plot_data,
+        aes(x = Treatment, y = value, fill = Treatment)
+      ) +
+        geom_boxplot(width = 0.6, alpha = 0.7, linewidth = 0.8) +
+        geom_point(
+          position = position_jitter(width = 0.2),
+          size = 2,
+          alpha = 0.6
+        ) +
+        scale_fill_manual(
+          values = c("+P" = "lightblue", "-P" = "lightcoral"),
+          labels = c("+P" = "+P (Reference)", "-P" = "-P (Low P)")
+        ) +
+        labs(
+          title = "Significant Treatment Effects (FDR < 0.05)",
+          subtitle = "Traits showing significant response to phosphorus limitation",
+          y = "Spatially Corrected Value",
+          x = "Phosphorus Treatment",
+          fill = "Treatment"
+        ) +
+        facet_wrap(~ trait, scales = "free_y", ncol = 3) +
+        pheno_theme2
+      
+      print(treatment_plot)
+    }
+  }
+  
+  # Focus on significant interaction effects
+  if (exists("interaction_effects")) {
+    sig_interaction_traits <- interaction_effects %>%
+      filter(p_adj_fdr < 0.05) %>%
+      pull(trait)
+    
+    if (length(sig_interaction_traits) > 0) {
+      interaction_plot_data <- plot_data_combined %>%
+        filter(trait %in% sig_interaction_traits)
+      
+      interaction_detailed_plot <- ggplot(
+        interaction_plot_data, 
+        aes(x = genotype, y = value, fill = Treatment)
+      ) +
+        geom_boxplot(
+          width = 0.6, 
+          alpha = 0.7,
+          position = position_dodge(width = 0.8),
+          linewidth = 0.8
+        ) +
+        geom_point(
+          aes(color = Treatment),
+          position = position_jitterdodge(
+            dodge.width = 0.8,
+            jitter.width = 0.2
+          ),
+          size = 1.5,
+          alpha = 0.6
+        ) +
+        scale_fill_manual(
+          values = c("+P" = "lightblue", "-P" = "lightcoral"),
+          labels = c("+P" = "+P (Reference)", "-P" = "-P (Low P)")
+        ) +
+        scale_color_manual(
+          values = c("+P" = "blue", "-P" = "red"),
+          labels = c("+P" = "+P (Reference)", "-P" = "-P (Low P)")
+        ) +
+        labs(
+          title = "Significant Inv4m:-Ps (FDR < 0.05)",
+          subtitle = "Genotypes respond differently to phosphorus limitation",
+          y = "Spatially Corrected Value",
+          x = "Genotype",
+          fill = "P Treatment",
+          color = "P Treatment"
+        ) +
+        facet_wrap(~ trait, scales = "free_y", ncol = 3) +
+        pheno_theme2 +
+        guides(color = "none")  # Remove duplicate legend
+      
+      print(interaction_detailed_plot)
+    }
+  }
+}
+```
+
+## 11. Summary statistics and effect sizes
+
+```{r summary-statistics}
+# Calculate effect sizes and summary statistics
+effect_summary <- nil_corrected_combined %>%
+  pivot_longer(
+    cols = all_of(common_phenos),
+    names_to = "trait",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  group_by(trait, Treatment, genotype) %>%
+  summarise(
+    n = n(),
+    mean = mean(value),
+    sd = sd(value),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = genotype,
+    values_from = c(n, mean, sd, se),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    diff_mean = mean_Inv4m - mean_CTRL,
+    percent_change = (diff_mean / mean_CTRL) * 100,
+    pooled_sd = sqrt(((n_Inv4m - 1) * sd_Inv4m^2 + (n_CTRL - 1) * sd_CTRL^2) / 
+                     (n_Inv4m + n_CTRL - 2)),
+    cohens_d = diff_mean / pooled_sd
+  ) %>%
+  arrange(Treatment, desc(abs(cohens_d)))
+
+cat("\n=== Effect Size Summary ===\n")
+print(effect_summary %>% 
+       select(trait, Treatment, diff_mean, percent_change, cohens_d) %>%
+       mutate(across(where(is.numeric), ~ round(.x, 3))))
+```
+
+## 12. Export results
+
+```{r export-results}
+# Export the combined spatially corrected dataset
+combined_output_file <- "PSU2022_spatially_corrected_both_treatments.csv"
+write.csv(sp_corrected_combined, combined_output_file, row.names = FALSE)
+
+# Export all model coefficients
+if (exists("all_coefficients")) {
+  coefficients_output_file <- "PSU2022_model_coefficients_spatially_corrected.csv"
+  write.csv(all_coefficients, coefficients_output_file, row.names = FALSE)
+  
+  # Export treatment effects table
+  if (exists("treatment_effects")) {
+    treatment_output_file <- "PSU2022_treatment_effects_spatially_corrected.csv"
+    write.csv(treatment_effects, treatment_output_file, row.names = FALSE)
+  }
+  
+  # Export interaction effects table
+  if (exists("interaction_effects")) {
+    interaction_output_file <- "PSU2022_interaction_effects_spatially_corrected.csv"
+    write.csv(interaction_effects, interaction_output_file, row.names = FALSE)
+  }
+  
+  # Export genotype effects table
+  if (exists("genotype_effects")) {
+    genotype_output_file <- "PSU2022_genotype_effects_spatially_corrected.csv"
+    write.csv(genotype_effects, genotype_output_file, row.names = FALSE)
+  }
+}
+
+# Export summary statistics with treatment contrasts
+effect_summary_treatment <- nil_corrected_combined %>%
+  pivot_longer(
+    cols = all_of(common_phenos),
+    names_to = "trait",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  group_by(trait, Treatment, genotype) %>%
+  summarise(
+    n = n(),
+    mean = mean(value),
+    sd = sd(value),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) %>%
+  # Calculate treatment effects (relative to +P reference)
+  pivot_wider(
+    names_from = Treatment,
+    values_from = c(n, mean, sd, se),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    treatment_effect = `mean_-P` - `mean_+P`,
+    treatment_percent_change = (treatment_effect / `mean_+P`) * 100
+  ) %>%
+  # Add genotype comparison within each treatment
+  group_by(trait) %>%
+  mutate(
+    genotype_effect_plus_p = case_when(
+      genotype == "Inv4m" ~ `mean_+P` - `mean_+P`[genotype == "CTRL"],
+      TRUE ~ NA_real_
+    ),
+    genotype_effect_minus_p = case_when(
+      genotype == "Inv4m" ~ `mean_-P` - `mean_-P`[genotype == "CTRL"],
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  ungroup()
+
+summary_output_file <- "PSU2022_effect_summary_with_treatment_reference.csv"
+write.csv(effect_summary_treatment, summary_output_file, row.names = FALSE)
+
+cat("=== Files Exported ===\n")
+cat("Spatially corrected data:", combined_output_file, "\n")
+if (exists("all_coefficients")) {
+  cat("All model coefficients:", coefficients_output_file, "\n")
+  if (exists("treatment_effects")) cat("Treatment effects:", treatment_output_file, "\n")
+  if (exists("interaction_effects")) cat("Interaction effects:", interaction_output_file, "\n")
+  if (exists("genotype_effects")) cat("Genotype effects:", genotype_output_file, "\n")
+}
+cat("Effect summary (treatment reference):", summary_output_file, "\n")
+```
+
+```{r summary-final-analysis}
+# Final analysis summary
+cat("\n=== Final Analysis Summary ===\n")
+cat("Total phenotypes evaluated:", length(all_phenotypes), "\n")
+cat("Usable phenotypes (<50% missing):", length(usable_phenotypes), "\n")
+cat("Successfully fitted models (+P):", length(all_models_plus_p), "\n")
+cat("Successfully fitted models (-P):", length(all_models_minus_p), "\n")
+cat("Common phenotypes between treatments:", length(common_phenos), "\n")
+cat("Total plots with corrected data:", nrow(sp_corrected_combined), "\n")
+cat("Significant traits (by treatment):", length(sig_treatment_traits), "\n")
+
+# Print model fit information for both treatments
+if (length(fit_info_plus_p) > 0) {
+  cat("\n=== +P Model Fit Details ===\n")
+  for (trait in names(fit_info_plus_p)) {
+    info <- fit_info_plus_p[[trait]]
+    cat(sprintf("%s: n=%d, status=%s\n", trait, info$n_obs, info$status))
+  }
+}
+
+# Final analysis summary
+cat("\n=== Final Analysis Summary ===\n")
+cat("Total phenotypes evaluated:", length(all_phenotypes), "\n")
+cat("Usable phenotypes (<50% missing):", length(usable_phenotypes), "\n")
+cat("Successfully fitted models (+P):", length(all_models_plus_p), "\n")
+cat("Successfully fitted models (-P):", length(all_models_minus_p), "\n")
+cat("Common phenotypes between treatments:", length(common_phenos), "\n")
+cat("Total plots with corrected data:", nrow(sp_corrected_combined), "\n")
+
+if (exists("treatment_effects") && exists("interaction_effects") && exists("genotype_effects")) {
+  cat("Significant treatment effects (FDR < 0.05):", sum(treatment_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(treatment_effects), "\n")
+  cat("Significant interaction effects (FDR < 0.05):", sum(interaction_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(interaction_effects), "\n")
+  cat("Significant genotype effects (FDR < 0.05):", sum(genotype_effects$p_adj_fdr < 0.05, na.rm = TRUE), "of", nrow(genotype_effects), "\n")
+}
+
+# Print model fit information for both treatments
+if (length(fit_info_plus_p) > 0) {
+  cat("\n=== +P Model Fit Details ===\n")
+  for (trait in names(fit_info_plus_p)) {
+    info <- fit_info_plus_p[[trait]]
+    cat(sprintf("%s: n=%d, status=%s\n", trait, info$n_obs, info$status))
+  }
+}
+
+if (length(fit_info_minus_p) > 0) {
+  cat("\n=== -P Model Fit Details ===\n")
+  for (trait in names(fit_info_minus_p)) {
+    info <- fit_info_minus_p[[trait]]
+    cat(sprintf("%s: n=%d, status=%s\n", trait, info$n_obs, info$status))
+  }
+}
+
+# Check for missing data patterns in final dataset
+missing_final <- sp_corrected_combined %>%
+  select(all_of(common_phenos)) %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "phenotype", values_to = "missing_count") %>%
+  mutate(
+    total_plots = nrow(sp_corrected_combined),
+    missing_pct = round(missing_count / total_plots * 100, 1)
+  ) %>%
+  arrange(missing_pct)
+
+cat("\n=== Missing Data in Final Dataset ===\n")
+print(missing_final)
+
+# Key findings summary
+if (exists("treatment_effects") && exists("interaction_effects")) {
+  cat("\n=== Key Findings Summary ===\n")
+  
+  # Most significant treatment effects
+  top_treatment <- treatment_effects %>%
+    filter(p_adj_fdr < 0.05) %>%
+    arrange(p_adj_fdr) %>%
+    head(3)
+  
+  if (nrow(top_treatment) > 0) {
+    cat("Top treatment effects (-P vs +P):\n")
+    for (i in 1:nrow(top_treatment)) {
+      trait <- top_treatment$trait[i]
+      est <- round(top_treatment$estimate[i], 3)
+      pval <- format(top_treatment$p_adj_fdr[i], scientific = TRUE, digits = 2)
+      direction <- ifelse(est < 0, "decreased", "increased")
+      cat(sprintf("  %s: %s by %s units (FDR = %s)\n", trait, direction, abs(est), pval))
+    }
+  }
+  
+  # Most significant interaction effects
+  top_interactions <- interaction_effects %>%
+    filter(p_adj_fdr < 0.05) %>%
+    arrange(p_adj_fdr) %>%
+    head(3)
+  
+  if (nrow(top_interactions) > 0) {
+    cat("\nTop genotype × treatment interactions:\n")
+    for (i in 1:nrow(top_interactions)) {
+      trait <- top_interactions$trait[i]
+      est <- round(top_interactions$estimate[i], 3)
+      pval <- format(top_interactions$p_adj_fdr[i], scientific = TRUE, digits = 2)
+      direction <- ifelse(est < 0, "more sensitive", "less sensitive")
+      cat(sprintf("  %s: Inv4m is %s to -P than CTRL (interaction = %s, FDR = %s)\n", 
+                  trait, direction, est, pval))
+    }
+  }
+}
+```

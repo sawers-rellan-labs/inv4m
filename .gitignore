@@ -1,0 +1,27 @@
+# Data and Results
+data/
+results/
+
+# R/HPC Outputs
+*.html
+*.pdf
+*.png
+*.jpg
+*.RDS
+*.RData
+*.csv
+*.tex
+*.log
+*.aln
+
+# System files
+.DS_Store
+.Rhistory
+.Rproj.user/
+
+# Agent Sandbox and AI artifacts
+scripts/00_agent_work/
+*.log
+*plan.sh
+migration_audit.md
+.gemini/

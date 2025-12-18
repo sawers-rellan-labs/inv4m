@@ -1,0 +1,1811 @@
+---
+title: "Differential Gene Expression Analysis: Leaf-Treatment Interaction Model"
+author: "Fausto Rodríguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+This analysis performs differential gene expression analysis on RNA-seq data from maize leaf samples across multiple experimental factors:
+
+- **Leaf tissue position**: Continuous gradient from apical to basal (leaf 1–4)
+- **Phosphorus treatment**: High P (+P) vs Low P (-P)
+- **Genotype**: Control (CTRL) vs Inversion 4m (Inv4m)
+
+The analysis uses the **limma-voom** pipeline to identify genes that respond to:
+
+- **Inv4m**: Genotype effect (Inversion 4m vs Control)
+- **Leaf**: Leaf stage effect
+- **-P**: Phosphorus deficiency effect
+- **Leaf:-P**: Interaction between leaf position and P treatment
+
+## Linear Model Specification for Gene Expression Analysis
+
+This model describes the log-transformed expression $y_{g,i}$ of gene $g$ in sample $i$ as a function of spatial, developmental, and treatment effects.
+Each gene is fitted separately using a common design matrix, producing gene-specific regression coefficients.
+
+$$
+\begin{aligned}
+y_{g,i} &= \beta_{g,0} + \beta_{g,R}\text{Row}_i + \beta_{g,L}\text{leafc}_i + \beta_{g,T}T_i \\
+&\quad + \beta_{g,L\times T}(\text{leafc}_i \times T_i) + \beta_{g,G}G_i \\
+&\quad + \beta_{g,G\times T}(G_i \times T_i) + \beta_{g,G\times L}(G_i \times \text{leafc}_i) \\
+&\quad + u_{g,\text{col}(i):T(i)} + \varepsilon_{g,i}
+\end{aligned}
+$$
+
+with,
+
+$$
+u_{g,\text{col}(i):T(i)} \sim N(0,\sigma^2_{u,g}), \quad \varepsilon_{g,i} \sim N(0,\phi_i \sigma^2_g)
+$$
+
+### Explanation of Model Components
+
+| Symbol | Description | Varies Over | Notes |
+|--------|-------------|-------------|-------|
+| $y_{g,i}$ | $\log_2$(CPM) expression of gene $g$ in sample $i$ | genes, samples | Response variable |
+| $\beta_{g,0}$ | Intercept (mean expression at centered leaf stage, +P treatment) | genes | Baseline expression |
+| $\beta_{g,R}$ | Fixed effect of plot row | genes | Corrects for field spatial gradients |
+| $\beta_{g,L}$ | Slope for leaf developmental stage (centered) | genes | Represents linear change with leaf age |
+| $\beta_{g,T}$ | Effect of phosphorus treatment (−P vs. +P) | genes | Treatment main effect |
+| $\beta_{g,L\times T}$ | Interaction between leaf stage and treatment | genes | Tests whether developmental slope differs under P deficiency |
+| $\beta_{g,G}$ | Effect of inversion genotype | genes | Genotypic main effect |
+| $\beta_{g,G\times T}$ | Interaction between inversion and treatment | genes | Tests whether inversion modifies P response |
+| $\beta_{g,G\times L}$ | Interaction between inversion and leaf | genes | Tests whether the effect of the leaf depends on Inv4m |
+| $u_{g,\text{col}(i):T(i)}$ | Random effect of plot column nested within treatment | samples (within treatment) | Accounts for spatial autocorrelation unique to each treatment field |
+| $\varepsilon_{g,i}$ | Residual error with voom-derived precision weights | samples | Captures heteroskedastic measurement error |
+
+### Notes on Indexing and Interpretation
+
+- $i$ indexes samples, not genes. Predictors like `Row`, `leaf_c`, `T`, and `G` vary at the sample level.
+- $g$ indexes genes, with each gene having its own set of regression coefficients $\beta_{g,*}$.
+- The term $u_{g,\text{col}(i):T(i)}$ introduces a treatment-specific random spatial correction, avoiding confounding between column and treatment.
+- The residual term $\varepsilon_{g,i}$ incorporates precision weights from the voom transformation, where samples with lower measurement variance receive higher weight.
+- This parametrization improves interpretability by centering `leaf_c` (so the intercept represents average expression) and nesting the spatial correction by treatment rather than imposing a global linear spatial trend.
+
+## Fold Change Thresholds
+
+- **Leaf effect**: ±0.5 log2FC
+- **P × Leaf interaction**: ±0.5 log2FC
+- **Inv4m × P interaction**: ±0.5 log2FC
+- **Inv4m × Leaf interaction**: ±0.5 log2FC
+- **Other effects (-P, Inv4m)**: ±1.5 log2FC
+
+## Key Genomic Regions
+
+- **Inv4m inversion**: Chr4:172,883,675–188,132,113
+- **Shared introgression**: Chr4:157,012,149–195,900,523
+
+Genes are classified as:
+
+- `in_Inv4m`: Within the inversion proper
+- `in_cis`: Within the shared introgression (includes inversion + flanking)
+- `in_trans`: Outside the shared introgression region
+
+## DEG Classification Tiers
+
+Three levels of stringency for different analyses:
+
+- **Significant DEGs**: for Manhattan plots, FDR < 0.05 (`is_DEG`).
+- **High-confidence DEGs**: for GO enrichment, FDR < 0.05 AND $\log_2FC > \pm1.5$ (`is_hiconf_DEG`).
+- **Selected DEGs**: for manuscript main tables, the union ($\cup$) of the top 20 by significance and the top 20 by Mahalanobis distance (`is_selected_DEG`).
+
+# Libraries
+
+```{r libraries}
+library(edgeR)
+library(limma)
+library(rtracklayer)
+library(GenomicRanges)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(ggpubr)
+library(ggfx)
+library(ggtext)
+library(robustbase)
+```
+
+# Data Import
+
+## Load Expression Counts
+
+```{r load_counts}
+counts <- read.csv("../data/inv4mRNAseq_gene_sample_exp.csv")
+{
+  cat("Loaded expression\n")
+  cat("  Dimensions:", dim(counts), "\n")
+  cat("  Genes:", nrow(counts), "\n")
+  cat("  Samples:", ncol(counts) - 2, "\n")
+}
+```
+
+## Load Sample Metadata
+
+```{r load_metadata}
+sampleInfo <- read.csv("../data/PSU-PHO22_Metadata.csv")
+sampleInfo$Treatment <- factor(sampleInfo$Treatment)
+levels(sampleInfo$Treatment) <- c("+P", "-P")
+sampleInfo$Genotype <- factor(sampleInfo$Genotype)
+levels(sampleInfo$Genotype) <- c("CTRL", "Inv4m")
+{
+  cat("\nSample meta\n")
+  cat("  Total samples:", nrow(sampleInfo), "\n")
+  cat("  Genotypes:", paste(unique(sampleInfo$Genotype), collapse = ", "), "\n")
+  cat("  Treatments:", paste(unique(sampleInfo$Treatment), collapse = ", "), "\n")
+}
+```
+
+## Prepare Count Matrix
+
+```{r prepare_counts}
+# Create sample ID mapping
+tag <- sampleInfo$side_tag
+names(tag) <- sampleInfo$library
+
+# Extract gene IDs
+gene_ids <- data.frame(gene = counts[, 2])
+
+# Convert to matrix and set row names
+counts <- as.matrix(counts[, -c(1:2)])
+rownames(counts) <- gene_ids$gene
+
+# Map sample names using tags
+sampleNames <- tag[colnames(counts)]
+colnames(counts) <- sampleNames
+
+# Reorder metadata to match count matrix column order
+sampleInfo <- sampleInfo[match(sampleNames, sampleInfo$side_tag), ]
+
+{
+  cat("\nAll samples in metadata:",
+      all(sampleNames %in% sampleInfo$side_tag), "\n")
+  cat("Count matrix prepared:\n")
+  cat("  Genes:", nrow(counts), "\n")
+  cat("  Samples:", ncol(counts), "\n")
+}
+```
+
+## Create DGEList Object
+
+```{r create_dgelist}
+# Create DGEList with counts and sample information
+y <- DGEList(counts = counts, samples = sampleInfo)
+
+# Define groups from Treatment and Genotype interaction
+y$group <- interaction(y$samples$Treatment, y$samples$Genotype)
+
+cat("\nDGEList object created\n")
+head(y$samples)
+```
+
+# Expression Filtering and Sample Quality Control
+
+## Filter Genes by Expression Level
+
+Using `filterByExpr` to remove genes with low counts across samples.
+
+```{r filter_expression}
+# Keep genes with sufficient expression
+keep <- filterByExpr(y, group = y$group)
+y_filtered <- y[keep, ]
+
+{
+  cat("\nExpression filtering:\n")
+  cat("  Genes before:", nrow(y), "\n")
+  cat("  Genes after:", nrow(y_filtered), "\n")
+  cat("  Genes removed:", sum(!keep), "\n")
+}
+```
+
+## Initial MDS: Quality Control Check
+
+Compute MDS on all libraries (after gene filtering but before sample filtering) to identify low-quality samples based on library size.
+
+```{r mds_qc_all_samples}
+# MDS with all samples (before library size filtering)
+mds_all <- plotMDS(y_filtered, pch = 21, plot = TRUE)
+
+# Histogram of library sizes
+hist(
+  y$samples$lib.size / 1e6,
+  main = "Library Size Distribution",
+  xlab = "Library Size (millions of reads)",
+  breaks = 20
+)
+
+{
+  cat("\nLibrary size summary:\n")
+  print(summary(y$samples$lib.size))
+  cat("\nSamples with lib.size < 20 million:",
+      sum(y$samples$lib.size < 2e7), "\n")
+}
+```
+
+```{r mds_colored_by_coverage, fig.width=10, fig.height=8}
+# Prepare data for plotting
+mds_qc_data <- y_filtered$samples %>%
+  mutate(
+    dim1 = mds_all$x,
+    dim2 = mds_all$y,
+    lib_size_millions = lib.size / 1e6
+  )
+
+# Plot MDS colored by library size
+ggplot(mds_qc_data, aes(x = dim1, y = dim2, color = lib_size_millions)) +
+  geom_point(size = 3) +
+  scale_color_viridis_c(option = "plasma") +
+  labs(
+    x = paste0("Dim1 (", round(100 * mds_all$var.explained[1]), "%)"),
+    y = paste0("Dim2 (", round(100 * mds_all$var.explained[2]), "%)"),
+    color = "Library Size\n(millions)"
+  ) +
+  theme_classic2(base_size = 15)
+```
+
+## Filter Low Quality Libraries
+
+Samples with library size < 20 million reads are considered low quality.
+
+```{r filter_samples}
+# Flag low count libraries
+y_filtered$samples$lowCount <- y_filtered$samples$lib.size < 2e7
+
+# Remove low quality samples
+y_filtered_bySample <- y_filtered[, !y_filtered$samples$lowCount]
+
+{
+  cat("\nLow quality libraries:\n")
+  print(table(y_filtered$samples$lowCount))
+  cat("\nSamples after filtering:\n")
+  cat("  Retained:", ncol(y_filtered_bySample), "\n")
+  cat("  Removed:", sum(y_filtered$samples$lowCount), "\n")
+}
+```
+
+## Sample Distribution Diagnostics
+
+Verify experimental design balance across factors after quality filtering.
+
+```{r sample_diagnostics}
+with(y_filtered_bySample$samples, {
+  cat("\n=== Sample Distribution by Factors ===\n")
+  cat("\n-- Treatment --\n")
+  print(table(Treatment))
+  cat("\n-- Genotype --\n")
+  print(table(Genotype))
+  cat("\n-- Leaf Tissue --\n")
+  print(table(leaf_tissue))
+  cat("\n-- Treatment × Leaf Tissue --\n")
+  print(table(Treatment, leaf_tissue))
+  cat("\n-- Genotype × Leaf Tissue --\n")
+  print(table(Genotype, leaf_tissue))
+  cat("\n-- Treatment × Genotype × Leaf Tissue (3-way) --\n")
+  print(table(Treatment, Genotype, leaf_tissue))
+})
+```
+
+# Quality Control: Batch Effects
+
+## Compute MDS Dimensions
+
+MDS reveals sources of variation in gene expression across samples. Dimensions 3 and 4 are extracted from eigenvectors scaled by square root of variance explained.
+
+```{r mds_calculation}
+mds <- plotMDS(
+
+  y_filtered_bySample,
+  pch = 21,
+  label = y_filtered_bySample$samples$side_tag,
+  plot = FALSE
+)
+
+# Store MDS coordinates in sample data
+d <- y_filtered_bySample$samples
+d$dim1 <- mds$x
+d$dim2 <- mds$y
+d$dim3 <- mds$eigen.vectors[, 3] * sqrt(mds$var.explained[3])
+d$dim4 <- mds$eigen.vectors[, 4] * sqrt(mds$var.explained[4])
+
+# Prepare factors for plotting
+d$Treatment <- factor(d$Treatment)
+d$Genotype <- factor(d$Genotype)
+d$RNA_Plant <- factor(d$RNA_Plant)
+
+# Variance explained by each dimension
+tibble(
+  dimension = paste("Dim", 1:4),
+  var_explained = round(mds$var.explained[1:4], 4)
+)
+```
+
+## MDS: Dimensions 1 and 2 Colored by Multiple Factors
+
+Exploring which experimental factors drive the main dimensions of variation.
+
+```{r mds_multiple_factors, fig.width=14, fig.height=10}
+# Define custom green to orange palette for leaf positions
+green_to_orange <- c(
+  "#00954A",
+  "#A4DF56",
+  "#D7E23C",
+  "#FF9A1F"
+)
+
+# Treatment
+p1 <- ggplot(d, aes(x = dim1, y = dim2, color = Treatment)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top")
+
+# Row position
+p2 <- ggplot(d, aes(x = dim1, y = dim2, color = row)) +
+  geom_point(size = 3) +
+  guides(
+    color = guide_colourbar(
+      title = "Row Position",
+      direction = "horizontal",
+      barwidth = 15,
+      barheight = 1,
+      title.position = "top",
+      title.hjust = 0.5
+    ),
+    shape = "none"
+  ) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top")
+
+# Collection time
+p3 <- ggplot(d, aes(x = dim1, y = dim2, color = decimal_time)) +
+  geom_point(size = 3) +
+  guides(
+    color = guide_colourbar(
+      title = "Collection Time",
+      direction = "horizontal",
+      barwidth = 15,
+      barheight = 1,
+      title.position = "top",
+      title.hjust = 0.5
+    ),
+    shape = "none"
+  ) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top")
+
+# Collector
+p4 <- ggplot(d, aes(x = dim1, y = dim2, color = COLLECTOR)) +
+  geom_point(size = 3) +
+  scale_color_discrete(labels = c("Team 1", "Team 2")) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top") +
+  labs(color = "Collector")
+
+# Genotype
+p5 <- ggplot(d, aes(x = dim1, y = dim2, color = Genotype)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top") +
+  labs(color = "Genotype")
+
+# Leaf tissue
+p6 <- d %>%
+  mutate(leaf = factor(leaf_tissue)) %>%
+  ggplot(aes(x = dim1, y = dim2, color = leaf)) +
+  scale_color_manual(values = green_to_orange) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top") +
+  labs(color = "Leaf")
+
+ggarrange(p1, p2, p3, p4, p5, p6, ncol = 3, nrow = 2)
+```
+
+## MDS: Primary Plot (Leaf Tissue and Treatment)
+
+```{r mds_primary, fig.width=10, fig.height=8}
+transcript_MDS_12 <- d %>%
+  mutate(leaf = factor(leaf_tissue)) %>%
+  ggplot(aes(x = dim1, y = dim2)) +
+  ggtitle("MDS Transcripts") +
+  xlab(paste0("dim1 (", round(100 * mds$var.explained[1]), "%)")) +
+  ylab(paste0("dim2 (", round(100 * mds$var.explained[2]), "%)")) +
+  geom_point(aes(fill = leaf, shape = Treatment), size = 4) +
+  scale_fill_manual(values = green_to_orange) +
+  scale_shape_manual(values = c(21, 25)) +
+  guides(
+    shape = guide_legend(
+      title = element_blank(),
+      order = 2,
+      override.aes = list(fill = "black"),
+      reverse = TRUE
+    ),
+    fill = guide_legend(
+      title = "Leaf",
+      order = 1,
+      override.aes = list(geom = "point", shape = 22, size = 7)
+    )
+  ) +
+  theme_classic2(base_size = 30) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.spacing = unit(0, "line"),
+    legend.box.spacing = unit(0, "in"),
+    legend.background = element_rect(fill = "transparent")
+  )
+
+saveRDS(transcript_MDS_12, "../results/transcript_MDS_12.rds")
+transcript_MDS_12
+```
+
+## MDS: Dimensions 3 and 4
+
+The third dimension separates by genotype.
+
+```{r mds_dim3_dim4, fig.width=10, fig.height=8}
+# Set up genotype labels with italic formatting
+labels <- c("CTRL", "*Inv4m*")
+names(labels) <- c("CTRL", "INV4")
+
+d %>%
+  ggplot(aes(x = dim3, y = dim4, fill = Genotype, shape = Treatment)) +
+  xlab(paste0("dim3 (", round(100 * mds$var.explained[3]), "%)")) +
+  ylab(paste0("dim4 (", round(100 * mds$var.explained[4]), "%)")) +
+  geom_point(size = 4) +
+  scale_fill_viridis_d(direction = -1, labels = labels) +
+  scale_shape_manual(values = c(24, 21)) +
+  guides(
+    shape = "none",
+    fill = guide_legend(
+      title = "Genotype",
+      order = 2,
+      override.aes = list(geom = "point", shape = 22, size = 7, reverse = TRUE)
+    )
+  ) +
+  theme_classic2(base_size = 25) +
+  theme(
+    legend.position = c(0.89, 0.9),
+    legend.text = element_markdown(),
+    legend.spacing = unit(0, "line"),
+    legend.box.spacing = unit(0, "line")
+  )
+```
+
+## MDS Dimension Correlations
+
+```{r mds_correlations}
+# Calculate correlations and p-values
+mds_cor_results <- tibble(
+  dimension = c("Dim1", "Dim2", "Dim3"),
+  factor = c("Treatment", "Leaf tissue", "Genotype"),
+  correlation = c(
+    cor(d$dim1, as.numeric(d$Treatment)),
+    cor(d$dim2, d$leaf_tissue),
+    cor(d$dim3, as.numeric(d$Genotype))
+  ),
+  p_value = c(
+    cor.test(d$dim1, as.numeric(d$Treatment))$p.value,
+    cor.test(d$dim2, d$leaf_tissue)$p.value,
+    cor.test(d$dim3, as.numeric(d$Genotype))$p.value
+  )
+) %>%
+  mutate(
+    adj_p_value = p.adjust(p_value, method = "fdr"),
+    correlation = round(correlation, 3),
+    p_value = signif(p_value, 3),
+    adj_p_value = signif(adj_p_value, 3)
+  )
+
+mds_cor_results
+```
+
+# Normalization and Design Matrix
+
+Apply TMM (Trimmed Mean of M-values) normalization to account for sequencing depth differences, then fit a linear model including spatial covariates (`Plot_Row`, `Plot_Column`), biological factors (`Genotype`, `leaf_tissue`, `Treatment`), and the `leaf_tissue:Treatment` interaction. Voom transformation estimates mean-variance relationships and computes precision weights for each observation.
+
+```{r linear_modelling}
+# Center the continuous leaf stage variable
+# Centering subtracts the mean leaf age so that:
+#   - the intercept represents expression at the *average leaf age*,
+#   - the Treatment coefficient corresponds to the treatment effect at mean leaf stage,
+#   - and collinearity between leaf age and Treatment is minimized.
+d$leaf_tissue_c <- scale(d$leaf_tissue, center = TRUE, scale = FALSE)
+
+# Define block: column nested within treatment
+block <- interaction(d$Treatment, d$Plot_Column)
+
+# Design matrix: spatial covariates + biological factors + interactions
+design <- model.matrix(
+  ~ Plot_Row + leaf_tissue_c * Treatment + Genotype * Treatment + Genotype * leaf_tissue_c,
+  d
+)
+
+# Voom transformation with precision weights
+voomR <- voom(y_filtered_bySample, design = design, plot = FALSE)
+
+# Save normalized expression for downstream analyses
+saveRDS(voomR$E, file = "~/Desktop/normalized_expression_logCPM_leaf_trt.rda")
+saveRDS(voomR, file = "~/Desktop/normalized_expression_voom_object_leaf_trt.rda")
+
+{
+  cat("Normalization factors range:",
+      range(y_filtered_bySample$samples$norm.factors), "\n")
+  cat("Design matrix:", nrow(design), "samples ×", ncol(design),
+      "coefficients\n")
+  design %>% as.data.frame() %>% tibble() %>% print()
+  cat("Voom expression matrix:", nrow(voomR$E), "genes ×",
+      ncol(voomR$E), "samples\n")
+}
+```
+
+# Linear Model Fitting
+
+Fit linear model to voom-transformed data, then apply robust empirical Bayes moderation to stabilize variance estimates and improve power for differential expression testing.
+
+```{r fit_linear_model}
+# Estimate consensus correlation for blocks
+corfit <- duplicateCorrelation(voomR, design, block = block)
+
+# Fit linear model accounting for block correlation
+fit <- lmFit(voomR, design, block = block, correlation = corfit$consensus.correlation)
+
+# Apply empirical Bayes moderation
+ebfit <- eBayes(fit)
+
+{
+  cat("Model fitted:", nrow(fit$coefficients), "genes ×",
+      ncol(fit$coefficients), "coefficients\n")
+  cat("\nSignificant genes per coefficient (FDR < 0.05):\n")
+  print(colSums(abs(decideTests(ebfit))))
+}
+```
+
+# Effect Estimation and Confidence Intervals
+
+## Extract Coefficients of Interest
+
+We focus on biological effects while accounting for spatial covariates.
+
+```{r extract_coefficients}
+# Define predictors of interest with ORIGINAL names from model
+predictors_original <- c(
+  "leaf_tissue_c",
+  "Treatment-P",
+
+  "GenotypeINV4",
+  "Treatment-P:GenotypeInv4m",
+  "leaf_tissue_c:Treatment-P",
+  "leaf_tissue_c:GenotypeInv4m"
+)
+
+topTable(ebfit) %>% colnames()
+
+predictors_toptable <- c(
+  "leaf_tissue_c",
+  "Treatment.P",
+  "GenotypeINV4",
+  "Treatment.P.GenotypeInv4m",
+  "leaf_tissue_c.Treatment.P",
+  "leaf_tissue_c.GenotypeInv4m"
+)
+
+# Define STANDARDIZED names for output
+predictors_standard <- c(
+  "Leaf",
+  "-P",
+  "Inv4m",
+  "Leaf:-P",
+  "Leaf:-P",
+  "Leaf:Inv4m"
+)
+
+# Create mapping
+predictor_map <- setNames(predictors_standard, predictors_original)
+
+{
+  cat("\nExtracting coefficients:\n")
+  for (i in seq_along(predictors_original)) {
+    cat("  ", predictors_original[i], "→", predictors_standard[i], "\n")
+  }
+}
+```
+
+## Calculate Effects and Confidence Intervals
+
+For each predictor, extract results and calculate 95% confidence intervals.
+
+```{r calculate_ci}
+#' Extract differential expression results for specified predictors
+#'
+#' @param ebfit An eBayes fitted model object from limma
+#' @param predictor_map Named vector mapping coefficient names to display names
+#'
+#' @return A data frame with DE results for all specified predictors
+extract_predictor_effects <- function(ebfit, predictor_map) {
+  # Get coefficient names from the model
+  coef_names <- colnames(coef(ebfit))
+
+  # Match predictor names to coefficient positions
+  coef_indices <- match(names(predictor_map), coef_names)
+
+  # Validate all predictors found
+  if (any(is.na(coef_indices))) {
+    missing <- names(predictor_map)[is.na(coef_indices)]
+    stop(
+      "Coefficients not found: ", paste(missing, collapse = ", "),
+      "\nAvailable: ", paste(coef_names, collapse = ", ")
+    )
+  }
+
+  # Extract results for each predictor
+  result_list <- lapply(seq_along(coef_indices), function(i) {
+    idx <- coef_indices[i]
+    tt <- topTable(ebfit, coef = idx, sort.by = "none", n = Inf)
+
+    # Calculate 95% confidence intervals
+    crit_value <- qt(0.975, ebfit$df.residual + ebfit$df.prior)
+    std_errors <- ebfit$stdev.unscaled[, idx] * sqrt(ebfit$s2.post)
+
+    tt$std_err <- std_errors
+    tt$upper <- tt$logFC + crit_value * std_errors
+    tt$lower <- tt$logFC - crit_value * std_errors
+    tt$predictor <- predictor_map[i]
+    tt$response <- rownames(tt)
+    tt
+  })
+
+  # Combine and format
+  effects <- do.call(rbind, result_list)
+  rownames(effects) <- NULL
+
+  effects %>%
+    dplyr::select(predictor, response, everything()) %>%
+    arrange(adj.P.Val)
+}
+
+# Map coefficients (use names from coef(), not topTable())
+predictor_map <- c(
+  "leaf_tissue_c" = "Leaf",
+  "Treatment-P" = "-P",
+  "GenotypeInv4m" = "Inv4m",
+  "Treatment-P:GenotypeInv4m" = "Inv4m:-P",
+  "leaf_tissue_c:Treatment-P" = "Leaf:-P",
+  "leaf_tissue_c:GenotypeInv4m" = "Leaf:Inv4m"
+)
+
+# Verify coefficient names match
+{
+  cat("Available coefficients:\n")
+  print(colnames(coef(ebfit)))
+}
+```
+
+## Create Combined Effects Table
+
+Combine all predictor results and annotate with gene information.
+
+```{r make_effect_table}
+# Define factor level order for predictors
+effect_order <- c("Leaf", "-P", "Leaf:-P", "Inv4m", "Inv4m:-P", "Leaf:Inv4m")
+
+effects_df <- extract_predictor_effects(ebfit, predictor_map) %>%
+  dplyr::rename(gene = "response") %>%
+  mutate(predictor = factor(predictor, levels = effect_order)) %>%
+  mutate(neglogP = -log10(adj.P.Val))
+
+# Add DEG and regulation flags
+effects_df <- effects_df %>%
+  mutate(is_DEG = adj.P.Val < 0.05) %>%
+  mutate(
+    regulation = case_when(
+      is_DEG & logFC > 0 ~ "Upregulated",
+      is_DEG & logFC < 0 ~ "Downregulated",
+      .default = "Unregulated"
+    )
+  )
+
+{
+  cat("\nTotal tests:", nrow(effects_df), "\n")
+  cat("Tests per predictor:\n")
+  print(table(effects_df$predictor))
+  cat("\nSignificant per predictor (FDR < 0.05):\n")
+  print(table(effects_df$predictor[effects_df$adj.P.Val < 0.05]))
+  cat("\nCombined effects table created:\n")
+  print(with(effects_df, table(predictor, regulation)))
+}
+```
+
+# Robust Outlier Detection
+
+Identifies extreme differentially expressed genes using robust Mahalanobis distance based on the Minimum Covariance Determinant (MCD) method. This approach is resistant to the influence of outliers themselves, providing more reliable outlier detection than classical methods.
+
+The MCD method estimates location and covariance using only the most central 75% of observations (`alpha = 0.75`), making it robust to contamination.
+
+```{r mahalanobis_outlier_function}
+#' Calculate robust Mahalanobis distance for one predictor
+#'
+#' @param per_predictor Data frame for a single predictor
+#' @param mcd_alpha Alpha parameter for MCD estimation
+#'
+#' @return Data frame with mahalanobis column added
+calculate_robust_distance <- function(per_predictor, mcd_alpha) {
+  # Extract bivariate data (logFC and -log10(FDR))
+  bivariate <- per_predictor %>%
+    dplyr::select(logFC, neglogP) %>%
+    as.matrix()
+
+  # Compute robust location and covariance using MCD
+  mcd_result <- covMcd(bivariate, alpha = mcd_alpha)
+
+  # Calculate robust Mahalanobis distances
+  per_predictor$mahalanobis <- mahalanobis(
+    x = bivariate,
+    center = mcd_result$center,
+    cov = mcd_result$cov
+  )
+
+  per_predictor
+}
+
+#' Add robust Mahalanobis outlier flags
+#'
+#' @param data Data frame with effects
+#' @param distance_quantile Quantile threshold for outlier detection
+#' @param FDR FDR threshold for significance
+#' @param mcd_alpha Alpha parameter for MCD estimation
+#'
+#' @return Data frame with mahalanobis and is_mh_outlier columns
+add_mahalanobis_outliers <- function(
+    data = NULL,
+    distance_quantile = 0.05,
+    FDR = 0.05,
+    mcd_alpha = 0.75
+) {
+  # Calculate robust Mahalanobis distance per predictor
+  data <- split(data, factor(data$predictor)) %>%
+    lapply(calculate_robust_distance, mcd_alpha = mcd_alpha) %>%
+    bind_rows()
+
+  # Chi-square cutoff for bivariate data (df = 2)
+  cutoff <- qchisq(p = 1 - distance_quantile, df = 2)
+
+  # Flag outliers: significant AND extreme distance
+  data$is_mh_outlier <- (data$adj.P.Val < FDR) & (data$mahalanobis > cutoff)
+
+  # Sort by distance within groups
+  data %>%
+    ungroup() %>%
+    group_by(predictor, regulation) %>%
+    arrange(-mahalanobis, .by_group = TRUE) %>%
+    ungroup()
+}
+```
+
+## Calculate Mahalanobis Distances and Outlier Flags
+
+```{r apply_mahalanobis}
+effects_df <- add_mahalanobis_outliers(
+  effects_df,
+  distance_quantile = 0.05,
+  FDR = 0.05
+)
+
+{
+  cat("\nMahalanobis outliers detected:\n")
+  print(with(effects_df, table(predictor, is_mh_outlier)))
+}
+```
+
+# Gene Annotation
+
+Load gene symbols, functional descriptions (Pannzer), and genomic coordinates (B73 v5 GFF3). Gene IDs are cleaned and coordinates imported as both GRanges (for overlap operations) and data.frame (for dplyr filtering).
+
+```{r load_gene_annotations}
+# Gene symbols and locus names
+gene_symbol <- read.table(
+  "/Users/fvrodriguez/Library/CloudStorage/GoogleDrive-frodrig4@ncsu.edu/My Drive/repos/inv4mRNA/data/gene_symbol.tab",
+  quote = "",
+  header = TRUE,
+  sep = "\t",
+  na.strings = ""
+)
+
+# Pannzer functional annotations
+pannzer <- read.table(
+  "../data/PANNZER_DESC.tab",
+  quote = "",
+  header = TRUE,
+  sep = "\t"
+) %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  dplyr::select(gene_model, desc)
+
+# Create unique gene symbol table
+gene_symbol_unique <- gene_symbol %>%
+  group_by(gene_model, locus_symbol) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+# Merge annotations
+gene_pannzer <- gene_symbol_unique %>%
+  left_join(pannzer, by = c("gene_model" = "gene_model")) %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::select(gene_model, locus_symbol, locus_name, desc)
+
+# Genomic coordinates (GRanges + data.frame)
+v5_gff_file <- "/Users/fvrodriguez/ref/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+genes_gr <- rtracklayer::import(v5_gff_file) %>%
+  subset(type == "gene" & seqnames %in% 1:10)
+genes <- as.data.frame(genes_gr)
+genes$ID <- gsub("gene:", "", genes$ID)
+
+{
+  cat("Annotations loaded:\n")
+  cat("  Gene symbols:", nrow(gene_symbol), "\n")
+  cat("  Pannzer descriptions:", nrow(pannzer), "\n")
+  cat("  Merged annotations:", nrow(gene_pannzer), "\n")
+  cat("  Genomic features:", nrow(genes), "genes across",
+      length(unique(genes$seqnames)), "chromosomes\n")
+}
+```
+
+## Define Genomic Regions of Interest
+
+Define three nested regions on chromosome 4:
+(1) Inv4m inversion proper (gene-defined boundaries),
+(2) shared introgression including flanking regions (manually verified from genotyping data), and
+(3) flanking regions (in introgression but outside inversion).
+
+```{r define_genomic_regions}
+# Inv4m inversion boundaries (defined by specific genes)
+inv4m_start <- genes[genes$ID == "Zm00001eb190470", "start"]
+inv4m_end <- genes[genes$ID == "Zm00001eb194800", "end"]
+
+# Shared introgression boundaries (from RNAseq genotype verification)
+introgression_start <- 157012149
+introgression_end <- 195900523
+
+# Extract gene IDs for each region
+inv4m_gene_ids <- genes %>%
+  filter(seqnames == 4, start >= inv4m_start, end <= inv4m_end) %>%
+  pull(ID)
+
+shared_introgression_gene_ids <- genes %>%
+  filter(seqnames == 4, start >= introgression_start, end <= introgression_end) %>%
+  pull(ID)
+
+flanking_introgression_gene_ids <- shared_introgression_gene_ids[
+  !(shared_introgression_gene_ids %in% inv4m_gene_ids)
+]
+
+{
+  cat("Inv4m inversion: Chr4:", inv4m_start, "-", inv4m_end,
+      "(", length(inv4m_gene_ids), "genes )\n")
+  cat("Shared introgression: Chr4:", introgression_start, "-", introgression_end,
+      "(", length(shared_introgression_gene_ids), "genes )\n")
+  cat("Introgressed flanking:", length(flanking_introgression_gene_ids), "genes\n")
+}
+```
+
+# Three-Tier DEG Classification
+
+The goal of this section is to classify differentially expressed genes (DEGs) into three tiers of stringency based on significance (FDR) and effect size (`log2FC`), as well as a final set of genes selected for deep-dive analysis.
+
+## Methodology for Fold Change Thresholds
+
+The effect sizes are interpreted differently based on the predictor:
+
+- **Leaf Position (`leaf` predictor)**: This was modeled as a continuous slope ($\beta$). To be considered a large effect, the total change across the 3 units (Leaf 1 → Leaf 4) must meet the $|\log_2FC|>3/2$ criterion.
+  $
+  |\text{Total Change}| = |3\beta| > 3/2 \implies |\beta| > 1/2 = 0.5
+  $
+  We use $|\beta| > 0.5$ as the threshold for the leaf slope and interaction with -P.
+
+- **Categorical Predictors (-P, Inv4m, Interaction)**: The standard large effect size threshold of $|\log_2FC| > 1.5$ is applied directly.
+
+## Significant DEGs
+
+This first tier identifies all genes that pass the statistical significance threshold, regardless of effect size.
+
+```{r significant_degs}
+{
+  cat("\nSignificant DEGs (is_DEG, FDR < 0.05) Count:\n")
+  print(with(effects_df, table(predictor, is_DEG)))
+}
+```
+
+## High-Confidence DEGs
+
+The second tier filters the significant DEGs further by applying the custom large effect size thresholds.
+
+```{r highconf_degs}
+is_large_effect <- rep(FALSE, nrow(effects_df))
+is_leaf <- effects_df$predictor == "Leaf"
+is_interaction <- effects_df$predictor == "Leaf:-P" |
+  effects_df$predictor == "Inv4m:-P" |
+  effects_df$predictor == "Leaf:Inv4m"
+
+is_large_effect[is_leaf & abs(effects_df$logFC) > 0.5] <- TRUE
+is_large_effect[is_interaction & abs(effects_df$logFC) > 0.5] <- TRUE
+is_large_effect[!is_leaf & abs(effects_df$logFC) > 1.5] <- TRUE
+
+effects_df <- effects_df %>%
+  mutate(is_hiconf_DEG = is_DEG & is_large_effect)
+
+{
+  cat("\nHigh-Confidence DEGs (is_hiconf_DEG) Count:\n")
+  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+  print(
+    with(
+      effects_df %>% filter(is_hiconf_DEG),
+      table(predictor, regulation, is_hiconf_DEG)
+    ) %>%
+      as_tibble() %>%
+      arrange(desc(predictor), desc(regulation))
+  )
+}
+```
+
+## Selected DEGs (Rank-Based)
+
+The final tier, `is_selected_DEG`, selects the most interesting genes for visualization and detailed annotation.
+
+```{r select_degs_by_rank}
+rank_threshold <- 10
+
+effects_df <- effects_df %>%
+  group_by(is_hiconf_DEG, predictor, regulation) %>%
+  mutate(
+    pval_rank = row_number(dplyr::desc(neglogP)),
+    mahal_rank = row_number(dplyr::desc(mahalanobis))
+  ) %>%
+  ungroup() %>%
+  mutate(
+    is_selected_DEG = (pval_rank <= rank_threshold & is_hiconf_DEG) |
+      (mahal_rank <= rank_threshold & is_hiconf_DEG)
+  )
+
+{
+  cat(sprintf(
+    "\nSelected DEGs (is_selected_DEG, Top N=%d by Rank) Count:\n",
+    rank_threshold
+  ))
+  with(
+    effects_df %>% filter(is_selected_DEG & regulation != "Unregulated"),
+    table(regulation, predictor, is_selected_DEG)
+  )
+}
+```
+
+## Annotate with Gene Information
+
+```{r annotate_effect_locus_name}
+# Join gene annotations (locus_name, desc come from gene_pannzer)
+effects_df <- effects_df %>%
+  left_join(
+    gene_pannzer,
+    by = c(gene = "gene_model"),
+    relationship = "many-to-many"
+  ) %>%
+  mutate(desc_merged = coalesce(locus_name, desc)) %>%
+  dplyr::select(predictor, regulation, gene, locus_symbol, desc_merged, everything()) %>%
+  inner_join(
+    genes %>%
+      dplyr::select(gene = ID, CHR = seqnames, BP = start) %>%
+      mutate(CHR = as.character(CHR) %>% as.integer()),
+    by = "gene"
+  )
+
+# Make locus_symbol the default locus_label
+# Remove symbols corresponding to DNA markers in the consensus map
+effects_df <- effects_df %>%
+  mutate(
+    locus_label = case_when(
+      is.na(locus_symbol) ~ NA_character_,
+      grepl("^si\\d*[a-h]", locus_symbol) ~ NA_character_,
+      grepl("^umc", locus_symbol) ~ NA_character_,
+      grepl("^csu", locus_symbol) ~ NA_character_,
+      grepl("^bnlg", locus_symbol) ~ NA_character_,
+      grepl("^php\\d\\d", locus_symbol) ~ NA_character_,
+      grepl("^csu\\d+\a", locus_symbol) ~ NA_character_,
+      grepl("^pco", locus_symbol) ~ NA_character_,
+      grepl("^IDP", locus_symbol) ~ NA_character_,
+      grepl("^TIDP\\d{4}", locus_symbol) ~ NA_character_,
+      grepl("^cl\\d*_\\d", locus_symbol) ~ NA_character_,
+      grepl("^cl\\d*_-", locus_symbol) ~ NA_character_,
+      grepl("^Zm00001eb", locus_symbol) ~ NA_character_,
+      grepl("^Zm00001d", locus_symbol) ~ NA_character_,
+      grepl("^GRM", locus_symbol) ~ NA_character_,
+      grepl("LOC\\d{4}", locus_symbol) ~ NA_character_,
+      TRUE ~ locus_symbol
+    )
+  )
+
+{
+  cat("\nAnnotations added:\n")
+  cat("  Final columns:", ncol(effects_df), "\n")
+  cat("  Genes with coordinates:\n")
+  print(with(effects_df, table(predictor, !is.na(effects_df$CHR))))
+}
+
+# Add curated locus labels
+curated <- read.csv("~/Desktop/selected_DEGs_leaf_interaction_model_curated.csv") %>%
+  dplyr::select(gene, locus_label, desc_merged) %>%
+  group_by(gene) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+# Coalesce curated locus_label into effects_df
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_curated")) %>%
+  mutate(desc_merged = ifelse(desc_merged == "", NA, desc_merged)) %>%
+  mutate(
+    locus_label = coalesce(locus_label_curated, locus_label),
+    desc_merged = coalesce(desc_merged_curated, desc_merged)
+  ) %>%
+  dplyr::select(-locus_label_curated, -desc_merged_curated)
+```
+
+## Add Region Classification
+
+Classify genes by genomic location relative to Inv4m.
+
+```{r add_region_classification}
+#' Count unique genes in a specified genomic region
+#'
+#' @param effects_df Data frame containing gene annotations and region indicators
+#' @param region Character string specifying the region column name
+#'
+#' @return Integer count of unique genes in the specified region
+count_genes_in_region <- function(effects_df, region) {
+  stopifnot(
+    is.data.frame(effects_df),
+    is.character(region),
+    region %in% names(effects_df),
+    "gene" %in% names(effects_df)
+  )
+
+  effects_df %>%
+    filter(.data[[region]]) %>%
+    distinct(gene) %>%
+    nrow()
+}
+
+effects_df <- effects_df %>%
+  mutate(
+    in_Inv4m = gene %in% inv4m_gene_ids,
+    in_cis = gene %in% shared_introgression_gene_ids,
+    in_flank = gene %in% flanking_introgression_gene_ids,
+    in_trans = !in_cis
+  )
+
+regions <- c("in_Inv4m", "in_cis", "in_flank", "in_trans")
+
+{
+  cat("\nRegion classification:\n")
+  print(sapply(regions, function(r) count_genes_in_region(effects_df, r)))
+}
+```
+
+# Regional Enrichment Analysis
+
+Test whether DEGs are enriched in specific genomic regions using Fisher's exact test.
+
+```{r fisher_helper_function}
+#' Run Fisher's exact test for regional enrichment
+#'
+#' @param data Data frame with region and DEG indicators
+#' @param region_col Column name for region indicator
+#' @param deg_col Column name for DEG indicator
+#'
+#' @return Tibble with enrichment statistics
+run_fisher <- function(data, region_col, deg_col) {
+  contingency <- table(data[[region_col]], data[[deg_col]])
+  fisher_result <- fisher.test(contingency)
+
+  tibble(
+    in_region_DEG = contingency[2, 2],
+    in_region_total = sum(contingency[2, ]),
+    outside_DEG = contingency[1, 2],
+    outside_total = sum(contingency[1, ]),
+    odds_ratio = fisher_result$estimate,
+    p_value = fisher_result$p.value,
+    enrichment = (contingency[2, 2] / sum(contingency[2, ])) /
+      (contingency[1, 2] / sum(contingency[1, ]))
+  )
+}
+```
+
+## DEG Enrichment by Region
+
+```{r fisher_tests_degs}
+# Create separate data frame for Inv4m predictor
+Region_effects <- effects_df %>%
+  filter(predictor == "Inv4m") %>%
+  mutate(outside = in_trans)
+
+# All DEG enrichment tests
+deg_tests <- bind_rows(
+  run_fisher(Region_effects, "in_cis", "is_DEG") %>%
+    mutate(comparison = "Shared introgression vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_flank | outside),
+    "in_flank",
+    "is_DEG"
+  ) %>%
+    mutate(comparison = "Flanking vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_Inv4m | outside),
+    "in_Inv4m",
+    "is_DEG"
+  ) %>%
+    mutate(comparison = "Inv4m vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_cis),
+    "in_Inv4m",
+    "is_DEG"
+  ) %>%
+    mutate(comparison = "Inv4m vs Flanking")
+) %>%
+  dplyr::select(comparison, everything())
+
+{
+  cat("DEG Enrichment (FDR < 0.05):\n")
+  print(deg_tests)
+}
+```
+
+## High-Confidence DEG Enrichment
+
+```{r fisher_tests_hiconf_degs}
+hiconf_deg_tests <- bind_rows(
+  run_fisher(Region_effects, "in_cis", "is_hiconf_DEG") %>%
+    mutate(comparison = "Shared introgression vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_flank | outside),
+    "in_flank",
+    "is_hiconf_DEG"
+  ) %>%
+    mutate(comparison = "Flanking vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_Inv4m | outside),
+    "in_Inv4m",
+    "is_hiconf_DEG"
+  ) %>%
+    mutate(comparison = "Inv4m vs Outside"),
+  run_fisher(
+    Region_effects %>% filter(in_cis),
+    "in_Inv4m",
+    "is_hiconf_DEG"
+  ) %>%
+    mutate(comparison = "Inv4m vs Flanking")
+) %>%
+  dplyr::select(comparison, everything())
+
+{
+  cat("\nHigh-confidence DEG Enrichment (FDR < 0.05, |logFC| > 1.5):\n")
+  print(hiconf_deg_tests)
+}
+```
+
+## Enrichment Interpretation
+
+```{r enrichment_interpretation}
+{
+  cat("\n=== Key Findings ===\n")
+  cat("1. DEGs are enriched in Inv4m region vs genome-wide\n")
+  cat("2. Both Inv4m and flanking show enrichment vs outside\n")
+  cat("3. Regional enrichment pattern observed for high-confidence DEGs\n")
+  cat("\nInterpretation: The introgression region (inversion + flanking)\n")
+  cat("shows elevated differential expression patterns.\n")
+}
+```
+
+# Quality Control Tables
+
+## Top 10 DEGs per Predictor and Regulation
+
+Showing top differentially expressed genes by adjusted p-value.
+
+```{r top_degs_table}
+top_degs_qc <- effects_df %>%
+  filter(is_DEG, regulation != "Unregulated") %>%
+  group_by(predictor, regulation) %>%
+  arrange(-neglogP, .by_group = TRUE) %>%
+  dplyr::slice(1:10) %>%
+  dplyr::select(
+    predictor, gene, locus_symbol,
+    desc_merged, logFC, neglogP
+  ) %>%
+  arrange(predictor, regulation, -neglogP)
+
+{
+  cat("\nTop 10 DEGs per predictor and regulation:\n")
+  print(top_degs_qc)
+}
+```
+
+## Top Mahalanobis Outliers
+
+Most extreme differentially expressed genes.
+
+```{r top_outliers_table}
+top_outliers_qc <- effects_df %>%
+  filter(is_mh_outlier) %>%
+  group_by(predictor, regulation) %>%
+  arrange(-mahalanobis, .by_group = TRUE) %>%
+  dplyr::slice(1:10) %>%
+  dplyr::select(
+    predictor, regulation, gene,
+    locus_symbol, desc_merged,
+    logFC, neglogP, mahalanobis
+  ) %>%
+  arrange(-neglogP)
+
+{
+  cat("\nTop Mahalanobis outliers per predictor and regulation:\n")
+  print(top_outliers_qc)
+}
+```
+
+## DEG Summary Statistics
+
+```{r deg_summary_tables}
+# Overall DEG counts by predictor
+overall_summary <- effects_df %>%
+  group_by(predictor) %>%
+  summarise(
+    total_genes = n(),
+    n_significant = sum(is_DEG),
+    n_DEG = sum(is_DEG),
+    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_selected_DEG = sum(is_selected_DEG),
+    pct_DEG = round(100 * n_DEG / total_genes, 2)
+  )
+
+# Region distribution for Inv4m effect
+inv4m_region_summary <- effects_df %>%
+  filter(predictor == "Inv4m", is_DEG) %>%
+  group_by(regulation, in_Inv4m, in_cis) %>%
+  summarise(n = n(), .groups = "drop")
+
+{
+  cat("\n=== DEG Summary Statistics ===\n")
+  print(overall_summary)
+  cat("\nInv4m DEGs by region and regulation:\n")
+  print(inv4m_region_summary)
+}
+```
+
+# Selected DEGs for Manuscript
+
+Extract selected DEGs for detailed presentation in manuscript tables.
+
+```{r selected_degs_table}
+selected_degs <- effects_df %>%
+  filter(is_selected_DEG) %>%
+  dplyr::select(
+    predictor,
+    regulation,
+    gene,
+    locus_symbol,
+    locus_label,
+    desc_merged,
+    std_err,
+    logFC,
+    neglogP,
+    mahalanobis,
+    pval_rank,
+    mahal_rank
+  ) %>%
+  arrange(predictor, regulation, -neglogP)
+
+{
+  cat("\n=== Selected DEGs for Manuscript ===\n")
+  cat("Total selected DEGs:", nrow(selected_degs), "\n")
+  cat("Counts by predictor and regulation:\n")
+  print(with(selected_degs, table(predictor, regulation)))
+}
+```
+
+## Selected DEGs: Phosphorus Effect
+
+Export selected DEGs specific to the phosphorus effect with pannzer description.
+
+```{r selected_p_degs}
+p_selected <- selected_degs %>%
+  mutate(
+    regulation = factor(
+      regulation,
+      levels = c("Upregulated", "Downregulated")
+    )
+  ) %>%
+  filter(predictor == "-P") %>%
+  arrange(regulation, -neglogP)
+
+{
+  cat("\nPhosphorus effect selected DEGs:\n")
+  cat("  Upregulated:", sum(p_selected$regulation == "Upregulated"), "\n")
+  cat("  Downregulated:", sum(p_selected$regulation == "Downregulated"), "\n")
+  print(p_selected)
+}
+```
+
+## Selected DEGs: Leaf Effect
+
+```{r selected_leaf_degs}
+leaf_selected <- selected_degs %>%
+  mutate(
+    regulation = factor(
+      regulation,
+      levels = c("Upregulated", "Downregulated")
+    )
+  ) %>%
+  filter(predictor == "Leaf") %>%
+  arrange(regulation, -neglogP)
+
+{
+  cat("\nLeaf stage effect selected DEGs:\n")
+  cat("  Upregulated:", sum(leaf_selected$regulation == "Upregulated"), "\n")
+  cat("  Downregulated:", sum(leaf_selected$regulation == "Downregulated"), "\n")
+  print(leaf_selected)
+}
+```
+
+## Selected DEGs: Leaf:Treatment Interaction
+
+Export selected DEGs specific to the leaf:treatment interaction.
+
+```{r selected_interaction_degs}
+interaction_selected <- selected_degs %>%
+  mutate(
+    regulation = factor(
+      regulation,
+      levels = c("Upregulated", "Downregulated")
+    )
+  ) %>%
+  group_by(regulation) %>%
+  filter(predictor == "Leaf:-P") %>%
+  arrange(regulation, -neglogP)
+
+{
+  cat("\nLeaf:Treatment interaction selected DEGs:\n")
+  cat("  Upregulated:", sum(interaction_selected$regulation == "Upregulated"), "\n")
+  cat("  Downregulated:",
+      sum(interaction_selected$regulation == "Downregulated"), "\n")
+  print(interaction_selected)
+}
+```
+
+# Plot Interactions
+
+## Spaghetti Plot
+
+```{r spaghetti_plot, fig.width=12, fig.height=10}
+# Load normalized expression data
+voomR <- readRDS("~/Desktop/normalized_expression_voom_object_leaf_trt.rda")
+
+# Define genes of interest - High_confidence interaction genes
+interaction_highconf <- effects_df %>%
+  filter(is_hiconf_DEG & predictor == "Leaf:-P")
+
+interaction_genes <- interaction_highconf %>%
+  pull(gene) %>%
+  unique()
+
+# Extract expression matrix for genes of interest
+expr_matrix <- voomR$E[interaction_genes, ]
+
+# Convert to long format and join with sample metadata
+expr_long <- as.data.frame(t(expr_matrix)) %>%
+  tibble::rownames_to_column("sample") %>%
+  pivot_longer(
+    cols = -sample,
+    names_to = "gene",
+    values_to = "log2CPM"
+  ) %>%
+  left_join(
+    voomR$targets %>%
+      tibble::rownames_to_column("sample") %>%
+      dplyr::select(sample, Treatment, leaf_tissue, Genotype),
+    by = "sample"
+  ) %>%
+  left_join(
+    interaction_highconf %>%
+      filter(predictor == "Leaf:-P") %>%
+      dplyr::select(gene, regulation) %>%
+      distinct(),
+    by = "gene"
+  )
+
+# Recode treatment levels
+expr_long$leafxP <- factor(expr_long$regulation)
+levels(expr_long$leafxP) <- c("Negative", "Positive")
+
+# Center expression per gene-treatment combination
+expr_long <- expr_long %>%
+  group_by(gene, Treatment) %>%
+  mutate(centered_log2CPM = log2CPM - mean(log2CPM)) %>%
+  ungroup()
+
+# Calculate mean centered expression per gene per leaf stage per treatment
+expr_summary <- expr_long %>%
+  group_by(gene, Treatment, leaf_tissue, leafxP) %>%
+  summarise(mean_log2CPM = mean(centered_log2CPM), .groups = "drop")
+
+# Create separate datasets for each treatment
+expr_minusP <- expr_summary %>% filter(Treatment == "-P")
+expr_plusP <- expr_summary %>% filter(Treatment == "+P")
+
+# Create spaghetti plot
+base_size <- 30
+
+# Create base plot for +P treatment (plotted first, will be in back)
+p_plusP_base <- expr_plusP %>%
+  ggplot(aes(x = leaf_tissue, y = mean_log2CPM, color = Treatment)) +
+  geom_line(
+    aes(group = interaction(gene, Treatment)),
+    alpha = 0.1,
+    linewidth = 0.8
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  geom_smooth(
+    aes(group = Treatment),
+    method = "lm",
+    formula = y ~ x,
+    se = FALSE,
+    linewidth = 2
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  facet_wrap(~leafxP, ncol = 2) +
+  labs(
+    x = "Leaf",
+    y = expression("Centered " * log[2] * "(CPM)")
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    plot.title = element_blank(),
+    axis.title.y = element_text(margin = margin(r = -10)),
+    plot.margin = margin(5.5, 7, 50, 5.5, "pt")
+  )
+
+# Overlay -P data on top (plotted second, will be in front)
+p_spaghetti <- p_plusP_base +
+  geom_line(
+    data = expr_minusP,
+    aes(
+      x = leaf_tissue, y = mean_log2CPM, color = Treatment,
+      group = interaction(gene, Treatment)
+    ),
+    alpha = 0.1,
+    linewidth = 0.8
+  ) +
+  geom_smooth(
+    data = expr_minusP,
+    aes(
+      x = leaf_tissue, y = mean_log2CPM, color = Treatment,
+      group = Treatment
+    ),
+    method = "lm",
+    formula = y ~ x,
+    se = FALSE,
+    linewidth = 2
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  scale_color_manual(
+    values = c("+P" = "gold", "-P" = "purple4"),
+    name = "Treatment"
+  ) +
+  guides(color = guide_legend(
+    override.aes = list(linewidth = 2, alpha = 1)
+  )) +
+  theme(
+    legend.position = c(0.4, 0.95),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill = "transparent"),
+    legend.box.background = element_rect(fill = "transparent", color = NA)
+  )
+
+p_spaghetti
+
+# Select top annotated genes per regulation direction
+interaction_for_profiles <- interaction_highconf %>%
+  mutate(regulation = factor(
+    regulation,
+    levels = c("Downregulated", "Upregulated")
+  )) %>%
+  filter(predictor == "Leaf:-P") %>%
+  group_by(regulation) %>%
+  arrange(regulation, -neglogP) %>%
+  dplyr::slice(1:12) %>%
+  ungroup() %>%
+  mutate(locus_label = paste0(
+    locus_label, " ", gene, "\n",
+    str_wrap(coalesce(locus_name, desc_merged),
+      width = 30,
+      whitespace_only = FALSE
+    )
+  )) %>%
+  mutate(locus_label = gsub("pco139502b |NA ", "", locus_label))
+
+interaction_for_profiles$locus_label <- gsub("^ +", "", interaction_for_profiles$locus_label)
+
+interaction_for_profiles$gene
+
+# Filter and annotate existing expr_long
+expr_plot <- expr_long %>%
+  inner_join(interaction_for_profiles) %>%
+  group_by(regulation) %>%
+  mutate(locus_label = forcats::fct_reorder(locus_label, -neglogP))
+
+# Define gene display order (top 2 per direction)
+gene_order <- interaction_for_profiles %>%
+  group_by(regulation) %>%
+  arrange(regulation, -neglogP) %>%
+  dplyr::slice(1:2) %>%
+  pull(gene)
+
+gene_order
+```
+
+## Reaction Norm Plot
+
+```{r reaction_norm_plot, fig.width=10, fig.height=12}
+p_gene <- expr_plot %>%
+  filter(gene %in% gene_order) %>%
+  group_by(regulation) %>%
+  arrange(regulation, -neglogP) %>%
+  ungroup() %>%
+  ggplot(aes(
+    x = leaf_tissue, y = log2CPM,
+    color = Treatment,
+    fill = Treatment,
+    group = Treatment,
+    shape = Treatment
+  )) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1) +
+  stat_summary(fun = mean, geom = "point", size = 5) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.1, linewidth = 1.5) +
+  scale_shape_manual(values = c(19, 25)) +
+  scale_fill_manual(
+    values = c("+P" = "gold", "-P" = "purple4"),
+    name = "Treatment"
+  ) +
+  scale_color_manual(
+    values = c("+P" = "gold", "-P" = "purple4"),
+    name = "Treatment"
+  ) +
+  guides(
+    color = "none",
+    shape = guide_legend(
+      override.aes = list(color = c("gold", "purple4"))
+    )
+  ) +
+  facet_wrap(~locus_label, scales = "free_y", ncol = 2, dir = "v") +
+  labs(
+    x = "Leaf",
+    y = expression(log[2] * "(CPM)")
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 16, face = "bold", hjust = 0),
+    plot.margin = margin(-53, 5.5, 5.5, 5.5, "pt"),
+    legend.background = element_rect(fill = "transparent"),
+    legend.box.background = element_rect(fill = "transparent", color = NA),
+    legend.position = c(0.075, 0.65),
+    legend.title = element_blank()
+  )
+
+p_gene
+```
+
+## Plot Individual Gene Interaction
+
+```{r individual_gene_interaction, fig.width=18, fig.height=14}
+plot_genes <- interaction_for_profiles %>%
+  group_by(regulation) %>%
+  dplyr::select(predictor:gene, locus_label, desc_merged, neglogP) %>%
+  distinct() %>%
+  arrange(regulation, -neglogP) %>%
+  dplyr::slice(1:10) %>%
+  pull(gene)
+
+p_interaction <- expr_plot %>%
+  filter(gene %in% plot_genes) %>%
+  group_by(regulation) %>%
+  arrange(regulation, -neglogP) %>%
+  ggplot(aes(
+    x = leaf_tissue, y = log2CPM,
+    color = Treatment, group = Treatment
+  )) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1) +
+  stat_summary(fun = mean, geom = "point", size = 5) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.1, linewidth = 1.5) +
+  scale_color_manual(
+    values = c("+P" = "gold", "-P" = "purple4"),
+    name = "Treatment"
+  ) +
+  guides(color = guide_legend(reverse = TRUE)) +
+  facet_wrap(~locus_label,
+    scales = "free_y",
+    ncol = 5, nrow = 4
+  ) +
+  labs(
+    x = "Leaf",
+    y = expression(log[2] * "(CPM)")
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 15, face = "bold", hjust = 0),
+    legend.background = element_rect(fill = "transparent"),
+    legend.box.background = element_rect(fill = "transparent", color = NA),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+
+p_interaction
+```
+
+## Plot Right Figure Panel
+
+```{r right_panel, fig.width=8, fig.height=15}
+# Combine plots
+right_panel <- cowplot::plot_grid(
+  p_spaghetti, p_gene,
+  ncol = 1,
+  align = "h",
+  axis = "lr"
+)
+
+ggsave(
+  "~/Desktop/right_panel.png",
+  plot = right_panel,
+  width = 8,
+  height = 15,
+  dpi = 150
+)
+
+right_panel
+
+{
+  cat("Spaghetti plot created with shadows\n")
+  cat("Total unique genes plotted:", length(plot_genes), "\n")
+}
+```
+
+# Export Results
+
+## Export Full Effects Table
+
+```{r export_full_effects, eval=FALSE}
+# Full effects table with all columns
+write.csv(
+  effects_df,
+  file = "~/Desktop/predictor_effects_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+{
+  cat("\nFull effects table exported:\n")
+  cat("  predictor_effects_leaf_interaction_model.csv\n")
+}
+```
+
+## Export Selected DEGs
+
+```{r export_selected_degs, eval=FALSE}
+# Selected DEGs for manuscript
+write.csv(
+  selected_degs,
+  file = "~/Desktop/selected_DEGs_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+# Phosphorus selected DEGs
+write.csv(
+  p_selected,
+  file = "~/Desktop/p_selected_DEGs_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+# Leaf selected DEGs
+write.csv(
+  leaf_selected,
+  file = "~/Desktop/leaf_selected_DEGs_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+# Inv4m selected DEGs
+write.csv(
+  selected_degs %>% filter(predictor == "Inv4m"),
+  file = "~/Desktop/inv4m_selected_DEGs_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+# Leaf:Treatment interaction selected DEGs
+write.csv(
+  interaction_selected,
+  file = "~/Desktop/leafxP_selected_DEGs_leaf_interaction_model.csv",
+  row.names = FALSE
+)
+
+{
+  cat("\nSelected DEG tables exported:\n")
+  cat("  selected_DEGs_leaf_interaction_model.csv - All selected DEGs\n")
+  cat("  p_selected_DEGs_leaf_interaction_model.csv - Phosphorus effect\n")
+  cat("  leaf_selected_DEGs_leaf_interaction_model.csv - Leaf effect\n")
+  cat("  inv4m_selected_DEGs_leaf_interaction_model.csv - Inv4m effect\n")
+  cat("  leafxP_selected_DEGs_leaf_interaction_model.csv - Leaf:Treatment interaction\n")
+}
+```
+
+# Summary
+
+This analysis identified differentially expressed genes across four main effects:
+
+- **Inv4m genotype**: Genes with different expression in Inv4m vs Control (|logFC| > 1.5, FDR < 0.05)
+- **Leaf position gradient**: Genes showing expression changes along the apical-basal axis (|logFC| > 0.5, FDR < 0.05)
+- **Phosphorus deficiency**: Genes responding to low P treatment (|logFC| > 1.5, FDR < 0.05)
+- **Leaf × Treatment interaction**: Genes where the leaf gradient differs between P treatments (|logFC| > 1.5, FDR < 0.05)
+
+## Key Findings
+
+- **MDS analysis revealed that**:
+  - Dimension 1 correlates with phosphorus treatment
+  - Dimension 2 correlates with leaf tissue position
+  - Dimension 3 correlates with genotype
+- Spatial covariates (`Plot_Row`, `Plot_Column`) were included to account for field position effects
+- **Region enrichment**: DEGs show enrichment in the Inv4m region, with patterns observed across both inversion and flanking regions
+
+## Three-tier classification:
+
+- **Significant DEGs** (FDR < 0.05): 17354 genes
+- **High-confidence DEGs** (FDR < 0.05, |logFC| > 1.5): 2937 genes
+- **Selected DEGs** (top 10 by significance/Mahalanobis): 122 genes
+
+## Output Files
+
+All results include:
+
+- Effect sizes (log2 fold change) with 95% confidence intervals
+- FDR-adjusted p-values
+- Gene annotations (symbols and descriptions)
+- Genomic coordinates
+- Region classification (cis/trans, within Inv4m)
+- Mahalanobis outlier flags
+- Three-tier DEG classifications
+
+The full effects table contains **144066 gene × predictor combinations**.
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```

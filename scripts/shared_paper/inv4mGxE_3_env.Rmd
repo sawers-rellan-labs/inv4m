@@ -1,0 +1,942 @@
+---
+title: "Genotype × Environment Analysis of inv4m: PSU2022, PSU2025, CLY2025"
+author: "Analysis of inv4m GxE Interactions"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      fig.width = 12, fig.height = 8)
+```
+
+## Overview
+
+This analysis examines **Genotype × Environment (GxE) interactions** for the inv4m introgression across three environments:
+
+- **PSU2022**: Pennsylvania environment (2022 season)
+- **PSU2025**: Pennsylvania environment (2025 season)
+- **CLY2025**: North Carolina environment (southern, 2025 season)
+
+**Research Questions:**
+1. Does inv4m show consistent effects across environments?
+2. Which traits (PH, DTA, DTS, GDDA, GDDS) exhibit significant GxE interactions?
+3. How do environmental conditions modify inv4m effects?
+
+## 1. Load Libraries and Data
+
+```{r load-libraries}
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+library(ggtext)
+library(ggbeeswarm)
+library(emmeans)
+library(effectsize)
+library(broom)
+library(patchwork)
+library(viridis)
+```
+
+```{r load-data}
+psu2022 <- read_csv("PSU2022_spatially_corrected_phenotypes.csv")
+psu2022$donor <- "MI21"
+
+psu2025 <- read_csv("PSU2025_spatially_corrected_phenotypes.csv")
+cly2025 <- read_csv("CLY2025_spatially_corrected_phenotypes.csv")
+
+cat("PSU2022 dimensions:", dim(psu2022), "\n")
+cat("PSU2025 dimensions:", dim(psu2025), "\n")
+cat("CLY2025 dimensions:", dim(cly2025), "\n")
+cat("PSU2022 genotypes:", paste(unique(psu2022$genotype), collapse = ", "), "\n")
+cat("PSU2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
+cat("CLY2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
+cat("PSU2022 donors:", paste(unique(psu2022$donor), collapse = ", "), "\n")
+cat("PSU2025 donors:", paste(unique(psu2025$donor), collapse = ", "), "\n")
+cat("CLY2025 donors:", paste(unique(cly2025$donor), collapse = ", "), "\n")
+
+psu2022 <- psu2022 %>%
+  mutate(
+    genotype = case_when(
+      genotype == "Inv4m" ~ "INV4M",
+      genotype == "CTRL" ~ "CTRL",
+      TRUE ~ genotype
+    )
+  )
+
+psu2025 <- psu2025 %>%
+  mutate(
+    genotype = case_when(
+      genotype == "Inv4m" ~ "INV4M",
+      genotype == "CTRL" ~ "CTRL",
+      TRUE ~ genotype
+    )
+  )
+
+cat("\nAfter standardization:\n")
+cat("PSU2022 genotypes:", paste(unique(psu2022$genotype), collapse = ", "), "\n")
+cat("PSU2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
+cat("CLY2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
+
+shared_phenotypes <- c("PH", "DTA", "DTS", "GDDA", "GDDS")
+common_donors <- "MI21"
+```
+
+## 2. Data Integration for GxE Analysis
+
+```{r gxe-data-prep}
+gxe_data_list <- list()
+
+for (donor in "MI21") {
+  cat("\n=== Preparing GxE data for", donor, "===\n")
+  
+  psu2022_donor <- psu2022 %>%
+    filter(donor == !!donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(environment = "PSU2022", donor = donor) %>%
+    filter(complete.cases(.))
+  
+  psu2025_donor <- psu2025 %>%
+    filter(donor == !!donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(environment = "PSU2025", donor = donor) %>%
+    filter(complete.cases(.))
+  
+  cly2025_donor <- cly2025 %>%
+    filter(donor == !!donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(environment = "CLY2025", donor = donor) %>%
+    filter(complete.cases(.))
+  
+  donor_gxe <- bind_rows(psu2022_donor, psu2025_donor, cly2025_donor) %>%
+    mutate(
+      genotype = factor(genotype, levels = c("CTRL", "INV4M")),
+      environment = factor(environment, levels = c("PSU2022", "PSU2025", "CLY2025"))
+    )
+  
+  gxe_data_list[[donor]] <- donor_gxe
+  
+  cat("Sample sizes by environment and genotype:\n")
+  print(table(donor_gxe$environment, donor_gxe$genotype))
+}
+
+gxe_all_data <- bind_rows(gxe_data_list, .id = "donor")
+
+cat("\nFinal combined dataset dimensions:", dim(gxe_all_data), "\n")
+cat("Traits available:", paste(shared_phenotypes, collapse = ", "), "\n")
+```
+
+## 3. Phase 1: Within-Environment Analysis
+
+### 3.1 PSU2022 Analysis
+
+```{r psu2022-analysis}
+psu2022_results_list <- list()
+
+for (current_donor in "MI21") {
+  cat("\n=== PSU2022", current_donor, "Analysis ===\n")
+  
+  psu2022_donor <- gxe_all_data %>%
+    filter(environment == "PSU2022") %>%
+    filter(donor == current_donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(genotype = factor(genotype, levels = c("CTRL", "INV4M"))) %>%
+    filter(complete.cases(.))
+  
+  if (nrow(psu2022_donor) < 6) {
+    cat("Insufficient data for", current_donor, "(n =", nrow(psu2022_donor), ")\n")
+    next
+  }
+  
+  cat("Sample size:", nrow(psu2022_donor), "plots\n")
+  print(table(psu2022_donor$genotype))
+  
+  psu2022_results <- psu2022_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    t_test(value ~ genotype) %>%
+    adjust_pvalue(method = "fdr") %>%
+    add_significance("p.adj")
+  
+  psu2022_cohens_d <- psu2022_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    rstatix::cohens_d(value ~ genotype, ref.group = "INV4M", 
+                      ci = TRUE, var.equal = FALSE)
+  
+  psu2022_summary <- psu2022_results %>%
+    left_join(psu2022_cohens_d %>% select(trait, effsize, magnitude), 
+              by = "trait") %>%
+    mutate(donor = current_donor, environment = "PSU2022")
+  
+  psu2022_results_list[[current_donor]] <- psu2022_summary
+  
+  cat("Results for", current_donor, ":\n")
+  print(psu2022_summary)
+}
+
+psu2022_all_results <- bind_rows(psu2022_results_list)
+```
+
+### 3.2 PSU2025 Analysis
+
+```{r psu2025-analysis}
+psu2025_results_list <- list()
+
+for (current_donor in "MI21") {
+  cat("\n=== PSU2025", current_donor, "Analysis ===\n")
+  
+  psu2025_donor <- gxe_all_data %>%
+    filter(environment == "PSU2025") %>%
+    filter(donor == current_donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(genotype = factor(genotype, levels = c("CTRL", "INV4M"))) %>%
+    filter(complete.cases(.))
+  
+  if (nrow(psu2025_donor) < 6) {
+    cat("Insufficient data for", current_donor, "(n =", nrow(psu2025_donor), ")\n")
+    next
+  }
+  
+  cat("Sample size:", nrow(psu2025_donor), "plots\n")
+  print(table(psu2025_donor$genotype))
+  
+  psu_results <- psu2025_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    t_test(value ~ genotype) %>%
+    adjust_pvalue(method = "fdr") %>%
+    add_significance("p.adj")
+  
+  psu_cohens_d <- psu2025_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    rstatix::cohens_d(value ~ genotype, ref.group = "INV4M", 
+                      ci = TRUE, var.equal = FALSE) 
+  
+  psu_summary <- psu_results %>%
+    left_join(psu_cohens_d %>% select(trait, effsize, magnitude), 
+              by = "trait") %>%
+    mutate(donor = current_donor, environment = "PSU2025")
+  
+  psu2025_results_list[[current_donor]] <- psu_summary
+  
+  cat("Results for", current_donor, ":\n")
+  print(psu_summary)
+}
+
+psu2025_all_results <- bind_rows(psu2025_results_list)
+```
+
+### 3.3 CLY2025 Analysis
+
+```{r cly2025-analysis}
+cly2025_results_list <- list()
+
+for (current_donor in "MI21") {
+  cat("\n=== CLY2025", current_donor, "Analysis ===\n")
+  
+  cly2025_donor <- gxe_all_data %>%
+    filter(environment == "CLY2025") %>%
+    filter(donor == current_donor, genotype %in% c("CTRL", "INV4M")) %>%
+    select(plotId, genotype, all_of(shared_phenotypes)) %>%
+    mutate(genotype = factor(genotype, levels = c("CTRL", "INV4M"))) %>%
+    filter(complete.cases(.))
+  
+  if (nrow(cly2025_donor) < 6) {
+    cat("Insufficient data for", current_donor, "(n =", nrow(cly2025_donor), ")\n")
+    next
+  }
+  
+  cat("Sample size:", nrow(cly2025_donor), "plots\n")
+  print(table(cly2025_donor$genotype))
+  
+  cly_results <- cly2025_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    t_test(value ~ genotype) %>%
+    adjust_pvalue(method = "fdr") %>%
+    add_significance("p.adj")
+  
+  cly_cohens_d <- cly2025_donor %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait) %>%
+    rstatix::cohens_d(value ~ genotype, ref.group = "INV4M", 
+                      ci = TRUE, var.equal = FALSE)
+  
+  cly_summary <- cly_results %>%
+    left_join(cly_cohens_d %>% select(trait, effsize, magnitude), 
+              by = "trait") %>%
+    mutate(donor = current_donor, environment = "CLY2025")
+  
+  cly2025_results_list[[current_donor]] <- cly_summary
+  
+  cat("Results for", current_donor, ":\n")
+  print(cly_summary)
+}
+
+cly2025_all_results <- bind_rows(cly2025_results_list)
+```
+
+## 4. Phase 2: GxE Statistical Analysis
+
+### 4.1 GxE ANOVA by Donor
+
+```{r gxe-anova-by-donor}
+gxe_results_by_donor <- list()
+
+for (donor in common_donors) {
+  cat("\n=== GxE Analysis for", donor, "===\n")
+  
+  donor_data <- gxe_all_data
+  gxe_anova_results <- list()
+  gxe_effect_sizes <- list()
+  gxe_emmeans_results <- list()
+  
+  for (trait in shared_phenotypes) {
+    cat("\n--- Analyzing", trait, "for", donor, "---\n")
+    
+    trait_data <- donor_data %>%
+      select(plotId, genotype, environment, value = all_of(trait)) %>%
+      filter(!is.na(value))
+    
+    if (nrow(trait_data) < 8) {
+      cat("Insufficient data for", trait, "in", donor, "\n")
+      next
+    }
+    
+    anova_model <- aov(value ~ genotype * environment, data = trait_data)
+    anova_summary <- summary(anova_model)
+    
+    effect_sizes <- eta_squared(anova_model, partial = TRUE)
+    
+    gxe_anova_results[[trait]] <- anova_summary
+    gxe_effect_sizes[[trait]] <- effect_sizes
+    
+    cat("ANOVA Results for", trait, "in", donor, ":\n")
+    print(anova_summary)
+    
+    if (length(unique(trait_data$environment)) > 1 && 
+        length(unique(trait_data$genotype)) > 1) {
+      emmeans_result <- emmeans(anova_model, ~ genotype | environment)
+      emmeans_contrast <- pairs(emmeans_result)
+      
+      gxe_emmeans_results[[trait]] <- list(
+        means = emmeans_result,
+        contrasts = emmeans_contrast
+      )
+      
+      cat("Estimated Marginal Means:\n")
+      print(emmeans_result)
+    }
+  }
+  
+  gxe_results_by_donor[[donor]] <- list(
+    anova = gxe_anova_results,
+    effect_sizes = gxe_effect_sizes,
+    emmeans = gxe_emmeans_results
+  )
+}
+```
+
+### 4.2 GxE Interaction Summary
+
+```{r gxe-interaction-summary}
+gxe_interaction_summary_list <- list()
+
+get_anova_df <- function(anobj) {
+  if (inherits(anobj, "aov")) {
+    s <- summary(anobj)
+    if (!is.null(s[[1]])) return(as.data.frame(s[[1]]))
+  }
+  if (inherits(anobj, "summary.aov") || is.list(anobj)) {
+    first <- anobj[[1]]
+    if (is.data.frame(first) || inherits(first, "matrix")) 
+      return(as.data.frame(first))
+  }
+  safe <- tryCatch(as.data.frame(anobj), error = function(e) NULL)
+  return(safe)
+}
+
+find_row_index <- function(df, term_patterns) {
+  if (is.null(df)) return(NA_integer_)
+  rn <- rownames(df)
+  for (pat in term_patterns) {
+    idx <- which(rn == pat)
+    if (length(idx) == 1) return(idx[1])
+  }
+  for (pat in term_patterns) {
+    words <- unlist(strsplit(gsub("[^[:alnum:]]", " ", pat), "\\s+"))
+    words <- words[nzchar(words)]
+    if (length(words) == 0) next
+    logicals <- sapply(rn, function(x) 
+      all(sapply(words, function(w) grepl(w, x, ignore.case = TRUE))))
+    if (any(logicals)) return(which(logicals)[1])
+  }
+  idx_colon <- which(grepl(":", rn))
+  if (length(idx_colon) > 0) {
+    for (pat in term_patterns) {
+      words <- unlist(strsplit(gsub("[^[:alnum:]]", " ", pat), "\\s+"))
+      words <- words[nzchar(words)]
+      cand <- idx_colon[sapply(idx_colon, function(i) 
+        all(sapply(words, function(w) grepl(w, rn[i], ignore.case = TRUE))))]
+      if (length(cand) > 0) return(cand[1])
+    }
+    return(idx_colon[1])
+  }
+  return(NA_integer_)
+}
+
+for (donor in common_donors) {
+  if (!donor %in% names(gxe_results_by_donor)) next
+  donor_results <- gxe_results_by_donor[[donor]]
+
+  interaction_summary <- tibble(
+    donor = donor,
+    trait = shared_phenotypes,
+    interaction_p = NA_real_,
+    interaction_eta2 = NA_real_,
+    genotype_p = NA_real_,
+    environment_p = NA_real_
+  )
+
+  for (i in seq_along(shared_phenotypes)) {
+    trait <- shared_phenotypes[i]
+    if (!trait %in% names(donor_results$anova)) next
+
+    anobj <- donor_results$anova[[trait]]
+    an_df <- get_anova_df(anobj)
+    if (is.null(an_df)) next
+
+    pcol_idx <- grep("^Pr\\(>F\\)$", colnames(an_df))
+    if (length(pcol_idx) == 0) pcol_idx <- ncol(an_df)
+
+    idx_int <- find_row_index(an_df, c("genotype:environment", 
+                                       "genotype: environment", 
+                                       "environment:genotype", 
+                                       "genotype x environment"))
+    idx_gen <- find_row_index(an_df, c("genotype"))
+    idx_env <- find_row_index(an_df, c("environment"))
+
+    if (!is.na(idx_int) && idx_int <= nrow(an_df)) {
+      interaction_summary$interaction_p[i] <- as.numeric(an_df[idx_int, pcol_idx])
+    }
+    if (!is.na(idx_gen) && idx_gen <= nrow(an_df)) {
+      interaction_summary$genotype_p[i] <- as.numeric(an_df[idx_gen, pcol_idx])
+    }
+    if (!is.na(idx_env) && idx_env <= nrow(an_df)) {
+      interaction_summary$environment_p[i] <- as.numeric(an_df[idx_env, pcol_idx])
+    }
+
+if (trait %in% names(donor_results$effect_sizes)) {
+  es_df <- donor_results$effect_sizes[[trait]]
+  
+  # Check for either Eta2 or Eta2_partial column
+  eta_col <- if ("Eta2_partial" %in% colnames(es_df)) {
+    "Eta2_partial"
+  } else if ("Eta2" %in% colnames(es_df)) {
+    "Eta2"
+  } else {
+    NULL
+  }
+  
+  if (!is.null(eta_col) && "Parameter" %in% colnames(es_df)) {
+    int_row <- which(es_df$Parameter == "genotype:environment")
+    if (length(int_row) == 0) {
+      int_row <- grep("genotype.*environment", es_df$Parameter, 
+                     ignore.case = TRUE)
+    }
+    if (length(int_row) >= 1) {
+      interaction_summary$interaction_eta2[i] <- 
+        as.numeric(es_df[[eta_col]][int_row[1]])
+    }
+  }
+}
+
+  }
+
+  interaction_summary <- interaction_summary %>%
+    mutate(
+      interaction_sig = case_when(
+        !is.na(interaction_p) & interaction_p < 0.001 ~ "***",
+        !is.na(interaction_p) & interaction_p < 0.01  ~ "**",
+        !is.na(interaction_p) & interaction_p < 0.05  ~ "*",
+        !is.na(interaction_p)                         ~ "ns",
+        TRUE                                          ~ NA_character_
+      ),
+      genotype_sig = case_when(
+        !is.na(genotype_p) & genotype_p < 0.001 ~ "***",
+        !is.na(genotype_p) & genotype_p < 0.01  ~ "**",
+        !is.na(genotype_p) & genotype_p < 0.05  ~ "*",
+        !is.na(genotype_p)                      ~ "ns",
+        TRUE                                    ~ NA_character_
+      ),
+      environment_sig = case_when(
+        !is.na(environment_p) & environment_p < 0.001 ~ "***",
+        !is.na(environment_p) & environment_p < 0.01  ~ "**",
+        !is.na(environment_p) & environment_p < 0.05  ~ "*",
+        !is.na(environment_p)                         ~ "ns",
+        TRUE                                          ~ NA_character_
+      )
+    )
+
+  gxe_interaction_summary_list[[donor]] <- interaction_summary
+
+  cat("\nGxE Interaction Summary for", donor, ":\n")
+  print(interaction_summary)
+}
+
+gxe_all_interactions <- bind_rows(gxe_interaction_summary_list)
+```
+### 4.3 Overall Genotype Main Effects (Marginal Means)
+```{r overall-genotype-effects}
+overall_genotype_effects <- list()
+
+for (donor in common_donors) {
+  cat("\n=== Overall Genotype Main Effects for", donor, "===\n")
+  
+  donor_data <- gxe_all_data
+  
+  for (trait in shared_phenotypes) {
+    cat("\n--- Analyzing", trait, "---\n")
+    
+    trait_data <- donor_data %>%
+      select(plotId, genotype, environment, value = all_of(trait)) %>%
+      filter(!is.na(value))
+    
+    if (nrow(trait_data) < 8) next
+    
+    anova_model <- aov(value ~ genotype * environment, data = trait_data)
+    
+    # Marginal means across all environments
+    genotype_marginal <- emmeans(anova_model, ~ genotype)
+    genotype_contrast <- pairs(genotype_marginal, reverse = TRUE)
+    
+    overall_genotype_effects[[trait]] <- list(
+      marginal_means = genotype_marginal,
+      contrast = genotype_contrast
+    )
+    
+    cat("\nMarginal Means (averaged across environments):\n")
+    print(genotype_marginal)
+    cat("\nPairwise Contrast:\n")
+    print(genotype_contrast)
+  }
+}
+
+# Extract into a summary table
+overall_summary <- tibble(
+  trait = shared_phenotypes,
+  CTRL = NA_real_,
+  INV4M = NA_real_,
+  effect = NA_real_,
+  SE = NA_real_,
+  df = NA_real_,
+  t_ratio = NA_real_,
+  p_value = NA_real_
+)
+
+for (i in seq_along(shared_phenotypes)) {
+  trait <- shared_phenotypes[i]
+  if (!trait %in% names(overall_genotype_effects)) next
+  
+  means_df <- as.data.frame(overall_genotype_effects[[trait]]$marginal_means)
+  contrast_df <- as.data.frame(overall_genotype_effects[[trait]]$contrast)
+  
+  overall_summary$CTRL[i] <- means_df$emmean[means_df$genotype == "CTRL"]
+  overall_summary$INV4M[i] <- means_df$emmean[means_df$genotype == "INV4M"]
+  overall_summary$effect[i] <- contrast_df$estimate[1]
+  overall_summary$SE[i] <- contrast_df$SE[1]
+  overall_summary$df[i] <- contrast_df$df[1]
+  overall_summary$t_ratio[i] <- contrast_df$t.ratio[1]
+  overall_summary$p_value[i] <- contrast_df$p.value[1]
+}
+
+overall_summary <- overall_summary %>%
+  mutate(
+    CI_lower = effect - qt(0.975, df) * SE,
+    CI_upper = effect + qt(0.975, df) * SE,
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+cat("\n=== OVERALL GENOTYPE MAIN EFFECTS SUMMARY (emmeans) ===\n")
+print(overall_summary)
+
+write_csv(overall_summary, "overall_genotype_main_effects.csv")
+```
+
+## 5. Phase 3: Comprehensive Visualization
+
+### 5.1 Interaction Plots by Donor
+
+```{r interaction-plots-by-donor, fig.width=15, fig.height=10}
+pheno_theme <- theme_classic2(base_size = 16) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = element_markdown(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(face = "bold", color = "black"),
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 14),
+    legend.position = "none"
+  )
+
+for (donor in common_donors) {
+  cat("\n=== Creating interaction plots for", donor, "===\n")
+  
+  interaction_stats <- gxe_all_data %>%
+    pivot_longer(cols = all_of(shared_phenotypes), 
+                 names_to = "trait", values_to = "value") %>%
+    group_by(trait, genotype, environment) %>%
+    summarise(
+      mean_value = mean(value, na.rm = TRUE),
+      se_value = sd(value, na.rm = TRUE) / sqrt(n()),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      trait = factor(trait, levels = shared_phenotypes),
+      environment = factor(environment, levels = c("PSU2022", "PSU2025", "CLY2025"))
+    )
+  
+  interaction_plot <- ggplot(interaction_stats, 
+                            aes(x = environment, y = mean_value, 
+                                color = genotype, group = genotype)) +
+    geom_line(size = 1.2, alpha = 0.8) +
+    geom_point(size = 3) +
+    geom_errorbar(aes(ymin = mean_value - se_value, 
+                     ymax = mean_value + se_value),
+                  width = 0.1, size = 1) +
+    scale_color_manual(values = c("CTRL" = "gold", "INV4M" = "purple4")) +
+    facet_wrap(~ factor(trait, 
+                        levels= c("DTA", "DTS","PH", "GDDA", "GDDS",  "BL", "BW", "EBA")),
+               scales = "free_y", ncol = 3) +
+    labs(
+      title = paste("**Genotype × Environment Interaction Effects:**", 
+                   donor, "**donor**"),
+      subtitle = "Genotype means ± SE across environments",
+      x = "Environment",
+      y = "Trait Value",
+      color = "Genotype"
+    ) +
+    pheno_theme +
+    theme(legend.position = "top")
+  
+  print(interaction_plot)
+}
+```
+
+### 5.2 Effect Size Comparisons
+
+```{r effect-size-comparison, fig.width=12, fig.height=10}
+all_effect_sizes <- bind_rows(
+  psu2022_all_results %>% select(trait, donor, environment, magnitude, effsize),
+  psu2025_all_results %>% select(trait, donor, environment, magnitude, effsize),
+  cly2025_all_results %>% select(trait, donor, environment, magnitude, effsize)
+) %>%
+  filter(donor %in% common_donors) %>%
+  mutate(
+    trait = factor(trait, levels = shared_phenotypes),
+    environment = factor(environment, levels = c("PSU2022", "PSU2025", "CLY2025"))
+  )
+
+forest_plot <- ggplot(all_effect_sizes, 
+                     aes(x = effsize, y = interaction(trait, donor), 
+                         color = environment)) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.6) +
+  geom_point(size = 3, position = position_dodge(width = 0.4)) +
+  geom_text(aes(label = paste0("(", magnitude, ")")),
+            position = position_dodge(width = 0.4),
+            hjust = -0.2, size = 3) +
+  scale_color_manual(values = c("PSU2022" = "forestgreen", 
+                                "PSU2025" = "royalblue", 
+                                "CLY2025" = "tomato")) +
+  labs(
+    title = "**Effect Sizes (Cohen's d) of inv4m Across Environments**",
+    subtitle = "Positive values indicate INV4M > CTRL",
+    x = "Cohen's d (Effect Size)",
+    y = "Trait × Donor",
+    color = "Environment"
+  ) +
+  pheno_theme +
+  theme(
+    legend.position = "top",
+    axis.text.y = element_text(size = 10)
+  )
+
+print(forest_plot)
+```
+
+## 6. Summary and Export Results
+
+### 6.1 Summary Tables
+
+```{r summary-tables}
+cat("=== FINAL SUMMARY ===\n\n")
+
+cat("1. PSU2022 Results:\n")
+if (nrow(psu2022_all_results) > 0) {
+  print(psu2022_all_results)
+} else {
+  cat("No PSU2022 results available\n")
+}
+
+cat("\n2. PSU2025 Results:\n")
+if (nrow(psu2025_all_results) > 0) {
+  print(psu2025_all_results)
+} else {
+  cat("No PSU2025 results available\n")
+}
+
+cat("\n3. CLY2025 Results:\n")
+if (nrow(cly2025_all_results) > 0) {
+  print(cly2025_all_results)
+} else {
+  cat("No CLY2025 results available\n")
+}
+
+cat("\n4. GxE Interaction Effects:\n")
+if (nrow(gxe_all_interactions) > 0) {
+  print(gxe_all_interactions)
+} else {
+  cat("No GxE interaction results available\n")
+}
+```
+
+### 6.2 Export Results
+
+```{r export-results}
+if (nrow(psu2022_all_results) > 0) {
+  write_csv(psu2022_all_results, "PSU2022_inv4m_results.csv")
+}
+
+if (nrow(psu2025_all_results) > 0) {
+  write_csv(psu2025_all_results, "PSU2025_inv4m_results.csv")
+}
+
+if (nrow(cly2025_all_results) > 0) {
+  write_csv(cly2025_all_results, "CLY2025_inv4m_results.csv")
+}
+
+if (nrow(gxe_all_interactions) > 0) {
+  write_csv(gxe_all_interactions, "three_env_GxE_interaction_results.csv")
+}
+
+if (nrow(all_effect_sizes) > 0) {
+  write_csv(all_effect_sizes, "three_env_effect_sizes_by_environment.csv")
+}
+
+if (nrow(gxe_all_data) > 0) {
+  write_csv(gxe_all_data, "three_env_combined_gxe_dataset.csv")
+}
+
+cat("Results exported to CSV files\n")
+```
+
+## 7. Key Findings
+
+```{r key-findings}
+cat("=== KEY FINDINGS ===\n\n")
+
+if (nrow(gxe_all_interactions) > 0) {
+  sig_interactions <- gxe_all_interactions %>%
+    filter(interaction_p < 0.05, !is.na(interaction_p))
+  
+  if (nrow(sig_interactions) > 0) {
+    cat("Significant GxE interactions (p < 0.05):\n")
+    print(sig_interactions %>% 
+            select(donor, trait, interaction_p, interaction_sig, interaction_eta2))
+  } else {
+    cat("No significant GxE interactions detected (p < 0.05)\n")
+  }
+  
+  cat("\nSummary by donor:\n")
+  donor_summary <- gxe_all_interactions %>%
+    group_by(donor) %>%
+    summarise(
+      traits_tested = sum(!is.na(interaction_p)),
+      significant_interactions = sum(interaction_p < 0.05, na.rm = TRUE),
+      .groups = "drop"
+    )
+  print(donor_summary)
+  
+} else {
+  cat("No GxE analysis results available\n")
+}
+```
+
+## Calculate Raw Effect Sizes (Mean Differences)
+```{r raw-effect-sizes}
+calculate_raw_effects <- function(data, traits) {
+  data %>%
+    pivot_longer(cols = all_of(traits), 
+                 names_to = "trait", 
+                 values_to = "value") %>%
+    group_by(trait, genotype) %>%
+    summarise(
+      mean_value = mean(value, na.rm = TRUE),
+      sd_value = sd(value, na.rm = TRUE),
+      n = n(),
+      se = sd_value / sqrt(n),
+      .groups = "drop"
+    ) %>%
+    pivot_wider(
+      names_from = genotype,
+      values_from = c(mean_value, sd_value, n, se)
+    ) %>%
+    mutate(
+      raw_effect = mean_value_INV4M - mean_value_CTRL,
+      se_diff = sqrt(se_INV4M^2 + se_CTRL^2)
+    )
+}
+
+psu2022_raw <- gxe_all_data %>%
+  filter(environment == "PSU2022") %>%
+  calculate_raw_effects(shared_phenotypes) %>%
+  mutate(environment = "PSU2022")
+
+psu2025_raw <- gxe_all_data %>%
+  filter(environment == "PSU2025") %>%
+  calculate_raw_effects(shared_phenotypes) %>%
+  mutate(environment = "PSU2025")
+
+cly2025_raw <- gxe_all_data %>%
+  filter(environment == "CLY2025") %>%
+  calculate_raw_effects(shared_phenotypes) %>%
+  mutate(environment = "CLY2025")
+
+all_raw_effects <- bind_rows(psu2022_raw, psu2025_raw, cly2025_raw)
+
+cat("=== RAW EFFECT SIZES (INV4M - CTRL) ===\n\n")
+print(all_raw_effects %>%
+  select(environment, trait, mean_value_CTRL, mean_value_INV4M, 
+         raw_effect, se_diff))
+
+across_env_raw <- gxe_all_data %>%
+  calculate_raw_effects(shared_phenotypes)
+
+cat("\n=== MAIN EFFECT ACROSS ALL ENVIRONMENTS ===\n")
+print(across_env_raw %>%
+  select(trait, mean_value_CTRL, mean_value_INV4M, raw_effect, se_diff))
+
+write_csv(all_raw_effects, "three_env_raw_effect_sizes.csv")
+write_csv(across_env_raw, "main_effect_raw_sizes.csv")
+```
+
+
+## Temperature Sensitivity Analysis
+```{r load-temp-data}
+hourly_temp <- read_csv("hourly_temp_100_DAP.csv")
+
+# Calculate temperature metrics per environment
+temp_metrics <- hourly_temp %>%
+  group_by(environment) %>%
+  summarise(
+    mean_temp = mean(T2M, na.rm = TRUE),
+    min_temp = min(T2M, na.rm = TRUE),
+    max_temp = max(T2M, na.rm = TRUE),
+    temp_range = max_temp - min_temp,
+    gdd_total = sum(pmax(T2M - 10, 0) / 24, na.rm = TRUE),  # base 10°C
+    .groups = "drop"
+  )
+
+print(temp_metrics)
+```
+# Join temperature data with phenotypes
+```{r temp-sensitivity-analysis}
+pheno_temp <- gxe_all_data %>%
+  left_join(temp_metrics, by = "environment")
+
+# Test if genotype modifies temperature sensitivity
+# Key hypothesis: interaction term tests if inv4m changes the slope
+model_dta_temp <- lm(DTA ~ mean_temp * genotype, data = pheno_temp)
+model_dts_temp <- lm(DTS ~ mean_temp * genotype, data = pheno_temp)
+model_ph_temp <- lm(PH ~ mean_temp * genotype, data = pheno_temp)
+
+cat("=== TEMPERATURE SENSITIVITY TESTS ===\n\n")
+
+cat("Days to Anthesis:\n")
+print(summary(model_dta_temp))
+cat("\nInterpretation: genotype:mean_temp interaction tests if inv4m changes temperature response\n")
+
+cat("\n\nDays to Silking:\n")
+print(summary(model_dts_temp))
+
+cat("\n\nPlant Height:\n")
+print(summary(model_ph_temp))
+
+# Extract interaction effects
+temp_sens_summary <- tibble(
+  trait = c("DTA", "DTS", "PH"),
+  interaction_coef = c(
+    coef(model_dta_temp)["mean_temp:genotypeINV4M"],
+    coef(model_dts_temp)["mean_temp:genotypeINV4M"],
+    coef(model_ph_temp)["mean_temp:genotypeINV4M"]
+  ),
+  interaction_se = c(
+    summary(model_dta_temp)$coefficients["mean_temp:genotypeINV4M", "Std. Error"],
+    summary(model_dts_temp)$coefficients["mean_temp:genotypeINV4M", "Std. Error"],
+    summary(model_ph_temp)$coefficients["mean_temp:genotypeINV4M", "Std. Error"]
+  ),
+  interaction_p = c(
+    summary(model_dta_temp)$coefficients["mean_temp:genotypeINV4M", "Pr(>|t|)"],
+    summary(model_dts_temp)$coefficients["mean_temp:genotypeINV4M", "Pr(>|t|)"],
+    summary(model_ph_temp)$coefficients["mean_temp:genotypeINV4M", "Pr(>|t|)"]
+  )
+)
+
+print(temp_sens_summary)
+
+write_csv(temp_sens_summary, "temperature_sensitivity_results.csv")
+```
+
+# Visualize temperature sensitivity (reaction norms)
+```{r temp-sensitivity-plots, fig.width=12, fig.height=8}
+reaction_norm_data <- pheno_temp %>%
+  pivot_longer(cols = c(DTA, DTS, PH), 
+               names_to = "trait", values_to = "value") %>%
+  group_by(environment, genotype, trait, mean_temp) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE),
+            se_value = sd(value, na.rm = TRUE) / sqrt(n()),
+            .groups = "drop")
+
+ggplot(reaction_norm_data, 
+       aes(x = mean_temp, y = mean_value, color = genotype, group = genotype)) +
+  geom_point(size = 3) +
+  geom_line(size = 1.2) +
+  geom_errorbar(aes(ymin = mean_value - se_value, 
+                    ymax = mean_value + se_value), width = 0.2) +
+  scale_color_manual(values = c("CTRL" = "gold", "INV4M" = "purple4")) +
+  facet_wrap(~ trait, scales = "free_y") +
+  labs(
+    title = "Temperature Sensitivity: Genotype Reaction Norms",
+    x = "Mean Temperature (°C)",
+    y = "Trait Value",
+    color = "Genotype"
+  ) +
+  theme_classic(base_size = 14)
+```
+
+## 8. Session Information
+
+```{r session-info}
+sessionInfo()
+```

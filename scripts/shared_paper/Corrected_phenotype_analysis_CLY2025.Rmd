@@ -1,0 +1,68 @@
+---
+title: 'CLY 2025 Spatial Analysis: SpATS Spatial Correction for All Phenotypes'
+author: "Fausto Rodríguez Zapata"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      fig.width = 12, fig.height = 8)
+```
+
+```{r load-libraries}
+# Additional libraries for visualization and reporting
+library(tidyverse)
+library(knitr)
+library(ggpubr)
+library(ggtext)
+```
+
+### 2.2. Load and Clean Data
+
+```{r load-data}
+# Load the dataset
+file_path <- "/Users/fvrodriguez/Desktop/inv4mHighland/data/CLY25_Inv4m.csv"
+if (!file.exists(file_path)) {
+  stop("Error: CLY25_Inv4m.csv not found in the working directory.")
+} else {
+  field_data_raw <- read.csv(file_path, na.strings = c("","#N/A","NA"))
+  
+  # Clean and prepare data
+  field_data <- field_data_raw %>%
+    # Calculate Estimated Blade Area (EBA) = 0.75 * BL * BW FIRST
+    mutate(EBA = 0.75 * BL * BW) %>%
+    rename(
+      plant_id = plant,
+      block = rep,
+      x = X_pos,
+      y = Y_pos,
+      inv4m = inv4m_gt
+    ) %>%
+    # Convert relevant columns to factors
+    mutate(across(c(plot_id, block, donor, inv4m), as.factor)) %>%
+    # Add small amount of noise to x coordinates to avoid identical positions
+    mutate(x = x + runif(n(), min = 0.0, max = 0.01))
+
+  # Define phenotypes to analyze
+  phenotypes <- c("DTA", "DTS", "LAE", "PH", "EN", "SL", "BL", "BW", "EBA")
+  
+  # Verify all phenotypes exist in the dataset
+  available_phenotypes <- intersect(phenotypes, names(field_data))
+  phenotypes <- available_phenotypes
+  
+  cat("Data loaded and cleaned successfully!\n")
+  cat("Phenotypes available for analysis:", paste(phenotypes, collapse = ", "), "\n")
+  cat("Data dimensions:", dim(field_data), "\n")
+}
+
+head(field_data)
+```
+

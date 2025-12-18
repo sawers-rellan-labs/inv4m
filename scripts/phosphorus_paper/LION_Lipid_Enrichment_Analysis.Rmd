@@ -1,0 +1,227 @@
+---
+title: "LION Lipid Enrichment Analysis"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+**Purpose**: Visualize LION (Lipid Ontology) enrichment results comparing lipid profiles between Low P and High P treatments.
+
+This is a plotting wrapper for pre-processed LION enrichment data. The enrichment analysis identifies biological categories of lipids (classes, cellular locations, biophysical properties) that are over-represented among differentially abundant lipids under phosphorus stress.
+
+# Libraries
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(ggrepel)
+library(ggpubr)
+```
+
+# Data Loading
+```{r load_data}
+# Load LION enrichment results
+enrichment <- read.csv("~/Desktop/LION-enrichment_LowPVSHighP.csv")
+
+cat("Loaded", nrow(enrichment), "enrichment terms\n")
+```
+
+# Data Preprocessing
+```{r clean_data}
+# Clean column names
+enrichment <- enrichment %>%
+  clean_names()
+
+# Calculate -log10 transformations
+enrichment <- enrichment %>%
+  mutate(
+    neg_log10_fdr = -log10(fdr_q_value),
+    neg_log10_pvalue = -log10(p_value)
+  )
+
+# Define significance threshold and create labels
+fdr_threshold <- 0.05
+
+enrichment <- enrichment %>%
+  mutate(
+    is_significant = fdr_q_value < fdr_threshold,
+    label = ifelse(is_significant, discription, "")
+  )
+
+# Filter to significant terms
+sig_enrichment <- enrichment %>%
+  filter(is_significant)
+
+# Diagnostics
+cat("Significant terms (FDR < 0.05):", nrow(sig_enrichment), "/", 
+    nrow(enrichment), "\n")
+cat("Upregulated:", sum(sig_enrichment$regulated == "UP"), "\n")
+cat("Downregulated:", sum(sig_enrichment$regulated == "DOWN"), "\n")
+```
+
+# Summary Tables
+```{r summary_tables}
+# Top upregulated terms
+top_up <- enrichment %>%
+  filter(regulated == "UP") %>%
+  arrange(fdr_q_value) %>%
+  select(term_id, discription, annotated, p_value, fdr_q_value, es) %>%
+  head(10)
+
+knitr::kable(
+  top_up,
+  caption = "Top 10 Upregulated Lipid Categories",
+  digits = 3
+)
+
+# Top downregulated terms
+top_down <- enrichment %>%
+  filter(regulated == "DOWN") %>%
+  arrange(fdr_q_value) %>%
+  select(term_id, discription, annotated, p_value, fdr_q_value, es) %>%
+  head(10)
+
+knitr::kable(
+  top_down,
+  caption = "Top 10 Downregulated Lipid Categories",
+  digits = 3
+)
+```
+
+# Visualization
+```{r create_plot, fig.width=14, fig.height=6}
+# Create bubble plot with labeled significant terms
+lion_plot <- sig_enrichment %>%
+  ggplot(aes(x = es , y = -log10(fdr_q_value) , label = label)) +
+  ggtitle("LION Lipid Enrichment -P vs P")+
+  geom_vline(
+    xintercept = 0,
+    linetype = "dashed",
+    color = "grey30",
+    size = 0.8
+  ) +
+  geom_point(
+    aes(size = annotated, color = neg_log10_fdr),
+    alpha = 0.8,
+    shape = 19, 
+  
+  ) +
+  geom_text_repel(
+    aes(color = neg_log10_fdr),
+    max.overlaps = 10,
+    min.segment.length = 2,
+    size = 6,
+    hjust=1,
+    box.padding = 0.2,
+    point.padding = 1,
+    force = 3
+  ) +
+  scale_color_gradient(
+    low = "dodgerblue",
+    high = "tomato",
+    name = expression(-log[10](FDR))
+  ) +
+  scale_size_continuous(
+    name = expression("Count"),
+    breaks = c(3, 6, 10)
+  ) +
+  xlab("Enrichment Score (ES)") +
+  ylab(expression(-log[10](q))) +
+
+  theme_classic2(base_size = 25) +
+  theme(
+    plot.title = element_text(size=25),
+   # legend.position = c(0.8, 0.2),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.key.size = unit(0.8, "lines"),
+    legend.spacing.x = unit(0.5, "cm")
+  )
+
+print(lion_plot)
+```
+
+# Biological Interpretation
+```{r interpretation}
+# Summary statistics
+cat("=== LION Enrichment Summary ===\n\n")
+cat("Total terms tested:", nrow(enrichment), "\n")
+cat("Significant terms:", nrow(sig_enrichment), "\n\n")
+
+# Most enriched upregulated category
+top_up_term <- enrichment %>%
+  filter(regulated == "UP") %>%
+  arrange(fdr_q_value) %>%
+  slice(1)
+
+cat("Top UP category:", top_up_term$discription, "\n")
+cat("  FDR:", format(top_up_term$fdr_q_value, scientific = TRUE, digits = 3), "\n")
+cat("  ES:", round(top_up_term$es, 3), "\n")
+cat("  Lipids:", top_up_term$annotated, "\n\n")
+
+# Most enriched downregulated category
+top_down_term <- enrichment %>%
+  filter(regulated == "DOWN") %>%
+  arrange(fdr_q_value) %>%
+  slice(1)
+
+cat("Top DOWN category:", top_down_term$discription, "\n")
+cat("  FDR:", format(top_down_term$fdr_q_value, scientific = TRUE, digits = 3), "\n")
+cat("  ES:", round(top_down_term$es, 3), "\n")
+cat("  Lipids:", top_down_term$annotated, "\n")
+```
+
+**Upregulated Under Low P (Storage Lipids)**:
+- Triacylglycerols: Neutral storage lipids in lipid droplets
+- Increased energy storage under P deficiency
+
+**Downregulated Under Low P (Membrane Lipids)**:
+- Membrane components: Structural phospholipids
+- Glycerophospholipids: Major membrane constituents
+- Polyunsaturated fatty acids: Important for membrane fluidity
+
+**Interpretation**: Phosphorus stress triggers membrane remodeling, reducing phosphorus-containing membrane lipids (phospholipids) while increasing phosphorus-free storage lipids (triacylglycerols).
+
+# Export
+```{r export_results, eval=FALSE}
+# Save for figure assembly
+saveRDS(
+  lion_plot,
+  file = "~/Desktop/figure_panels/lion_plot.rds"
+)
+
+ggsave(
+  lion_plot,
+  file = "~/Desktop/figure_panels/lion_plot.pdf",
+  width = 14,
+  height = 12
+)
+
+# Export processed data
+write.csv(
+  sig_enrichment,
+  file = "~/Desktop/LION_enrichment_significant.csv",
+  row.names = FALSE
+)
+```
+
+# Session Info
+```{r session_info}
+sessionInfo()
+```

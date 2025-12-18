@@ -1,0 +1,793 @@
+---
+title: "Consensus Module Enrichment Analysis with Direction-Split GO"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 7
+)
+```
+
+# Overview
+
+**Purpose**: Identify consensus modules associated with putative adaptive 
+phenotypes (DTA, DTS, PH) in Inv4m introgression lines, with GO enrichment 
+stratified by Inv4m regulation direction.
+
+**Approach**: 
+1. Calculate module eigengenes from consensus module assignments
+2. Test eigengene ~ leaf_tissue_c + Treatment + phenotype + (1|plotId)
+3. Split modules by Inv4m up/down regulation from effects_df
+4. GO enrichment of: (a) whole modules, (b) upregulated subsets, (c) downregulated subsets
+
+**Expected outcome**: Modules that covary with flowering time and plant height, 
+with direction-specific functional annotations.
+
+# Libraries
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(WGCNA)
+library(lme4)
+library(broom.mixed)
+library(clusterProfiler)
+library(patchwork)
+```
+
+# Data Import
+
+## Expression Data
+```{r load_expression}
+voomr <- readRDS(
+ "~/Desktop/normalized_expression_voom_object_leaf_trt.rda"
+)
+
+expr_matrix <- voomr$E
+cat("Expression matrix:", nrow(expr_matrix), "genes ×", 
+    ncol(expr_matrix), "samples\n")
+```
+
+## Sample Metadata
+```{r load_metadata}
+sample_info <- read.csv(
+  "/Users/fvrodriguez/Library/CloudStorage/GoogleDrive-frodrig4@ncsu.edu/My Drive/repos/inv4mRNA/data/PSU-PHO22_Metadata.csv"
+) %>%
+  mutate(
+    Treatment = factor(Treatment),
+    Genotype = factor(Genotype),
+    plotId = row,
+    leaf_tissue_c = scale(leaf_tissue, center = TRUE, scale = FALSE)[, 1]
+  )
+
+levels(sample_info$Treatment) <- c("+P", "-P")
+levels(sample_info$Genotype) <- c("CTRL", "Inv4m")
+
+cat("Samples:", nrow(sample_info), "\n")
+cat("Leaf tissue range:", range(sample_info$leaf_tissue), "\n")
+```
+
+## Phenotype Data
+```{r load_phenotypes}
+pheno_file <- paste0(
+  "/Users/fvrodriguez/Desktop/Desktop/",
+  "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv"
+)
+
+pheno_raw <- read.csv(pheno_file) %>%
+  rename(plotId = P22.) %>%
+  filter(plotId %in% sample_info$plotId) %>%
+  select(plotId, PH = Height_Anthesis, DTA, DTS)
+
+cat("Plants with phenotypes:", nrow(pheno_raw), "\n")
+cat("Phenotype correlations:\n")
+print(cor(pheno_raw[, c("DTA", "DTS", "PH")], use = "complete.obs"))
+```
+
+## Differential Expression Effects (Inv4m Direction)
+```{r load_effects}
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+# Extract Inv4m regulation direction
+inv4m_direction <- effects_df %>%
+  filter(predictor == "Inv4m") %>%
+  select(gene, regulation, logFC) %>%
+  distinct()
+
+cat("Genes with Inv4m direction:", nrow(inv4m_direction), "\n")
+cat("Direction distribution:\n")
+print(table(inv4m_direction$regulation))
+```
+
+## Consensus Module Assignments
+```{r load_modules}
+module_path <- paste0(
+  "/Users/fvrodriguez/Desktop/WGCNA/consensus/output/",
+  "run20251212_015143_30_per_module_2/06_consensus_network/",
+  "consensus_modules_assigned.csv"
+)
+
+consensus_modules <- read.csv(module_path)
+
+# Merge with Inv4m direction
+consensus_modules <- consensus_modules %>%
+  left_join(inv4m_direction, by = "gene")
+
+cat("Genes in consensus modules:", nrow(consensus_modules), "\n")
+cat("Module distribution:\n")
+print(table(consensus_modules$color))
+
+# Direction distribution within modules
+cat("\nDirection distribution per module:\n")
+consensus_modules %>%
+  count(color, regulation) %>%
+  pivot_wider(names_from = regulation, values_from = n, values_fill = 0) %>%
+  print()
+```
+
+## GO Annotation
+```{r load_go}
+TERM2NAME <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2NAME.rds"
+)
+
+TERM2GENE <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
+)
+```
+
+# Prepare Analysis Data
+
+**Purpose**: Merge metadata and subset expression to module genes.
+```{r prepare_data}
+# Merge sample info with phenotypes
+sample_pheno <- sample_info %>%
+  select(side_tag, plotId, Treatment, Genotype, leaf_tissue_c) %>%
+  left_join(pheno_raw, by = "plotId") %>%
+  filter(side_tag %in% colnames(expr_matrix))
+
+# Subset expression to module genes present in data
+module_genes <- consensus_modules$gene[
+  consensus_modules$gene %in% rownames(expr_matrix)
+]
+
+expr_modules <- expr_matrix[module_genes, sample_pheno$side_tag]
+
+cat("Samples with complete data:", nrow(sample_pheno), "\n")
+cat("Module genes in expression data:", length(module_genes), "\n")
+cat("Missing phenotypes - DTA:", sum(is.na(sample_pheno$DTA)),
+    "DTS:", sum(is.na(sample_pheno$DTS)),
+    "PH:", sum(is.na(sample_pheno$PH)), "\n")
+```
+
+# Calculate Module Eigengenes
+
+**Purpose**: Compute first principal component of each module as summary measure.
+```{r calculate_eigengenes}
+# Create color vector aligned with expression matrix genes
+gene_colors <- consensus_modules$color[
+  match(rownames(expr_modules), consensus_modules$gene)
+]
+
+# Calculate eigengenes (samples as rows, genes as columns)
+ME_result <- moduleEigengenes(
+  expr = t(expr_modules),
+  colors = gene_colors,
+  excludeGrey = FALSE
+)
+
+MEs <- ME_result$eigengenes
+rownames(MEs) <- sample_pheno$side_tag
+
+# Remove "ME" prefix from column names
+colnames(MEs) <- gsub("^ME", "", colnames(MEs))
+
+cat("Module eigengenes calculated:", ncol(MEs), "modules\n")
+cat("Samples:", nrow(MEs), "\n")
+```
+
+# Module-Phenotype Association
+
+**Purpose**: Test association between module eigengenes and adaptive phenotypes.
+
+**Model**: eigengene ~ leaf_tissue_c + Treatment + phenotype + (1|plotId)
+```{r fit_models}
+phenotypes <- c("DTA", "DTS", "PH")
+modules <- colnames(MEs)
+
+analysis_df <- bind_cols(sample_pheno, MEs)
+
+results_list <- list()
+idx <- 1
+
+for (mod in modules) {
+  for (pheno in phenotypes) {
+    if (!pheno %in% names(analysis_df)) next
+    
+    df <- analysis_df[!is.na(analysis_df[[pheno]]), ]
+    if (nrow(df) < 5 || length(unique(df$plotId)) <= 1) next
+    
+    fmla <- as.formula(paste(mod, "~ leaf_tissue_c + Treatment +", pheno, "+ (1|plotId)"))
+    
+    fit <- tryCatch(
+      lmer(fmla, data = df, REML = TRUE, 
+           control = lmerControl(check.conv.singular = "ignore")),
+      error = function(e) NULL
+    )
+    
+    if (is.null(fit)) next
+    
+    tidy_res <- tidy(fit, effects = "fixed")
+    if (!"p.value" %in% names(tidy_res)) {
+      tidy_res$p.value <- 2 * pnorm(-abs(tidy_res$statistic))
+    }
+    
+    target_row <- tidy_res[tidy_res$term == pheno, ]
+    if (nrow(target_row) == 0) next
+    
+    results_list[[idx]] <- tibble(
+      module = mod,
+      phenotype = pheno,
+      estimate = as.numeric(target_row$estimate),
+      std.error = as.numeric(target_row$std.error),
+      statistic = as.numeric(target_row$statistic),
+      p.value = as.numeric(target_row$p.value),
+      n_obs = nobs(fit),
+      n_plants = length(unique(df$plotId))
+    )
+    idx <- idx + 1
+  }
+}
+
+pheno_effects <- bind_rows(results_list)
+
+if (nrow(pheno_effects) > 0) {
+  pheno_effects <- pheno_effects %>%
+    group_by(phenotype) %>%
+    mutate(fdr = p.adjust(p.value, method = "BH")) %>%
+    ungroup() %>%
+    arrange(phenotype, fdr)
+}
+
+cat("Models fit:", nrow(pheno_effects), "/", length(modules) * length(phenotypes), "\n")
+```
+
+## Results Summary
+```{r results_summary}
+sig_associations <- pheno_effects %>%
+  filter(fdr < 0.1) %>%
+  arrange(fdr)
+
+cat("Significant module-phenotype associations (FDR < 0.1):\n")
+print(sig_associations)
+
+cat("\nSignificant modules per phenotype:\n")
+sig_associations %>% count(phenotype) %>% print()
+```
+
+## Effect Direction Concordance
+```{r direction_concordance}
+flowering_concordance <- pheno_effects %>%
+  filter(phenotype %in% c("DTA", "DTS")) %>%
+  select(module, phenotype, estimate, fdr) %>%
+  pivot_wider(
+    names_from = phenotype,
+    values_from = c(estimate, fdr)
+  ) %>%
+  mutate(
+    concordant = sign(estimate_DTA) == sign(estimate_DTS),
+    both_sig = fdr_DTA < 0.1 & fdr_DTS < 0.1
+  )
+
+cat("DTA-DTS direction concordance:\n")
+cat("  Concordant modules:", sum(flowering_concordance$concordant, na.rm = TRUE), "/",
+    nrow(flowering_concordance), "\n")
+cat("  Both significant & concordant:", 
+    sum(flowering_concordance$both_sig & flowering_concordance$concordant, na.rm = TRUE), "\n")
+```
+
+# Visualization
+
+## Effect Heatmap
+```{r effect_heatmap, fig.width=8, fig.height=6}
+effect_matrix <- pheno_effects %>%
+  select(module, phenotype, estimate) %>%
+  pivot_wider(names_from = phenotype, values_from = estimate) %>%
+  column_to_rownames("module") %>%
+  as.matrix()
+
+module_order <- rownames(effect_matrix)[
+  order(rowMeans(abs(effect_matrix)), decreasing = TRUE)
+]
+
+effect_long <- pheno_effects %>%
+  mutate(
+    module = factor(module, levels = module_order),
+    sig_label = case_when(
+      fdr < 0.01 ~ "**",
+      fdr < 0.05 ~ "*",
+      fdr < 0.1 ~ "†",
+      TRUE ~ ""
+    )
+  )
+
+p_heatmap <- ggplot(effect_long, aes(x = phenotype, y = module)) +
+  geom_tile(aes(fill = estimate), color = "white") +
+  geom_text(aes(label = sig_label), size = 5) +
+  scale_fill_gradient2(
+    low = "#2166AC", mid = "white", high = "#B2182B",
+    midpoint = 0, name = "Effect\n(β)"
+  ) +
+  labs(
+    title = "Module-Phenotype Associations",
+    subtitle = "† FDR < 0.1, * FDR < 0.05, ** FDR < 0.01",
+    x = "Phenotype", y = "Module"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid = element_blank())
+
+print(p_heatmap)
+```
+
+## Eigengene-Phenotype Scatter
+```{r scatter_plots, fig.width=12, fig.height=8}
+top_assoc <- sig_associations %>% slice_head(n = 6)
+
+if (nrow(top_assoc) > 0) {
+  scatter_list <- list()
+  
+  for (i in seq_len(nrow(top_assoc))) {
+    mod <- top_assoc$module[i]
+    pheno <- top_assoc$phenotype[i]
+    fdr_val <- top_assoc$fdr[i]
+    
+    df <- data.frame(
+      plotId = analysis_df$plotId,
+      Treatment = analysis_df$Treatment,
+      pheno_val = analysis_df[[pheno]],
+      eigengene = analysis_df[[mod]],
+      module = mod,
+      phenotype = pheno,
+      fdr = fdr_val
+    ) %>%
+      filter(!is.na(pheno_val))
+    
+    scatter_list[[i]] <- df
+  }
+  
+  scatter_data <- bind_rows(scatter_list)
+  
+  p_scatter <- ggplot(scatter_data, aes(x = pheno_val, y = eigengene)) +
+    geom_point(aes(color = Treatment), alpha = 0.6) +
+    geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.5) +
+    facet_wrap(
+      ~ paste0(module, " ~ ", phenotype, "\nFDR = ", signif(fdr, 2)),
+      scales = "free", ncol = 3
+    ) +
+    scale_color_manual(values = c("+P" = "#1B9E77", "-P" = "#D95F02")) +
+    labs(x = "Phenotype Value", y = "Module Eigengene") +
+    theme_bw(base_size = 12)
+  
+  print(p_scatter)
+}
+```
+
+# GO Enrichment: Direction-Stratified Analysis
+
+**Purpose**: Functional annotation of modules with three gene sets per module:
+whole module, upregulated subset (by Inv4m), downregulated subset (by Inv4m).
+
+## Prepare Gene Lists
+```{r prepare_gene_lists}
+# Priority modules (FDR < 0.1 for any phenotype)
+priority_modules <- unique(sig_associations$module)
+
+if (length(priority_modules) == 0) {
+  cat("No modules at FDR < 0.1. Using FDR < 0.2 threshold.\n")
+  priority_modules <- pheno_effects %>%
+    filter(fdr < 0.2) %>%
+    pull(module) %>%
+    unique()
+}
+
+cat("Priority modules for GO enrichment:", length(priority_modules), "\n")
+
+# Build three types of gene lists
+gene_lists_whole <- list()
+gene_lists_up <- list()
+gene_lists_down <- list()
+
+for (mod in priority_modules) {
+  mod_genes <- consensus_modules %>% filter(color == mod)
+  
+  # Whole module
+  gene_lists_whole[[mod]] <- mod_genes$gene
+  
+  # Upregulated by Inv4m
+  up_genes <- mod_genes %>% filter(regulation == "Upregulated") %>% pull(gene)
+  if (length(up_genes) >= 5) {
+    gene_lists_up[[paste0(mod, "_Up")]] <- up_genes
+  }
+  
+  # Downregulated by Inv4m
+  down_genes <- mod_genes %>% filter(regulation == "Downregulated") %>% pull(gene)
+  if (length(down_genes) >= 5) {
+    gene_lists_down[[paste0(mod, "_Down")]] <- down_genes
+  }
+}
+
+# Summary
+cat("\nGene list sizes:\n")
+list_summary <- data.frame(
+  module = priority_modules,
+  whole = sapply(priority_modules, function(m) length(gene_lists_whole[[m]])),
+  up = sapply(priority_modules, function(m) {
+    nm <- paste0(m, "_Up")
+    if (nm %in% names(gene_lists_up)) length(gene_lists_up[[nm]]) else 0
+  }),
+  down = sapply(priority_modules, function(m) {
+    nm <- paste0(m, "_Down")
+    if (nm %in% names(gene_lists_down)) length(gene_lists_down[[nm]]) else 0
+  })
+)
+print(list_summary)
+```
+
+## Run GO Enrichment
+```{r run_go_enrichment}
+# Universe: all Inv4m DEGs
+universe <- effects_df %>%
+  filter(predictor == "Inv4m") %>%
+  pull(gene) %>%
+  unique()
+
+cat("Universe size:", length(universe), "genes\n")
+
+# Enrichment function
+ego <- function(x, ontology = "BP") {
+  enricher(
+    gene = x,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    universe = universe,
+    minGSSize = 10,
+    maxGSSize = 500,
+    TERM2GENE = TERM2GENE[TERM2GENE$GO %in% TERM2NAME[[ontology]]$go_id, ],
+    TERM2NAME = TERM2NAME[[ontology]]
+  )
+}
+
+# Run enrichment for each set type
+run_compare_cluster <- function(gene_list, set_type) {
+  if (length(gene_list) == 0) return(NULL)
+  
+  result <- tryCatch(
+    compareCluster(geneCluster = gene_list, fun = ego, ontology = "BP"),
+    error = function(e) {
+      message("GO enrichment failed for ", set_type, ": ", e$message)
+      NULL
+    }
+  )
+  
+  if (!is.null(result) && nrow(result@compareClusterResult) > 0) {
+    result@compareClusterResult$set_type <- set_type
+  }
+  result
+}
+
+compGO_whole <- run_compare_cluster(gene_lists_whole, "Whole")
+compGO_up <- run_compare_cluster(gene_lists_up, "Inv4m_Up")
+compGO_down <- run_compare_cluster(gene_lists_down, "Inv4m_Down")
+
+# Combine results
+go_results_list <- list()
+if (!is.null(compGO_whole)) go_results_list$whole <- compGO_whole@compareClusterResult
+if (!is.null(compGO_up)) go_results_list$up <- compGO_up@compareClusterResult
+if (!is.null(compGO_down)) go_results_list$down <- compGO_down@compareClusterResult
+
+go_combined <- bind_rows(go_results_list)
+
+cat("\nEnriched GO terms by set type:\n")
+if (nrow(go_combined) > 0) {
+  go_combined %>% count(set_type) %>% print()
+} else {
+  cat("No enriched terms found.\n")
+}
+```
+
+## GO Enrichment Summary Table
+```{r go_summary_table}
+if (nrow(go_combined) > 0) {
+  # Parse module from Cluster (remove _Up/_Down suffix for grouping)
+  go_summary <- go_combined %>%
+    mutate(
+      module_base = gsub("_(Up|Down)$", "", Cluster),
+      direction = case_when(
+        set_type == "Inv4m_Up" ~ "Up",
+        set_type == "Inv4m_Down" ~ "Down",
+        TRUE ~ "Whole"
+      )
+    ) %>%
+    group_by(module_base, direction) %>%
+    summarise(
+      n_terms = n(),
+      top_term = Description[which.min(p.adjust)],
+      top_fdr = min(p.adjust),
+      .groups = "drop"
+    ) %>%
+    pivot_wider(
+      names_from = direction,
+      values_from = c(n_terms, top_term, top_fdr),
+      names_glue = "{direction}_{.value}"
+    )
+  
+  cat("GO enrichment summary by module and direction:\n")
+  print(go_summary)
+}
+```
+
+## GO Visualization: Whole Modules
+```{r go_plot_whole, fig.width=12, fig.height=8}
+if (!is.null(compGO_whole) && nrow(compGO_whole@compareClusterResult) > 0) {
+  top_go_whole <- compGO_whole@compareClusterResult %>%
+    group_by(Cluster) %>%
+    arrange(p.adjust) %>%
+    slice_head(n = 5) %>%
+    ungroup() %>%
+    mutate(neglogP = -log10(p.adjust))
+  
+  p_go_whole <- ggplot(top_go_whole, aes(x = Cluster, y = reorder(Description, neglogP))) +
+    geom_point(aes(size = Count, color = neglogP)) +
+    scale_color_gradient(low = "dodgerblue", high = "tomato", name = "-log10(FDR)") +
+    scale_size_continuous(range = c(2, 8), name = "Gene Count") +
+    labs(
+      title = "GO BP Enrichment: Whole Modules",
+      x = "Module", y = NULL
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(p_go_whole)
+}
+```
+
+## GO Visualization: Direction-Split
+```{r go_plot_direction, fig.width=14, fig.height=10}
+if (nrow(go_combined) > 0) {
+  # Prepare data for direction-split plot
+  go_direction <- go_combined %>%
+    filter(set_type %in% c("Inv4m_Up", "Inv4m_Down")) %>%
+    mutate(
+      module_base = gsub("_(Up|Down)$", "", Cluster),
+      direction = ifelse(set_type == "Inv4m_Up", "Upregulated", "Downregulated"),
+      neglogP = -log10(p.adjust)
+    ) %>%
+    group_by(Cluster, direction) %>%
+    arrange(p.adjust) %>%
+    slice_head(n = 4) %>%
+    ungroup()
+  
+  if (nrow(go_direction) > 0) {
+    p_go_direction <- ggplot(
+      go_direction,
+      aes(x = module_base, y = reorder(Description, neglogP))
+    ) +
+      geom_point(aes(size = Count, color = neglogP)) +
+      facet_wrap(~ direction, scales = "free_y", ncol = 2) +
+      scale_color_gradient(low = "dodgerblue", high = "tomato", name = "-log10(FDR)") +
+      scale_size_continuous(range = c(2, 7), name = "Gene Count") +
+      labs(
+        title = "GO BP Enrichment by Inv4m Regulation Direction",
+        subtitle = "Top 4 terms per module × direction",
+        x = "Module", y = NULL
+      ) +
+      theme_minimal(base_size = 11) +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(face = "bold", size = 12)
+      )
+    
+    print(p_go_direction)
+  }
+}
+```
+
+## Comparative Dotplot: Up vs Down
+```{r comparative_dotplot, fig.width=12, fig.height=10}
+if (nrow(go_combined) > 0) {
+  # Select terms enriched in at least one direction
+  go_compare <- go_combined %>%
+    filter(set_type %in% c("Inv4m_Up", "Inv4m_Down")) %>%
+    mutate(
+      module_base = gsub("_(Up|Down)$", "", Cluster),
+      direction = ifelse(set_type == "Inv4m_Up", "Up", "Down")
+    ) %>%
+    select(module_base, direction, ID, Description, p.adjust, Count) %>%
+    group_by(module_base, direction) %>%
+    arrange(p.adjust) %>%
+    slice_head(n = 3) %>%
+    ungroup()
+  
+  # Pivot to show both directions
+  go_paired <- go_compare %>%
+    select(module_base, direction, Description, p.adjust) %>%
+    pivot_wider(
+      names_from = direction,
+      values_from = p.adjust,
+      names_prefix = "fdr_"
+    ) %>%
+    mutate(
+      fdr_Up = replace_na(fdr_Up, 1),
+      fdr_Down = replace_na(fdr_Down, 1),
+      log_ratio = log10(fdr_Down / fdr_Up)  # Positive = more enriched in Up
+    )
+  
+  if (nrow(go_paired) > 0) {
+    p_compare <- ggplot(
+      go_paired,
+      aes(x = module_base, y = reorder(Description, log_ratio), fill = log_ratio)
+    ) +
+      geom_tile(color = "white") +
+      scale_fill_gradient2(
+        low = "#2166AC", mid = "white", high = "#B2182B",
+        midpoint = 0, name = "log10(FDR ratio)\nDown/Up",
+        limits = c(-2, 2), oob = scales::squish
+      ) +
+      labs(
+        title = "GO Term Enrichment: Up vs Down Comparison",
+        subtitle = "Red = enriched in Inv4m-upregulated genes; Blue = enriched in Inv4m-downregulated",
+        x = "Module", y = NULL
+      ) +
+      theme_minimal(base_size = 11) +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 9)
+      )
+    
+    print(p_compare)
+  }
+}
+```
+
+# Integration Table
+
+**Purpose**: Summarize modules by phenotype association and direction-specific GO.
+```{r integration_table}
+# Base integration from phenotype effects
+integration_long <- pheno_effects %>%
+  filter(phenotype %in% c("DTA", "DTS", "PH")) %>%
+  rename(effect = estimate, response = phenotype) %>%
+  left_join(
+    consensus_modules %>% count(color, name = "n_genes"),
+    by = c("module" = "color")
+  )
+
+# Add direction counts
+direction_counts <- consensus_modules %>%
+  count(color, regulation) %>%
+  pivot_wider(names_from = regulation, values_from = n, values_fill = 0) %>%
+  rename(module = color, n_up = Upregulated, n_down = Downregulated)
+
+integration_long <- integration_long %>%
+  left_join(direction_counts, by = "module")
+
+# Add top GO terms by direction if available
+if (nrow(go_combined) > 0) {
+  top_go_by_type <- go_combined %>%
+    mutate(module_base = gsub("_(Up|Down)$", "", Cluster)) %>%
+    group_by(module_base, set_type) %>%
+    arrange(p.adjust) %>%
+    slice_head(n = 1) %>%
+    select(module_base, set_type, top_GO = Description, GO_fdr = p.adjust) %>%
+    pivot_wider(
+      names_from = set_type,
+      values_from = c(top_GO, GO_fdr),
+      names_glue = "{set_type}_{.value}"
+    )
+  
+  integration_long <- integration_long %>%
+    left_join(top_go_by_type, by = c("module" = "module_base"))
+}
+
+# Export
+write.csv(
+  integration_long,
+  "~/Desktop/WGCNA/consensus_module_phenotype_integration_direction.csv",
+  row.names = FALSE
+)
+
+cat("Significant associations with direction info:\n")
+integration_long %>%
+  filter(fdr < 0.1) %>%
+  select(module, response, effect, fdr, n_genes, n_up, n_down) %>%
+  print()
+```
+
+# Priority Modules for Follow-up
+```{r priority_modules}
+# Modules with both up and down regulated genes showing distinct GO
+if (nrow(go_combined) > 0) {
+  modules_with_both <- go_combined %>%
+    filter(set_type %in% c("Inv4m_Up", "Inv4m_Down")) %>%
+    mutate(module_base = gsub("_(Up|Down)$", "", Cluster)) %>%
+    count(module_base, set_type) %>%
+    pivot_wider(names_from = set_type, values_from = n, values_fill = 0) %>%
+    filter(Inv4m_Up > 0 & Inv4m_Down > 0)
+  
+  cat("Modules with GO enrichment in BOTH directions:\n")
+  print(modules_with_both)
+}
+
+# High priority: phenotype association + direction-specific GO
+high_priority <- integration_long %>%
+  filter(fdr < 0.1) %>%
+  pull(module) %>%
+  unique()
+
+cat("\nHigh-priority modules (FDR < 0.1 for phenotype):\n")
+cat(high_priority, sep = ", ")
+```
+
+# Export Results
+```{r export}
+# Phenotype effects
+write.csv(
+  pheno_effects,
+  "~/Desktop/WGCNA/output/consensus_module_phenotype_effects.csv",
+  row.names = FALSE
+)
+
+# Module assignments with direction
+write.csv(
+  consensus_modules,
+  "~/Desktop/WGCNA/output/consensus_modules_with_direction.csv",
+  row.names = FALSE
+)
+
+# GO enrichment (all sets)
+if (nrow(go_combined) > 0) {
+  write.csv(
+    go_combined,
+    "~/Desktop/WGCNA/output/consensus_module_GO_direction_stratified.csv",
+    row.names = FALSE
+  )
+}
+
+# Eigengenes
+saveRDS(
+  list(
+    eigengenes = MEs,
+    sample_info = sample_pheno,
+    module_assignments = consensus_modules
+  ),
+  "~/Desktop/WGCNA/output/consensus_module_eigengenes.rds"
+)
+
+cat("Results exported to ~/Desktop/WGCNA/output/\n")
+```
+
+# Session Info
+```{r session_info}
+sessionInfo()
+```
+
+Key changes from the original:
+
+1. **Added `inv4m_direction`** extracted from `effects_df` (line ~70-80)
+2. **Merged direction into `consensus_modules`** so each gene has its regulation status
+3. **Built three gene list types** for each priority module: whole, `_Up`, `_Down` (requires ≥5 genes)
+4. **Ran `compareCluster` separately** for each set type, then combined results
+5. **Added direction-specific visualizations**: faceted dotplot, comparative heatmap showing Up vs Down enrichment ratio
+6. **Expanded integration table** to include `n_up`, `n_down`, and top GO terms per direction

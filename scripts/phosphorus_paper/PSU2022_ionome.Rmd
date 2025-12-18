@@ -1,0 +1,946 @@
+---
+title: "Inv4m Ionome Treatment Effects"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 12
+)
+```
+
+## Overview
+
+This analysis evaluates ionome responses to phosphorus starvation in maize, comparing
+wild-type (CTRL) and *Inv4m* mutant genotypes. The analysis uses spatially corrected
+data and focuses on:
+
+1. **Main Figure** (`p_main_combined`): P, Zn, Ca, and S responses arranged in 4 columns
+2. **Supplementary Figure** (`p_supp_combined`): Remaining minerals (Mg, Mn, K, Fe) in 4 columns
+3. **Ratio Analysis**: Seed:Stover ratios for each mineral
+4. **Interaction Analysis**: Genotype × Treatment interactions
+
+Each mineral plot uses nested facets showing: Tissue (stover/seed) > Genotype (CTRL/Inv4m), with Treatment on the x-axis.
+
+## Load Libraries
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(purrr) 
+library(ggplot2)
+library(ggpubr)
+library(ggbeeswarm)
+library(ggfx)
+library(rstatix)
+library(ggtext)
+library(tibble)
+library(ggh4x)
+```
+
+## Define Plot Parameters
+```{r parameters}
+# Color palette for treatments
+pal <- c("gold", "purple4")
+
+# Reliable minerals analyzed
+reliable <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
+```
+
+## Load Spatially Corrected Data
+```{r load-data}
+# Read spatially corrected mineral concentrations
+ionome <- read.csv("PSU2022_spatially_corrected_both_treatments.csv")
+
+# Rename for consistency and filter for Inv4m and CTRL genotypes only
+ionome <- ionome %>%
+  rename(Genotype = genotype) %>%
+  filter(Genotype %in% c("CTRL", "Inv4m")) %>%
+  droplevels()
+
+ionome$Fe_stover[ionome$Fe_stover > 800] <- NA
+ionome$Mn_stover[ionome$Mn_stover > 75] <- NA
+
+# Ensure proper factor levels
+ionome$Treatment <- factor(ionome$Treatment, levels = c("+P", "-P"))
+ionome$Genotype <- factor(ionome$Genotype, levels = c("CTRL", "Inv4m"))
+
+# Display sample sizes
+ionome %>%
+  count(Genotype, Treatment)
+```
+
+## Calculate Seed:Stover Ratios
+```{r calculate-ratios}
+# Calculate ratios for each reliable mineral
+for (ion in reliable) {
+  ionome[[paste0(ion, "_ratio")]] <- 
+    ionome[[paste0(ion, "_seed")]] / ionome[[paste0(ion, "_stover")]]
+}
+
+# Create list of all mineral-tissue combinations
+reliable_by_tissue <- paste(
+  rep(reliable, each = 2),
+  rep(c("seed", "stover"), times = length(reliable)),
+  sep = "_"
+)
+
+vars <- c(reliable_by_tissue, paste0(reliable, "_ratio"))
+```
+
+## Prepare Data for Plotting
+```{r prepare-plot-data}
+# Pivot to long format for plotting (EXCLUDE ratio tissue)
+to_plot <- ionome %>%
+  select(Genotype, Treatment, all_of(reliable_by_tissue)) %>%
+  pivot_longer(
+    cols = all_of(reliable_by_tissue),
+    names_to = "mineral_tissue",
+    values_to = "ppm"
+  ) %>%
+  separate_wider_delim(
+    cols = "mineral_tissue",
+    names = c("mineral", "tissue"),
+    delim = "_"
+  ) %>%
+  filter(tissue %in% c("seed", "stover")) %>%
+  mutate(
+    tissue = factor(tissue, levels = c("stover", "seed")),
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
+
+# Display data structure
+to_plot %>%
+  group_by(mineral, tissue, Genotype, Treatment) %>%
+  summarise(
+    n = n(),
+    mean_ppm = mean(ppm, na.rm = TRUE),
+    sd_ppm = sd(ppm, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(mineral, tissue) %>%
+  print(n = 30)
+```
+
+## Prepare Ratio Data for Plotting
+```{r prepare-ratio-data}
+# Pivot ratio data to long format
+ratio_plot <- ionome %>%
+  select(Genotype, Treatment, all_of(paste0(reliable, "_ratio"))) %>%
+  pivot_longer(
+    cols = ends_with("_ratio"),
+    names_to = "mineral_ratio",
+    values_to = "ratio"
+  ) %>%
+  mutate(
+    mineral = sub("_ratio$", "", mineral_ratio),
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  ) %>%
+  select(-mineral_ratio) %>%
+  filter(!is.na(ratio), !is.infinite(ratio))
+
+# Display data structure
+ratio_plot %>%
+  group_by(mineral, Genotype, Treatment) %>%
+  summarise(
+    n = n(),
+    mean_ratio = mean(ratio, na.rm = TRUE),
+    sd_ratio = sd(ratio, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(mineral) %>%
+  print(n = 20)
+```
+
+## Fit Linear Models for All Ionome Variables
+```{r fit-models}
+# Fit linear models: mineral ~ Genotype * Treatment
+effects <- lapply(vars, FUN = function(x) {
+  n_obs <- sum(!is.na(ionome[[x]]))
+  
+  if (n_obs < 20) {
+    message("Skipping ", x, " - insufficient data (n=", n_obs, ")")
+    return(NULL)
+  }
+  
+  form <- paste(x, "~ Genotype * Treatment")
+  
+  model <- tryCatch(
+    lm(as.formula(form), data = ionome),
+    error = function(e) {
+      message("Model failed for ", x, ": ", e$message)
+      return(NULL)
+    }
+  )
+  
+  if (is.null(model)) return(NULL)
+  
+  out <- coef(summary(model)) %>% 
+    as.data.frame() %>% 
+    tibble::rownames_to_column("predictor")
+  
+  colnames(out)[3] <- "Std.Error"
+  colnames(out)[5] <- "p.value"
+  out$response <- x
+  out %>% select(response, everything())
+}) %>% 
+  bind_rows() %>%
+  mutate(p.adjust = p.adjust(p.value, method = "fdr")) %>% 
+  arrange(p.adjust)
+
+cat("\n=== Model Summary ===\n")
+cat("Total models fitted:", length(unique(effects$response)), "\n")
+cat("Total effects tested:", nrow(effects), "\n")
+```
+
+## Identify Significant Effects
+```{r significant-effects}
+# Filter for significant effects (FDR < 0.05)
+significant <- effects %>%
+  filter(
+    p.adjust < 0.05, 
+    !grepl("Intercept", predictor)
+  ) %>%
+  arrange(p.adjust)
+
+# Recode predictor names for plotting
+significant <- significant %>%
+  mutate(
+    predictor = case_when(
+      predictor == "Treatment-P" ~ "-P",
+      predictor == "GenotypeInv4m" ~ "Inv4m",
+      predictor == "GenotypeInv4m:Treatment-P" ~ "Inv4m:-P",
+      TRUE ~ predictor
+    ),
+    predictor = factor(predictor, levels = c("-P", "Inv4m", "Inv4m:-P"))
+  )
+
+cat("\n=== Significant Effects (FDR < 0.05) ===\n")
+print(significant %>% select(response, predictor, Estimate, p.value, p.adjust))
+
+# Count by effect type
+cat("\n=== Summary by Effect Type ===\n")
+print(table(significant$predictor))
+```
+
+## Focus on Genotype × Treatment Interactions
+```{r interaction-analysis}
+# Extract interaction effects specifically
+interaction_effects <- effects %>%
+  filter(grepl(":", predictor)) %>%
+  mutate(
+    predictor_clean = case_when(
+      predictor == "GenotypeInv4m:Treatment-P" ~ "Inv4m:-P",
+      TRUE ~ predictor
+    )
+  ) %>%
+  separate(
+    response, 
+    into = c("mineral", "tissue"), 
+    sep = "_", 
+    remove = FALSE
+  ) %>%
+  mutate(
+    signif = case_when(
+      p.adjust < 0.001 ~ "***",
+      p.adjust < 0.01 ~ "**",
+      p.adjust < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  arrange(p.adjust)
+
+cat("\n=== Genotype × Treatment Interactions ===\n")
+cat("Total interactions tested:", nrow(interaction_effects), "\n")
+cat("Significant interactions (FDR < 0.05):", 
+    sum(interaction_effects$p.adjust < 0.05), "\n\n")
+
+if (any(interaction_effects$p.adjust < 0.05)) {
+  cat("Significant interactions:\n")
+  interaction_effects %>%
+    filter(p.adjust < 0.05) %>%
+    select(mineral, tissue, Estimate, Std.Error, p.value, p.adjust, signif) %>%
+    print()
+}
+```
+```{r interaction-summary}
+# Summary of significant interactions
+cat("\nSummary of Genotype × Treatment Interactions:\n")
+cat("Total mineral-tissue combinations tested:", nrow(interaction_effects), "\n")
+cat("Significant interactions (FDR < 0.05):", 
+    sum(interaction_effects$p.adjust < 0.05), "\n\n")
+
+if (any(interaction_effects$p.adjust < 0.05)) {
+  cat("Significant interactions:\n")
+  interaction_effects %>%
+    filter(p.adjust < 0.05) %>%
+    select(mineral, tissue, Estimate, p.adjust, signif) %>%
+    print()
+}
+```
+
+## Calculate T-tests for Significance Brackets
+```{r calculate-ttests}
+# T-tests comparing treatments within each genotype-mineral-tissue combination
+treatment.t.test <- to_plot %>%
+  group_by(tissue, Genotype, mineral) %>%
+  rstatix::t_test(ppm ~ Treatment) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12)
+
+# Display significant results
+cat("\n=== T-test Results (FDR < 0.05) ===\n")
+treatment.t.test %>%
+  filter(p.adj < 0.05) %>%
+  select(mineral, tissue, Genotype, statistic, p, p.adj, p.adj.signif) %>%
+  arrange(p.adj) %>%
+  print(n = 50)
+```
+
+## Calculate T-tests for Ratios
+```{r calculate-ratio-ttests}
+# T-tests comparing treatments within each genotype-mineral combination
+ratio.t.test <- ratio_plot %>%
+  group_by(Genotype, mineral) %>%
+  filter(n() >= 6) %>%
+  rstatix::t_test(ratio ~ Treatment) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance()
+
+# Add y positions separately for each Genotype-mineral combination
+if (nrow(ratio.t.test) > 0) {
+  ratio.t.test <- ratio.t.test %>%
+    group_by(Genotype, mineral) %>%
+    group_modify(~ {
+      mineral_data <- ratio_plot %>%
+        filter(Genotype == .y$Genotype, mineral == .y$mineral)
+      
+      .x %>%
+        rstatix::add_y_position(
+          data = mineral_data,
+          formula = ratio ~ Treatment,
+          step.increase = 0.12
+        )
+    }) %>%
+    ungroup()
+  
+  # Validate y.position values
+  ratio.t.test <- ratio.t.test %>%
+    filter(
+      !is.na(y.position),
+      !is.infinite(y.position),
+      !is.nan(y.position)
+    )
+}
+
+# Display significant results
+cat("\n=== Ratio T-test Results (FDR < 0.05) ===\n")
+if (nrow(ratio.t.test) > 0) {
+  ratio.t.test %>%
+    filter(p.adj < 0.05) %>%
+    select(mineral, Genotype, statistic, p, p.adj, p.adj.signif) %>%
+    arrange(p.adj) %>%
+    print(n = 50)
+} else {
+  cat("No valid t-test results\n")
+}
+```
+
+## Generate Individual Mineral Plots
+```{r individual-mineral-plots, fig.width=12, fig.height=4}
+# Function to create plot for a single mineral
+plot_mineral <- function(mineral_name, log_scale = FALSE) {
+  plot_data <- to_plot %>%
+    filter(
+      mineral == mineral_name,
+      tissue %in% c("seed", "stover")
+    ) %>%
+    mutate(
+      tissue = factor(tissue, levels = c("stover", "seed")),
+      Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+      Treatment = factor(Treatment, levels = c("+P", "-P"))
+    )
+  
+  # Get t-test results for this mineral
+  ttest_subset <- treatment.t.test %>%
+    filter(mineral == mineral_name)
+  
+  p <- ggplot(plot_data, aes(x = Treatment, y = ppm, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = pal) +
+    labs(
+      title = mineral_name,
+      x = NULL, 
+      y = "ppm [mg/kg]"
+    )
+  
+  # Add y-scale (log or linear)
+  if (log_scale) {
+    ttest_subset$y.position <- log2(ttest_subset$y.position)
+    p <- p + 
+      scale_y_continuous(
+        trans = "log2", 
+        breaks = c(5, 10, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400),
+        expand = expansion(mult = c(0.05, 0.15))
+      ) +
+      stat_pvalue_manual(
+        ttest_subset,
+        label = "p.adj.signif",
+        size = 5,
+        bracket.size = 0.5,
+        hide.ns = TRUE
+      ) + 
+      ggh4x::facet_nested(~ tissue + Genotype, scales = "free_y")
+  } else {
+    p <- p + 
+      scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+      stat_pvalue_manual(
+        ttest_subset,
+        label = "p.adj.signif",
+        size = 5,
+        bracket.size = 0.5,
+        hide.ns = TRUE
+      ) + 
+      ggh4x::facet_nested(~ tissue + Genotype, scales = "free_y") 
+  }
+  
+  # Add theme with element_markdown for italics
+  p <- p +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank(),
+      panel.spacing = unit(0.1, "lines"),
+      ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5)
+    )
+  
+  return(p)
+}
+```
+
+## Generate Individual Ratio Plots
+```{r ratio-plot-function}
+# Function to create plot for a single mineral ratio
+plot_ratio <- function(mineral_name) {
+  plot_data <- ratio_plot %>%
+    filter(mineral == mineral_name) %>%
+    mutate(
+      Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+      Treatment = factor(Treatment, levels = c("+P", "-P"))
+    )
+  
+  # Check if we have enough data
+  if (nrow(plot_data) < 6) {
+    message("Insufficient data for ", mineral_name, " ratio plot")
+    return(NULL)
+  }
+  
+  # Get t-test results for this mineral
+  ttest_subset <- ratio.t.test %>%
+    filter(mineral == mineral_name)
+  
+  # Remove any rows with invalid y.position
+  if (nrow(ttest_subset) > 0) {
+    ttest_subset <- ttest_subset %>%
+      filter(
+        !is.na(y.position),
+        !is.infinite(y.position),
+        !is.nan(y.position)
+      )
+  }
+  
+  # Create base plot
+  p <- ggplot(plot_data, aes(x = Treatment, y = ratio, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    stat_pvalue_manual(
+      ttest_subset,
+      label = "p.adj.signif",
+      size = 5,
+      bracket.size = 0.5,
+      hide.ns = TRUE
+    ) +
+    scale_color_manual(values = pal) +
+    facet_wrap(~ Genotype) +
+    labs(
+      x = NULL,
+      y = "Seed/Stover Ratio"
+    ) + 
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(color = "black", face = "bold",size = 13),
+      plot.title = element_blank(),
+      #plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank()
+    )
+  
+  return(p)
+}
+
+# Test individual plots before combining
+cat("\n=== Testing ratio plots ===\n")
+test_minerals <- c("P", "Zn", "Ca", "S")
+for (m in test_minerals) {
+  tryCatch({
+    p_test <- plot_ratio(m)
+    if (!is.null(p_test)) {
+      cat(m, ": OK\n")
+    } else {
+      cat(m, ": NULL (insufficient data)\n")
+    }
+  }, error = function(e) {
+    cat(m, ": ERROR -", e$message, "\n")
+  })
+}
+```
+
+## Arrange Main Figure (P, Zn, Ca, S)
+```{r arrange-main-figure, fig.width=12, fig.height=4}
+# Create individual plots for mineral content
+p_P <- plot_mineral("P")
+p_Zn <- plot_mineral("Zn")
+p_Ca <- plot_mineral("Ca", log_scale = TRUE)
+p_S <- plot_mineral("S")
+
+# Combine plots in 4 columns
+p_main_combined <- ggarrange(
+  p_P,
+  p_Zn + ggpubr::rremove("ylab"),
+  p_Ca + ggpubr::rremove("ylab"),
+  p_S + ggpubr::rremove("ylab"),
+  ncol = 4,
+  nrow = 1,
+  align = "h"
+)
+
+print(p_main_combined)
+```
+
+## Arrange Main Figure with Ratios
+```{r main-with-ratios, fig.width=12, fig.height=8}
+# Create ratio plots for main minerals with error handling
+p_P_ratio <- tryCatch(plot_ratio("P"), error = function(e) {
+  message("Error creating P ratio plot: ", e$message)
+  NULL
+})
+
+p_Zn_ratio <- tryCatch(plot_ratio("Zn"), error = function(e) {
+  message("Error creating Zn ratio plot: ", e$message)
+  NULL
+})
+
+p_Ca_ratio <- tryCatch(plot_ratio("Ca"), error = function(e) {
+  message("Error creating Ca ratio plot: ", e$message)
+  NULL
+})
+
+p_S_ratio <- tryCatch(plot_ratio("S"), error = function(e) {
+  message("Error creating S ratio plot: ", e$message)
+  NULL
+})
+
+# Build plot list carefully
+all_plots <- list()
+all_plots[[1]] <- p_P
+all_plots[[2]] <- p_Zn + rremove("ylab")
+all_plots[[3]] <- p_Ca + rremove("ylab")
+all_plots[[4]] <- p_S + rremove("ylab")
+
+if (!is.null(p_P_ratio)) all_plots[[5]] <- p_P_ratio 
+if (!is.null(p_Zn_ratio)) all_plots[[6]] <- p_Zn_ratio + rremove("ylab") 
+if (!is.null(p_Ca_ratio)) all_plots[[7]] <- p_Ca_ratio + rremove("ylab") 
+if (!is.null(p_S_ratio)) all_plots[[8]] <- p_S_ratio + rremove("ylab") 
+
+# Only combine if we have ratio plots
+if (length(all_plots) > 4) {
+  p_main_with_ratios <- ggarrange(
+    plotlist = all_plots,
+    ncol = 4,
+    nrow = 2,
+    align = "hv",
+  labels = c("A","","","","B"),
+  font.label = list(size = 30)
+  )
+  print(p_main_with_ratios)
+} else {
+  message("No valid ratio plots for main minerals, showing content only")
+  print(p_main_combined)
+}
+```
+
+## Generate Supplementary Plots (Other Minerals)
+```{r supplementary-plots, fig.width=12, fig.height=4}
+# Create plots for supplementary minerals
+p_Mg <- plot_mineral("Mg")
+p_Fe <- plot_mineral("Fe")
+p_K <- plot_mineral("K")
+p_Mn <- plot_mineral("Mn", log_scale = TRUE)
+
+# Combine supplementary plots in 4 columns
+p_supp_combined <- ggarrange(
+  p_Mg,
+  p_Mn + ggpubr::rremove("ylab"),
+  p_K + ggpubr::rremove("ylab"),
+  p_Fe + ggpubr::rremove("ylab"),
+  ncol = 4,
+  nrow = 1,
+  align = "h",
+  labels = c("A","","","","B"),
+  font.label = list(size = 30)
+)
+
+print(p_supp_combined)
+```
+
+## Arrange Supplementary Figure with Ratios
+```{r supplementary-with-ratios, fig.width=12, fig.height=8}
+# Create ratio plots for supplementary minerals with error handling
+p_Mg_ratio <- tryCatch(plot_ratio("Mg"), error = function(e) {
+  message("Error creating Mg ratio plot: ", e$message)
+  NULL
+})
+
+p_Mn_ratio <- tryCatch(plot_ratio("Mn"), error = function(e) {
+  message("Error creating Mn ratio plot: ", e$message)
+  NULL
+})
+
+p_K_ratio <- tryCatch(plot_ratio("K"), error = function(e) {
+  message("Error creating K ratio plot: ", e$message)
+  NULL
+})
+
+p_Fe_ratio <- tryCatch(plot_ratio("Fe"), error = function(e) {
+  message("Error creating Fe ratio plot: ", e$message)
+  NULL
+})
+
+# Build plot list carefully
+all_supp_plots <- list()
+all_supp_plots[[1]] <- p_Mg
+all_supp_plots[[2]] <- p_Mn + rremove("ylab")
+all_supp_plots[[3]] <- p_K + rremove("ylab")
+all_supp_plots[[4]] <- p_Fe + rremove("ylab")
+
+if (!is.null(p_Mg_ratio)) all_supp_plots[[5]] <- p_Mg_ratio + labs(title = NULL)
+if (!is.null(p_Mn_ratio)) all_supp_plots[[6]] <- p_Mn_ratio + labs(title = NULL) + rremove("ylab")
+if (!is.null(p_K_ratio)) all_supp_plots[[7]] <- p_K_ratio + labs(title = NULL) + rremove("ylab")
+if (!is.null(p_Fe_ratio)) all_supp_plots[[8]] <- p_Fe_ratio + labs(title = NULL) + rremove("ylab")
+
+# Only combine if we have ratio plots
+if (length(all_supp_plots) > 4) {
+  p_supp_with_ratios <- ggarrange(
+    plotlist = all_supp_plots,
+    ncol = 4,
+    nrow = 2,
+    align = "hv",
+  labels = c("A","","","","B"),
+  font.label = list(size = 30)
+    
+  )
+  print(p_supp_with_ratios)
+} else {
+  message("No valid ratio plots for supplementary minerals, showing content only")
+  print(p_supp_combined)
+}
+```
+
+## Save Output
+```{r save-plots, eval=FALSE}
+# Save main combined figure (content only)
+ggsave(
+  "ionome_main_figure.pdf",
+  plot = p_main_combined,
+  width = 12,
+  height = 4,
+  units = "in"
+)
+
+ggsave(
+  "ionome_main_figure.png",
+  plot = p_main_combined,
+  width = 12,
+  height = 4,
+  units = "in",
+  dpi = 300
+)
+
+# Save main figure with ratios (if exists)
+if (exists("p_main_with_ratios")) {
+  ggsave(
+    "ionome_main_with_ratios.pdf",
+    plot = p_main_with_ratios,
+    width = 12,
+    height = 8,
+    units = "in"
+  )
+  
+  ggsave(
+    "ionome_main_with_ratios.png",
+    plot = p_main_with_ratios,
+    width = 12,
+    height = 8,
+    units = "in",
+    dpi = 300
+  )
+}
+
+# Save supplementary combined figure (content only)
+ggsave(
+  "ionome_supplementary_figure.pdf",
+  plot = p_supp_combined,
+  width = 12,
+  height = 4,
+  units = "in"
+)
+
+ggsave(
+  "ionome_supplementary_figure.png",
+  plot = p_supp_combined,
+  width = 12,
+  height = 4,
+  units = "in",
+  dpi = 300
+)
+
+# Save supplementary figure with ratios (if exists)
+if (exists("p_supp_with_ratios")) {
+  ggsave(
+    "ionome_supplementary_with_ratios.pdf",
+    plot = p_supp_with_ratios,
+    width = 12,
+    height = 8,
+    units = "in"
+  )
+  
+  ggsave(
+    "ionome_supplementary_with_ratios.png",
+    plot = p_supp_with_ratios,
+    width = 12,
+    height = 8,
+    units = "in",
+    dpi = 300
+  )
+}
+
+# Export CSV files
+write.csv(effects, "ionome_linear_model_effects.csv", row.names = FALSE)
+write.csv(significant, "ionome_significant_effects.csv", row.names = FALSE)
+write.csv(interaction_effects, "ionome_interaction_effects.csv", row.names = FALSE)
+write.csv(treatment.t.test, "ionome_treatment_ttests.csv", row.names = FALSE)
+
+if (nrow(ratio.t.test) > 0) {
+  write.csv(ratio.t.test, "ionome_ratio_ttests.csv", row.names = FALSE)
+}
+```
+
+## Pairwise Genotype Comparisons for Significant Effects
+```{r genotype-pairwise-comparisons, fig.width=8, fig.height=4}
+# Define genotype color palette
+pal_geno <- c("CTRL" = "gold", "<i>Inv4m</i>" = "#4a0f82")
+
+# Filter data for the two significant mineral-tissue combinations
+mg_seed_data <- to_plot %>%
+  filter(mineral == "Mg", tissue == "seed") %>%
+  mutate(
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  )
+
+ca_stover_data <- to_plot %>%
+  filter(mineral == "Ca", tissue == "stover") %>%
+  mutate(
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  )
+
+# T-tests comparing genotypes within each treatment
+genotype.t.test <- bind_rows(
+  mg_seed_data %>% mutate(mineral_tissue = "Mg_seed"),
+  ca_stover_data %>% mutate(mineral_tissue = "Ca_stover")
+) %>%
+  group_by(mineral_tissue, Treatment) %>%
+  rstatix::t_test(ppm ~ Genotype) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance()
+
+# Add y positions separately for each mineral-treatment combination
+if (nrow(genotype.t.test) > 0) {
+  genotype.t.test <- genotype.t.test %>%
+    group_by(mineral_tissue, Treatment) %>%
+    group_modify(~ {
+      if (.y$mineral_tissue == "Mg_seed") {
+        test_data <- mg_seed_data %>%
+          filter(Treatment == .y$Treatment)
+      } else {
+        test_data <- ca_stover_data %>%
+          filter(Treatment == .y$Treatment)
+      }
+      
+      .x %>%
+        rstatix::add_y_position(
+          data = test_data,
+          formula = ppm ~ Genotype,
+          step.increase = 0.12
+        )
+    }) %>%
+    ungroup()
+  
+  # Validate y.position values
+  genotype.t.test <- genotype.t.test %>%
+    filter(
+      !is.na(y.position),
+      !is.infinite(y.position),
+      !is.nan(y.position)
+    )
+}
+
+# Split tests by mineral
+mg_seed_genotype_test <- genotype.t.test %>%
+  filter(mineral_tissue == "Mg_seed")
+
+ca_stover_genotype_test <- genotype.t.test %>%
+  filter(mineral_tissue == "Ca_stover")
+
+# Plot for Mg seed
+p_mg_seed_genotype <- ggplot(
+  mg_seed_data, 
+  aes(x = Genotype, y = ppm, color = Genotype)
+) +
+  geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(size = 2) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  stat_pvalue_manual(
+    mg_seed_genotype_test,
+    label = "p.adj.signif",
+    size = 5,
+    bracket.size = 0.5,
+    hide.ns = TRUE
+  ) +
+  scale_color_manual(values = pal_geno) +
+  facet_wrap(~ Treatment) +
+  labs(
+    title = "Mg (Seed)",
+    x = NULL,
+    y = "ppm [mg/kg]"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(color = "black", face = "bold"),
+    axis.text.x = element_markdown(angle = 0, hjust = 0.5),
+    axis.title.y = element_text(face = "bold", size = 14),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_blank()
+  )
+
+# Plot for Ca stover 
+
+p_ca_stover_genotype <- ggplot(
+  ca_stover_data, 
+  aes(x = Genotype, y = ppm, color = Genotype)
+) +
+  geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(size = 2) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  stat_pvalue_manual(
+    ca_stover_genotype_test,
+    label = "p.adj.signif",
+    size = 5,
+    bracket.size = 0.5,
+    hide.ns = TRUE
+  ) +
+  scale_color_manual(values = pal_geno) +
+  facet_wrap(~ Treatment) +
+  labs(
+    title = "Ca (Stover)",
+    x = NULL,
+    y = "ppm [mg/kg]"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(color = "black", face = "bold"),
+    axis.text.x = element_markdown(angle = 0, hjust = 0.5),
+    axis.title.y = element_text(face = "bold", size = 14),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_blank()
+  )
+
+# Combine both plots
+p_genotype_effects <- ggarrange(
+  p_mg_seed_genotype,
+  p_ca_stover_genotype + rremove("ylab"),
+  ncol = 2,
+  nrow = 1,
+  align = "h"
+)
+
+print(p_genotype_effects)
+
+# Display test results
+cat("\n=== Genotype Effects on Mg (Seed) ===\n")
+print(mg_seed_genotype_test)
+
+cat("\n=== Genotype Effects on Ca (Stover) ===\n")
+print(ca_stover_genotype_test)
+```
+```{r save-genotype-comparison, eval=FALSE}
+# Save genotype comparison figure
+ggsave(
+  "ionome_genotype_effects.pdf",
+  plot = p_genotype_effects,
+  width = 8,
+  height = 4,
+  units = "in"
+)
+
+ggsave(
+  "ionome_genotype_effects.png",
+  plot = p_genotype_effects,
+  width = 8,
+  height = 4,
+  units = "in",
+  dpi = 300
+)
+
+# Export genotype comparison statistics
+write.csv(
+  genotype.t.test, 
+  "ionome_genotype_comparison_ttests.csv", 
+  row.names = FALSE
+)
+```
+## Session Info
+```{r session-info}
+sessionInfo()
+```

@@ -1,0 +1,1127 @@
+---
+title: "Crow et al. 2020 Differential Gene Expression Reanalysis I: Complete new Model Expotratory"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8,
+  cache = FALSE
+)
+```
+
+# Overview
+
+This analysis performs differential gene expression analysis on RNA-seq data from 
+Crow et al. (2020), examining maize apical tissue samples across multiple 
+experimental factors:
+
+- **Tissue type**: V1_Root, V1_Leaf,V3_Leaf, V3_Root, V3_SAM
+- **temperature treatment**: CTRL (warm) vs cold
+- **Genotype**: CTRL (B73) vs Inv4m (inverted karyotype)
+- **Donor**: PT vs Mi21 (treated as batch effect)
+
+The analysis uses the limma-voom pipeline to identify genes that respond to:
+
+1. **temp (cold)**: temperature treatment effect
+2. **Inv4m**: Genotype effect
+3. **temp:Inv4m**: Interaction between temperature and genotype
+
+## Linear Model Specification
+
+This model describes the log-transformed expression \( y_{g,i} \) of gene \( g \) 
+in sample \( i \):
+
+\[
+\begin{aligned}
+y_{g,i} &= \beta_{g,0}
++ \beta_{g,D}\,D_i
++ \sum_{t=1}^{4}\beta_{g,T_t}\,T_{t,i}
++ \beta_{g,\text{temp}}\,\text{temp}_i \\
+&\quad + \beta_{g,G}\,G_i
++ \beta_{g,\text{temp} \times G}\,(\text{temp}_i \times G_i)
++ \varepsilon_{g,i}
+\end{aligned}
+\]
+
+with \( \varepsilon_{g,i} \sim N(0, \phi_i\sigma^2_{g}) \)
+
+### Model Components
+
+| Symbol | Description | Notes |
+|:-------|:-------------|:------|
+| \( y_{g,i} \) | log\(_2\)(CPM) expression | Response variable |
+| \( \beta_{g,0} \) | Intercept | Baseline: PT, V1_Root, CTRL temp, CTRL genotype |
+| \( \beta_{g,D} \) | Donor effect (Mi21 vs PT) | Batch correction |
+| \( \beta_{g,T_t} \) | Tissue effects | 4 dummy variables (V1_Root is reference) |
+| \( \beta_{g,\text{temp}} \) | Cold temperature effect | Main effect |
+| \( \beta_{g,G} \) | Inv4m genotype effect | Main effect |
+| \( \beta_{g,\text{temp} \times G} \) | temperature × Genotype | Interaction (key effect) |
+| \( \varepsilon_{g,i} \) | Residual error | Voom-weighted |
+
+## Fold Change Thresholds
+
+- **Interaction (temp:Inv4m)**: ±0.5 log2FC
+- **Main effects (temp, Inv4m)**: ±1.5 log2FC
+
+## DEG Classification Tiers
+
+1. **Significant DEGs**: FDR < 0.05 (`is_DEG`)
+2. **High-confidence DEGs**: FDR < 0.05 AND appropriate |log2FC| threshold (`is_hiconf_DEG`)
+3. **Selected DEGs**: Top 10 by significance + top 10 by Mahalanobis distance (`is_selected_DEG`)
+
+# Libraries
+```{r libraries}
+library(edgeR)          # Differential expression analysis
+library(limma)          # Linear models for RNA-seq
+library(rtracklayer)    # Genomic annotation handling
+library(GenomicRanges)  # Genomic ranges operations
+library(dplyr)          # Data manipulation
+library(tidyr)          # Data manipulation
+library(stringr)        # String manipulation
+library(ggplot2)        # Plotting
+library(ggpubr)         # Publication ready plots
+library(ggfx)           # Extra effects for ggplots (shadows)
+library(ggtext)         # Formatted text in plots
+library(robustbase)     # Robust statistics (MCD for Mahalanobis)
+```
+
+# Data Loading and Preprocessing
+
+## Load Expression Counts
+```{r load_counts}
+counts <- read.csv("~/Desktop/crow2020_gene_xp.csv")
+
+{
+  cat("Loaded expression data:\n")
+  cat("  Dimensions:", dim(counts), "\n")
+  cat("  Genes:", nrow(counts), "\n")
+  cat("  Samples:", ncol(counts) - 1, "\n")
+}
+```
+
+## Load Sample Metadata
+```{r load_metadata}
+quant_dir <- "/Volumes/DOE_CAREER/inv4m/run/results_quantify/kallisto_quant"
+
+# Define paths
+sra_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/SraRunTable.csv"
+sample_submission_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/gc7_sample_submission.csv"
+
+# Load data
+sra_meta <- read.csv(sra_file, stringsAsFactors = FALSE, check.names = FALSE)
+submission_meta <- read.csv(sample_submission_file, stringsAsFactors = FALSE)
+
+# Standardize SRA metadata
+sra_meta <- sra_meta %>%
+  dplyr::rename(
+    samp = `Library Name`,
+    genotype = genotype,
+    temp = temp,
+    tissue = tissue,
+    Run = Run
+  )
+
+# Join core metadata and filter to NIL lines of interest
+metadata <- submission_meta %>%
+  filter(old_line %in% c("PT_NIL", "Mi21_NIL")) %>%
+  dplyr::select(samp, old_line, ID, source, harvest_date, tube_num_full) %>%
+  inner_join(sra_meta, by = "samp") %>%
+  arrange(Run)
+
+# Create analysis factors and sampling covariates
+metadata <- metadata %>%
+  mutate(
+    # === Biological factors ===
+    # Donor
+    Donor = case_when(
+      grepl("^PT_", old_line) ~ "PT",
+      grepl("^Mi21_", old_line) ~ "Mi21",
+      TRUE ~ NA_character_
+    ),
+    Donor = factor(Donor, levels = c("PT", "Mi21")),
+    
+    # Genotype
+    Genotype = factor(genotype, levels = c("B73", "Inv4m")),
+    Genotype = recode(Genotype, "B73" = "CTRL", "Inv4m" = "Inv4m"),
+    
+    # temperature
+    temp = factor(temp, levels = c("warm", "cold")),
+    temp = recode(temp, "warm" = "CTRL", "cold" = "cold"),
+    
+    # Tissue — with leaf subtypes
+    Tissue = case_when(
+      tissue == "V1_Leaf_tissue"    ~ "V1_Leaf",
+      tissue == "V1_Primary_root"   ~ "V1_Root",
+      tissue == "V3_Leaf_tissue"    ~ "V3_Leaf",
+      tissue == "V3_leaf_base"      ~ "V3_Leaf_Base",
+      tissue == "V3_leaf_sheath"    ~ "V3_Leaf_Sheath",
+      tissue == "V3_S2_leaf_base"   ~ "V3_S2_Leaf_Base",
+      tissue == "V3_S2_leaf_tip"    ~ "V3_S2_Leaf_Tip",
+      tissue == "V3_Primary_root"   ~ "V3_Root",
+      tissue == "V3_Stem_SAM"       ~ "V3_SAM",
+      TRUE ~ NA_character_
+    ),
+    Tissue = factor(Tissue, levels = c(
+      "V1_Root", "V3_Root", "V1_Leaf", "V3_Leaf", 
+      "V3_Leaf_Base", "V3_Leaf_Sheath", 
+      "V3_S2_Leaf_Base", "V3_S2_Leaf_Tip", "V3_SAM"
+    )),
+    
+    # === Sampling & technical covariates ===
+    # Unique plant identifier (from submission metadata)
+    plant_id = ID,
+    
+    # Collection team (source column = technician/team ID)
+    collector_team = as.factor(source),
+    
+    # Harvest date (biological sampling day)
+    harvest_date = as.Date(harvest_date, format = "%m/%d/%Y"),
+    
+    # Plant serial number (numeric suffix of ID; proxy for planting/sampling order)
+    plant_serial_number = as.numeric(stringr::str_sub(ID, 5)),
+    
+    # Within-plant tissue order (0 = leaf, 1 = root, 2 = base, etc.)
+    tissue_order_index = as.numeric(
+      stringr::str_extract(tube_num_full, "\\.[0-9]+")
+    ) %>% 
+      dplyr::coalesce(0) %>% 
+      abs(),
+    
+    # SRA upload time (proxy for library prep + sequencing batch)
+    sra_upload_time = as.POSIXct(create_date, format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC"),
+    
+    # Combined harvest batch (date + team)
+    harvest_batch = interaction(harvest_date, collector_team, drop = TRUE)
+  ) %>%
+  # Remove samples with unmapped tissue
+  filter(!is.na(Tissue))
+
+metadata$harvest_date_f <- factor(metadata$harvest_date)
+
+{
+  cat("\nSample metadata:\n")
+  cat("  Total samples:", nrow(metadata), "\n")
+  cat("  Genotypes:", paste(unique(metadata$Genotype), collapse = ", "), "\n")
+  cat("  temperatures:", paste(unique(metadata$temp), collapse = ", "), "\n")
+  cat("  Donors:", paste(unique(metadata$Donor), collapse = ", "), "\n")
+  cat("  Tissues:", paste(levels(metadata$Tissue), collapse = ", "), "\n")
+  cat("  Collection teams:", paste(levels(metadata$collector_team), collapse = ", "), "\n")
+  cat("  Harvest dates:", paste(sort(unique(metadata$harvest_date)), collapse = ", "), "\n")
+  cat("\nTissue counts:\n")
+  print(sort(table(metadata$Tissue), decreasing = TRUE))
+}
+```
+
+## Verify Experimental Design Balance
+```{r check_balance}
+{
+  cat("\n=== Experimental Design Balance ===\n")
+  
+  cat("\nDonor × Genotype × temperature:\n")
+  print(with(metadata, table(Donor, Genotype, temp)))
+  
+  cat("\nTissue × Genotype × temperature:\n")
+  print(with(metadata, table(Tissue, Genotype, temp)))
+  
+  cat("\nDonor × Genotype (overall):\n")
+  print(with(metadata, table(Donor, Genotype)))
+}
+```
+
+## Prepare Count Matrix
+```{r prepare_counts}
+# Extract gene IDs
+gene_ids <- counts[, 1]
+
+# Convert to matrix
+counts_matrix <- as.matrix(counts[, -1])
+rownames(counts_matrix) <- gene_ids
+
+# Match sample names to metadata
+# Assuming column names in counts are Run IDs
+sample_order <- match(colnames(counts_matrix), metadata$Run)
+metadata <- metadata[sample_order, ]
+
+{
+  cat("\nCount matrix prepared:\n")
+  cat("  Genes:", nrow(counts_matrix), "\n")
+  cat("  Samples:", ncol(counts_matrix), "\n")
+  cat("  All samples matched:", 
+      all(colnames(counts_matrix) == metadata$Run), "\n")
+}
+```
+
+## Create DGEList Object
+```{r create_dgelist}
+# Create DGEList with counts and sample information
+y <- DGEList(counts = counts_matrix, samples = metadata)
+
+# Define groups from experimental factors
+y$samples$group <- interaction(
+  y$samples$temp,
+  y$samples$Genotype,
+  y$samples$Tissue
+)
+
+{
+  cat("\nDGEList object created\n")
+  cat("  Number of groups:", nlevels(y$samples$group), "\n")
+  head(y$samples)
+}
+```
+
+# Expression Filtering and Sample Quality Control
+
+## Filter Genes by Expression Level
+```{r filter_expression}
+# Keep genes with sufficient expression
+keep <- filterByExpr(y, group = y$samples$group)
+y_filtered <- y[keep, ]
+
+{
+  cat("\nExpression filtering:\n")
+  cat("  Genes before:", nrow(y), "\n")
+  cat("  Genes after:", nrow(y_filtered), "\n")
+  cat("  Genes removed:", sum(!keep), "\n")
+}
+```
+
+## Library Size Quality Control
+```{r library_qc}
+# Histogram of library sizes
+hist(
+  y_filtered$samples$lib.size / 1e6,
+  main = "Library Size Distribution",
+  xlab = "Library Size (millions of reads)",
+  breaks = 20
+)
+
+{
+  cat("\nLibrary size summary:\n")
+  print(summary(y_filtered$samples$lib.size))
+  cat("\nSamples with lib.size < 10 million:", 
+      sum(y_filtered$samples$lib.size < 1e7), "\n")
+}
+```
+
+## Filter Low Quality Libraries
+```{r filter_samples}
+# Flag and remove low count libraries (< 10M reads)
+y_filtered$samples$lowCount <- y_filtered$samples$lib.size < 1e5
+y_filtered <- y_filtered[, !y_filtered$samples$lowCount]
+
+{
+  cat("\nLow quality libraries removed:\n")
+  cat("  Retained:", ncol(y_filtered), "\n")
+  cat("  Removed:", sum(y$samples$lib.size < 1e5), "\n")
+}
+```
+
+## Sample Distribution After Filtering
+```{r sample_distribution}
+{
+  with(y_filtered$samples, {
+    cat("\n=== Sample Distribution After QC ===\n")
+    cat("\n-- Genotype --\n")
+    print(table(Genotype))
+    cat("\n-- Temperature --\n")
+    print(table(temp))
+    cat("\n-- Tissue --\n")
+    print(table(Tissue))
+    cat("\n-- Donor --\n")
+    print(table(Donor))
+  })
+}
+```
+
+# Quality Control: Batch Effects
+
+## Compute MDS Dimensions (10 dimensions for diagnostics)
+```{r mds_calculation}
+# TMM normalization
+y_filtered <- calcNormFactors(y_filtered, method = "TMM")
+
+# Compute MDS
+mds <- plotMDS(y_filtered, plot = FALSE)
+
+# Use 10 dimensions based on scree plot
+n_mds_dims <- 10
+
+# Step 1: Prepare metadata columns (from your processed metadata)
+meta_cols <- metadata %>%
+  dplyr::select(
+    Run,
+    temp, Genotype, Donor, Tissue,
+    plant_id, collector_team, harvest_date,
+    plant_serial_number, tissue_order_index,
+    sra_upload_time, harvest_batch
+  )
+
+# Step 2: Prepare DGE sample info (from y_filtered)
+dge_cols <- y_filtered$samples %>%
+  dplyr::select(Run, lib.size, norm.factors, group)
+
+# Step 3: Prepare MDS coordinates
+mds_coords <- tibble(Run = y_filtered$samples$Run)
+for (i in 1:n_mds_dims) {
+  mds_coords[[paste0("dim", i)]] <- mds$eigen.vectors[, i] * sqrt(mds$var.explained[i])
+}
+
+# Step 4: Merge all three cleanly
+d <- meta_cols %>%
+  inner_join(dge_cols, by = "Run") %>%
+  inner_join(mds_coords, by = "Run")
+
+# Report variance explained
+var_explained <- mds$var.explained[1:n_mds_dims]
+cumvar_pct <- cumsum(var_explained) / sum(mds$var.explained[mds$var.explained > 0]) * 100
+
+var_explained_df <- tibble(
+  dimension = paste0("dim", 1:n_mds_dims),
+  var_explained = round(var_explained, 4),
+  cum_var_pct = round(cumvar_pct, 1)
+)
+
+cat("Variance explained by first", n_mds_dims, "MDS dimensions:\n")
+print(var_explained_df)
+```
+
+## MDS Dimension Correlations: Biological & Technical Covariates
+```{r mds_correlations_all}
+# Define all covariates to test
+biological_covs <- c("temp", "Genotype", "Donor", "Tissue")
+technical_covs <- c(
+  "collector_team", 
+  "harvest_date", 
+  "plant_serial_number", 
+  "tissue_order_index", 
+  "sra_upload_time"
+)
+all_covs <- c(biological_covs, technical_covs)
+
+# Prepare a numeric version of d for correlation
+d_numeric <- d %>%
+  mutate(
+    # Convert factors to numeric (ordered levels)
+    temp_n = as.numeric(temp),
+    Genotype_n = as.numeric(Genotype),
+    Donor_n = as.numeric(Donor),
+    Tissue_n = as.numeric(Tissue),
+    collector_team_n = as.numeric(collector_team),
+    # Date/time as numeric (days since origin)
+    harvest_date_n = as.numeric(harvest_date),
+    sra_upload_time_n = as.numeric(sra_upload_time)
+    # plant_serial_number and tissue_order_index are already numeric
+  )
+
+# Get MDS dimension names (dim1 to dim10)
+mds_dims <- paste0("dim", 1:10)
+
+# Initialize results tibble
+cor_results <- tibble(
+  dimension = character(),
+  covariate = character(),
+  correlation = numeric(),
+  p_value = numeric()
+)
+
+# Perform correlations
+for (dim in mds_dims) {
+  for (cov in all_covs) {
+    cov_n <- paste0(cov, "_n")
+    
+    # Skip if numeric version doesn't exist (e.g., already numeric)
+    if (!cov_n %in% names(d_numeric)) {
+      if (cov %in% c("plant_serial_number", "tissue_order_index")) {
+        cov_n <- cov  # these are already numeric
+      } else {
+        next
+      }
+    }
+    
+    x <- d_numeric[[dim]]
+    y <- d_numeric[[cov_n]]
+    
+    # Skip if no variation
+    if (sd(x, na.rm = TRUE) == 0 || sd(y, na.rm = TRUE) == 0) {
+      next
+    }
+    
+    # Spearman correlation (robust, handles ties)
+    test_result <- tryCatch({
+      cor.test(x, y, method = "spearman", exact = FALSE)
+    }, error = function(e) {
+      NULL
+    })
+    
+    if (!is.null(test_result)) {
+      cor_results <- cor_results %>%
+        add_row(
+          dimension = dim,
+          covariate = cov,
+          correlation = test_result$estimate,
+          p_value = test_result$p.value
+        )
+    }
+  }
+}
+
+# Adjust p-values (FDR across all tests)
+cor_results <- cor_results %>%
+  mutate(
+    adj_p_value = p.adjust(p_value, method = "fdr"),
+    significant = adj_p_value < 0.05,
+    correlation = round(correlation, 3),
+    p_value = signif(p_value, 3),
+    adj_p_value = signif(adj_p_value, 3)
+  ) %>%
+  arrange(desc(abs(correlation)))
+
+# Display top significant results
+cat("\nTop significant MDS correlations (FDR < 0.05):\n")
+print(cor_results %>% filter(significant) %>% head(15))
+
+# Optional: Save full results for later
+mds_cor_full <- cor_results
+```
+
+
+## MDS: Multiple Factors
+```{r mds_multiple_factors, fig.width=14, fig.height=14}
+library(ggpubr)
+
+# 1. strongest effect
+p1 <- ggplot(d, aes(x = dim1, y = dim2, color = harvest_date)) +
+  geom_point(size = 3) +
+  scale_color_viridis_c(option = "plasma", name = "Harvest Date") +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top")
+
+# 2. Collection team (technical)
+p2 <- ggplot(d, aes(x = dim1, y = dim2, color = collector_team)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top",
+         plot.margin = margin(r = 60))
+
+# 3. Temperature (biological)
+p3 <- ggplot(d, aes(x = dim1, y = dim2, color = temp)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top")
+
+# 4. Genotype (biological)
+p4 <- ggplot(d, aes(x = dim1, y = dim2, color = Genotype)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top",
+         plot.margin = margin(r = 60))
+
+# 5. Donor (biological)
+p5 <- ggplot(d, aes(x = dim1, y = dim2, color = Donor)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top",
+         plot.margin = margin(r = 60))
+
+# 6. Tissue (biological)
+p6 <- ggplot(d, aes(x = dim1, y = dim2, color = Tissue)) +
+  geom_point(size = 3) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "top",
+         plot.margin = margin(r = 80))
+
+# Arrange in 2 columns, 3 rows
+ggarrange(p1, p2, p3, p4, p5, p6, ncol = 2, nrow = 3)
+```
+
+# Normalization and Design Matrix
+```{r linear_modelling}
+# Design matrix
+design <- model.matrix(
+  ~ Donor + Tissue*Genotype+ temp*Genotype,
+  data = y_filtered$samples
+)
+
+# Voom transformation with precision weights
+voomR <- voom(y_filtered, design = design, plot = TRUE)
+
+# Save normalized expression
+saveRDS(voomR$E, file = "../results/normalized_expression_logCPM_crow2020.rds")
+saveRDS(voomR, file = "../results/normalized_expression_voom_object_crow2020.rds")
+
+{
+  cat("Normalization factors range:", 
+      range(y_filtered$samples$norm.factors), "\n\n")
+  cat("Design matrix:", nrow(design), "samples ×", ncol(design), 
+      "coefficients\n")
+  cat("\nCoefficients:\n")
+  print(colnames(design))
+  cat("\nVoom expression matrix:", nrow(voomR$E), "genes ×", 
+      ncol(voomR$E), "samples\n")
+}
+```
+
+## Batch-Corrected Expression (Visualization Only)
+```{r batch_correction}
+# Remove collection order and donor batch effect for visualization
+# Design matrix with ONLY technical effects to remove
+design_batch <- model.matrix(
+  ~  Donor,
+  data = metadata
+)
+
+# Remove ONLY these effects
+corrected_logCPM <- removeBatchEffect(
+  voomR$E,
+  design = design_batch
+)
+
+# Save for downstream visualization
+saveRDS(
+  corrected_logCPM, 
+  "../results/normalized_expression_batch_corrected_crow2020.rds"
+)
+
+{
+  cat("\nBatch-corrected expression saved (for visualization only)\n")
+  cat("Use voomR for differential expression analysis\n")
+}
+```
+
+# Linear Model Fitting
+```{r fit_linear_model}
+# Fit linear model
+fit <- lmFit(voomR, design)
+
+# Apply empirical Bayes moderation
+ebfit <- eBayes(fit)
+
+{
+  cat("Model fitted:", nrow(fit$coefficients), "genes ×", 
+      ncol(fit$coefficients), "coefficients\n")
+  cat("\nSignificant genes per coefficient (FDR < 0.05):\n")
+  print(colSums(abs(decideTests(ebfit))))
+}
+```
+
+# Effect Estimation and Confidence Intervals
+
+## Extract Coefficients of Interest
+```{r extract_coefficients}
+# Map coefficients (excluding Intercept and Donor batch)
+predictor_map <- c(
+  "DonorMi21"                       = "Mi21",
+  "TissueV1_Leaf"                   = "V1L",
+  "TissueV3_Root"                   = "V3R",
+  "TissueV3_Leaf"                   = "V3L",
+  "TissueV3_Leaf_Base"              = "V3LBase",
+  "TissueV3_Leaf_Sheath"            = "V3LSheath",
+  "TissueV3_S2_Leaf_Base"           = "V3L2Base",
+  "TissueV3_S2_Leaf_Tip"            = "V3L2Tip",
+  "TissueV3_SAM"                    = "V3SAM",
+  "GenotypeInv4m"                   = "Inv4m",
+  "tempcold"                        = "cold",
+  "TissueV3_Root:GenotypeInv4m"     = "V3R:Inv4m",
+  "TissueV1_Leaf:GenotypeInv4m"     = "V1L:Inv4m",
+  "TissueV3_Leaf:GenotypeInv4m"     = "V3L:Inv4m",
+  "TissueV3_Leaf_Base:GenotypeInv4m"= "V3LB:Inv4m",
+  "TissueV3_Leaf_Sheath:GenotypeInv4m" = "V3LS:Inv4m",
+  "TissueV3_S2_Leaf_Base:GenotypeInv4m" = "V3L2B:Inv4m",
+  "TissueV3_S2_Leaf_Tip:GenotypeInv4m"  = "V3L2T:Inv4m",
+  "TissueV3_SAM:GenotypeInv4m"      = "V3SAM:Inv4m",
+  "GenotypeInv4m:tempcold"          = "Inv4m:cold"   # ← FIXED: matches actual coef name
+)
+
+{
+  cat("\nExtracting coefficients:\n")
+  for (i in seq_along(predictor_map)) {
+    cat("  ", names(predictor_map)[i], "→", predictor_map[i], "\n")
+  }
+}
+```
+
+## Extract Results Function
+```{r extract_effects_function}
+#' Extract differential expression results for specified predictors
+#'
+#' @param ebfit An eBayes fitted model object from limma
+#' @param predictor_map Named vector mapping coefficient names to display names
+#'
+#' @return A data frame with DE results for all specified predictors
+extract_predictor_effects <- function(ebfit, predictor_map) {
+  coef_names <- colnames(coef(ebfit))
+  coef_indices <- match(names(predictor_map), coef_names)
+  
+  if (any(is.na(coef_indices))) {
+    missing <- names(predictor_map)[is.na(coef_indices)]
+    stop("Coefficients not found: ", paste(missing, collapse = ", "),
+         "\nAvailable: ", paste(coef_names, collapse = ", "))
+  }
+  
+  result_list <- lapply(seq_along(coef_indices), function(i) {
+    idx <- coef_indices[i]
+    
+    tt <- topTable(ebfit, coef = idx, sort.by = "none", n = Inf)
+    
+    # Calculate 95% confidence intervals
+    crit_value <- qt(0.975, ebfit$df.residual + ebfit$df.prior)
+    std_errors <- ebfit$stdev.unscaled[, idx] * sqrt(ebfit$s2.post)
+    tt$std_err <- std_errors
+    tt$upper <- tt$logFC + crit_value * std_errors
+    tt$lower <- tt$logFC - crit_value * std_errors
+    tt$predictor <- predictor_map[i]
+    tt$response <- rownames(tt)
+    
+    tt
+  })
+  
+  effects <- do.call(rbind, result_list)
+  rownames(effects) <- NULL
+  
+  effects %>%
+    dplyr::select(predictor, response, everything()) %>%
+    arrange(adj.P.Val)
+}
+```
+
+## Extract Effects
+```{r extract_effects}
+# Define effect order by number of DEGs detected
+effect_order <- c(
+  "V3L2Tip",
+  "V1L",
+  "V3L",
+  "V3LBase",
+  "V3L2Base",
+  "V3LSheath",
+  "V3SAM",
+  "cold",
+  "Mi21",
+  "V3R",
+  "Inv4m",
+  "V3L2B:Inv4m",
+  "V3L2T:Inv4m",
+  "V3L:Inv4m",
+  "V3LB:Inv4m",
+  "V1L:Inv4m",
+  "V3LS:Inv4m",
+  "Inv4m:cold",
+  "V3SAM:Inv4m",
+  "V3R:Inv4m"
+)
+
+effects_df <- extract_predictor_effects(ebfit, predictor_map) %>%
+  dplyr::rename(gene = response) %>%
+  mutate(predictor = factor(predictor, levels = effect_order)) %>%
+  mutate(neglogP = -log10(adj.P.Val))
+
+{
+  cat("\nTotal tests:", nrow(effects_df), "\n")
+  cat("Tests per predictor:\n")
+  print(table(effects_df$predictor))
+}
+```
+
+## Annotate with DEG Status
+```{r annotate_deg_status}
+effects_df <- effects_df %>%
+  mutate(is_DEG = adj.P.Val < 0.05) %>%
+  mutate(regulation = case_when(
+    is_DEG & logFC > 0 ~ "Upregulated",
+    is_DEG & logFC < 0 ~ "Downregulated",
+    .default = "Unregulated"
+  ))
+
+{
+  cat("\nDEG counts:\n")
+  print(with(effects_df, table(predictor, is_DEG)))
+  cat("\nRegulation:\n")
+  print(with(effects_df, table(predictor, regulation)))
+}
+```
+
+## Define Robust Outlier Detection Function
+```{r mahalanobis_function}
+# Modified helper function with sample size check
+calculate_robust_distance <- function(per_predictor, mcd_alpha) {
+  # Require at least 10 significant DEGs for robust estimation
+  if (nrow(per_predictor) < 10) {
+    per_predictor$mahalanobis <- NA_real_
+    return(per_predictor)
+  }
+  
+  bivariate <- per_predictor %>%
+    dplyr::select(logFC, neglogP) %>%
+    as.matrix()
+  
+  # Check for variance (all same values would cause singularity)
+  if (var(bivariate[, 1]) < 1e-10 || var(bivariate[, 2]) < 1e-10) {
+    per_predictor$mahalanobis <- NA_real_
+    return(per_predictor)
+  }
+  
+  tryCatch({
+    mcd_result <- covMcd(bivariate, alpha = mcd_alpha)
+    
+    per_predictor$mahalanobis <- mahalanobis(
+      x = bivariate,
+      center = mcd_result$center,
+      cov = mcd_result$cov
+    )
+  }, error = function(e) {
+    warning("Could not calculate Mahalanobis distance for group: ", 
+            unique(per_predictor$predictor), " - ", 
+            unique(per_predictor$regulation))
+    per_predictor$mahalanobis <- NA_real_
+  })
+  
+  per_predictor
+}
+
+# Modified main function
+add_mahalanobis_outliers <- function(
+    data = NULL,
+    distance_quantile = 0.05,
+    FDR = 0.05,
+    mcd_alpha = 0.75
+) {
+  # Calculate distances per predictor AND regulation
+  data <- data %>%
+    group_by(predictor, regulation) %>%
+    group_split() %>%
+    lapply(calculate_robust_distance, mcd_alpha = mcd_alpha) %>%
+    bind_rows()
+  
+  cutoff <- qchisq(p = 1 - distance_quantile, df = 2)
+  
+  data$is_mh_outlier <- (data$adj.P.Val < FDR) & 
+                        (data$mahalanobis > cutoff) & 
+                        !is.na(data$mahalanobis)
+  
+  data %>%
+    ungroup() %>%
+    group_by(predictor, regulation) %>%
+    arrange(-mahalanobis, .by_group = TRUE) %>%
+    ungroup()
+}
+```
+
+## Calculate Mahalanobis Distances
+```{r apply_mahalanobis}
+effects_df <- add_mahalanobis_outliers(
+  effects_df, 
+  distance_quantile = 0.05, 
+  FDR = 0.05
+)
+
+{
+  cat("\nMahalanobis outliers detected:\n")
+  print(with(effects_df, table(predictor, is_mh_outlier, useNA = "ifany")))
+  
+  cat("\nGroups with insufficient data (NA):\n")
+  na_summary <- effects_df %>%
+    filter(is.na(mahalanobis)) %>%
+    count(predictor, regulation)
+  print(na_summary)
+}
+```
+
+# Gene Annotation
+```{r load_annotations}
+# Gene symbols and locus names
+gene_symbol <- read.table(
+  "../data/gene_symbol.tab",
+  quote = "",
+  header = TRUE,
+  sep = "\t",
+  na.strings = ""
+)
+
+# Pannzer functional annotations
+pannzer <- read.table(
+  "../data/PANNZER_DESC.tab",
+  quote = "",
+  header = TRUE,
+  sep = "\t"
+) %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  dplyr::select(gene_model, desc)
+
+# Merge annotations
+gene_symbol_unique <- gene_symbol %>%
+  group_by(gene_model, locus_symbol) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+gene_pannzer <- gene_symbol_unique %>%
+  left_join(pannzer, by = "gene_model") %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::select(gene_model, locus_symbol, locus_name, desc)
+
+# Genomic coordinates
+v5_gff_file <- "/Users/fvrodriguez/ref/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+genes_gr <- rtracklayer::import(v5_gff_file) %>%
+  subset(type == "gene" & seqnames %in% 1:10)
+genes <- as.data.frame(genes_gr)
+genes$ID <- gsub("gene:", "", genes$ID)
+
+{
+  cat("Annotations loaded:\n")
+  cat("  Gene symbols:", nrow(gene_symbol), "\n")
+  cat("  Pannzer descriptions:", nrow(pannzer), "\n")
+  cat("  Genomic features:", nrow(genes), "genes\n")
+}
+```
+
+## Define Genomic Regions
+```{r define_regions}
+# Inv4m inversion boundaries
+inv4m_start <- genes[genes$ID == "Zm00001eb190470", "start"]
+inv4m_end <- genes[genes$ID == "Zm00001eb194800", "end"]
+
+# Shared introgression boundaries
+introgression_start <- 157012149
+introgression_end <- 195900523
+
+# Extract gene IDs
+inv4m_gene_ids <- genes %>%
+  filter(seqnames == 4, start >= inv4m_start, end <= inv4m_end) %>%
+  pull(ID)
+
+shared_introgression_gene_ids <- genes %>%
+  filter(seqnames == 4, start >= introgression_start, end <= introgression_end) %>%
+  pull(ID)
+
+flanking_introgression_gene_ids <- shared_introgression_gene_ids[
+  !(shared_introgression_gene_ids %in% inv4m_gene_ids)
+]
+
+{
+  cat("Inv4m inversion:", length(inv4m_gene_ids), "genes\n")
+  cat("Shared introgression:", length(shared_introgression_gene_ids), "genes\n")
+  cat("Flanking:", length(flanking_introgression_gene_ids), "genes\n")
+}
+```
+
+# Three-Tier DEG Classification
+
+## High-Confidence DEGs
+```{r highconf_degs}
+# Define fold change thresholds
+is_large_effect <- rep(FALSE, nrow(effects_df))
+is_interaction <- effects_df$predictor == "cold:Inv4m"
+is_large_effect[is_interaction & abs(effects_df$logFC) > 0.5] <- TRUE
+is_large_effect[!is_interaction & abs(effects_df$logFC) > 1.5] <- TRUE
+
+effects_df <- effects_df %>%
+  mutate(is_hiconf_DEG = is_DEG & is_large_effect)
+
+{
+  cat("\nHigh-Confidence DEGs:\n")
+  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+}
+```
+
+## Selected DEGs
+```{r select_degs}
+rank_threshold <- 10
+
+effects_df <- effects_df %>%
+  group_by(is_hiconf_DEG, predictor, regulation) %>%
+  mutate(
+    pval_rank = row_number(dplyr::desc(neglogP)),
+    mahal_rank = row_number(dplyr::desc(mahalanobis))
+  ) %>%
+  ungroup() %>%
+  mutate(
+    is_selected_DEG = (pval_rank <= rank_threshold & is_hiconf_DEG) |
+                      (mahal_rank <= rank_threshold & is_hiconf_DEG)
+  )
+
+{
+  cat("\nSelected DEGs (Top", rank_threshold, "by rank):\n")
+  print(with(
+    effects_df %>% filter(is_selected_DEG & regulation != "Unregulated"),
+    table(regulation, predictor)
+  ))
+}
+```
+
+## Annotate with Gene Information
+```{r annotate_effects}
+effects_df <- effects_df %>%
+  left_join(
+    gene_pannzer,
+    by = c(gene = "gene_model"),
+    relationship = "many-to-many"
+  ) %>%
+  mutate(desc_merged = coalesce(locus_name, desc)) %>%
+  dplyr::select(predictor, regulation, gene, locus_symbol, desc_merged, everything()) %>%
+  inner_join(
+    genes %>%
+      dplyr::select(gene = ID, CHR = seqnames, BP = start) %>%
+      mutate(CHR = as.character(CHR) %>% as.integer()),
+    by = "gene"
+  ) %>%
+  mutate(
+    locus_label = case_when(
+      is.na(locus_symbol) ~ NA_character_,
+      grepl("^si\\d*[a-h]", locus_symbol) ~ NA_character_,
+      grepl("^umc", locus_symbol) ~ NA_character_,
+      grepl("^Zm00001eb", locus_symbol) ~ NA_character_,
+      TRUE ~ locus_symbol
+    )
+  )
+
+{
+  cat("\nAnnotations added:", ncol(effects_df), "columns\n")
+}
+```
+
+## Add Region Classification
+```{r add_regions}
+effects_df <- effects_df %>%
+  mutate(
+    in_Inv4m = gene %in% inv4m_gene_ids,
+    in_cis = gene %in% shared_introgression_gene_ids,
+    in_flank = gene %in% flanking_introgression_gene_ids,
+    in_trans = !in_cis
+  )
+
+# Summarize genomic region classification by predictor
+region_summary <- effects_df %>%
+  group_by(predictor) %>%
+  summarise(
+    in_Inv4m = sum(in_Inv4m, na.rm = TRUE),
+    in_cis   = sum(in_cis,   na.rm = TRUE),
+    in_flank = sum(in_flank, na.rm = TRUE),
+    in_trans = sum(in_trans, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(match(predictor, effect_order))  # keep your desired order
+
+# Print as a clean table
+{
+  cat("\nRegion classification by predictor:\n")
+  print(region_summary, row.names = FALSE)
+  }
+
+```
+
+# Quality Control Tables
+
+## Top DEGs per Predictor
+```{r top_degs}
+top_degs_qc <- effects_df %>%
+  filter(is_DEG, regulation != "Unregulated") %>%
+  group_by(predictor, regulation) %>%
+  arrange(-neglogP, .by_group = TRUE) %>%
+  dplyr::slice(1:10) %>%
+  dplyr::select(predictor, gene, locus_symbol, desc_merged, logFC, neglogP) %>%
+  arrange(predictor, regulation, -neglogP)
+
+top_degs_qc
+```
+
+## DEG Summary Statistics
+```{r deg_summary}
+overall_summary <- effects_df %>%
+  group_by(predictor) %>%
+  summarise(
+    total_genes = n(),
+    n_DEG = sum(is_DEG),
+    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_selected_DEG = sum(is_selected_DEG),
+    pct_DEG = round(100 * n_DEG / total_genes, 2)
+  )
+
+overall_summary
+```
+
+```{r, check_trans_network_effects}
+
+trans_effects <- read.csv("~/Desktop/network_effects.csv") 
+
+```
+
+# Selected DEGs for Manuscript
+```{r selected_degs_table}
+selected_degs <- effects_df %>%
+  filter(is_selected_DEG) %>%
+  dplyr::select(
+    predictor,
+    regulation,
+    gene,
+    locus_symbol,
+    locus_label,
+    desc_merged,
+    logFC,
+    neglogP,
+    mahalanobis,
+    pval_rank,
+    mahal_rank
+  ) %>%
+  arrange(predictor, regulation, -neglogP)
+
+{
+  cat("\nSelected DEGs for manuscript:", nrow(selected_degs), "\n")
+  print(with(selected_degs, table(predictor, regulation)))
+}
+```
+
+
+# Export Results
+```{r export_results, eval=FALSE}
+# Full effects table
+write.csv(
+  effects_df,
+  file = "../results/predictor_effects_crow2020.csv",
+  row.names = FALSE
+)
+
+# Selected DEGs
+write.csv(
+  dplyr::selected_degs,
+  file = "../results/selected_DEGs_crow2020.csv",
+  row.names = FALSE
+)
+
+{
+  cat("\nResults exported:\n")
+  cat("  predictor_effects_crow2020.csv\n")
+  cat("  dplyr::selected_DEGs_crow2020.csv\n")
+}
+```
+
+# Summary
+
+This analysis identified differentially expressed genes across three main effects:
+
+1. **Cold temperature**: `r sum(effects_df$is_DEG & effects_df$predictor == "cold")` DEGs
+2. **Inv4m genotype**: `r sum(effects_df$is_DEG & effects_df$predictor == "Inv4m")` DEGs
+3. **temp × Genotype interaction**: `r sum(effects_df$is_DEG & effects_df$predictor == "cold:Inv4m")` DEGs
+
+Donor batch effect was controlled as a fixed effect in the model. Expression data 
+was normalized using TMM and transformed with voom for variance stabilization.
+
+# Session Information
+```{r session_info}
+sessionInfo()
+```

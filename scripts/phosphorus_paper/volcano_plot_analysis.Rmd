@@ -1,0 +1,670 @@
+---
+title: "Differential Expression Volcano Plot Analysis"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 300
+)
+```
+
+# Overview
+
+**Purpose**: Generate multi-panel volcano plots for differential expression 
+analysis across multiple predictors (leaf tissue, phosphorus treatment, inv4m 
+genotype), highlighting genes selected by Mahalanobis distance outlier 
+detection.
+
+**Input**: CSV file containing differential expression results with Mahalanobis 
+outlier identification (`is_selected_DEG` column).
+
+**Output**: 
+- Multi-panel volcano plots (3-panel, 2-panel, and single-panel versions)
+- Annotated results table (CSV)
+- LaTeX tables of top labeled genes by predictor × regulation
+
+---
+
+# Setup
+
+## Load Libraries
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggpubr)
+library(ggtext)
+library(kableExtra)
+library(readr)
+```
+
+---
+
+# Data Import and Filtering
+
+**Purpose**: Load differential expression results and filter to predictors of 
+interest.
+
+**Approach**: Import CSV and subset to leaf tissue, phosphorus treatment, and 
+inv4m genotype effects. The input contains pre-calculated Mahalanobis distances 
+and outlier flags from upstream analysis.
+
+**Expected outcome**: Filtered dataset with three predictor levels, retaining 
+all columns including `is_selected_DEG` for gene labeling.
+```{r import_filter}
+
+predictor_order <- c("Leaf", "-P","Leaf:-P")
+
+# Load DE results with Mahalanobis outlier detection
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv") %>%
+  filter(predictor %in% predictor_order ) %>%
+  droplevels()
+
+# Set predictor order: Leaf, -P, Inv4m
+
+effects_df$predictor <- factor(effects_df$predictor, levels = predictor_order)
+
+# Diagnostics
+cat("Predictors in dataset (ordered):", levels(effects_df$predictor), "\n")
+cat("Total genes:", nrow(effects_df), "\n")
+cat("Genes per predictor:\n")
+print(table(effects_df$predictor))
+```
+
+---
+
+# Gene Selection for Labeling
+
+**Purpose**: Identify top genes to label in volcano plots based on 
+Mahalanobis distance ranking.
+
+**Approach**: For each predictor and regulation direction, select the top N 
+genes (default N=10) that are marked as `is_selected_DEG` and have 
+locus_label annotation in selected_DEGs_curated_locus_label.csv. Load curated 
+labels from the external file, coalesce with existing labels, then filter for 
+genes with valid annotations to label in the plot.
+
+**Expected outcome**: Data frame of genes to label, with custom label text 
+from curated annotations.
+```{r select_labels}
+# Load curated labels from external file
+# curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+curated <- read.csv("~/Desktop/selected_DEGs_leaf_interaction_model.csv") %>%
+  select(
+    regulation,
+    predictor,
+    gene,
+    locus_symbol,
+    locus_label,
+    desc_merged,
+    mahalanobis,
+    logFC,
+    neglogP
+  )
+
+# Set predictor order for curated data
+curated$predictor <- factor(curated$predictor, levels = predictor_order)
+
+# Define number of labels per predictor and regulation
+label_counts <- data.frame(
+  predictor = c("Leaf", "Leaf", "-P", "-P", "Leaf:-P","Leaf:-P"),
+  regulation = c("Downregulated", "Upregulated",
+                 "Downregulated", "Upregulated", 
+                 "Downregulated", "Upregulated"),
+  n_labels = c(21, 20, 10, 15,10,10),
+  stringsAsFactors = FALSE
+)
+
+# Select genes for labeling based on specified counts
+to_plot <- curated %>%
+  ungroup() %>%
+  filter(!is.na(locus_label) & locus_label != "") %>%
+  arrange(regulation, predictor, -mahalanobis) %>%
+  left_join(label_counts, by = c("predictor", "regulation")) %>%
+  group_by(regulation, predictor) %>%
+  mutate(row_num = row_number()) %>%
+  filter(row_num <= n_labels) %>%
+  select(-row_num, -n_labels) %>%
+  arrange(-mahalanobis) %>%
+  ungroup() %>%
+  mutate(predictor = factor(predictor, levels = predictor_order)) %>%  
+  data.frame()
+
+# Diagnostics
+cat("Total curated genes:", nrow(curated), "\n")
+cat("Genes with locus_label:", sum(!is.na(curated$locus_label) & curated$locus_label != ""), "\n")
+cat("\nSelected DEGs by regulation and predictor:\n")
+with(curated, print(table(regulation, predictor)))
+cat("\nGenes selected for labeling:", nrow(to_plot), "\n")
+cat("Labels per predictor/regulation:\n")
+with(to_plot, print(table(regulation, predictor)))
+
+# Show configured label counts
+cat("\nConfigured label counts:\n")
+print(label_counts)
+```
+
+---
+
+# Visualization
+
+## Three-Panel Volcano Plot (Leaf, -P, Inv4m)
+
+**Purpose**: Create three-panel volcano plot showing logFC vs. FDR across 
+all predictors.
+
+**Approach**: Use faceted ggplot with:
+- Points colored by regulation status (down/Bellow threshold/up)
+- Text labels for top Mahalanobis-selected genes
+- Free x-axis scales to accommodate different effect size ranges
+- Expression formatting for axis labels
+
+**Expected outcome**: Three-panel figure saved as high-resolution PNG.
+```{r volcano_3panel, fig.width=12, fig.height=12}
+# Custom formatting function for y-axis
+scaleFUN <- function(x) sprintf("%.0f", x)
+
+# Set regulation based on high-confidence DEG flag
+effects_df$regulation[!effects_df$is_hiconf_DEG] <- "Unregulated"
+to_plot <- to_plot %>% filter(
+  !(predictor=="Leaf" & regulation=="Upregulated" & neglogP < 2.5)
+  )
+
+effects_df$predictor_label <- effects_df$predictor
+effects_df$predictor_label[effects_df$predictor=="Leaf:-P"] <- "Leaf × -P"
+# Generate three-panel plot
+gene_volcano_3 <- effects_df %>%
+  ggplot(aes(x = logFC, y = neglogP, col = regulation)) +
+  ylab(expression(-log[10](italic(FDR)))) +
+  xlab(expression(log[2]("Fold Change"))) +
+  scale_y_continuous(labels = scaleFUN,expand = expansion(mult = c(0, 0.1)) ) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_text_repel(
+    data = to_plot,
+    aes(label = locus_label),
+    color = "black",
+    fontface="bold.italic",
+    segment.color ="grey",
+    force = 2,
+    size=7,
+    min.segment.length = 0,
+    max.overlaps = 50
+  ) +
+  scale_color_manual(
+    name = "",
+    values = c("#00AFBB", "grey", "#bb0c00"),
+    labels = c("Downregulated", "Bellow threshold", "Upregulated")
+  ) +
+  facet_wrap(. ~ predictor, scales = "free_x" ) +
+  guides(color = guide_legend(
+    reverse = TRUE, 
+    override.aes = list(size = 6)
+  )) +
+  theme_classic2(base_size = 30) +
+  theme(
+    plot.title = element_blank(),
+    strip.text = element_blank(),
+    #strip.text = element_markdown( size=35),
+    legend.position = c(0.87, 0.95),
+    legend.background = element_rect(fill = "transparent"),
+    legend.spacing = unit(0, "line"),
+    legend.box.spacing = unit(0, "line"),
+    legend.text = element_text(size = 25),
+    legend.direction = "vertical",
+    plot.margin = margin(0, 5.5, 5.5,5.5, "pt"),
+    strip.background = element_blank()
+  )
+
+
+
+# Load lipid volcano
+if (file.exists("../results/lipid_volcano_3_TIC.rds")) {
+  lipid_volcano_3 <- readRDS("../results/lipid_volcano_3_TIC.rds")
+  cat("Loaded lipid volcano plot\n")
+} else {
+  warning("Growth parameter plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
+}
+
+
+# Load transcript MDS
+if (file.exists("../results/transcript_MDS_12.rds")) {
+  p_transcript_MDS <- readRDS("../results/transcript_MDS_12.rds")
+  cat("Loaded growth parameter plot\n")
+} else {
+  warning("transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
+}
+
+if (file.exists("../results/lipid_MDS_23.rds")) {
+  p_lipid_MDS <- readRDS("../results/lipid_MDS_23.rds")
+  cat("Loaded fitted curves plot\n")
+} else {
+  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+}
+
+
+compound_MDS<- ggpubr::ggarrange(
+  p_lipid_MDS,
+  p_transcript_MDS,
+  nrow=2,
+  align ="hv")
+
+ggsave(
+  filename = "~/Desktop/compound_MDS.png",
+  plot = compound_MDS,
+  height = 14,
+  width = 8,
+  units = "in",
+  dpi = 150
+)
+
+compound_volcano<- ggpubr::ggarrange(
+  lipid_volcano_3,
+  gene_volcano_3,
+  ncol=1,
+  align ="v"
+  )
+
+ggsave(
+  filename = "~/Desktop/compound_volcano.png",
+  plot = compound_volcano,
+  height = 12,
+  width = 14,
+  units = "in",
+  dpi = 150
+)
+
+ compound_plot<- ggpubr::ggarrange(
+  compound_MDS,
+  compound_volcano,
+  ncol=2,
+  widths =  c(0.5,1)
+)
+
+ggsave(
+  filename = "~/Desktop/compound_plot.png",
+  plot = compound_plot,
+  height = 12,
+  width = 20,
+  units = "in",
+  dpi = 150
+)
+
+
+compound_volcano
+```
+
+## Two-Panel Volcano Plot (Leaf, -P only)
+
+**Purpose**: Create two-panel volcano plot focusing on Leaf and -P predictors.
+
+**Approach**: Filter data to exclude Inv4m, adjust legend position for 
+two-panel layout.
+
+**Expected outcome**: Two-panel figure saved as high-resolution PNG.
+```{r volcano_2panel, fig.width=10, fig.height=6}
+# Filter for Leaf and -P only
+effects_2panel <- effects_df %>%
+    mutate(predictor = factor(predictor, levels = predictor_order)) %>%
+  filter(predictor %in% c("Leaf", "-P")) %>%
+  droplevels()
+
+to_plot_2panel <- to_plot%>%
+    mutate(predictor = factor(predictor, levels = predictor_order)) %>%
+  filter(predictor %in% c("Leaf", "-P")) %>%
+  droplevels()
+# to_plot_2panel%>% filter(locus_label=="hhtmp5")
+# to_plot_2panel%>% filter(locus_label=="hhtmp5")
+# to_plot_2panel$locus_label[to_plot_2panel$locus_label=="hhtmp5"] <- NA
+# Generate two-panel plot
+volcano_2panel <- effects_2panel %>%
+  ggplot(aes(x = logFC, y = neglogP, col = regulation)) +
+  ylab(expression(-log[10](italic(FDR)))) +
+  xlab(expression(log[2]("Fold Change"))) +
+  #scale_x_continuous(expand = expansion(mult = c(0.3, 0.3)),labels = scaleFUN) +
+  scale_y_continuous(expand = expansion(mult = c(0., 0.2)),labels = scaleFUN) +
+  geom_point(alpha = 0.3, size=0.3) +
+  geom_text_repel(
+    data = to_plot_2panel,
+    aes(label = locus_label),
+    color = "black",
+    segment.color="grey",
+    force = 1,
+    fontface="bold.italic",
+    size=5.5,
+    fontface = "italic",
+    min.segment.length = 0,
+    max.overlaps = 50
+  ) +
+  scale_color_manual(
+    name = "",
+    values = c("#00AFBB", "grey", "#bb0c00"),
+    labels = c("Downregulated", "Bellow threshold", "Upregulated")
+  ) +
+  facet_wrap(. ~ predictor, scales = "free_x") +
+  guides(color = guide_legend(
+    reverse = TRUE, 
+    override.aes = list(size = 5)
+  )) +
+  theme_classic2(base_size = 30) +
+  theme(
+    # plot.title = element_blank(),
+    strip.text = element_markdown(size=35),
+    strip.background = element_blank(),
+    axis.title.y = element_text(size=25,margin = margin(r = -10)),
+    # axis.title.x = element_blank(),
+    #plot.margin = margin(5.5, 5.5, 30, 5.5, "pt"),
+    legend.position = c(0.15, 0.99),
+    legend.background = element_rect(fill = "transparent"),
+    legend.spacing = unit(0, "line"),
+    legend.box.spacing = unit(0, "line"),
+    legend.text = element_text(size = 20)
+  )
+```
+
+## Print panels
+```{r,print_panels}
+
+# Load lipid volcano
+if (file.exists("../results/lipid_volcano_2_TIC.rds")) {
+  lipid_volcano_2 <- readRDS("../results/lipid_volcano_2_TIC.rds")
+  cat("Loaded lipid volcano plot\n")
+} else {
+  warning("Growth parameter plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
+}
+
+
+# Load transcript MDS
+if (file.exists("../results/transcript_MDS_12.rds")) {
+  p_transcript_MDS <- readRDS("../results/transcript_MDS_12.rds")
+  cat("Loaded growth parameter plot\n")
+} else {
+  warning("transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
+}
+
+if (file.exists("../results/lipid_MDS_23.rds")) {
+  p_lipid_MDS <- readRDS("../results/lipid_MDS_23.rds")
+  cat("Loaded fitted curves plot\n")
+} else {
+  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+}
+
+if (file.exists("../results/lipid_trajectory_6panel.rds")) {
+  p_lipid_examples <- readRDS("../results/lipid_trajectory_6panel.rds")
+  cat("Loaded fitted curves plot\n")
+} else {
+  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+}
+
+
+top_panel   <- cowplot::plot_grid(
+  p_transcript_MDS +  theme(plot.margin = margin(l=5.5,r=-15, b=-5, "pt")),
+  volcano_2panel + ggpubr::rremove("xlab"),
+  nrow=1,
+  ncol=2,
+  rel_widths = c(1,2),
+  align = "h", 
+  axis = "tb", 
+  common.legend = TRUE,
+  legend = "left")
+
+ggsave(
+  filename = "~/Desktop/top_panel.png",
+  plot = top_panel,
+  height = 6,
+  width = 18,
+  units = "in",
+  dpi = 150
+)
+cat("Figure saved: top_panel.png (10 x 6 inches @ 300 dpi)\n")
+
+bottom_panel   <- cowplot::plot_grid(
+  p_lipid_MDS +  theme(plot.margin = margin(l=5.5,r=-15, "pt")),
+  lipid_volcano_2 + ggpubr::rremove("xlab"),
+  nrow=1,
+  ncol=2,
+  rel_widths = c(1,2),
+  align = "h", 
+  axis = "tb", 
+  common.legend = TRUE,
+  legend = "left")
+
+
+ggsave(
+  filename = "~/Desktop/bottom_panel.png",
+  plot = bottom_panel,
+  height = 6,
+  width = 18,
+  units = "in",
+  dpi = 150
+)
+cat("Figure saved: bottom_panel.png (10 x 6 inches @150 dpi)\n")
+
+
+cat("Figure saved: volcano_plot_2panel.png (10 x 6 inches @ 150 dpi)\n")
+# The top and bottom panels don't look good on the knitted document
+compound_volcano_2<- ggpubr::ggarrange(
+  volcano_2panel,
+  lipid_volcano_2,
+  ncol=1,
+  align ="v"
+  )
+compound_MDS<- ggpubr::ggarrange(
+  p_lipid_MDS,
+  p_transcript_MDS,
+  ncol=2,
+  align ="hv")
+
+# So I print a webpage friendly version for knitting
+print(compound_volcano_2)
+print(compound_MDS)
+```
+
+
+## Single-Panel Volcano Plot (Leaf:-P only)
+
+**Purpose**: Create single-panel volcano plot focusing exclusively on Inv4m 
+genotype effects.
+
+**Approach**: Filter data to Inv4m only, optimize layout for single panel 
+with centered legend.
+
+**Expected outcome**: Single-panel figure saved as high-resolution PNG.
+```{r volcano_1panel_inv4m, fig.width=6, fig.height=6}
+# Filter for Inv4m only
+effects_1panel <- effects_df %>%
+  filter(predictor == "Leaf:-P") 
+
+to_plot_1panel <- to_plot %>%
+  filter(predictor == "Leaf:-P")
+
+# Generate single-panel plot
+volcano_1panel <- effects_1panel %>%
+  ggplot(aes(x = logFC, y = neglogP, col = regulation)) +
+  ylab(expression(-log[10](italic(FDR)))) +
+  xlab(expression(log[2]("Fold Change"))) +
+  scale_y_continuous(labels = scaleFUN, breaks=0:6) +
+  geom_point(alpha = 0.3, size = 2) +
+  geom_text_repel(
+    data = to_plot_1panel,
+    aes(label = locus_label),
+    segment.color ="grey",
+    force = 2,
+    fontface = "bold.italic",
+    size=6,
+    color = "black",
+    min.segment.length = 0,
+    max.overlaps = 50,
+    size = 7
+  ) +
+  scale_color_manual(
+    name = "",
+    values = c("#00AFBB", "grey", "#bb0c00"),
+    labels = c("Negative", "Bellow threshold", "Positive")
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 5))) +
+  theme_classic2(base_size = 22) +
+  theme(
+    plot.title = element_blank(),
+    legend.position = "top",
+    legend.justification = "right",
+    legend.background = element_rect(fill = "transparent"),
+    legend.spacing = unit(0, "line"),
+    legend.box.spacing = unit(0, "line"),
+    legend.text = element_text(size = 20),
+    legend.direction = "horizontal"
+  )
+
+
+ggsave(
+  filename = "~/Desktop/volcano_plot_LeafxP.png",
+  plot = volcano_1panel,
+  height = 7,
+  width = 7,
+  units = "in",
+  dpi = 150
+)
+cat("Figure saved: volcano_plot_LeafxP.png (6 x 6 inches @ 300 dpi)\n")
+
+print(volcano_1panel)
+
+```
+
+---
+
+# Export Results
+
+## Generate LaTeX Tables by Predictor × Regulation
+
+**Purpose**: Create formatted tables of labeled genes for manuscript inclusion, 
+split by predictor and regulation combination.
+
+**Approach**: Subset to labeled genes, round numeric values, format for 
+publication, and export separate LaTeX tables for each predictor × regulation 
+combination.
+
+**Expected outcome**: Multiple LaTeX table files organized by predictor and 
+regulation direction.
+```{r latex_tables}
+# Prepare table data
+table_data <- curated %>%
+  #filter(!is.na(locus_label) & locus_label != "") %>%
+  group_by(predictor, regulation) %>%
+  arrange(predictor, regulation, -neglogP) %>%
+  mutate(
+    logFC = round(logFC, digits = 2),
+    neglogP = format(neglogP, digits = 2)
+  ) %>%
+  select(predictor, regulation, gene, locus_label, desc_merged, neglogP, logFC) %>%
+  ungroup()
+
+# Get unique predictor × regulation combinations
+pred_reg_combinations <- table_data %>%
+  distinct(predictor, regulation) %>%
+  arrange(predictor, regulation)
+
+# Generate separate LaTeX table for each combination
+for (i in 1:nrow(pred_reg_combinations)) {
+  pred <- pred_reg_combinations$predictor[i]
+  reg <- pred_reg_combinations$regulation[i]
+  
+  # Filter data for this combination
+  subset_data <- table_data %>%
+    filter(predictor == pred, regulation == reg)
+  
+  # Create filename
+  filename <- paste0("~/Desktop/DEG_table_", pred, "_", reg, ".tex")
+  filename <- gsub(":", "_", filename)
+  filename <- gsub("-", "minus", filename)  # Replace - with negP for filename
+  
+  # Generate LaTeX table
+  subset_data %>%
+    select(-predictor, -regulation) %>%
+    kbl(
+      caption = paste0(
+        "Genes with ", tolower(reg), " expression in ", pred, 
+        " condition, selected by Mahalanobis distance"
+      ),
+      format = "latex",
+      col.names = c("Gene", "Label", "Description", "-log10(FDR)", "logFC"),
+      align = "lllrr",
+      booktabs = TRUE
+    ) %>%
+    kable_classic(full_width = FALSE, latex_options = "HOLD_position") %>%
+    save_kable(file = filename, format = "latex")
+  
+  cat("Saved:", filename, "(", nrow(subset_data), "genes )\n")
+}
+
+# Also generate combined table with all genes
+table_data %>%
+  kbl(
+    caption = paste(
+      "All characterized genes selected by Mahalanobis distance outlier detection",
+      "across predictors and regulation directions"
+    ),
+    format = "latex",
+    col.names = c("Predictor", "Regulation", "Gene", "Label", "Description",
+                  "-log10(FDR)", "logFC"),
+    align = "llllrr",
+    booktabs = TRUE
+  ) %>%
+  kable_classic(full_width = FALSE, latex_options = c("HOLD_position", "scale_down")) %>%
+  collapse_rows(columns = 1:2, latex_hline = "major") %>%
+  save_kable(file = "DEG_table_all_combined.tex", format = "latex")
+
+cat("\nSaved: DEG_table_all_combined.tex (", nrow(table_data), "genes total )\n")
+```
+
+## Display Table Previews by Predictor × Regulation
+
+**Purpose**: Display HTML previews of tables for each predictor × regulation 
+combination in the notebook.
+```{r table_previews, results='asis'}
+# Display separate tables for each combination
+for (i in 1:nrow(pred_reg_combinations)) {
+  pred <- pred_reg_combinations$predictor[i]
+  reg <- pred_reg_combinations$regulation[i]
+  
+  # Filter data for this combination
+  subset_data <- table_data %>%
+    filter(predictor == pred, regulation == reg) %>%
+    select(-predictor, -regulation)
+  
+  # Display header
+  cat("\n\n### ", pred, " / ", reg, "\n\n")
+  
+  # Display table
+  tbl <- subset_data %>%
+    kbl(
+      caption = paste0(nrow(subset_data), " genes"),
+      col.names = c("Gene", "Label", "Description", "-log10(FDR)", "logFC")
+    ) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
+  
+  print(tbl)
+}
+
+cat("\n\nTotal genes across all tables:", nrow(table_data), "\n")
+```
+
+---
+
+# Session Information
+```{r session_info}
+sessionInfo()
+```

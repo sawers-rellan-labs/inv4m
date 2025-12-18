@@ -1,0 +1,726 @@
+# Pigment Biosynthesis Expression Indices
+```{r, pigment_biosynthesis}
+# Pigment Metabolism Expression Indices
+# Purpose: Calculate transcriptomic indices for pigment biosynthesis and
+# catabolism pathways across leaf development
+
+## Helper Functions
+
+#' Process Pigment Metabolism Indices
+#'
+#' Calculates, normalizes, and models pigment pathway expression indices
+#'
+#' @param go_terms Named vector of GO term IDs (names are pigment types)
+#' @param metabolism_type Character: "Biosynthesis" or "Catabolism"
+#' @param term2gene Data frame mapping GO terms to genes
+#' @param expression_matrix Expression matrix (genes x samples)
+#' @param universe Character vector of background genes
+#'
+#' @return List with indices_normalized, summary_data, and stats_table
+process_pigment_indices <- function(go_terms,
+                                    metabolism_type,
+                                    term2gene,
+                                    expression_matrix,
+                                    universe) {
+  
+  # Extract gene sets
+  gene_sets <- lapply(names(go_terms), function(pigment) {
+    term2gene %>%
+      filter(GO == go_terms[pigment]) %>%
+      pull(gene) %>%
+      unique() %>%
+      intersect(universe)
+  })
+  names(gene_sets) <- names(go_terms)
+  
+  # Calculate indices
+  indices <- calculate_gene_set_indices(
+    expression_matrix = expression_matrix,
+    gene_sets = gene_sets,
+    method = "mean"
+  ) %>%
+    mutate(
+      leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample)),
+      treatment = factor(substr(sample, 1, 2), levels = c("+P", "-P"))
+    )
+  
+  # Normalize to 0-1
+  indices_normalized <- indices %>%
+    mutate(across(
+      all_of(names(go_terms)),
+      ~ (. - min(.)) / (max(.) - min(.))
+    ))
+  
+  # Fit linear models and extract statistics
+  stats_list <- lapply(names(go_terms), function(pigment) {
+    formula_str <- paste(pigment, "~ leaf_stage")
+    lm_fit <- lm(as.formula(formula_str), data = indices_normalized)
+    lm_summary <- summary(lm_fit)
+    
+    list(
+      pigment = pigment,
+      r2 = lm_summary$r.squared,
+      p = coef(lm_summary)["leaf_stage", "Pr(>|t|)"],
+      slope = coef(lm_summary)["leaf_stage", "Estimate"]
+    )
+  })
+  
+  stats_table <- bind_rows(stats_list) %>%
+    mutate(
+      pigment = tools::toTitleCase(pigment),
+      metabolism = metabolism_type
+    )
+  
+  # Prepare summary data
+  summary_data <- indices_normalized %>%
+    select(leaf_stage, all_of(names(go_terms))) %>%
+    group_by(leaf_stage) %>%
+    summarise(across(
+      all_of(names(go_terms)),
+      list(mean = mean, se = ~ sd(.) / sqrt(n())),
+      .names = "{.col}_{.fn}"
+    ), .groups = "drop") %>%
+    pivot_longer(
+      cols = -leaf_stage,
+      names_to = c("pigment", ".value"),
+      names_pattern = "(.+)_(mean|se)"
+    ) %>%
+    mutate(
+      pigment = factor(
+        tools::toTitleCase(pigment),
+        levels = tools::toTitleCase(names(go_terms))
+      ),
+      metabolism = metabolism_type
+    )
+  
+  list(
+    indices_normalized = indices_normalized,
+    summary_data = summary_data,
+    stats_table = stats_table,
+    gene_counts = sapply(gene_sets, length)
+  )
+}
+
+format_pval <- function(p) {
+  sapply(p, function(x) {
+    if (x < 0.001) return("p < 0.001")
+    if (x < 0.01) return(sprintf("p = %.3f", x))
+    sprintf("p = %.2f", x)
+  })
+}
+
+## Define GO Terms
+
+biosynthesis_go <- c(
+  chlorophyll = "GO:0015995",
+  carotenoid = "GO:0016117",
+  anthocyanin = "GO:0009718"
+)
+
+catabolism_go <- c(
+  chlorophyll = "GO:0015996",
+  carotenoid = "GO:0016119",
+  anthocyanin = "GO:0046283"
+)
+
+## Process Biosynthesis Indices
+
+biosynthesis_results <- process_pigment_indices(
+  go_terms = biosynthesis_go,
+  metabolism_type = "Biosynthesis",
+  term2gene = TERM2GENE,
+  expression_matrix = normalized_expression,
+  universe = universe
+)
+
+## Process Catabolism Indices
+
+catabolism_results <- process_pigment_indices(
+  go_terms = catabolism_go,
+  metabolism_type = "Catabolism",
+  term2gene = TERM2GENE,
+  expression_matrix = normalized_expression,
+  universe = universe
+)
+
+## Combine Data for Faceted Plot
+
+combined_summary <- bind_rows(
+  biosynthesis_results$summary_data,
+  catabolism_results$summary_data
+) %>%
+  mutate(
+    metabolism = factor(metabolism, levels = c("Biosynthesis", "Catabolism"))
+  )
+
+combined_stats <- bind_rows(
+  biosynthesis_results$stats_table,
+  catabolism_results$stats_table
+) %>%
+  mutate(
+    p_formatted = format_pval(p),
+    metabolism = factor(metabolism, levels = c("Biosynthesis", "Catabolism"))
+  )
+
+## Create Faceted Plot
+
+base_size <- 30
+
+p_pigment_metabolism <- ggplot(
+  combined_summary,
+  aes(x = leaf_stage, y = mean, color = pigment)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 4) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  scale_color_manual(
+    values = c(
+      "Chlorophyll" = "darkgreen",
+      "Carotenoid" = "gold",
+      "Anthocyanin" = "purple4"
+    )
+  ) +
+  facet_wrap(~ metabolism, ncol = 2) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression Index",
+    color = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.position = "top",
+    legend.text = element_text(size = 20),
+    strip.background = element_blank(),
+    strip.text = element_text(size = base_size, face = "bold")
+  )
+
+print(p_pigment_metabolism)
+
+ggsave(
+  "~/Desktop/pigment_metabolism_indices.png",
+  plot = p_pigment_metabolism,
+  width = 16,
+  height = 8,
+  dpi = 300
+)
+
+## Summary Diagnostics
+{
+  cat("\n=== PIGMENT METABOLISM INDICES SUMMARY ===\n\n")
+  
+  cat("Gene Set Sizes:\n")
+  cat("Biosynthesis:\n")
+  print(biosynthesis_results$gene_counts)
+  cat("\nCatabolism:\n")
+  print(catabolism_results$gene_counts)
+  
+  cat("\n\nLinear Model Statistics:\n")
+  combined_stats %>%
+    select(metabolism, pigment, r2, slope, p_formatted) %>%
+    arrange(metabolism, pigment) %>%
+    print()
+  
+  cat("\n\nIndex Range (normalized):\n")
+  combined_summary %>%
+    group_by(metabolism, pigment) %>%
+    summarise(
+      min = min(mean),
+      max = max(mean),
+      range = max - min,
+      .groups = "drop"
+    ) %>%
+    print()
+}
+```
+## Anthocyanin dependence on -P
+
+```{r, anthocyanin_p_treatment}
+# Anthocyanin Biosynthesis: Phosphorus Treatment Response
+# Purpose: Test whether anthocyanin biosynthesis responds to P stress
+# independent of leaf developmental stage
+
+## Extract Anthocyanin Biosynthesis Data
+
+anthocyanin_data <- biosynthesis_results$indices_normalized %>%
+  select(sample, leaf_stage, treatment, anthocyanin) %>%
+  group_by(leaf_stage, treatment) %>%
+  summarise(
+    mean = mean(anthocyanin),
+    se = sd(anthocyanin) / sqrt(n()),
+    .groups = "drop"
+  )
+
+## Statistical Models
+
+cat("=== Anthocyanin Biosynthesis: Treatment Effects ===\n\n")
+
+# Full model with interaction
+lm_full <- lm(
+  anthocyanin ~ treatment * leaf_stage,
+  data = biosynthesis_results$indices_normalized
+)
+cat("Full model (treatment * leaf_stage):\n")
+summary(lm_full) %>% print()
+
+# Treatment main effect
+cat("\n\nTreatment main effect:\n")
+lm_treatment <- lm(
+  anthocyanin ~ treatment + leaf_stage,
+  data = biosynthesis_results$indices_normalized
+)
+summary(lm_treatment) %>% print()
+
+# Separate models by treatment
+cat("\n\n+P treatment (leaf stage effect):\n")
+lm_plus_p <- lm(
+  anthocyanin ~ leaf_stage,
+  data = biosynthesis_results$indices_normalized %>% filter(treatment == "+P")
+)
+summary(lm_plus_p) %>% print()
+
+cat("\n\n-P treatment (leaf stage effect):\n")
+lm_minus_p <- lm(
+  anthocyanin ~ leaf_stage,
+  data = biosynthesis_results$indices_normalized %>% filter(treatment == "-P")
+)
+summary(lm_minus_p) %>% print()
+
+# Extract statistics
+stats_by_treatment <- data.frame(
+  treatment = c("+P", "-P", "Overall"),
+  r2 = c(
+    summary(lm_plus_p)$r.squared,
+    summary(lm_minus_p)$r.squared,
+    summary(lm_treatment)$r.squared
+  ),
+  slope = c(
+    coef(lm_plus_p)["leaf_stage"],
+    coef(lm_minus_p)["leaf_stage"],
+    coef(lm_treatment)["leaf_stage"]
+  ),
+  p_leaf = c(
+    coef(summary(lm_plus_p))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_minus_p))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_treatment))["leaf_stage", "Pr(>|t|)"]
+  )
+)
+
+# Treatment effect p-value
+treatment_p <- coef(summary(lm_treatment))["treatment-P", "Pr(>|t|)"]
+interaction_p <- coef(summary(lm_full))["treatment-P:leaf_stage", "Pr(>|t|)"]
+
+cat("\n\n=== Summary Statistics ===\n")
+print(stats_by_treatment)
+cat("\nTreatment main effect p-value:", format_pval(treatment_p), "\n")
+cat("Treatment × Leaf interaction p-value:", format_pval(interaction_p), "\n")
+
+## Create Plot
+
+base_size <- 30
+
+p_anthocyanin_treatment <- ggplot(
+  anthocyanin_data,
+  aes(x = leaf_stage, y = mean, color = treatment, shape = treatment)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5, fill = "purple4") +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  scale_color_manual(
+    values = c("+P" = "purple4", "-P" = "purple4"),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_shape_manual(
+    values = c("+P" = 21, "-P" = 25),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_fill_manual(
+    values = c("+P" = "purple4", "-P" = "purple4")
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Anthocyanin\nBiosynthesis Index",
+    color = NULL,
+    shape = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.position = c(0.85, 0.85),
+    legend.text = element_text(size = 20),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key.size = unit(1.5, "lines")
+  )
+
+print(p_anthocyanin_treatment)
+
+ggsave(
+  "~/Desktop/anthocyanin_biosynthesis_treatment.png",
+  plot = p_anthocyanin_treatment,
+  width = 8,
+  height = 8,
+  dpi = 300
+)
+```
+## Anthocyanin catabolism dependency on -p
+```{r, anthocyanin_degradation_p}
+# Anthocyanin Catabolism: Phosphorus Treatment Response
+# Purpose: Test whether anthocyanin catabolism responds to P stress
+# independent of leaf developmental stage
+
+## Extract Anthocyanin Catabolism Data
+
+anthocyanin_cat_data <- catabolism_results$indices_normalized %>%
+  select(sample, leaf_stage, treatment, anthocyanin) %>%
+  group_by(leaf_stage, treatment) %>%
+  summarise(
+    mean = mean(anthocyanin),
+    se = sd(anthocyanin) / sqrt(n()),
+    .groups = "drop"
+  )
+
+## Statistical Models
+
+cat("=== Anthocyanin Catabolism: Treatment Effects ===\n\n")
+
+# Full model with interaction
+lm_full_cat <- lm(
+  anthocyanin ~ treatment * leaf_stage,
+  data = catabolism_results$indices_normalized
+)
+cat("Full model (treatment * leaf_stage):\n")
+summary(lm_full_cat) %>% print()
+
+# Treatment main effect
+cat("\n\nTreatment main effect:\n")
+lm_treatment_cat <- lm(
+  anthocyanin ~ treatment + leaf_stage,
+  data = catabolism_results$indices_normalized
+)
+summary(lm_treatment_cat) %>% print()
+
+# Separate models by treatment
+cat("\n\n+P treatment (leaf stage effect):\n")
+lm_plus_p_cat <- lm(
+  anthocyanin ~ leaf_stage,
+  data = catabolism_results$indices_normalized %>% filter(treatment == "+P")
+)
+summary(lm_plus_p_cat) %>% print()
+
+cat("\n\n-P treatment (leaf stage effect):\n")
+lm_minus_p_cat <- lm(
+  anthocyanin ~ leaf_stage,
+  data = catabolism_results$indices_normalized %>% filter(treatment == "-P")
+)
+summary(lm_minus_p_cat) %>% print()
+
+# Extract statistics
+stats_by_treatment_cat <- data.frame(
+  treatment = c("+P", "-P", "Overall"),
+  r2 = c(
+    summary(lm_plus_p_cat)$r.squared,
+    summary(lm_minus_p_cat)$r.squared,
+    summary(lm_treatment_cat)$r.squared
+  ),
+  slope = c(
+    coef(lm_plus_p_cat)["leaf_stage"],
+    coef(lm_minus_p_cat)["leaf_stage"],
+    coef(lm_treatment_cat)["leaf_stage"]
+  ),
+  p_leaf = c(
+    coef(summary(lm_plus_p_cat))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_minus_p_cat))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_treatment_cat))["leaf_stage", "Pr(>|t|)"]
+  )
+)
+
+# Treatment effect p-value
+treatment_p_cat <- coef(summary(lm_treatment_cat))["treatment-P", "Pr(>|t|)"]
+interaction_p_cat <- coef(summary(lm_full_cat))["treatment-P:leaf_stage", "Pr(>|t|)"]
+
+cat("\n\n=== Summary Statistics ===\n")
+print(stats_by_treatment_cat)
+cat("\nTreatment main effect p-value:", format_pval(treatment_p_cat), "\n")
+cat("Treatment × Leaf interaction p-value:", format_pval(interaction_p_cat), "\n")
+
+## Create Plot
+
+p_anthocyanin_cat_treatment <- ggplot(
+  anthocyanin_cat_data,
+  aes(x = leaf_stage, y = mean, color = treatment, shape = treatment)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5, fill = "purple4") +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  scale_color_manual(
+    values = c("+P" = "purple4", "-P" = "purple4"),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_shape_manual(
+    values = c("+P" = 21, "-P" = 25),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_fill_manual(
+    values = c("+P" = "purple4", "-P" = "purple4")
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Anthocyanin\nCatabolism Index",
+    color = NULL,
+    shape = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.position = c(0.85, 0.85),
+    legend.text = element_text(size = 20),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key.size = unit(1.5, "lines")
+  )
+
+print(p_anthocyanin_cat_treatment)
+
+ggsave(
+  "~/Desktop/anthocyanin_catabolism_treatment.png",
+  plot = p_anthocyanin_cat_treatment,
+  width = 8,
+  height = 8,
+  dpi = 300
+)
+```
+
+## Carotenoid catabolism
+
+```{r, caratotenoid_catbolism_p_tratment}
+# Carotenoid Catabolism: Phosphorus Treatment Response
+# Purpose: Test whether carotenoid catabolism responds to P stress
+# independent of leaf developmental stage
+
+## Extract Carotenoid Catabolism Data
+
+carotenoid_cat_data <- catabolism_results$indices_normalized %>%
+  select(sample, leaf_stage, treatment, carotenoid) %>%
+  group_by(leaf_stage, treatment) %>%
+  summarise(
+    mean = mean(carotenoid),
+    se = sd(carotenoid) / sqrt(n()),
+    .groups = "drop"
+  )
+
+## Statistical Models
+
+cat("=== Carotenoid Catabolism: Treatment Effects ===\n\n")
+
+# Full model with interaction
+lm_full_car <- lm(
+  carotenoid ~ treatment * leaf_stage,
+  data = catabolism_results$indices_normalized
+)
+cat("Full model (treatment * leaf_stage):\n")
+summary(lm_full_car) %>% print()
+
+# Treatment main effect
+cat("\n\nTreatment main effect:\n")
+lm_treatment_car <- lm(
+  carotenoid ~ treatment + leaf_stage,
+  data = catabolism_results$indices_normalized
+)
+summary(lm_treatment_car) %>% print()
+
+# Separate models by treatment
+cat("\n\n+P treatment (leaf stage effect):\n")
+lm_plus_p_car <- lm(
+  carotenoid ~ leaf_stage,
+  data = catabolism_results$indices_normalized %>% filter(treatment == "+P")
+)
+summary(lm_plus_p_car) %>% print()
+
+cat("\n\n-P treatment (leaf stage effect):\n")
+lm_minus_p_car <- lm(
+  carotenoid ~ leaf_stage,
+  data = catabolism_results$indices_normalized %>% filter(treatment == "-P")
+)
+summary(lm_minus_p_car) %>% print()
+
+# Extract statistics
+stats_by_treatment_car <- data.frame(
+  treatment = c("+P", "-P", "Overall"),
+  r2 = c(
+    summary(lm_plus_p_car)$r.squared,
+    summary(lm_minus_p_car)$r.squared,
+    summary(lm_treatment_car)$r.squared
+  ),
+  slope = c(
+    coef(lm_plus_p_car)["leaf_stage"],
+    coef(lm_minus_p_car)["leaf_stage"],
+    coef(lm_treatment_car)["leaf_stage"]
+  ),
+  p_leaf = c(
+    coef(summary(lm_plus_p_car))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_minus_p_car))["leaf_stage", "Pr(>|t|)"],
+    coef(summary(lm_treatment_car))["leaf_stage", "Pr(>|t|)"]
+  )
+)
+
+# Treatment effect p-value
+treatment_p_car <- coef(summary(lm_treatment_car))["treatment-P", "Pr(>|t|)"]
+interaction_p_car <- coef(summary(lm_full_car))["treatment-P:leaf_stage", "Pr(>|t|)"]
+
+cat("\n\n=== Summary Statistics ===\n")
+print(stats_by_treatment_car)
+cat("\nTreatment main effect p-value:", format_pval(treatment_p_car), "\n")
+cat("Treatment × Leaf interaction p-value:", format_pval(interaction_p_car), "\n")
+
+## Create Plot
+
+p_carotenoid_cat_treatment <- ggplot(
+  carotenoid_cat_data,
+  aes(x = leaf_stage, y = mean, color = treatment, shape = treatment)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5, fill = "gold") +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  scale_color_manual(
+    values = c("+P" = "gold3", "-P" = "gold3"),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_shape_manual(
+    values = c("+P" = 21, "-P" = 25),
+    labels = c("+P" = "+P", "-P" = "−P")
+  ) +
+  scale_fill_manual(
+    values = c("+P" = "gold", "-P" = "gold")
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Carotenoid\nCatabolism Index",
+    color = NULL,
+    shape = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.position = c(0.85, 0.85),
+    legend.text = element_text(size = 20),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key.size = unit(1.5, "lines")
+  )
+
+print(p_carotenoid_cat_treatment)
+
+ggsave(
+  "~/Desktop/carotenoid_catabolism_treatment.png",
+  plot = p_carotenoid_cat_treatment,
+  width = 8,
+  height = 8,
+  dpi = 300
+)
+```
+## Check annotation
+```{r,check_annotation}
+pigment_genes <- list(
+  chlorophyll = TERM2GENE %>%
+    filter(GO == "GO:0015995") %>%
+    pull(gene) %>%
+    unique() %>%
+    intersect(universe),
+  
+  carotenoid = TERM2GENE %>%
+    filter(GO == "GO:0016117") %>%
+    pull(gene) %>%
+    unique() %>%
+    intersect(universe),
+  
+  anthocyanin = TERM2GENE %>%
+    filter(GO == "GO:0009718") %>%
+    pull(gene) %>%
+    unique() %>%
+    intersect(universe)
+)
+# Extract anthocyanin biosynthesis gene annotations
+cat("=== Anthocyanin Biosynthesis Gene Annotations ===\n\n")
+
+anthocyanin_biosynthesis_annotated <- effects_df %>%
+  filter(gene %in% pigment_genes$anthocyanin) %>%
+  select(gene, locus_label, desc_merged) %>%
+  distinct() %>%
+  arrange(locus_label)
+
+cat("Total genes in biosynthesis set:", 
+    length(pigment_genes$anthocyanin), "\n")
+cat("Genes with annotations:", 
+    nrow(anthocyanin_biosynthesis_annotated), "\n\n")
+
+# Print full table
+print(anthocyanin_biosynthesis_annotated)
+
+# Summarize annotation patterns
+cat("\n\n=== Annotation Pattern Summary ===\n")
+
+# Search for known anthocyanin pathway enzymes
+pathway_enzymes <- anthocyanin_biosynthesis_annotated %>%
+  mutate(
+    enzyme_class = case_when(
+      grepl("chalcone|chs", desc_merged, ignore.case = TRUE) ~ "CHS (chalcone synthase)",
+      grepl("chi|isomerase", desc_merged, ignore.case = TRUE) ~ "CHI (chalcone isomerase)",
+      grepl("f3h|flavanone", desc_merged, ignore.case = TRUE) ~ "F3H (flavanone 3-hydroxylase)",
+      grepl("f3'h|flavonoid 3'", desc_merged, ignore.case = TRUE) ~ "F3'H (flavonoid 3'-hydroxylase)",
+      grepl("dfr|reductase", desc_merged, ignore.case = TRUE) ~ "DFR (dihydroflavonol reductase)",
+      grepl("ans|ldox|anthocyanidin", desc_merged, ignore.case = TRUE) ~ "ANS/LDOX (anthocyanidin synthase)",
+      grepl("ufgt|ugt|glucosyltransferase", desc_merged, ignore.case = TRUE) ~ "UFGT (UDP-glucosyltransferase)",
+      grepl("gst|glutathione", desc_merged, ignore.case = TRUE) ~ "GST (glutathione S-transferase)",
+      grepl("bhlh|myb|wd40|transcription", desc_merged, ignore.case = TRUE) ~ "Transcription factor",
+      grepl("transporter|mate|abc", desc_merged, ignore.case = TRUE) ~ "Transporter",
+      TRUE ~ "Other/Unknown"
+    )
+  )
+
+cat("\nGene classification:\n")
+pathway_enzymes %>%
+  count(enzyme_class) %>%
+  arrange(desc(n)) %>%
+  print()
+
+# Show structural genes specifically
+cat("\n\nPutative structural genes (biosynthetic enzymes):\n")
+pathway_enzymes %>%
+  filter(enzyme_class %in% c(
+    "CHS (chalcone synthase)",
+    "CHI (chalcone isomerase)", 
+    "F3H (flavanone 3-hydroxylase)",
+    "F3'H (flavonoid 3'-hydroxylase)",
+    "DFR (dihydroflavonol reductase)",
+    "ANS/LDOX (anthocyanidin synthase)",
+    "UFGT (UDP-glucosyltransferase)"
+  )) 
+```

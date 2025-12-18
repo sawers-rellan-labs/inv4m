@@ -1,0 +1,1160 @@
+---
+title: "GO Enrichment Analysis of DEGs across Three Predictors"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overview
+
+**Purpose**: Generate GO over-representation plots for differential expression analysis across three experimental predictors with annotated gene symbols.
+
+**Experimental predictors**:
+
+ - **Leaf**: Leaf development/senescence (FC threshold: ±0.7)
+
+ - **-P**: Phosphorus deficiency (FC threshold: ±2)
+
+ - **Inv4m**: Inversion Inv4m genotype (FC threshold: ±2)
+
+**Expected outcomes**: Two plots—one showing all three predictors, and one focused on Leaf and -P only (since inv4m shows minimal enrichment).
+
+# Libraries
+
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(clusterProfiler)
+library(tidyr)
+library(forcats)
+library(ggvenn)
+```
+
+# Data Import and Processing
+
+## Load DEG Data
+
+```{r load_degs}
+
+# Load differential expression results
+#effects_df <- read.csv("~/Desktop/DEG_effects.csv")
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+# Load curated labels from external file
+curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+  select(gene, locus_label)
+
+effects_df$locus_label[effects_df$locus_label=="A0A1D6NG77"] <-NA
+
+# Coalesce curated locus_label into effects_df
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_curated")) %>%
+  mutate(locus_label = coalesce(locus_label_curated, locus_label)) %>%
+  select(-locus_label_curated)
+
+predictor_order <- c("Leaf","-P","Inv4m") 
+predictor_levels <- effects_df$predictor %>% as.factor() %>%levels() 
+                           
+# Diagnostics
+cat("Intended order:\t", paste(predictor_order,sep="\t"),"\n")
+cat("Factor levels:\t", paste(predictor_levels,sep="\t") , "\n")
+```
+
+## DEG Summary Statistics
+
+```{r deg_summary}
+# DEG counts by predictor and direction
+deg_table <- with(
+  effects_df %>% filter(is_hiconf_DEG),
+  table(regulation, predictor)
+)
+
+# Gene universe for enrichment testing
+universe <- union(
+  effects_df$gene[effects_df$predictor == "Leaf"],
+  effects_df$gene[effects_df$predictor == "Leaf"]
+)
+
+# Diagnostics
+print(addmargins(deg_table))
+cat("Universe size:", length(universe), "genes\n")
+```
+
+# GO Enrichment Analysis
+
+## Load GO Annotation Data
+
+```{r load_go_data}
+TERM2NAME <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2NAME.rds"
+)
+
+TERM2GENE <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
+)
+```
+
+## Define Enrichment Function
+
+```{r enrichment_function}
+#' Perform GO Enrichment Analysis
+#'
+#' Wrapper for clusterProfiler::enricher with project-specific parameters.
+#'
+#' @param x Character vector of gene IDs to test
+#' @param ontology GO ontology ("BP", "MF", or "CC")
+#'
+#' @return enrichResult object from clusterProfiler
+ego <- function(x, ontology = "BP") {
+  n_genes <- length(x)
+  print(paste("Calculating enrichment for:", n_genes, "genes"))
+
+  enricher(
+    gene = x,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "none",
+    universe = universe,
+    minGSSize = 10,
+    maxGSSize = 500,
+    qvalueCutoff = 0.2,
+    TERM2GENE = TERM2GENE[TERM2GENE$GO %in% TERM2NAME[[ontology]]$go_id, ],
+    TERM2NAME = TERM2NAME[[ontology]]
+  )
+}
+```
+
+## Prepare DEG Gene Lists
+
+```{r prepare_deg_lists}
+# Extract gene lists by predictor and regulation direction
+redundant_DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+  list(
+    Leaf.Down = gene[predictor == "Leaf" & regulation == "Downregulated"],
+    Leaf.Up = gene[predictor == "Leaf" & regulation == "Upregulated"],
+    `-P.Down` = gene[predictor == "-P" & regulation == "Downregulated"],
+    `-P.Up` = gene[predictor == "-P" & regulation == "Upregulated"],
+    `Leaf:-P.Down` = gene[predictor == "Leaf:-P" & regulation == "Downregulated"],
+       `Leaf:-P.Up` = gene[predictor == "Leaf:-P" & regulation == "Upregulated"],
+    Inv4m.Down = gene[predictor == "Inv4m" & regulation == "Downregulated"],
+    Inv4m.Up = gene[predictor == "Inv4m" & regulation == "Upregulated"]
+  )
+})
+
+DEGs <- lapply(redundant_DEGs, unique)
+n_genes <- lapply(DEGs, length) %>% unlist()
+
+# Diagnostics
+print(n_genes)
+```
+
+## Run Comparative GO Enrichment
+
+```{r run_enrichment}
+# Comparative GO enrichment across all DEG sets
+compGO_BP <- compareCluster(
+  geneCluster = DEGs,
+  fun = ego
+)
+
+# write.csv(compGO_BP@compareClusterResult,
+#           file="../results/inv4mleafP_FC_goa_Fattel.csv")
+
+# Set factor levels for consistent ordering
+cluster_order <- names(DEGs)
+levels(compGO_BP@compareClusterResult$Cluster) <- cluster_order
+
+# Diagnostics
+cat("Enriched terms per cluster:\n")
+print(table(compGO_BP@compareClusterResult$Cluster))
+```
+
+## Filter to Curated GO Slim Terms
+
+```{r load_curated_terms}
+# Load pre-curated GO slim and filter enrichment results
+slim <- read.csv("~/Desktop/slim_to_plot.csv")
+
+slim_comp <- compGO_BP
+slim_comp@compareClusterResult <- slim_comp@compareClusterResult %>%
+  filter(ID %in% slim$ID)
+
+# Diagnostics
+cat("Curated terms per cluster:\n")
+print(table(slim_comp@compareClusterResult$Cluster))
+```
+
+# Visualization: All Three Predictors
+
+## Identify Terms with Known Gene Symbols
+
+```{r identify_annotated_terms}
+# Filter to terms containing genes with annotated locus symbols
+with_known_gene <- slim_comp@compareClusterResult %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = "geneID") %>%
+  inner_join(
+    effects_df %>%
+      select(gene, locus_label = locus_label, desc_merged) %>%
+      distinct(),
+    relationship = "many-to-many"
+  ) %>%
+  select(Cluster, ID, Description, gene, locus_label, desc_merged) %>%
+  filter(!is.na(locus_label) & !is.na(desc_merged)) %>%
+  pull(ID) %>%
+  sort() %>%
+  unique()
+
+# Diagnostics
+cat("GO terms with annotated genes:", length(with_known_gene), "\n")
+```
+
+## Select Top Terms per Cluster
+
+```{r select_top_terms}
+# Select top 6 terms by p-value per cluster
+sorted_by_p <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  droplevels() %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  slice(1:6) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+top_terms <- levels(sorted_by_p$Description)
+```
+
+## Prepare Plot Data and Gene Annotations
+
+**Approach**: Select top gene per GO term by Mahalanobis distance for labeling.
+
+```{r prepare_plot_data}
+# Prepare enrichment data for plotting
+to_plot <- slim_comp@compareClusterResult %>%
+  filter(ID %in% with_known_gene) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  filter(Description %in% top_terms) %>%
+  mutate(neglogP = -log10(p.adjust)) %>%
+  group_by(Cluster) %>%
+  arrange(Cluster, p.adjust) %>%
+  mutate(Description = factor(Description, levels = top_terms)) %>%
+  mutate(label_order = 1:n()) %>%
+  mutate(Description = fct_reorder(Description, label_order))
+
+# Prepare gene metadata with cluster labels
+effects_gene_label <- effects_df %>%
+  filter(is_hiconf_DEG) %>%
+  mutate(Cluster = case_when(
+    regulation == "Upregulated" ~ paste(predictor, "Up", sep = "."),
+    regulation == "Downregulated" ~ paste(predictor, "Down", sep = ".")
+  )) %>%
+  select(
+    predictor, Cluster, gene, locus_label,locus_symbol,
+    desc_merged, logFC, P = adj.P.Val, mahalanobis
+  ) %>%
+  filter(!is.na(locus_label) & !is.na(locus_symbol) & !is.na(Cluster)) %>%
+  mutate(neglogPG = -log10(P))
+
+cluster_order <-cluster_order[!grepl("Inv4m",cluster_order)]
+to_plot <- to_plot %>%
+  filter(!grepl(Cluster,"Inv4m")) %>%
+  droplevels() %>%
+  mutate(Cluster=factor(Cluster,levels=cluster_order))
+
+# Map top gene label per GO term (by Mahalanobis distance)
+term2gene_label <- to_plot %>%
+  filter(ID %in% with_known_gene) %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = "geneID") %>%
+  inner_join(effects_gene_label, relationship = "many-to-many") %>%
+  select(
+    Cluster, gene, locus_label, ID, Description,
+    p.adjust, Count, mahalanobis, logFC, P, neglogPG
+  ) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID,  P) %>%
+  #arrange(Cluster, ID, -mahalanobis) %>%
+  slice(1)
+
+# Set consistent factor levels
+levels(to_plot$Cluster) <- cluster_order
+levels(term2gene_label$Cluster) <- cluster_order
+```
+
+## Create Full Plot
+
+```{r plot_all_predictors, fig.width=12, fig.height=6}
+
+
+
+# Format cluster labels with gene counts
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n", "(", n_genes, ")"
+) %>% 
+  gsub("Leaf:-P.Down","Negative\nLeaf × -P",.) %>%
+  gsub("Leaf:-P.Up","Positive\nLeaf × -P",.)
+names(labels) <- names(n_genes)
+
+# Base GO enrichment dot plot
+bg <- to_plot %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("GO Biological Process Annotation of DEGs") +
+  scale_fill_continuous(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(limits = rev(levels(to_plot$Description))) +
+  scale_x_discrete(labels = labels, drop = FALSE) +
+  geom_point(shape = 21) +
+  scale_size(range = c(2, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    #legend.position = c(0.2, 0.2),
+    #legend.box = "horizontal",
+    axis.text.x = element_text(vjust = 0.5)
+  )
+
+is_diox <-term2gene_label$gene=="Zm00001eb419580"
+term2gene_label$locus_label[is_diox] <-"diox"
+
+# Add gene symbol annotations
+annotation_plot <- bg +
+  geom_text(
+    data = term2gene_label,
+    position = position_nudge(0.12),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    mapping = aes(x = Cluster, y = Description, label = locus_label),
+    inherit.aes = FALSE
+  )
+
+print(annotation_plot)
+
+ggsave(
+  filename = "~/Desktop/HC_DEG_GO_annotation.svg",
+  plot = annotation_plot,
+  height = 7,
+  width = 12,
+  units = "in",
+  dpi = 150
+)
+
+```
+
+
+```{r,generate_plot_gene_list_for_table}
+
+  # Extract all genes from enriched terms with cluster info
+  genes_in_enriched_terms <- to_plot %>%
+    separate_longer_delim(geneID, delim = "/") %>%
+    rename(gene = "geneID") %>%
+    select(Cluster, ID, Description, gene)
+  
+  # Create cluster code lookup
+  cluster_codes <- c(
+    "Leaf.Down" = "LD",
+    "Leaf.Up" = "LU",
+    "-P.Down" = "PD",
+    "-P.Up" = "PU",
+    "Inv4m.Down" = "ID",
+    "Inv4m.Up" = "IU"
+  )
+  
+  # Summarize by gene
+gene_summary <- genes_in_enriched_terms %>%
+  group_by(gene) %>%
+  summarise(
+    n_terms = n_distinct(ID),
+    cluster_string = paste(
+      sort(unique(cluster_codes[as.character(Cluster)])),
+      collapse = ""
+    ),
+    go_categories = paste(
+      sort(unique(Description)),
+      collapse = "; "
+    ),
+    .groups = "drop"
+  )
+  
+  
+# sgrl1_goa <-   TERM2GENE %>% filter(gene=="Zm00001eb076680") %>% inner_join(TERM2NAME$BP, by=c(GO="go_id"))
+# 
+# aging_goa <-   TERM2GENE %>% filter(GO =="GO:0007568") %>% 
+#   inner_join(TERM2NAME$BP, by=c(GO="go_id")) %>% 
+#   filter(gene %in% genes_in_enriched_terms)
+# 
+# effects_gene_label %>% 
+#   filter(gene %in% genes_in_enriched_terms)                            
+# 
+# sum(sgrl1_goa$GO %in% compGO_BP@compareClusterResult$ID)
+
+curated_genes <- effects_gene_label %>%
+  filter(predictor != ("Inv4m"),  # zap1 is regulated by inv4m too
+         Cluster != ("-P.Down")) %>% # aaap48 is in -P.Down
+  group_by(Cluster) %>%
+  mutate(relative_mahalanobis = mahalanobis / max(mahalanobis, na.rm = TRUE)) %>%
+  ungroup() %>%
+ inner_join(gene_summary) %>%
+ group_by(cluster_string,gene) %>%
+    arrange(cluster_string, gene, -relative_mahalanobis) %>%
+  dplyr::slice(1) %>%
+  select(-predictor, -Cluster) %>%
+  select(cluster_string,locus_label, desc_merged, everything()) %>% print(n=200)
+
+# PSR_genes <- genes_in_enriched_terms %>% filter(ID =="GO:0016036")
+#curated_genes %>% filter(gene %in% PSR_genes)
+
+
+curated_genes$locus_label
+# Generate table
+n_curated_genes<- unique(curated_genes$gene) %>% length()
+
+# Diagnostics
+{
+  cat("Total table rows:",nrow(curated_genes), "\n")
+  cat("Total genes in enriched terms:",n_curated_genes, "\n")
+  cat("Terms per gene range:", range(curated_genes$n_terms), "\n")
+  cat("Cluster combinations:\n")
+   print(table(curated_genes$Cluster))
+}
+```
+
+
+```{r,custom_annotation_function}
+#' Perform Fisher's Exact Test for Custom Gene Set Enrichment
+#'
+#' Tests enrichment of custom annotation terms in DEG lists using Fisher's
+#' exact test with FDR correction.
+#'
+#' @param deg_lists Named list of character vectors, where names are cluster
+#'   labels and values are gene IDs
+#' @param annotation Named list where names are terms and values are character
+#'   vectors of gene IDs belonging to each term
+#' @param universe Character vector of all genes in the background set
+#'
+#' @return Data frame with columns matching clusterProfiler output format
+test_custom_enrichment <- function(deg_lists, annotation, universe) {
+  # Filter annotation to only genes in universe
+  annotation_filtered <- lapply(annotation, function(term_genes) {
+    intersect(term_genes, universe)
+  })
+  
+  # Remove empty terms
+  annotation_filtered <- annotation_filtered[
+    sapply(annotation_filtered, length) > 0
+  ]
+  
+  results <- list()
+  
+  for (cluster_name in names(deg_lists)) {
+    deg_genes <- deg_lists[[cluster_name]]
+    
+    for (term_name in names(annotation_filtered)) {
+      term_genes <- annotation_filtered[[term_name]]
+      
+      # Genes in both DEG list and term
+      overlap <- intersect(deg_genes, term_genes)
+      
+      # Build contingency table
+      in_both <- length(overlap)
+      in_deg_only <- length(setdiff(deg_genes, term_genes))
+      in_term_only <- length(setdiff(term_genes, deg_genes))
+      in_neither <- length(universe) - in_both - in_deg_only - in_term_only
+      
+      contingency <- matrix(
+        c(in_both, in_deg_only, in_term_only, in_neither),
+        nrow = 2
+      )
+      
+      # Fisher's exact test
+      fisher_result <- fisher.test(contingency, alternative = "greater")
+      
+      # Calculate enrichment metrics
+      gene_ratio <- paste0(in_both, "/", length(deg_genes))
+      bg_ratio <- paste0(length(term_genes), "/", length(universe))
+      rich_factor <- in_both / length(term_genes)
+      fold_enrichment <- (in_both / length(deg_genes)) / 
+                        (length(term_genes) / length(universe))
+      
+      # Store result
+      results[[length(results) + 1]] <- data.frame(
+        Cluster = cluster_name,
+        ID = term_name,
+        Description = term_name,
+        GeneRatio = gene_ratio,
+        BgRatio = bg_ratio,
+        RichFactor = rich_factor,
+        FoldEnrichment = fold_enrichment,
+        pvalue = fisher_result$p.value,
+        geneID = paste(overlap, collapse = "/"),
+        Count = in_both,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  
+  # Combine results and adjust p-values
+  results_df <- do.call(rbind, results)
+  results_df$p.adjust <- p.adjust(results_df$pvalue, method = "BH")
+  results_df$qvalue <- p.adjust(results_df$pvalue, method = "fdr")
+  
+  # Reorder columns to match clusterProfiler format
+  results_df <- results_df %>%
+    select(
+      Cluster, ID, Description, GeneRatio, BgRatio, 
+      RichFactor, FoldEnrichment, pvalue, p.adjust, 
+      qvalue, geneID, Count
+    )
+  
+  results_df %>% arrange( p.adjust)
+}
+
+
+```
+
+```{r,generate_custom_annotation_gene_table}
+
+
+v3_v5 <- read.table(file="/Users/fvrodriguez/Desktop/B73_gene_xref/B73v3_to_B73v5.tsv", sep = "\t", header= FALSE) %>%
+  dplyr::rename(v3="V1",v5="V2")%>%
+  tidyr::separate_longer_delim(cols = v5,delim=",")
+
+v4_v5 <- read.table(file="/Users/fvrodriguez/Desktop/B73_gene_xref/B73v4_to_B73v5.tsv", sep = "\t", header= FALSE) %>%
+  dplyr::rename(v4="V1",v5="V2")%>%
+  tidyr::separate_longer_delim(cols = v5,delim=",")
+
+
+# Load annotation source files
+sag_orthologs <- read.csv("~/Desktop/SAG_orthologs.csv") %>% 
+  janitor::clean_names() %>%
+      inner_join(v3_v5, by = c(gene_id_maize="v3"))
+
+staygreen_network <- read.csv("~/Desktop/staygreen_network_sekhon2019.csv",na.strings="") %>% 
+  janitor::clean_names() %>%
+      inner_join(v4_v5, by = c(gene="v4"))
+
+natural_senescence <- read.csv("~/Desktop/natural_senescence.csv") %>% 
+  janitor::clean_names() %>%
+      inner_join(v3_v5, by = c(gene_id="v3"))
+
+# Build annotation list
+custom_annotation <- c(
+  list(staygreen = staygreen_network$v5),  
+  list(sag = sag_orthologs$v5),
+
+  natural_senescence %>%
+    select(term = set, gene = v5) %>% 
+    distinct() %>% 
+    split(.$term) %>% 
+    lapply(function(x) x$gene)
+)
+
+# Extract all genes from enriched custom annotation terms with cluster info
+
+custom_enrichment_results <- test_custom_enrichment(DEGs, custom_annotation, universe)  %>%
+filter(p.adjust <0.05) 
+
+custom_enrichment_results %>%
+select(-geneID)
+
+
+genes_in_custom_terms <- custom_enrichment_results %>%
+  filter(p.adjust < 0.05) %>%  # Filter to significant terms
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = "geneID") %>%
+  select(Cluster, ID, Description, gene) %>%
+  inner_join( effects_df %>% 
+  select(gene,locus_label,desc_merged) %>% distinct()
+  )
+```
+```{r, calculate_gene_indices}
+#' Calculate Gene Set Expression Indices
+#'
+#' Computes expression indices as the sum of normalized expression values
+#' for genes in specified gene sets (e.g., photosynthesis, senescence).
+#'
+#' @param expression_matrix Matrix or data frame with genes as rows and
+#'   samples as columns. Row names should be gene IDs.
+#' @param gene_sets Named list where each element contains a character vector
+#'   of gene IDs for that gene set
+#' @param method Aggregation method: "sum" (default), "mean", or "median"
+#' @param log_scale Logical, whether expression values are log-transformed.
+#'   If TRUE, back-transforms before aggregation (default: FALSE)
+#' @param log_base Base of logarithm if log_scale=TRUE (default: 10)
+#'
+#' @return Data frame with samples as rows and one column per gene set index
+calculate_gene_set_indices <- function(expression_matrix,
+                                      gene_sets,
+                                      method = "sum",
+                                      log_scale = FALSE,
+                                      log_base = 10) {
+  if (!is.matrix(expression_matrix) && !is.data.frame(expression_matrix)) {
+    stop("expression_matrix must be a matrix or data frame")
+  }
+  
+  indices <- lapply(names(gene_sets), function(set_name) {
+    genes_in_set <- gene_sets[[set_name]]
+    genes_available <- intersect(genes_in_set, rownames(expression_matrix))
+    
+    if (length(genes_available) == 0) {
+      warning(paste("No genes from", set_name, "found in expression matrix"))
+      return(rep(NA, ncol(expression_matrix)))
+    }
+    
+    set_expression <- expression_matrix[genes_available, , drop = FALSE]
+    
+    # Back-transform if log-scaled
+    if (log_scale) {
+      set_expression <- log_base^set_expression
+    }
+    
+    # Calculate index
+    index <- switch(method,
+      "sum" = colSums(set_expression, na.rm = TRUE),
+      "mean" = colMeans(set_expression, na.rm = TRUE),
+      "median" = apply(set_expression, 2, median, na.rm = TRUE),
+      stop("method must be 'sum', 'mean', or 'median'")
+    )
+    
+    cat(sprintf("%s index: %d/%d genes found\n",
+                set_name, length(genes_available), length(genes_in_set)))
+    
+    index
+  })
+  
+  indices_df <- as.data.frame(indices)
+  names(indices_df) <- names(gene_sets)
+  indices_df$sample <- colnames(expression_matrix)
+  
+  indices_df %>%
+    select(sample, everything())
+}
+
+
+```
+
+```{r,building_phothosynthesis_index}
+# Load normalized expression data
+normalized_expression <- readRDS("~/Desktop/normalized_expression_logCPM.rda")
+
+
+# Check structure
+cat("Expression matrix dimensions:", dim(normalized_expression), "\n")
+cat("First few genes:", head(rownames(normalized_expression)), "\n")
+cat("First few samples:", head(colnames(normalized_expression)), "\n")
+
+
+# Add photosynthesis genes from GO terms
+photosynthesis_genes <- TERM2GENE %>%
+  filter(GO %in% c(
+    "GO:0015979",  # photosynthesis
+    "GO:0019684",  # photosynthesis, light reaction
+    "GO:0009768"   # photosynthesis, light harvesting
+  )) %>%
+  pull(gene) %>%
+  unique()
+
+custom_annotation$photosynthesis <- intersect(photosynthesis_genes, universe)
+
+
+
+# Check the object name and structure
+cat("Loaded objects:\n")
+print(ls())
+
+# Assuming the object is named 'normalized_expression' or similar
+# If different, replace with actual name from ls() output above
+
+# Define gene sets for photosynthesis and senescence
+gene_set_list <- list(
+  photosynthesis = custom_annotation$photosynthesis,
+  senescence = custom_annotation$sag
+)
+
+# Calculate indices
+# Usage with log10(CPM) data
+indices <- calculate_gene_set_indices(
+  expression_matrix = normalized_expression,
+  gene_sets = gene_set_list,
+  method = "sum",
+  # log_scale = TRUE,
+  # log_base = 10
+) %>%
+  mutate(
+    leaf_stage = as.numeric(
+      sub(".*L([0-9]+)[LR]$", "\\1", sample)
+    ) %>% as.numeric(),
+  treatment = substr(sample, 1, 2) %>% as.factor()
+)
+
+indices$treatment <-factor(indices$treatment, levels=c("+P","-P"))
+
+# Preview results
+head(indices)
+
+
+
+indices %>%
+  ggplot(aes(
+    y = photosynthesis, 
+    x = leaf_stage, 
+    fill = factor(leaf_stage),
+    shape = treatment
+  )) +
+  geom_point(size = 3, color = "black") +
+  scale_shape_manual(values = c(21, 24)) +
+  scale_fill_viridis_d()
+
+indices %>%
+  ggplot(aes(y = senescence, 
+             x = leaf_stage, 
+             color = factor(leaf_stage),
+             shape=treatment)) +
+  geom_point(size=2) +
+  scale_color_viridis_d()  +
+  theme_classic(base_size = 25)
+
+lm(data=indices,photosynthesis~treatment+leaf_stage) %>% summary()
+
+lm(data=indices,senescence~treatment+leaf_stage) %>% summary()
+
+indices %>%
+  ggplot(aes(x=photosynthesis,y=senescence,
+             color = factor(leaf_stage),
+             shape=treatment))  +
+  geom_point(size=2) +
+  scale_color_viridis_d()
+
+library(ggpubr)
+
+# Normalize indices to 0-1 range
+indices_normalized <- indices %>%
+  mutate(
+    photosynthesis = (photosynthesis - min(photosynthesis, na.rm = TRUE)) / 
+                     (max(photosynthesis, na.rm = TRUE) - min(photosynthesis, na.rm = TRUE)),
+    senescence = (senescence - min(senescence, na.rm = TRUE)) / 
+                 (max(senescence, na.rm = TRUE) - min(senescence, na.rm = TRUE))
+  )
+
+# Calculate summary statistics
+indices_summary <- indices_normalized %>%
+  group_by(leaf_stage) %>%
+  summarise(
+    photo_mean = mean(photosynthesis, na.rm = TRUE),
+    photo_se = sd(photosynthesis, na.rm = TRUE) / sqrt(n()),
+    senescence_mean = mean(senescence, na.rm = TRUE),
+    senescence_se = sd(senescence, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = c(photo_mean, senescence_mean),
+    names_to = "index_type",
+    values_to = "mean"
+  ) %>%
+  mutate(
+    se = ifelse(index_type == "photo_mean", photo_se, senescence_se),
+    index_type = factor(
+      index_type,
+      levels = c("photo_mean", "senescence_mean"),
+      labels = c("Photosynthesis", "Senescence")
+    )
+  )
+
+# Create plot
+ggplot(indices_summary, aes(x = leaf_stage, y = mean, color = index_type)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  scale_color_manual(values = c("Photosynthesis" = "darkgreen", "Senescence" = "gold")) +
+  labs(
+    x = "Leaf Stage",
+    y = "Normalized Expression Index",
+    color = NULL
+  ) +
+  theme_classic(base_size = 25)
+```
+
+```{r, custom_per_gene_stats}
+#' Get Differential Expression Stats for Custom Annotation Category
+#'
+#' Extracts and summarizes DEG statistics for genes in a specific custom
+#' annotation term.
+#'
+#' @param annotation_id Character string of the annotation term ID to filter
+#' @param gene_term_df Data frame with columns: gene, ID, Description (output
+#'   from genes_in_custom_terms)
+#' @param effects_data Data frame with differential expression results
+#' @param filter_hiconf Logical, filter to high-confidence DEGs only
+#' @param n_rows Number of rows to print (default: 100)
+#'
+#' @return Tibble with DEG statistics sorted by predictor, regulation, and
+#'   -log10(P)
+get_annotation_degs <- function(annotation_id,
+                                gene_term_df,
+                                effects_data,
+                                filter_hiconf = TRUE) {
+  # Get genes in annotation category
+  genes_in_category <- gene_term_df %>%
+    filter(ID == annotation_id) %>%
+    pull(gene)
+  
+  # Filter effects data
+  result <- effects_data %>%
+    filter(gene %in% genes_in_category)
+  
+  # Apply high-confidence filter if requested
+  if (filter_hiconf) {
+    result <- result %>% filter(is_hiconf_DEG)
+  }
+  
+  # Format and sort output
+  result <- result %>%
+    select(predictor:gene, locus_label, desc_merged, logFC, neglogP,mahalanobis) %>%
+    ungroup() %>%
+    group_by(predictor, regulation) %>%
+    arrange(predictor, regulation, -mahalanobis) %>%
+    tibble()
+  
+}
+```
+
+```{r}
+get_annotation_degs(
+    annotation_id = "natural",
+    gene_term_df = genes_in_custom_terms,
+    effects_data = effects_df,
+    filter_hiconf = TRUE
+) %>% filter(predictor=="Leaf") %>%
+as.data.frame() %>%
+filter(gene=="Zm00001eb319560") %>% print()
+
+get_annotation_degs(
+    annotation_id = "natural",
+    gene_term_df = genes_in_custom_terms,
+    effects_data = effects_df,
+    filter_hiconf = TRUE
+) %>% filter(predictor=="Leaf") %>% print(n=100)
+
+```
+
+
+```{r export_selected_degs, eval=FALSE}
+# Selected GO DEGs for manuscript
+  write.csv(
+    curated_genes,
+    file = "~/Desktop/selected_degs_GO.csv",
+    row.names = FALSE
+  )
+}
+```
+
+# Venn Diagram: Annotated vs All High-Confidence DEGs
+
+## Prepare Gene Sets
+```{r prepare_venn_sets}
+# High-confidence DEGs by predictor (no direction split)
+hiconf_leaf <- effects_df %>%
+  filter(is_hiconf_DEG, predictor == "Leaf") %>%
+  pull(gene) %>%
+  unique()
+
+hiconf_p <- effects_df %>%
+  filter(is_hiconf_DEG, predictor == "-P") %>%
+  pull(gene) %>%
+  unique()
+
+hiconf_interaction <- effects_df %>%
+  filter(is_hiconf_DEG, predictor == "Leaf:-P") %>%
+  pull(gene) %>%
+  unique()
+
+# Annotated genes (genes in any enriched GO term from compGO_BP)
+annotated_genes <- compGO_BP@compareClusterResult %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  pull(geneID) %>%
+  unique()
+
+# Annotated DEGs by predictor
+annotated_leaf <- intersect(hiconf_leaf, annotated_genes)
+annotated_p <- intersect(hiconf_p, annotated_genes)
+annotated_interaction <- intersect(hiconf_interaction , annotated_genes)
+
+# Diagnostics
+cat("High-confidence DEGs:\n")
+cat("  Leaf:", length(hiconf_leaf), "\n")
+cat("  -P:", length(hiconf_p), "\n")
+cat("  Overlap:", length(intersect(hiconf_leaf, hiconf_p)), "\n\n")
+
+cat("Annotated high-confidence DEGs:\n")
+cat("  Leaf:", length(annotated_leaf), "\n")
+cat("  -P:", length(annotated_p), "\n")
+cat("  Overlap:", length(intersect(annotated_leaf, annotated_p)), "\n")
+```
+
+## Create Venn Diagrams
+```{r venn_diagrams, fig.width=12, fig.height=6}
+# Prepare data for ggvenn
+venn_data_annotated <- list(
+  Leaf = annotated_leaf,
+  `-P` = annotated_p,
+  `Leaf x -P` = annotated_interaction
+)
+
+venn_data_all <- list(
+  Leaf = hiconf_leaf,
+  `-P` = hiconf_p,
+  `Leaf x -P` = hiconf_interaction
+)
+
+# Create both plots
+p1 <- ggvenn(
+  venn_data_annotated,
+  fill_color = c("#0073C2FF", "#EFC000FF", "darko"),
+  stroke_size = 0.5,
+  set_name_size = 5,
+  text_size = 4
+) +
+  ggtitle("Annotated High Confidence DEGs") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+
+p2 <- ggvenn(
+  venn_data_all,
+  fill_color = c("#0073C2FF", "#EFC000FF"),
+  stroke_size = 0.5,
+  set_name_size = 5,
+  text_size = 4
+) +
+  ggtitle("High Confidence DEGs") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+
+# Combine panels
+combined_venn <- ggarrange(p1, p2, ncol = 2, nrow = 1)
+
+print(combined_venn)
+```
+
+## Export Combined Plot
+```{r export_venn_combined, eval=FALSE}
+ggsave(
+  combined_venn,
+  file = "~/Desktop/venn_hiconf_degs.svg",
+  height = 6,
+  width = 12
+)
+```
+
+## Overlap Statistics and Enrichment Test
+```{r venn_stats}
+# Classify genes by response pattern
+dual_responsive_annotated <- intersect(annotated_leaf, annotated_p)
+single_responsive_annotated <- union(
+  setdiff(annotated_leaf, annotated_p),
+  setdiff(annotated_p, annotated_leaf)
+)
+
+dual_responsive_all <- intersect(hiconf_leaf, hiconf_p)
+single_responsive_all <- union(
+  setdiff(hiconf_leaf, hiconf_p),
+  setdiff(hiconf_p, hiconf_leaf)
+)
+
+# Overlap statistics
+{
+cat("Annotated DEGs:\n")
+cat("  Leaf-specific:", length(setdiff(annotated_leaf, annotated_p)), "\n")
+cat("  -P-specific:", length(setdiff(annotated_p, annotated_leaf)), "\n")
+cat("  Shared:", length(dual_responsive_annotated),
+    sprintf("(%.1f%% of Leaf, %.1f%% of -P)\n",
+            100 * length(dual_responsive_annotated) / length(annotated_leaf),
+            100 * length(dual_responsive_annotated) / length(annotated_p)))
+
+cat("\nAll high-confidence DEGs:\n")
+cat("  Leaf-specific:", length(setdiff(hiconf_leaf, hiconf_p)), "\n")
+cat("  -P-specific:", length(setdiff(hiconf_p, hiconf_leaf)), "\n")
+cat("  Shared:", length(dual_responsive_all),
+    sprintf("(%.1f%% of Leaf, %.1f%% of -P)\n",
+            100 * length(dual_responsive_all) / length(hiconf_leaf),
+            100 * length(dual_responsive_all) / length(hiconf_p)))
+}
+```
+
+```{r,fisher_test}
+# Fisher's exact test for annotation enrichment
+contingency <- matrix(
+  c(
+    length(dual_responsive_annotated),
+    length(single_responsive_annotated),
+    length(dual_responsive_all),
+    length(single_responsive_all)
+  ),
+  nrow = 2,
+  ncol = 2,
+  byrow = TRUE,
+  dimnames = list(
+    Status = c("Annotated", "All"),
+    Response = c("Dual", "Single")
+  )
+)
+
+fisher_result <- fisher.test(contingency, alternative = "greater")
+
+{
+  cat("\n--- Fisher's Exact Test ---\n")
+  print(contingency)
+  cat("OR =", round(fisher_result$estimate, 2),
+      "| P =", format.pval(fisher_result$p.value, digits = 2), "\n")
+}
+```
+
+## Export Combined Plot
+```{r export_venn_DEGs, eval=FALSE}
+ggsave(
+  combined_venn,
+  file = "~/Desktop/venn_hiconf_degs.svg",
+  height = 6,
+  width = 12
+)
+```
+
+# Focused Analysis: Leaf and -P Only
+
+## Prepare Data Excluding inv4m
+```{r prepare_leaf_p_only}
+# Filter to Leaf and -P only
+DEGs_leaf_p <- DEGs[!grepl("inv4m", names(DEGs))]
+n_genes_leaf_p <- lapply(DEGs_leaf_p, length) %>% unlist()
+cluster_order_leaf_p <- cluster_order[!grepl("inv4m", cluster_order)]
+
+# Filter plotting data
+to_plot_leaf_p <- to_plot %>%
+  filter(!grepl("inv4m", Cluster)) %>%
+  mutate(Cluster = factor(
+    Cluster,
+    levels = c("Leaf.Down", "Leaf.Up", "-P.Down", "-P.Up")
+  ))
+
+# Filter gene annotations
+term2gene_label_leaf_p <- term2gene_label %>%
+  filter(!grepl("inv4m", Cluster)) %>%
+  mutate(Cluster = factor(
+    Cluster,
+    levels = cluster_order_leaf_p
+  )) %>%
+  droplevels()
+
+{
+  cat("Gene counts (Leaf/-P):\n")
+  print(n_genes_leaf_p)
+}
+```
+
+## Create Leaf/-P Plot
+
+```{r plot_leaf_p_only, fig.width=10, fig.height=5}
+# Format cluster labels
+labels_leaf_p <- paste0(
+  gsub(".", " ", cluster_order_leaf_p, fixed = TRUE),
+  "\n", "(", n_genes_leaf_p, ")"
+)
+names(labels_leaf_p) <- names(n_genes_leaf_p)
+
+# Base plot
+bg_leaf_p <- to_plot_leaf_p %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("GO Biological Process Annotation of DEGs") +
+  scale_fill_continuous(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(limits = rev(levels(to_plot_leaf_p$Description))) +
+  scale_x_discrete(labels = labels_leaf_p, drop = FALSE) +
+  geom_point(shape = 21) +
+  scale_size(range = c(2, 8)) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    legend.position = c(0.15, 0.2),
+    legend.box = "horizontal",
+    axis.text.x = element_text(vjust = 0.5)
+  )
+
+# Add annotations
+annotation_plot_leaf_p <- bg_leaf_p +
+  geom_text(
+    data = term2gene_label_leaf_p,
+    position = position_nudge(0.1),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    mapping = aes(x = Cluster, y = Description, label = locus_label),
+    inherit.aes = FALSE
+  )
+
+print(annotation_plot_leaf_p)
+```
+
+# Export Plots
+
+```{r export_plots, eval=FALSE}
+# Save all three predictors
+ggsave(
+  annotation_plot,
+  file = "~/Desktop/FC_annotation_plot_all.svg",
+  height = 6.75,
+  width = 12
+)
+
+# Save as RDS for combining with other plots
+saveRDS(
+  annotation_plot_leaf_p,
+  file = "~/Desktop/FC_kegg_plot.RDS"
+)
+
+# Save Leaf/-P focused plot
+ggsave(
+  annotation_plot_leaf_p,
+  file = "~/Desktop/FC_annotation_plot_leaf_P.svg",
+  height = 6.75,
+  width = 10
+)
+```
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```

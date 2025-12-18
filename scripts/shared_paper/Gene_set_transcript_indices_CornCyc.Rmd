@@ -1,0 +1,2389 @@
+---
+title: "Gene Set Transcription Indices"
+author: "Maize Genetics Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+# Overview
+
+**Purpose**: Construct transcriptomic expression indices (xpindex) for 
+photosynthesis and senescence gene sets to proxy physiological trajectories 
+across leaf developmental stages.
+
+**Approach**:
+1. Define gene sets from literature, GO annotations, and CornCyc pathways
+2. Calculate aggregate xpindex values across developmental stages
+3. Normalize indices using different strategies (per_set, per_union, global)
+4. Validate patterns with individual marker genes
+5. Create publication-quality visualizations
+
+**Transcriptomic Expression Index (xpindex)**: An aggregate metric summarizing 
+the collective expression of all genes in a pathway or functional gene set. 
+Calculated by averaging log-transformed expression values across all genes 
+in the set, providing a single value per sample that represents pathway 
+activity.
+
+# Setup
+
+## Libraries
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(tidyr)
+library(stringr)
+library(clusterProfiler)
+library(ggtext)
+library(ggfx)
+library(ggrepel)
+```
+
+## Load Core Data
+```{r load_data}
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+  select(gene, locus_label)
+
+effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
+
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_curated")) %>%
+  mutate(locus_label = coalesce(locus_label_curated, locus_label)) %>%
+  select(-locus_label_curated)
+
+normalized_expression <- readRDS(
+  "~/Desktop/normalized_expression_logCPM.rda"
+)
+
+universe <- effects_df %>%
+  filter(predictor == "Leaf") %>%
+  pull(gene) %>%
+  unique()
+
+TERM2GENE <- readRDS(
+  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
+)
+
+{
+  cat("Expression matrix:", dim(normalized_expression), "\n")
+  cat("Universe size:", length(universe), "genes\n")
+}
+```
+
+# Core Functions for Expression Index Analysis
+
+## Extract Sample Metadata
+```{r helper_extract_metadata}
+#' Extract leaf stage and treatment from sample names
+#'
+#' @param sample_names Character vector of sample identifiers
+#' @return Data frame with sample, leaf_stage, and treatment columns
+extract_sample_metadata <- function(sample_names) {
+  data.frame(
+    sample = sample_names,
+    leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample_names)),
+    treatment = factor(
+      substr(sample_names, 1, 2),
+      levels = c("+P", "-P")
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+```
+
+## Calculate Expression Indices
+```{r helper_calculate_xpindex}
+#' Calculate transcriptomic expression indices (xpindex) for gene sets
+#'
+#' @param expression_matrix Matrix with genes as rows, samples as columns
+#' @param gene_sets Named list of gene ID vectors
+#' @param method Aggregation method: "sum", "mean", or "median"
+#' @return Data frame with sample-level xpindex values
+calculate_xpindex <- function(expression_matrix,
+                               gene_sets,
+                               method = "mean") {
+  indices <- lapply(names(gene_sets), function(set_name) {
+    genes_in_set <- gene_sets[[set_name]]
+    genes_available <- intersect(genes_in_set, rownames(expression_matrix))
+    
+    if (length(genes_available) == 0) {
+      warning(paste("No genes from", set_name, "found in expression matrix"))
+      return(rep(NA, ncol(expression_matrix)))
+    }
+    
+    set_expression <- expression_matrix[genes_available, , drop = FALSE]
+    
+    index <- switch(method,
+      "sum" = colSums(set_expression, na.rm = TRUE),
+      "mean" = colMeans(set_expression, na.rm = TRUE),
+      "median" = apply(set_expression, 2, median, na.rm = TRUE),
+      stop("method must be 'sum', 'mean', or 'median'")
+    )
+    
+    cat(sprintf(
+      "%s: %d/%d genes found\n",
+      set_name, length(genes_available), length(genes_in_set)
+    ))
+    
+    index
+  })
+  
+  indices_df <- as.data.frame(indices)
+  names(indices_df) <- names(gene_sets)
+  indices_df$sample <- colnames(expression_matrix)
+  
+  indices_df %>%
+    select(sample, everything()) %>%
+    left_join(
+      extract_sample_metadata(colnames(expression_matrix)),
+      by = "sample"
+    )
+}
+```
+
+## Normalize Expression Indices
+```{r helper_normalize_xpindex}
+#' Min-max normalization for transcriptomic expression indices
+#'
+#' @param xpindex_data Data frame with xpindex columns
+#' @param index_names Character vector of column names to normalize
+#' @param expression_matrix Optional: original expression matrix
+#' @param gene_sets Optional: named list of gene vectors
+#' @param method Normalization scope: "per_set", "per_union", or "global"
+#'
+#' @return Data frame with normalized xpindex values (0-1 scale)
+normalize_xpindex <- function(xpindex_data,
+                               index_names,
+                               expression_matrix = NULL,
+                               gene_sets = NULL,
+                               method = "per_set") {
+  
+  stopifnot(
+    method %in% c("per_set", "per_union", "global"),
+    is.data.frame(xpindex_data),
+    all(index_names %in% names(xpindex_data))
+  )
+  
+  if (method == "per_set") {
+    xpindex_data %>%
+      mutate(across(
+        all_of(index_names),
+        ~ (. - min(.)) / (max(.) - min(.))
+      ))
+    
+  } else if (method == "per_union") {
+    stopifnot(
+      !is.null(expression_matrix),
+      !is.null(gene_sets)
+    )
+    
+    union_genes <- unique(unlist(gene_sets))
+    union_genes <- union_genes[union_genes %in% rownames(expression_matrix)]
+    
+    global_min <- min(expression_matrix[union_genes, ], na.rm = TRUE)
+    global_max <- max(expression_matrix[union_genes, ], na.rm = TRUE)
+    
+    xpindex_data %>%
+      mutate(across(
+        all_of(index_names),
+        ~ (. - global_min) / (global_max - global_min)
+      ))
+    
+  } else if (method == "global") {
+    stopifnot(!is.null(expression_matrix))
+    
+    global_min <- min(expression_matrix, na.rm = TRUE)
+    global_max <- max(expression_matrix, na.rm = TRUE)
+    
+    xpindex_data %>%
+      mutate(across(
+        all_of(index_names),
+        ~ (. - global_min) / (global_max - global_min)
+      ))
+  }
+}
+```
+
+## Summarize Expression Indices
+```{r helper_summarize_xpindex}
+#' Prepare summary statistics for transcriptomic expression indices
+#'
+#' @param xpindex_data Data frame with normalized xpindex values
+#' @param index_names Character vector of xpindex column names
+#' @param group_vars Character vector of grouping variables
+#'
+#' @return Data frame with mean and SE for each xpindex and group
+summarize_xpindex <- function(xpindex_data,
+                               index_names,
+                               group_vars = "leaf_stage") {
+  
+  summary_data <- xpindex_data %>%
+    group_by(across(all_of(group_vars))) %>%
+    summarise(
+      across(
+        all_of(index_names),
+        list(mean = mean, se = ~ sd(.) / sqrt(n())),
+        .names = "{.col}_{.fn}"
+      ),
+      .groups = "drop"
+    )
+  
+  summary_long <- summary_data %>%
+    pivot_longer(
+      cols = -all_of(group_vars),
+      names_to = c("xpindex", ".value"),
+      names_pattern = "(.+)_(mean|se)"
+    )
+  
+  summary_long
+}
+```
+
+## Statistical Modeling Functions
+```{r helper_statistical_models}
+#' Convert p-values to significance stars
+#'
+#' @param p Numeric vector of p-values
+#' @return Character vector with significance stars
+star_significance <- function(p) {
+  sapply(p, function(x) {
+    if (is.na(x)) return("ns")
+    if (x < 0.0001) return("****")
+    if (x < 0.001) return("***")
+    if (x < 0.01) return("**")
+    if (x < 0.05) return("*")
+    return("ns")
+  })
+}
+
+#' Fit linear models for expression indices
+#'
+#' @param xpindex_data Data frame with xpindex values
+#' @param index_names Character vector of xpindex column names
+#' @param formula_rhs Right-hand side of formula
+#'
+#' @return Named list of fitted lm objects
+fit_xpindex_models <- function(xpindex_data,
+                                index_names,
+                                formula_rhs = "leaf_stage * treatment") {
+  
+  models <- lapply(index_names, function(xpindex) {
+    formula_str <- paste(xpindex, "~", formula_rhs)
+    lm(as.formula(formula_str), data = xpindex_data)
+  })
+  
+  names(models) <- index_names
+  models
+}
+
+#' Extract statistics from expression index linear models
+#'
+#' @param model_list Named list of lm objects
+#' @return Data frame with model statistics for all predictors
+extract_xpindex_stats <- function(model_list) {
+  
+  results <- lapply(names(model_list), function(index_name) {
+    model <- model_list[[index_name]]
+      model_summary <- summary(model)
+    coef_summary <- coef(model_summary)
+    predictors <- rownames(coef_summary)[-1]
+    
+    data.frame(
+      xpindex = tools::toTitleCase(index_name),
+      predictor = predictors,
+      effect = coef_summary[predictors, "Estimate"],
+      std_err = coef_summary[predictors, "Std. Error"],
+      p_value = coef_summary[predictors, "Pr(>|t|)"],
+      r2 =  model_summary$r.squared,
+      row.names = NULL,
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  bind_rows(results) %>%
+    mutate(
+      p_adj = p.adjust(p_value, method = "fdr"),
+      p_signif = star_significance(p_adj)
+    ) %>%
+    arrange(xpindex, predictor, p_value) %>%
+    as_tibble()
+}
+```
+
+# Phase 1: Exploration
+
+**Purpose**: Systematic exploration of senescence-associated gene lists from 
+multiple sources, comparing them with high-confidence DEGs from current study.
+
+**Gene list sources**:
+
+  - SAG orthologs from Zhang et al. 2014
+
+  - Natural senescence genes from Zhang et al. 2014
+
+  - SAG GWAS hits from Sekhon et al. 2019
+
+  - Stay-green network from Sekhon et al. 2019
+
+  - SAG hub genes from Ojeda et al. 2026
+
+  - Photosynthesis genes from Ojeda et al. 2026
+
+  - GO-based photosynthesis and leaf senescence gene sets, Fattel et al 2024
+
+```{r load_lists_data}
+# Load cross-reference tables for gene ID conversion
+v3_v5 <- read.table(
+  file = "/Users/fvrodriguez/Desktop/B73_gene_xref/B73v3_to_B73v5.tsv",
+  sep = "\t",
+  header = FALSE
+) %>%
+  rename(v3 = "V1", v5 = "V2") %>%
+  separate_longer_delim(cols = v5, delim = ",")
+
+v4_v5 <- read.table(
+  file = "/Users/fvrodriguez/Desktop/B73_gene_xref/B73v4_to_B73v5.tsv",
+  sep = "\t",
+  header = FALSE
+) %>%
+  rename(v4 = "V1", v5 = "V2") %>%
+  separate_longer_delim(cols = v5, delim = ",")
+```
+
+## SAG Orthologs - Zhang et al. 2014
+
+**Purpose**: Load SAG orthologs identified through comparative genomics and 
+convert to v5 gene IDs.
+
+```{r load_sag_zhang2014}
+sag_orthologs_Zhang2014 <- read.csv(
+  "~/Desktop/SAG_orthologs_Zhang2014.csv"
+) %>%
+  janitor::clean_names() %>%
+  inner_join(v3_v5, by = c(gene_id_maize = "v3"))
+
+cat("Total SAG orthologs (Zhang 2014):", 
+    length(unique(sag_orthologs_Zhang2014$v5)), "\n")
+```
+
+```{r check_sag_zhang2014_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% sag_orthologs_Zhang2014$v5
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble()
+```
+
+## SAG GWAS - Sekhon et al. 2019
+
+**Purpose**: Load GWAS-identified senescence genes and convert to v5 with 
+manual corrections for problematic mappings.
+
+```{r load_sag_gwas_sekhon2019}
+sag_gwas_Sekhon2019 <- read.csv(
+  "~/Desktop/senescence_Sekhon2019.csv"
+) %>%
+  left_join(v4_v5, by = c(gene_v4 = "v4"))
+
+# Manual corrections for genes with mapping issues
+to_correct <- c(
+  "Zm00001d045427" = "Zm00001eb377840",
+  "Zm00001d044747" = "Zm00001eb371660",
+  "Zm00001d039384" = "Zm00001eb120170"
+)
+
+sag_gwas_Sekhon2019$v5[
+  sag_gwas_Sekhon2019$gene_v4 %in% names(to_correct)
+] <- to_correct
+
+cat("Total SAG GWAS genes (Sekhon 2019):", 
+    length(unique(sag_gwas_Sekhon2019$v5)), "\n")
+```
+
+```{r check_sag_gwas_sekhon2019_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% sag_gwas_Sekhon2019$v5
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble()
+```
+
+## Stay-Green Network - Sekhon et al. 2019
+Supplemental Data Set 5.  Sekhon et al. 2019
+https://academic.oup.com/plcell/article/31/9/1968/5985812
+
+**Purpose**: Load genes in the stay-green regulatory network and convert to v5. 
+
+```{r load_staygreen_network}
+staygreen_network <- read.csv(
+  "~/Desktop/staygreen_network_sekhon2019.csv",
+  na.strings = ""
+) %>%
+  janitor::clean_names() %>%
+  inner_join(v4_v5, by = c(gene = "v4"))
+
+cat("Total stay-green network genes:", 
+    length(unique(staygreen_network$v5)), "\n")
+```
+
+```{r check_staygreen_network_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% staygreen_network$v5
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble() 
+```
+
+## Natural Senescence Genes - Zhang et al. 2014
+
+**Purpose**: Load genes associated with natural senescence processes and 
+convert to v5.
+
+```{r load_natural_senescence}
+natural_senescence <- read.csv(
+  "~/Desktop/natural_senescence.csv"
+) %>%
+  janitor::clean_names() %>%
+  inner_join(v3_v5, by = c(gene_id = "v3"))
+
+cat("Total natural senescence genes:", 
+    length(unique(natural_senescence$v5)), "\n")
+```
+
+```{r check_natural_senescence_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% natural_senescence$v5
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble() 
+```
+
+## SAG Hub Genes - Ojeda et al. 2026
+
+**Purpose**: Load hub genes from senescence co-expression network.
+
+```{r load_sag_hub_ojeda2026}
+sag_hub_ojeda2026 <- read.table(
+  "~/Desktop/senesence_hubs_ojeda2026.tab",
+  header = TRUE,
+  sep = "\t",
+  fill = TRUE
+)
+
+cat("Total SAG hub genes (Ojeda 2026):", 
+    length(unique(sag_hub_ojeda2026$gene)), "\n")
+```
+
+```{r check_sag_hub_ojeda2026_degs}
+
+sag_hubs <- sag_hub_ojeda2026 %>% 
+    left_join(
+     v3_v5 %>%
+      separate_longer_delim(v5, delim = ",") %>%
+      dplyr::select(v3 = v3, v5) %>%
+      group_by(v5) %>%
+      dplyr::slice(1),
+    by = c(gene = "v5")
+  ) %>%
+  left_join(
+    v4_v5 %>%
+      separate_longer_delim(v5, delim = ",") %>%
+      dplyr::select(v4 = v4, v5) %>%
+      group_by(v5) %>%
+      dplyr::slice(1),
+    by = c(gene = "v5")
+  ) %>%
+  dplyr::select(v3,v4,gene,everything()) %>%
+  inner_join (effects_df %>%
+    filter(
+      is_hiconf_DEG,
+      gene %in% sag_hub_ojeda2026$gene
+    ) 
+  ) %>%
+  select(predictor, regulation,v3,v4,gene,locus_label,symbol,functional_process, logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  ungroup() %>%
+  group_by(predictor, regulation) %>%
+  arrange(predictor, regulation, adj.P.Val) 
+
+write.csv(sag_hubs,
+          "~/Desktop/sag_hub_ojeda2026_hiconf_degs.csv",
+          row.names = FALSE)
+nrow(sag_hubs)
+```
+
+## Photosynthesis Genes - Ojeda et al. 2026
+
+**Purpose**: Load photosynthesis-related genes for expression index calculation.
+
+```{r load_photosynthesis_ojeda2026}
+photosynthesis_ojeda2026 <- read.table(
+  "~/Desktop/photosynthesis_expression_index_genes_ojeda2026.txt",
+  header = FALSE,
+  sep = "\t"
+)
+colnames(photosynthesis_ojeda2026) <- "gene"
+
+cat("Total photosynthesis genes (Ojeda 2026):", 
+    nrow(photosynthesis_ojeda2026), "\n")
+```
+
+```{r check_photosynthesis_ojeda2026_degs}
+photo_ojeda2026 <- effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% photosynthesis_ojeda2026$gene
+  ) %>%
+  select(predictor, regulation, gene,locus_label, logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  ungroup() %>%
+  group_by(predictor, regulation) %>%
+  arrange(predictor, regulation, adj.P.Val) 
+
+write.csv(photo_ojeda2026,
+          "~/Desktop/photo_ojeda2026_hiconf_degs.csv",
+          row.names = FALSE)
+nrow(photo_ojeda2026)
+
+```
+
+## GO-Based Gene Sets
+
+**Purpose**: Extract photosynthesis and leaf senescence genes from GO 
+annotations.
+
+**GO terms used**:
+- Photosynthesis: GO:0015979, GO:0019684, GO:0009768
+- Leaf senescence: GO:0010150
+
+```{r load_go_gene_sets}
+photosynthesis_genes <- TERM2GENE %>%
+  filter(GO %in% c("GO:0015979", "GO:0019684", "GO:0009768")) %>%
+  pull(gene) %>%
+  unique()
+
+leaf_senescence_genes <- TERM2GENE %>%
+  filter(GO %in% c("GO:0010150")) %>%
+  pull(gene) %>%
+  unique()
+
+cat("GO photosynthesis genes:", length(photosynthesis_genes), "\n")
+cat("GO leaf senescence genes:", length(leaf_senescence_genes), "\n")
+```
+
+```{r check_go_photosynthesis_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% photosynthesis_genes
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble() 
+```
+
+```{r check_go_senescence_degs}
+effects_df %>%
+  filter(
+    is_hiconf_DEG,
+    gene %in% leaf_senescence_genes
+  ) %>%
+  select(predictor, regulation, gene:logFC, std_err, adj.P.Val, 
+         desc_merged) %>%
+  group_by(predictor) %>%
+  arrange(predictor, regulation, adj.P.Val) %>%
+  tibble() 
+```
+
+## Expression Index Calculation
+
+
+**Purpose**: Calculate normalized expression indices for photosynthesis and 
+senescence gene sets across samples.
+
+**Approach**: Use mean expression of genes within each set, normalize per set, 
+and summarize by leaf stage and treatment.
+
+```{r calculate_expression_indices}
+# Define gene sets restricted to expression matrix universe
+gene_set_list <- list(
+  photosynthesis = intersect(photosynthesis_ojeda2026$gene, universe),
+  senescence = intersect(sag_hub_ojeda2026$gene, universe)
+)
+
+cat("\n=== Gene Set Sizes ===\n")
+print(sapply(gene_set_list, length))
+
+# Calculate raw expression indices
+xpindex_data <- calculate_xpindex(
+  expression_matrix = normalized_expression,
+  gene_sets = gene_set_list,
+  method = "mean"
+)
+
+# Normalize indices per set
+xpindex_norm <- normalize_xpindex(
+  xpindex_data = xpindex_data,
+  index_names = names(gene_set_list),
+  method = "per_set"
+)
+
+# Summarize by leaf stage and treatment
+xpindex_summary <- summarize_xpindex(
+  xpindex_data = xpindex_norm,
+  index_names = names(gene_set_list),
+  group_vars = c("leaf_stage", "treatment")
+) %>%
+  mutate(
+    xpindex = factor(
+      tools::toTitleCase(xpindex),
+      levels = c("Photosynthesis", "Senescence"),
+      labels = c("Photosynthesis", "Leaf Senescence")
+    )
+  )
+```
+## Pigment Biosynthesis Indices (CornCyc Pathways)
+
+**Purpose**: Calculate xpindex for pigment biosynthesis using CornCyc pathway 
+annotations.
+
+**Approach**: Extract gene sets from CornCyc, calculate mean xpindex, 
+normalize per_set, and visualize developmental trajectories.
+
+
+```{r explore_pigments}
+corncyc <- read.table(
+  "/Users/fvrodriguez/Desktop/corncyc_pathways.20251021",
+  sep = "\t",
+  header = TRUE,
+  quote = ""
+)
+
+pathway_ids <- list(
+  chlorophyll = c("CHLOROPHYLL-SYN", "PWY-5068","PWY-5188"),
+  carotenoid = "CAROTENOID-PWY",
+  anthocyanin = "PWY-5125",
+  flavonoids = "PWY1F-FLAVSYN"
+)
+
+corncyc_gene_sets <- lapply(names(pathway_ids), function(pigment) {
+  corncyc_genes <- corncyc %>%
+    filter(Pathway.id %in% pathway_ids[[pigment]]) %>%
+    pull(Protein.id) %>%
+    gsub("ZM00001EB", "Zm00001eb", .) %>%
+    gsub("_P\\d+$", "", ., perl = TRUE)
+  
+  missing <- corncyc_genes[!grepl("Zm00001eb", corncyc_genes)]
+  if (length(missing) > 0) {
+    cat(pigment, "- Protein.id missing:", 
+        paste(missing, collapse = ", "), "\n")
+  }
+  
+  corncyc_genes[grepl("Zm00001eb", corncyc_genes)] %>% unique()
+})
+
+names(corncyc_gene_sets) <- names(pathway_ids)
+
+{
+  cat("\n=== Pigment Gene Set Sizes ===\n")
+  print(sapply(corncyc_gene_sets, length))
+}
+
+corncyc_xpindex <- calculate_xpindex(
+  expression_matrix = normalized_expression,
+  gene_sets = corncyc_gene_sets,
+  method = "mean"
+)
+
+corncyc_xpindex_norm <- normalize_xpindex(
+  xpindex_data = corncyc_xpindex,
+  index_names = names(pathway_ids),
+  expression_matrix = normalized_expression,
+  gene_sets = corncyc_gene_sets,
+  method = "per_set"
+)
+
+{
+  cat("\n=== Normalized Pigment Index Ranges ===\n")
+  corncyc_xpindex_norm %>%
+    summarise(across(
+      all_of(names(pathway_ids)),
+      list(min = min, max = max),
+      .names = "{.col}_{.fn}"
+    )) %>%
+    pivot_longer(
+      cols = everything(),
+      names_to = c("index", "stat"),
+      names_pattern = "(.+)_(min|max)"
+    ) %>%
+    pivot_wider(
+      names_from = stat,
+      values_from = value
+    ) %>%
+    print()
+}
+
+corncyc_summary <- summarize_xpindex(
+  xpindex_data = corncyc_xpindex_norm,
+  index_names = names(pathway_ids),
+  group_vars = "leaf_stage"
+)
+
+effects_df %>%
+  filter(is_hiconf_DEG,
+         predictor=="Leaf", 
+         gene %in% corncyc_gene_sets$chlorophyll) %>%
+  select(gene:logFC,std_err,adj.P.Val,desc_merged) %>% tibble()
+
+
+effects_df %>%
+  filter(gene =="Zm00001eb191650") %>%
+  select(gene:logFC,std_err,adj.P.Val,desc_merged) %>% tibble()
+
+```
+
+## Pigment Plot
+```{r,plot_pigments}
+base_size <- 30
+
+p_pigments <- corncyc_summary %>%
+  filter(xpindex != "flavonoids") %>%
+  mutate(xpindex = tools::toTitleCase(xpindex)) %>%
+  ggplot(aes(x = leaf_stage, y = mean, color = xpindex)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Index",
+    color = "Pigment"
+  ) +
+  scale_color_manual(
+    values = c(
+      "Chlorophyll" = "darkgreen",
+      "Carotenoid" = "gold",
+      "Anthocyanin" = "purple4"
+    )
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(legend.position = c(0.9, 0.9))
+
+print(p_pigments)
+
+ggsave(
+  "~/Desktop/corncyc_pigment_biosynthesis_indices.png",
+  plot = p_pigments,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+```
+
+
+```{r, pigment_plot_by_tratment}
+p_by_treatment <- ggplot(
+  xpindex_summary,
+  aes(x = leaf_stage, y = mean, color = xpindex, linetype = treatment)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 4) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", 
+               "Leaf Senescence" = "orange")
+  ) +
+  scale_linetype_manual(
+    values = c("+P" = "solid", "-P" = "dashed")
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression Index",
+    color = NULL,
+    linetype = "Treatment"
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(legend.position = "right")
+
+print(p_by_treatment)
+```
+
+# Main Figure: Left Panel Components
+
+**Purpose**: Create publication-quality composite figure showing normalized 
+xpindex, individual gene trajectories, and marker gene validation.
+
+## Panel A: Normalized Gene Set Indices
+
+```{r left_panel_a, fig.width=6, fig.height=6}
+xpindex_summary_pooled <- summarize_xpindex(
+  xpindex_data = xpindex_norm,
+  index_names = names(gene_set_list),
+  group_vars = "leaf_stage"
+) %>%
+  mutate(
+    xpindex = factor(
+      tools::toTitleCase(xpindex),
+      levels = c("Photosynthesis", "Senescence"),
+      labels = c("Photosynthesis", "Leaf Senescence")
+    )
+  )
+
+# --- Compute correlation stats ---
+photo_cor <- cor.test(xpindex_norm$leaf_stage, xpindex_norm$photosynthesis, method = "pearson")
+sen_cor   <- cor.test(xpindex_norm$leaf_stage, xpindex_norm$senescence,   method = "pearson")
+
+# Format to 2 significant figures
+format_2sig <- function(x) {
+  x_sig <- signif(x, digits = 2)
+  format(x_sig, scientific = FALSE, trim = TRUE, nsmall = 0)
+}
+
+# Create plotmath label as character string
+make_label <- function(r_val, p_val) {
+  r_str <- format_2sig(r_val)
+  if (p_val < 0.01) {
+    exp_val <- floor(log10(p_val))
+    coeff  <- round(p_val / 10^exp_val, 2)
+    if (coeff >= 10) {
+      coeff <- coeff / 10
+      exp_val <- exp_val + 1
+    }
+    coeff_str <- format_2sig(coeff)
+    paste0("italic(r) == ", r_str, " * ',' ~ italic(p) == ", coeff_str, " %*% 10^", exp_val)
+  } else {
+    p_str <- format_2sig(p_val)
+    paste0("italic(r) == ", r_str, " * ',' ~ italic(p) == ", p_str)
+  }
+}
+
+# Build annotation data frame
+annotation_df <- data.frame(
+  x = 1.0,
+  y = c(0.51, 0.35),  # adjust y-spacing here
+  label = c(
+    make_label(photo_cor$estimate, photo_cor$p.value),
+    make_label(sen_cor$estimate,   sen_cor$p.value)
+  ),
+  stringsAsFactors = FALSE
+)
+
+# --- Plot ---
+base_family <- "Helvetica"
+up <- 58
+
+p_normalized <- ggplot(
+  xpindex_summary_pooled,
+  aes(x = leaf_stage, y = mean, color = xpindex)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 4) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", 
+               "Leaf Senescence" = "orange")
+  ) +
+  # Single annotation layer using data frame
+  geom_text(
+    data = annotation_df,
+    aes(x = x, y = y, label = label),
+    hjust = 0,
+    vjust = 0,
+    size = 5,
+    parse = TRUE,
+    family = base_family,
+    inherit.aes = FALSE
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression Index",
+    color = NULL
+  ) +
+  ggpubr::theme_classic2(base_size = base_size) +
+  theme(
+    legend.position = c(0.7, 0.9),
+    legend.text = element_text(size = 20),
+    legend.background = element_rect(fill = "transparent"),
+    legend.margin = margin(r = 50, unit = "pt"),
+    plot.margin = margin(5.5, 5.5, up, 7, "pt")
+  )
+
+print(p_normalized)
+```
+
+## Panel B: Spaghetti Plot (Individual Gene Trajectories)
+
+```{r left_panel_b, fig.width=6, fig.height=6}
+xp_photo_genes <- intersect(
+  gene_set_list$photosynthesis,
+  rownames(normalized_expression)
+)
+
+xp_photosynthesis <- normalized_expression[xp_photo_genes, ] %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("gene") %>%
+  pivot_longer(-gene, names_to = "sample", values_to = "expression") %>%
+  mutate(
+    leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample))
+  ) %>%
+  group_by(gene) %>%
+  mutate(centered_expr = expression - mean(expression)) %>%
+  ungroup() %>%
+  group_by(gene, leaf_stage) %>%
+  summarise(mean_expr = mean(centered_expr), .groups = "drop") %>%
+  arrange(gene)
+
+xp_senescence_genes <- intersect(
+  gene_set_list$senescence,
+  rownames(normalized_expression)
+)
+
+xp_senescence <- normalized_expression[xp_senescence_genes, ] %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("gene") %>%
+  pivot_longer(-gene, names_to = "sample", values_to = "expression") %>%
+  mutate(
+    leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample))
+  ) %>%
+  group_by(gene) %>%
+  mutate(centered_expr = expression - mean(expression)) %>%
+  ungroup() %>%
+  group_by(gene, leaf_stage) %>%
+  summarise(mean_expr = mean(centered_expr), .groups = "drop") %>%
+  arrange(gene)
+
+{
+  cat("\n=== Spaghetti Plot Gene Counts ===\n")
+  cat("Photosynthesis genes:", length(xp_photo_genes), "\n")
+  cat("Senescence genes:", length(xp_senescence_genes), "\n")
+}
+
+p_spaghetti <- xp_photosynthesis %>%
+  ggplot(aes(x = leaf_stage, y = mean_expr, group = gene)) +
+  geom_line(alpha = 0.1, linewidth = 0.5, color = "darkgreen") +
+  geom_smooth(
+    data = xp_photosynthesis,
+    aes(x = leaf_stage, y = mean_expr, group = 1),
+    method = "lm",
+    se = FALSE,
+    linewidth = 2,
+    color = "darkgreen"
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  geom_line(
+    data = xp_senescence,
+    aes(x = leaf_stage, y = mean_expr, group = gene),
+    alpha = 0.1,
+    linewidth = 0.5,
+    color = "orange"
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  geom_smooth(
+    data = xp_senescence,
+    aes(x = leaf_stage, y = mean_expr, group = 1),
+    method = "lm",
+    se = FALSE,
+    linewidth = 2,
+    color = "orange"
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 2) +
+  labs(
+    x = "Leaf",
+    y = expression("Centered " * log[2] * "(CPM)")
+  ) +
+  coord_cartesian(ylim = c(-1, 1)) +
+  scale_y_continuous(position = "right") +
+  ggpubr::theme_classic2(base_size = base_size) +
+  theme(plot.margin = margin(5.5, 7, up, 5.5, "pt"))
+
+print(p_spaghetti)
+```
+
+## Combine Top Panels
+
+```{r combine_top_panels, fig.width=12, fig.height=6}
+p_top_panel <- ggarrange(
+  p_normalized + rremove("xlab"),
+  p_spaghetti + rremove("xlab"),
+  ncol = 2
+) %>%
+  annotate_figure(
+    bottom = text_grob("Leaf", size = base_size, vjust = -2)
+  )
+
+print(p_top_panel)
+```
+
+## Panel C: Marker Gene  Ilustration
+
+```{r left_panel_c, fig.width=9, fig.height=7.5}
+marker_genes <- data.frame(
+  locus_label = c("pep1", "salt1",
+                  "ssu1", "mir3",
+                  "nye2", "sgrl1", 
+                  "cab1", "dapat3"),
+  gene_set = c("Photosynthesis", "Senescence",
+               "Photosynthesis", "Senescence",
+               "Senescence", "Senescence",
+               "Photosynthesis", "Senescence"),
+  pair = c("Pair1", "Pair1",
+           "Pair2", "Pair2",
+           "Pair3", "Pair3",
+           "Pair4", "Pair4"),
+  stringsAsFactors = FALSE
+)
+
+
+marker_genes <- data.frame(
+  locus_label = c("pep1", "salt1", 
+                  "ssu1", "mir3",
+                  "nye2", "sgrl1",
+                  "cab1", "nactf108"),
+  gene_set = c("Photosynthesis", "Senescence",
+               "Photosynthesis", "Senescence",
+               "Senescence", "Senescence",
+               "Photosynthesis", "Senescence"),
+  pair = c("Pair1", "Pair1",
+           "Pair2", "Pair2",
+           "Pair3", "Pair3", 
+           "Pair4", "Pair4"),
+  stringsAsFactors = FALSE
+)
+
+gene_ids <- effects_df %>%
+  filter(locus_label %in% marker_genes$locus_label, !is.na(locus_label)) %>%
+  select(gene, locus_label, desc_merged) %>%
+  distinct() %>%
+  group_by(locus_label) %>%
+  slice(1) %>%
+  ungroup()
+
+
+
+marker_data <- lapply(seq_len(nrow(gene_ids)), function(i) {
+  g <- gene_ids$gene[i]
+  data.frame(
+    sample = colnames(normalized_expression),
+    expression = normalized_expression[g, ],
+    gene = g
+  )
+}) %>%
+  bind_rows() %>%
+  left_join(gene_ids, by = "gene") %>%
+  left_join(marker_genes, by = "locus_label") %>%
+  mutate(
+    leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample))
+  )
+
+marker_summary <- marker_data %>%
+  group_by(gene, locus_label, gene_set, desc_merged, pair, leaf_stage) %>%
+  summarise(
+    mean_expr = mean(expression),
+    se_expr = sd(expression) / sqrt(n()),
+    .groups = "drop"
+  )
+
+pair_max_expr <- marker_summary %>%
+  group_by(pair) %>%
+  summarise(max_expr = max(mean_expr), .groups = "drop") %>%
+  arrange(desc(max_expr))
+
+marker_summary_colored <- marker_summary %>%
+  select(pair, locus_label, desc_merged, gene_set) %>%
+  distinct() %>%
+  mutate(
+    wrapped_text = stringr::str_wrap(desc_merged, width = 25),
+    with_br = gsub("\n", "<br>", wrapped_text),
+    with_color = case_when(
+      gene_set == "Photosynthesis" ~
+        paste0("<span style='color:darkgreen'>", with_br, "</span>"),
+      gene_set == "Senescence" ~
+        paste0("<span style='color:orange'>", with_br, "</span>"),
+      TRUE ~ with_br
+    ),
+    sort_order = ifelse(gene_set == "Photosynthesis", 1, 2)
+  )
+
+pair_labels <- marker_summary_colored %>%
+  arrange(pair, sort_order) %>%
+  group_by(pair) %>%
+  summarise(
+    facet_label = paste(with_color, collapse = "<br><br>"),
+    .groups = "drop"
+  ) %>%
+  left_join(pair_max_expr, by = "pair") %>%
+  arrange(desc(max_expr))
+
+marker_summary <- marker_summary %>%
+  left_join(
+    pair_labels %>% select(pair, facet_label, max_expr),
+    by = "pair"
+  ) %>%
+  mutate(
+    facet_label = factor(facet_label, levels = pair_labels$facet_label)
+  )
+
+p_markers <- ggplot(
+  marker_summary,
+  aes(x = leaf_stage, y = mean_expr, color = gene_set, group = gene)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5) +
+  geom_errorbar(
+    aes(ymin = mean_expr - se_expr, ymax = mean_expr + se_expr),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  geom_text(
+    data = marker_summary %>% filter(leaf_stage == 1),
+    aes(x = leaf_stage,
+        y = mean_expr,
+        label = locus_label,
+        color = gene_set),
+    nudge_x = -0.5,
+    hjust = 1,
+    fontface = "bold",
+    size = 5
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", "Senescence" = "orange")
+  ) +
+  scale_x_continuous(expand = expansion(add = c(1.5, 0.2)), breaks = 1:4) +
+  facet_wrap(
+    ~ facet_label,
+    nrow = 2,
+    scales = "free_y"
+  ) +
+  labs(
+    x = "Leaf",
+    y = expression(log[2] * "(CPM)"),
+    color = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 15, hjust = 0, face = "bold"),
+    plot.margin = margin(-50, 80, 5.5, 5.5, "pt"),
+    axis.title.y = element_text(margin = margin(r = -10)),
+    panel.spacing.x = unit(0, "cm"),
+    panel.spacing.y = unit(0, "cm"),
+    legend.position = "none"
+  )
+
+print(p_markers)
+```
+
+
+## Combine All Panels: Left Panel
+
+```{r create_left_panel, fig.width=9, fig.height=15}
+left_panel <- cowplot::plot_grid(
+  p_top_panel, p_markers,
+  ncol = 1,
+  align = 'h',
+  axis = 'lr'
+)
+
+ggsave(
+  "~/Desktop/left_panel.png",
+  plot = left_panel,
+  width = 9,
+  height = 15,
+  dpi = 150
+)
+
+print(left_panel)
+```
+
+# Phase 3: Statistical Analysis and Enrichment
+
+**Purpose**: Detailed statistical models and gene set enrichment analysis.
+
+## Statistical Models for Main Figure
+
+```{r main_figure_models}
+
+xpindex_models <- fit_xpindex_models(
+  xpindex_data = xpindex_norm,
+  index_names = names(gene_set_list),
+  formula_rhs = "leaf_stage * treatment"
+)
+
+xpindex_stats <- extract_xpindex_stats(xpindex_models)
+
+{
+  cat("\n=== Expression Index Model Statistics ===\n")
+  print(xpindex_stats, n = Inf)
+}
+```
+
+## Supplementary Visualizations
+
+**Purpose**: Additional exploratory plots to examine treatment effects and 
+relationships between indices.
+
+### Individual Index Plots by Treatment
+
+```{r supp_individual, fig.width=10, fig.height=5}
+p1 <- xpindex_data %>%
+  ggplot(aes(
+    y = photosynthesis,
+    x = leaf_stage,
+    fill = factor(leaf_stage),
+    shape = treatment
+  )) +
+  geom_point(size = 3, color = "black") +
+  scale_shape_manual(values = c(21, 25)) +
+  scale_fill_viridis_d() +
+  labs(
+    x = "Leaf",
+    y = "Photosynthesis xpindex",
+    fill = "Leaf",
+    shape = "Treatment"
+  ) +
+  theme_classic(base_size = 14)
+
+p2 <- xpindex_data %>%
+  ggplot(aes(
+    y = senescence,
+    x = leaf_stage,
+    fill = factor(leaf_stage),
+    shape = treatment
+  )) +
+  geom_point(size = 3, color = "black") +
+  scale_shape_manual(values = c(21, 25)) +
+  scale_fill_viridis_d() +
+  labs(
+    x = "Leaf",
+    y = "Senescence xpindex",
+    fill = "Leaf",
+    shape = "Treatment"
+  ) +
+  theme_classic(base_size = 14)
+
+p_individual <- ggarrange(p1, p2, ncol = 2,
+                          common.legend = TRUE, legend = "right")
+print(p_individual)
+```
+
+### Bivariate Relationship
+
+```{r supp_bivariate, fig.width=8, fig.height=6}
+p_bivariate <- xpindex_data %>%
+  ggplot(aes(
+    x = photosynthesis,
+    y = senescence,
+    fill = factor(leaf_stage),
+    shape = factor(treatment)
+  )) +
+  geom_point(size = 3, color = "black") +
+  scale_fill_viridis_d() +
+  scale_shape_manual(values = c(21, 25)) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  labs(
+    x = "Photosynthesis xpindex",
+    y = "Senescence xpindex",
+    fill = "Leaf",
+    shape = "Treatment"
+  ) +
+  theme_classic(base_size = 14)
+
+print(p_bivariate)
+```
+
+# Gene Set Enrichment Analysis
+
+## Custom Enrichment Function
+
+```{r enrichment_function}
+#' Fisher's Exact Test for Custom Gene Set Enrichment
+#'
+#' @param deg_lists Named list of DEG vectors by cluster
+#' @param annotation Named list of gene sets
+#' @param universe Background gene set
+#' @return Data frame with enrichment results
+test_custom_enrichment <- function(deg_lists, annotation, universe) {
+  annotation_filtered <- lapply(annotation, function(x) intersect(x, universe))
+  annotation_filtered <- annotation_filtered[
+    sapply(annotation_filtered, length) > 0
+  ]
+  
+  results <- list()
+  
+  for (cluster_name in names(deg_lists)) {
+    deg_genes <- deg_lists[[cluster_name]]
+    
+    for (term_name in names(annotation_filtered)) {
+      term_genes <- annotation_filtered[[term_name]]
+      overlap <- intersect(deg_genes, term_genes)
+      
+      in_both <- length(overlap)
+      in_deg_only <- length(setdiff(deg_genes, term_genes))
+      in_term_only <- length(setdiff(term_genes, deg_genes))
+      in_neither <- length(universe) - in_both - in_deg_only - in_term_only
+      
+      contingency <- matrix(
+        c(in_both, in_deg_only, in_term_only, in_neither),
+        nrow = 2
+      )
+      fisher_result <- fisher.test(contingency, alternative = "greater")
+      
+      results[[length(results) + 1]] <- data.frame(
+        Cluster = cluster_name,
+        ID = term_name,
+        Description = term_name,
+        GeneRatio = paste0(in_both, "/", length(deg_genes)),
+        BgRatio = paste0(length(term_genes), "/", length(universe)),
+        pvalue = fisher_result$p.value,
+        geneID = paste(overlap, collapse = "/"),
+        Count = in_both,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  
+  results_df <- do.call(rbind, results)
+  results_df$p.adjust <- p.adjust(results_df$pvalue, method = "BH")
+  
+  results_df %>% arrange(p.adjust)
+}
+
+#' Extract DEG Stats for Custom Annotation
+#'
+#' @param annotation_id Term ID to filter
+#' @param gene_term_df Data frame with gene-term mappings
+#' @param effects_data DEG results
+#' @param filter_hiconf Filter to high-confidence DEGs
+#' @return Tibble with DEG statistics
+get_annotation_degs <- function(annotation_id,
+                                gene_term_df,
+                                effects_data,
+                                filter_hiconf = TRUE) {
+  genes_in_category <- gene_term_df %>%
+    filter(ID == annotation_id) %>%
+    pull(gene)
+  
+  result <- effects_data %>%
+    filter(gene %in% genes_in_category)
+  
+  if (filter_hiconf) {
+    result <- result %>% filter(is_hiconf_DEG)
+  }
+  
+  result %>%
+    select(
+      predictor:gene, locus_label, desc_merged,
+      logFC, neglogP, mahalanobis
+    ) %>%
+    group_by(predictor, regulation) %>%
+    arrange(predictor, regulation, -mahalanobis) %>%
+    tibble()
+}
+```
+
+## Build Custom Annotation
+
+```{r build_annotation}
+custom_annotation <- c(
+  list(
+    staygreen = staygreen_network$v5,
+    sag = sag_orthologs_Zhang2014$v5,
+    photosynthesis = gene_set_list$photosynthesis,
+    leaf_senescence = gene_set_list$senescence
+  ),
+  natural_senescence %>%
+    select(term = set, gene = v5) %>%
+    distinct() %>%
+    split(.$term) %>%
+    lapply(function(x) x$gene)
+)
+
+{
+  cat("\n=== Custom Annotation Terms ===\n")
+  cat("Number of terms:", length(custom_annotation), "\n")
+  print(sapply(custom_annotation, length))
+}
+```
+
+## Run Enrichment Tests
+
+```{r run_enrichment}
+DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+  list(
+    Leaf.Down = unique(gene[
+      predictor == "Leaf" & regulation == "Downregulated"
+    ]),
+    Leaf.Up = unique(gene[predictor == "Leaf" & regulation == "Upregulated"]),
+    `-P.Down` = unique(gene[
+      predictor == "-P" & regulation == "Downregulated"
+    ]),
+    `-P.Up` = unique(gene[predictor == "-P" & regulation == "Upregulated"])
+  )
+})
+
+custom_enrichment_results <- test_custom_enrichment(
+  DEGs,
+  custom_annotation,
+  universe
+) %>%
+  filter(p.adjust < 0.05)
+
+{
+  cat("\n=== Enrichment Results (FDR < 0.05) ===\n")
+  custom_enrichment_results %>%
+    select(-geneID) %>%
+    print()
+}
+```
+
+## Gene-Level Statistics
+
+```{r gene_level_stats}
+genes_in_custom_terms <- custom_enrichment_results %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  rename(gene = "geneID") %>%
+  select(Cluster, ID, Description, gene) %>%
+  inner_join(
+    effects_df %>% select(gene, locus_label, desc_merged) %>% distinct(),
+    by = "gene"
+  )
+
+{
+  cat("\n=== Natural Senescence DEGs (Leaf effect) ===\n")
+  get_annotation_degs(
+    annotation_id = "natural",
+    gene_term_df = genes_in_custom_terms,
+    effects_data = effects_df,
+    filter_hiconf = TRUE
+  ) %>%
+    filter(predictor == "Leaf") %>%
+    print(n = 50)
+}
+```
+
+# Export Results
+
+```{r export, eval=FALSE}
+write.csv(
+  xpindex_data,
+  file = "~/Desktop/expression_indices.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  custom_enrichment_results,
+  file = "~/Desktop/custom_enrichment_results.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  xpindex_stats,
+  file = "~/Desktop/xpindex_model_statistics.csv",
+  row.names = FALSE
+)
+```
+
+# Build custom chlorophyll gene sets ---
+
+## Manually curate sets
+```{r, build_chlorophyll_sets}
+# Load CornCyc again if not in environment (safe re-load)
+corncyc <- read.table(
+  "/Users/fvrodriguez/Desktop/corncyc_pathways.20251021",
+  sep = "\t",
+  header = TRUE,
+  quote = ""
+)
+
+# Extract synthesis genes: CHLOROPHYLL-SYN + PWY-5068 + PWY-5188
+chloro_synthesis_genes <- corncyc %>%
+  filter(Pathway.id %in% c("CHLOROPHYLL-SYN", "PWY-5068", "PWY-5188")) %>%
+  pull(Protein.id) %>%
+  gsub("ZM00001EB", "Zm00001eb", .) %>%
+  gsub("_P\\d+$", "", ., perl = TRUE) %>%
+  grep("Zm00001eb", ., value = TRUE) %>%
+  unique()
+
+# Extract degradation genes from PWY-5098
+chloro_degradation_base <- corncyc %>%
+  filter(Pathway.id == "PWY-5098") %>%
+  pull(Protein.id) %>%
+  gsub("ZM00001EB", "Zm00001eb", .) %>%
+  gsub("_P\\d+$", "", ., perl = TRUE) %>%
+  grep("Zm00001eb", ., value = TRUE) %>%
+  unique()
+
+# Manually add your curated degradation genes (using maizegdb_id = rownames in expression matrix)
+# From Wei et al 2025
+manual_degradation_genes <- c(
+  "Zm00001eb307720",  # ZmCHL
+  "Zm00001eb047780",  # ZmCHL2
+  "Zm00001eb231810",  # ZmPPH
+  "Zm00001eb103480",  # ZmSGR
+  "Zm00001eb076680",  # ZmSGRL
+  "Zm00001eb140370"   # ZmPAO
+)
+
+chloro_degradation_genes <- unique(c(chloro_degradation_base, manual_degradation_genes))
+
+# Create named list
+chloro_gene_sets <- list(
+  chlorophyll_synthesis = chloro_synthesis_genes,
+  chlorophyll_degradation = chloro_degradation_genes
+)
+
+
+effects_df %>%
+  filter(#is_hiconf_DEG,
+         predictor=="Leaf:-P", 
+         gene %in% chloro_degradation_genes) %>%
+  select(gene:logFC,std_err,adj.P.Val,desc_merged) %>% tibble()
+
+```
+
+## Calculate and normalize xpindex 
+```{r,calculate_indices_xp}
+cat("=== Chlorophyll Gene Sets ===\n")
+cat("Synthesis genes:", length(chloro_gene_sets$chlorophyll_synthesis), "\n")
+cat("Degradation genes:", length(chloro_gene_sets$chlorophyll_degradation), "\n")
+
+chloro_xpindex <- calculate_xpindex(
+  expression_matrix = normalized_expression,
+  gene_sets = chloro_gene_sets,
+  method = "mean"
+)
+
+chloro_xpindex_norm <- normalize_xpindex(
+  xpindex_data = chloro_xpindex,
+  index_names = names(chloro_gene_sets),
+  method = "per_set"
+)
+
+lm(data=chloro_xpindex,
+   chlorophyll_degradation~leaf_stage*treatment ) %>%
+  summary()
+
+lm(data=chloro_xpindex,
+   chlorophyll_synthesis~leaf_stage*treatment ) %>%
+  summary()
+```
+
+## Summarize for plotting 
+```{r, summarize_indices_xp}
+
+
+# Pooled (all leaves, ignore treatment)
+summary_pooled <- summarize_xpindex(
+  xpindex_data = chloro_xpindex_norm,
+  index_names = names(chloro_gene_sets),
+  group_vars = "leaf_stage"
+) %>%
+  mutate(
+    xpindex = case_when(
+      xpindex == "chlorophyll_synthesis" ~ "Synthesis",
+      xpindex == "chlorophyll_degradation" ~ "Degradation"
+    ),
+    xpindex = factor(xpindex, levels = c("Synthesis", "Degradation"))
+  )
+
+# By treatment
+summary_by_treatment <- summarize_xpindex(
+  xpindex_data = chloro_xpindex_norm,
+  index_names = names(chloro_gene_sets),
+  group_vars = c("leaf_stage", "treatment")
+) %>%
+  mutate(
+    xpindex = case_when(
+      xpindex == "chlorophyll_synthesis" ~ "Synthesis",
+      xpindex == "chlorophyll_degradation" ~ "Degradation"
+    ),
+    xpindex = factor(xpindex, levels = c("Synthesis", "Degradation"))
+  )
+```
+
+## Plotting 1
+```{r, plot_chlorophyl_terms}
+# --- Correlation stats for p_normalized (Photosynthesis / Senescence) ---
+photo_cor <- cor.test(
+  xpindex_norm$leaf_stage,
+  xpindex_norm$photosynthesis,
+  method = "pearson")
+sen_cor   <- cor.test(
+  xpindex_norm$leaf_stage, 
+  xpindex_norm$senescence,
+  method = "pearson")
+
+
+annotation_df1 <- data.frame(
+  x = 1.0,
+  y = c(0.45, 0.38),
+  label = c(
+    make_label(photo_cor$estimate, photo_cor$p.value),
+    make_label(sen_cor$estimate,   sen_cor$p.value)
+  ),
+  stringsAsFactors = FALSE
+)
+
+synth_cor  <- cor.test(
+  chloro_xpindex_norm$leaf_stage, 
+  chloro_xpindex_norm$chlorophyll_synthesis,
+  method = "pearson")
+degrad_cor <- cor.test(
+  chloro_xpindex_norm$leaf_stage,
+  chloro_xpindex_norm$chlorophyll_degradation,
+  method = "pearson")
+
+annotation_df2 <- data.frame(
+  x = 1.0,
+  y = c(0.45, 0.38),
+  label = c(
+    make_label(synth_cor$estimate,  synth_cor$p.value),
+    make_label(degrad_cor$estimate, degrad_cor$p.value)
+  ),
+  stringsAsFactors = FALSE
+)
+
+p_normalized <- ggplot(
+  xpindex_summary_pooled,
+  aes(x = leaf_stage, y = mean, color = xpindex)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 1
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", 
+               "Leaf Senescence" = "orange")
+  ) +
+  geom_text(
+    data = annotation_df1,
+    aes(x = x, y = y, label = label),
+    hjust = 0,
+    vjust = 0,
+    size = 4,
+    parse = TRUE,
+    family = base_family,
+    inherit.aes = FALSE
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression",
+    color = NULL
+  ) +
+  ggpubr::theme_classic2(base_size = base_size) +
+  theme(
+    legend.position = c(0.7, 0.9),
+    legend.text = element_text(size = 25),
+    legend.background = element_rect(fill = "transparent"),
+    legend.margin = margin(r = 50, unit = "pt"),
+    plot.margin = margin(5.5, 5.5, up, 7, "pt")
+  )
+
+print(p_normalized)
+
+
+# --- Plot 2: p_chloro_pooled ---
+base_size <- 30
+
+p_chloro_pooled <- summary_pooled %>%
+  ggplot(aes(x = leaf_stage, y = mean, color = xpindex)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  scale_color_manual(
+    values = c("Synthesis" = "darkgreen",
+               "Degradation" = "darkorange")
+  ) +
+  geom_text(
+    data = annotation_df2,
+    aes(x = x, y = y, label = label),
+    hjust = 0,
+    vjust = 0,
+    size = 4,
+    parse = TRUE,
+    family = base_family,
+    inherit.aes = FALSE
+  ) +
+  labs(
+    y = "Normalized Expression",
+    x = "Leaf",
+    color = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(legend.position = "none")
+
+print(p_chloro_pooled)
+
+ggsave(
+  "~/Desktop/chlorophyll_synthesis_vs_degradation_pooled.png",
+  plot = p_chloro_pooled,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+```
+## Plotting 2 joins
+```{r,join_plots}
+
+pd <- position_dodge(width = 0.2)
+# Plot 2: By treatment
+p_chloro_treatment <- summary_by_treatment %>%
+  ggplot(aes(x = leaf_stage, y = mean, 
+             color = xpindex,
+             fill = xpindex,
+             linetype = treatment,
+             shape=treatment)) +
+  geom_line(linewidth = 2) +
+  geom_point(position = pd,
+             size = 5) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se), 
+    position = pd,
+    width = 0.2,
+    linewidth = 1,
+    linetype = "solid",
+  ) +
+  scale_x_continuous(
+    expand=expansion(add = c(0.2,0.2))
+  ) +
+  scale_y_continuous(
+    expand=expansion(add = c(0,0.2)),
+    breaks = 2*(0:5)/10
+  ) +
+  scale_color_manual(
+    values = c("Synthesis" = "darkgreen",
+               "Degradation" = "darkorange"),
+    labels = c("Chlorophyll\nSynthesis","Degradation")
+  ) +
+    scale_fill_manual(
+    values = c("Synthesis" = "darkgreen",
+               "Degradation" = "darkorange", guide= "none")
+  ) +
+  scale_linetype_manual(
+    values = c("+P" = "solid", "-P" = "dashed", guide= "none")
+  ) +
+    scale_shape_manual(
+    values = c("+P" = 19, "-P" = 25)
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression",
+    color = NULL,
+    shape = NULL,
+  ) +
+  guides(
+    fill = "none",
+    linetype = "none",
+    shape = guide_legend(
+      override.aes = list(fill = "black"),
+      order = 2,
+      #label.position = "left",
+      #label.hjust = 1 ,
+      reverse = TRUE
+      ),
+    color = guide_legend(
+      override.aes = list(shape = NA),
+      order = 1,
+      # label.position = "left",
+      # label.hjust = 1, 
+    )
+  )+
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = c(0.1, 1),
+    legend.justification = c(0, 1),
+    legend.text = element_text(
+      size = 25, 
+      margin = margin(l =unit(2, "lines"))
+      ),
+    legend.box = "horizontal",
+    legend.box.just = "bottom",
+    legend.margin = margin(0, 0, 0, 0),
+    legend.spacing.x = unit(1, "lines"),
+    legend.key.spacing.x = unit(2, "lines"),
+    legend.key.size = unit(2, "lines"),  
+    legend.key = element_rect(fill = "transparent"),
+    legend.background = element_rect(fill = "transparent")
+  )
+
+ p_chloro <- ggpubr::ggarrange(p_chloro_pooled,
+                              p_chloro_treatment,
+                              align="hv")
+p_chloro
+ggsave(
+  "~/Desktop/chlorophyll_synthesis_vs_degradation_by_treatment.png",
+  plot = p_chloro,
+  width = 12,
+  height = 7,
+  dpi = 300
+)
+
+# --- Step 1: Prepare both datasets with consistent structure ---
+
+
+p_photo_sene <- xpindex_summary %>%
+  ggplot(aes(x = leaf_stage, y = mean, 
+             color = xpindex,
+             fill = xpindex,
+             linetype = treatment,
+             shape=treatment)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(position = pd,
+             size = 5) +
+  geom_errorbar(
+    aes(ymin = mean - se, ymax = mean + se), 
+    position = pd,
+    width = 0.2,
+    linewidth = 1,
+    linetype = "solid",
+  ) +
+  scale_y_continuous(
+    expand=expansion(add = c(0,0.2))
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen",
+               "Leaf Senescence" = "darkorange"),
+  ) +
+    scale_fill_manual(
+     values = c("Photosynthesis" = "darkgreen",
+               "Leaf Senescence" = "darkorange"),
+     guide= "none"
+  ) +
+  scale_linetype_manual(
+    values = c("+P" = "solid", "-P" = "dashed", guide= "none")
+  ) +
+    scale_shape_manual(
+    values = c("+P" = 19, "-P" = 25),
+    guide="none"
+  ) +
+  labs(
+    x = "Leaf",
+    y = "Normalized Expression",
+    color = NULL,
+    shape = NULL,
+  ) +
+  guides(
+    fill = "none",
+    linetype = "none",
+    shape="none",
+    color = guide_legend(
+      override.aes = list(shape = NA),
+      order = 1,
+      #label.position = "left",
+      #label.hjust = 1, 
+    )
+    
+  )+
+  theme_classic(base_size = base_size) +
+  theme(
+   legend.title = element_blank(),
+    legend.position = c(0, 1),
+    legend.justification = c(0, 1),
+    legend.text = element_text(
+      size = 25,
+      margin = margin(l =unit(2, "lines"))                ),
+      # legend.text.align = 1,           
+      # legend.justification = "center",
+      # legend.box.just = "right",       
+      # legend.margin = margin(0, 0, 0, 0),
+      # legend.spacing.y = unit(0, "lines"),
+      # legend.key.spacing.y = unit(0, "lines"),
+    legend.key.size = unit(2, "lines"),  
+    legend.key = element_rect(fill = "transparent"),
+      legend.background = element_rect(fill = "transparent"),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank()
+  ) 
+
+print(p_photo_sene)
+
+p_combined_by_treatment <- ggpubr::ggarrange(
+  p_chloro_treatment + rremove("xlab"), 
+ p_photo_sene + rremove("xlab"),
+ nrow=1,
+ widths= c(1.4,1)) %>%
+    annotate_figure(
+    bottom = text_grob("Leaf", size = base_size, 
+                       vjust = -0.25,
+                       hjust = 0)
+  )
+
+p_combined_by_treatment
+ggsave(
+  "~/Desktop/combined_by_treatment_xpindex.png",
+  plot = p_combined_by_treatment,
+  width = 9.25,
+  height = 9,
+  dpi = 150
+)
+```
+## Pooled indices
+```{r, pooled_indices}
+# ------------------------------------------------------------
+# 1. Formatting helpers (must be defined)
+# ------------------------------------------------------------
+# If not already defined, uncomment these:
+format_2sig <- function(x) {
+  x_sig <- signif(x, digits = 2)
+  format(x_sig, scientific = FALSE, trim = TRUE, nsmall = 0)
+}
+
+make_p_label <- function(p_val) {
+  if (p_val < 0.01) {
+    exp_val <- floor(log10(p_val))
+    coeff  <- round(p_val / 10^exp_val, 2)
+    if (coeff >= 10) {
+      coeff <- coeff / 10
+      exp_val <- exp_val + 1
+    }
+    coeff_str <- format_2sig(coeff)
+    paste0("italic(p) == ", coeff_str, " %*% 10^", exp_val)
+  } else {
+    p_str <- format_2sig(p_val)
+    paste0("italic(p) == ", p_str)
+  }
+}
+
+# ------------------------------------------------------------
+# 2. Annotation data frames (one call each)
+# ------------------------------------------------------------
+annotation_left <- data.frame(
+  x = rep(2.5, 4),
+  y = c(0.65, 0.6, 0.2, 0.15),
+  label = c(
+    paste0("italic(r) == ", format_2sig(synth_cor$estimate)),
+    make_p_label(synth_cor$p.value),
+    paste0("italic(r) == ", format_2sig(degrad_cor$estimate)),
+    make_p_label(degrad_cor$p.value)
+  ),
+  stringsAsFactors = FALSE
+)
+
+annotation_right <- data.frame(
+  x = rep(2.5, 4),
+  y = c(0.70, 0.65, 0.2, 0.15),
+  label = c(
+    paste0("italic(r) == ", format_2sig(photo_cor$estimate)),
+    make_p_label(photo_cor$p.value),
+    paste0("italic(r) == ", format_2sig(sen_cor$estimate)),
+    make_p_label(sen_cor$p.value)
+  ),
+  stringsAsFactors = FALSE
+)
+
+# ------------------------------------------------------------
+# 3. Common scale
+# ------------------------------------------------------------
+common_y_scale <- scale_y_continuous(
+  limits = c(0, 1),
+  breaks = seq(0, 1, by = 0.2),
+  expand = expansion(add = c(0, 0.2))
+)
+
+size <- 6
+
+# ------------------------------------------------------------
+# 4. Left panel: Chlorophyll
+# ------------------------------------------------------------
+p_chloro_pooled_legend <- summary_pooled %>%
+  ggplot(aes(x = leaf_stage, y = mean, color = xpindex)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.2, linewidth = 0.8) +
+  scale_color_manual(
+    values = c("Synthesis" = "darkgreen", "Degradation" = "darkorange"),
+    labels = c("Chlorophyll\nSynthesis", "Degradation")
+  ) +
+  common_y_scale +
+  geom_text(
+    data = annotation_left,
+    aes(x = x, y = y, label = label),
+    hjust = 0,
+    vjust = 0,
+    size = size,
+    parse = TRUE,
+    family = base_family,
+    inherit.aes = FALSE
+  ) +
+  labs(x = "Leaf", y = "Normalized Expression") +
+  theme_classic(base_size = base_size) +
+  theme(
+    legend.position = c(0, 1),
+    legend.justification = c(0, 1),
+    legend.text = element_text(
+      size = 25,
+      margin = margin(l = unit(2, "lines"))
+    ),
+    legend.title = element_blank(),
+    legend.key = element_rect(fill = "transparent"),
+    legend.background = element_rect(fill = "transparent")
+  )
+
+# ------------------------------------------------------------
+# 5. Right panel: Photosynthesis & Senescence
+# ------------------------------------------------------------
+p_normalized_legend <- ggplot(xpindex_summary_pooled, 
+                              aes(x = leaf_stage, y = mean, color = xpindex)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.2, linewidth = 1) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", "Leaf Senescence" = "orange"),
+    labels = c("Photosynthesis", "Leaf Senescence")
+  ) +
+  common_y_scale +
+  geom_text(
+    data = annotation_right,
+    aes(x = x, y = y, label = label),
+    hjust = 0,
+    vjust = 0,
+    size = size,
+    parse = TRUE,
+    family = base_family,
+    inherit.aes = FALSE
+  ) +
+  labs(x = "Leaf", y = "Normalized Expression") +
+  ggpubr::theme_classic2(base_size = base_size) +
+  theme(
+    legend.position = c(0, 1),
+    legend.justification = c(0, 1),
+    legend.text = element_text(
+      size = 25,
+      margin = margin(l = unit(2, "lines"))
+    ),
+    legend.title = element_blank(),
+    legend.key = element_rect(fill = "transparent"),
+    legend.background = element_rect(fill = "transparent"),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank()
+  )
+
+# ------------------------------------------------------------
+# 6. Combine and save
+# ------------------------------------------------------------
+p_combined_pooled_separate_legends <- ggpubr::ggarrange(
+  p_chloro_pooled_legend + rremove("xlab"),
+  p_normalized_legend + rremove("xlab"),
+  nrow = 1,
+  widths = c(1.33, 1)
+) %>%
+  annotate_figure(
+    bottom = text_grob("Leaf", size = base_size, vjust = -0.3, hjust = 0)
+  )
+
+ggsave(
+  "~/Desktop/combined_pooled_xpindex_separate_legends.png",
+  plot = p_combined_pooled_separate_legends,
+  width = 8.2,
+  height = 7,
+  dpi = 150
+)
+
+print(p_combined_pooled_separate_legends)
+
+
+```
+## Panel C: Marker Gene Ilustration with black facet labels
+
+```{r left_panel_c_black_labels, fig.width=9, fig.height=7.5}
+
+marker_genes <- data.frame(
+  locus_label = c("pep1", "salt1",
+                  "ssu1", "mir3",
+                  "nye2", "sgrl1",
+                  "cab1", "nactf108"),
+  gene_set = c("Photosynthesis", "Senescence",
+               "Photosynthesis", "Senescence",
+               "Senescence", "Senescence",
+               "Photosynthesis", "Senescence"),
+  pair = c("Pair1", "Pair1",
+           "Pair2", "Pair2",
+           "Pair3", "Pair3",
+           "Pair4", "Pair4"),
+  stringsAsFactors = FALSE
+)
+
+# Trim ", chloroplastic" from desc_merged in effects_df before joining
+gene_ids <- effects_df %>%
+  mutate(desc_merged = stringr::str_remove(desc_merged, ", chloroplastic") %>%  # <-- (1) TRIM
+  stringr::str_remove( "Protein ") %>%  # <-- (1) TRIM
+  stringr::str_remove(" protein")
+  ) %>% 
+  filter(locus_label %in% marker_genes$locus_label, !is.na(locus_label)) %>%
+  select(gene, locus_label, desc_merged) %>%
+  distinct() %>%
+  group_by(locus_label) %>%
+  slice(1) %>%
+  ungroup()
+
+marker_data <- lapply(seq_len(nrow(gene_ids)), function(i) {
+  g <- gene_ids$gene[i]
+  data.frame(
+    sample = colnames(normalized_expression),
+    expression = normalized_expression[g, ],
+    gene = g
+  )
+}) %>%
+  bind_rows() %>%
+  left_join(gene_ids, by = "gene") %>%
+  left_join(marker_genes, by = "locus_label") %>%
+  mutate(
+    leaf_stage = as.numeric(sub(".*L([0-9]+)[LR]$", "\\1", sample))
+  )
+
+marker_summary <- marker_data %>%
+  group_by(gene, locus_label, gene_set, desc_merged, pair, leaf_stage) %>%
+  summarise(
+    mean_expr = mean(expression),
+    se_expr = sd(expression) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Build PLAIN TEXT facet labels with line breaks and wrapped descriptions
+pair_labels <- marker_summary %>%
+  distinct(pair, locus_label, gene, desc_merged, gene_set) %>%
+  mutate(
+         facet_label = paste0(locus_label, "\n", gene),
+    # Wrap ONLY the description part (e.g., width = 30)
+    # wrapped_desc = stringr::str_wrap(desc_merged, width = 30),
+    # Construct label: "locus gene\nwrapped description"
+        # facet_label = paste0(locus_label, " ", gene, "\n", wrapped_desc),
+    # trunc_desc = stringr::str_trunc(desc_merged, width = 27),
+   # facet_label = paste0(locus_label, " ", gene, "\n", trunc_desc),
+
+    order_key = ifelse(gene_set == "Photosynthesis", 1, 2)
+  ) %>%
+  arrange(pair, order_key) %>%
+  group_by(pair) %>%
+  summarise(
+    facet_label = paste(facet_label, collapse = "\n\n"),  # double line break between gene entries
+    .groups = "drop"
+  )
+
+# Get max expression per pair for ordering
+pair_max_expr <- marker_summary %>%
+  group_by(pair) %>%
+  summarise(max_expr = max(mean_expr), .groups = "drop") %>%
+  arrange(desc(max_expr))
+
+# Join and set factor levels in correct order
+pair_labels <- pair_labels %>%
+  left_join(pair_max_expr, by = "pair") %>%
+  arrange(desc(max_expr))
+
+marker_summary <- marker_summary %>%
+  left_join(pair_labels %>% select(pair, facet_label, max_expr), by = "pair") %>%
+  mutate(
+    facet_label = factor(facet_label, levels = pair_labels$facet_label)
+  )
+
+p_markers <- ggplot(
+  marker_summary,
+  aes(x = leaf_stage, y = mean_expr, color = gene_set, group = gene)
+) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 5) +
+  geom_errorbar(
+    aes(ymin = mean_expr - se_expr, ymax = mean_expr + se_expr),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  geom_text(
+    data = marker_summary %>% filter(leaf_stage == 1),
+    aes(x = leaf_stage,
+        y = mean_expr,
+        label = locus_label,
+        color = gene_set),
+    nudge_x = -0.25,
+    hjust = 1,
+    fontface = "bold.italic",
+    size = 5
+  ) +
+  scale_color_manual(
+    values = c("Photosynthesis" = "darkgreen", "Senescence" = "orange")
+  ) +
+  scale_x_continuous(expand = expansion(add = c(1.5, 0.2)), breaks = 1:4) +
+  facet_wrap(
+    ~ facet_label,
+    nrow = 2,
+    scales = "free_y"
+  ) +
+  labs(
+    x = "Leaf",
+    y = expression(log[2] * "(CPM)"),
+    color = NULL
+  ) +
+  theme_classic(base_size = base_size) +
+  theme(
+    strip.background = element_blank(),
+    # (3) Use plain element_text with black color
+    strip.text = element_text(size = 16, hjust = 0, face = "bold", color = "black"),
+    plot.margin = margin(-50, 80, 5.5, 5.5, "pt"),
+    axis.title.y = element_text(margin = margin(r = -10)),
+    panel.spacing.x = unit(0, "cm"),
+    panel.spacing.y = unit(0, "cm"),
+    legend.position = "none"
+  )
+
+print(p_markers)
+```
+## Print left panel 2
+
+```{r}
+left_panel <- cowplot::plot_grid(
+  p_combined_pooled_separate_legends  +
+  theme(plot.margin = margin(5.5, 80, up, 5.5, "pt")), 
+  p_markers,
+  ncol = 1,
+  align = 'h',
+  axis = 'lr'
+)
+
+ggsave(
+  "~/Desktop/left_panel2.svg",
+  fix_text_size = FALSE,
+  plot = left_panel,
+  width = 9,
+  height = 15,
+  dpi = 150
+)
+
+print(left_panel)
+```
+## Caluclate model stats
+```{r,calculate_model_stats}
+# --- Define combined gene sets ---
+panel_sets <- c(chloro_gene_sets, gene_set_list)
+
+# --- Calculate and normalize expression indices ---
+panel_data <- calculate_xpindex(
+  expression_matrix = normalized_expression,
+  gene_sets = panel_sets,
+  method = "mean"
+)
+
+panel_norm <- normalize_xpindex(
+  xpindex_data = panel_data,
+  index_names = names(panel_sets),
+  method = "per_set"
+)
+
+# --- Model 1: Full model with interaction (leaf_stage * treatment) ---
+cat("=== MODEL 1: Leaf Stage × Treatment Interaction ===\n")
+panel_models_interaction <- fit_xpindex_models(
+  xpindex_data = panel_norm,
+  index_names = names(panel_sets),
+  formula_rhs = "leaf_stage * treatment"
+)
+
+stats_interaction <- extract_xpindex_stats(panel_models_interaction)
+print(stats_interaction)
+
+# --- Model 2: Additive model (leaf_stage + treatment) ---
+cat("\n=== MODEL 2: Additive Effects (Leaf Stage + Treatment) ===\n")
+panel_models_additive <- fit_xpindex_models(
+  xpindex_data = panel_norm,
+  index_names = names(panel_sets),
+  formula_rhs = "leaf_stage + treatment"
+)
+
+stats_additive <- extract_xpindex_stats(panel_models_additive)
+print(stats_additive)
+
+# --- Model 3: Leaf stage only (pooled across treatments) ---
+cat("\n=== MODEL 3: Leaf Stage Only (Pooled) ===\n")
+panel_models_pooled <- fit_xpindex_models(
+  xpindex_data = panel_norm,
+  index_names = names(panel_sets),
+  formula_rhs = "leaf_stage"
+)
+
+stats_pooled <- extract_xpindex_stats(panel_models_pooled)
+print(stats_pooled)
+
+# --- Optional: Compare models via AIC (for one example index) ---
+# Example: Chlorophyll synthesis
+example_index <- "chlorophyll_synthesis"
+if (example_index %in% names(panel_sets)) {
+  m_int <- panel_models_interaction[[example_index]]
+  m_add <- panel_models_additive[[example_index]]
+  m_pooled <- panel_models_pooled[[example_index]]
+  
+  cat("\n=== AIC Comparison (", example_index, ") ===\n", sep = "")
+  AIC_comparison <- AIC(m_int, m_add, m_pooled)
+  rownames(AIC_comparison) <- c("Interaction", "Additive", "Pooled")
+  print(AIC_comparison)
+}
+
+# --- Export results (optional) ---
+# write.csv(stats_interaction, "~/Desktop/xpindex_interaction_stats.csv", row.names = FALSE)
+# write.csv(stats_pooled, "~/Desktop/xpindex_pooled_stats.csv", row.names = FALSE)
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

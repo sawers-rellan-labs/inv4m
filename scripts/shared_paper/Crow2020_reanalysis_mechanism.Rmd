@@ -1,0 +1,1093 @@
+---
+title: "Inv4m field vs growth chamber transcriptome: Crow2020 Reanalysis II"
+author: "Fausto Rodríguez-Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+# Biological Context & Analysis Goals
+
+## Research Hypothesis
+
+Inv4m constitutively upregulates DNA replication genes (PCNA2, MCM5, others) across tissues, accelerating cell cycle in the SAM, leading to:
+
+- Larger SAM size (9% increase at 3 weeks)
+- Taller plants
+- Earlier flowering
+
+## Specific Questions
+
+1. **Field-to-chamber replication**: Do field adult leaf DEGs replicate in chamber V3 leaf tissues (V1_Leaf, V3_Leaf, V3_S2_Leaf_Tip)?
+
+2. **SAM hypothesis**: Are field leaf DEGs upregulated in V3_Stem_SAM (SAM-enriched tissue)?
+
+3. **Temperature sensitivity**: Do Inv4m effects increase in magnitude under cold (highland adaptation hypothesis)? Focus on SAM and replication genes.
+
+4. **Root tip validation**: Are PCNA2/MCM5 upregulated in V1_Root (to justify EdU/confocal experiments)?
+
+## Statistical Approach
+
+Cell means model with explicit contrasts:
+
+- No reference levels for biological factors
+- Direct interpretation: each coefficient = mean expression in that condition
+- Symmetric treatment of all tissues
+- Clear temperature dependence tests
+
+---
+
+# Setup
+```{r setup, include=TRUE}
+library(edgeR)
+library(limma)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(ggbeeswarm)
+library(rstatix)
+library(ggpubr)
+library(readr)
+library(pheatmap)
+
+options(stringsAsFactors = FALSE)
+```
+
+---
+
+# Data Loading
+
+## Expression Counts
+```{r load_counts}
+counts <- read.csv("~/Desktop/crow2020_gene_xp.csv")
+gene_ids <- counts[, 1]
+counts_matrix <- as.matrix(counts[, -1])
+rownames(counts_matrix) <- gene_ids
+
+cat("Expression data loaded:\n")
+cat("  Genes:", nrow(counts_matrix), "\n")
+cat("  Samples:", ncol(counts_matrix), "\n")
+```
+
+## Sample Metadata
+```{r load_metadata}
+quant_dir <- "/Volumes/DOE_CAREER/inv4m/run/results_quantify/kallisto_quant"
+
+# Define paths
+sra_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/SraRunTable.csv"
+sample_submission_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/gc7_sample_submission.csv"
+
+# Load data
+sra_meta <- read.csv(sra_file, stringsAsFactors = FALSE, check.names = FALSE)
+submission_meta <- read.csv(sample_submission_file, stringsAsFactors = FALSE)
+
+# Standardize SRA metadata
+sra_meta <- sra_meta %>%
+  dplyr::rename(
+    samp = `Library Name`,
+    genotype = genotype,
+    temp = temp,
+    tissue = tissue,
+    Run = Run
+  )
+
+# Join core metadata and filter to NIL lines of interest
+metadata <- submission_meta %>%
+  filter(old_line %in% c("PT_NIL", "Mi21_NIL")) %>%
+  dplyr::select(samp, old_line, ID, source, harvest_date, tube_num_full) %>%
+  inner_join(sra_meta, by = "samp") %>%
+  arrange(Run)
+
+# Create analysis factors and sampling covariates
+metadata <- metadata %>%
+  mutate(
+    # === Biological factors ===
+    # Donor
+    Donor = case_when(
+      grepl("^PT_", old_line) ~ "PT",
+      grepl("^Mi21_", old_line) ~ "Mi21",
+      TRUE ~ NA_character_
+    ),
+    Donor = factor(Donor, levels = c("PT", "Mi21")),
+    
+    # Genotype
+    Genotype = factor(genotype, levels = c("B73", "Inv4m")),
+    Genotype = recode(Genotype, "B73" = "CTRL", "Inv4m" = "Inv4m"),
+    
+    # temperature
+    temp = factor(temp, levels = c("warm", "cold")),
+    temp = recode(temp, "warm" = "CTRL", "cold" = "cold"),
+    
+    # Tissue — with leaf subtypes
+    Tissue = case_when(
+      tissue == "V1_Leaf_tissue"    ~ "V1_Leaf",
+      tissue == "V1_Primary_root"   ~ "V1_Root",
+      tissue == "V3_Leaf_tissue"    ~ "V3_Leaf",
+      tissue == "V3_leaf_base"      ~ "V3_Leaf_Base",
+      tissue == "V3_leaf_sheath"    ~ "V3_Leaf_Sheath",
+      tissue == "V3_S2_leaf_base"   ~ "V3_S2_Leaf_Base",
+      tissue == "V3_S2_leaf_tip"    ~ "V3_S2_Leaf_Tip",
+      tissue == "V3_Primary_root"   ~ "V3_Root",
+      tissue == "V3_Stem_SAM"       ~ "V3_SAM",
+      TRUE ~ NA_character_
+    ),
+    Tissue = factor(Tissue, levels = c(
+      "V1_Root", "V3_Root", "V1_Leaf", "V3_Leaf", 
+      "V3_Leaf_Base", "V3_Leaf_Sheath", 
+      "V3_S2_Leaf_Base", "V3_S2_Leaf_Tip", "V3_SAM"
+    )),
+    
+    # === Sampling & technical covariates ===
+    # Unique plant identifier (from submission metadata)
+    plant_id = ID,
+    
+    # Collection team (source column = technician/team ID)
+    collector_team = as.factor(source),
+    
+    # Harvest date (biological sampling day)
+    harvest_date = as.Date(harvest_date, format = "%m/%d/%Y"),
+    
+    # Plant serial number (numeric suffix of ID; proxy for planting/sampling order)
+    plant_serial_number = as.numeric(stringr::str_sub(ID, 5)),
+    
+    # Within-plant tissue order (0 = leaf, 1 = root, 2 = base, etc.)
+    tissue_order_index = as.numeric(
+      stringr::str_extract(tube_num_full, "\\.[0-9]+")
+    ) %>% 
+      dplyr::coalesce(0) %>% 
+      abs(),
+    
+    # SRA upload time (proxy for library prep + sequencing batch)
+    sra_upload_time = as.POSIXct(create_date, format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC"),
+    
+    # Combined harvest batch (date + team)
+    harvest_batch = interaction(harvest_date, collector_team, drop = TRUE)
+  ) %>%
+  # Remove samples with unmapped tissue
+  filter(!is.na(Tissue))
+
+metadata$harvest_date_f <- factor(metadata$harvest_date)
+
+{
+  cat("\nSample metadata:\n")
+  cat("  Total samples:", nrow(metadata), "\n")
+  cat("  Genotypes:", paste(unique(metadata$Genotype), collapse = ", "), "\n")
+  cat("  temperatures:", paste(unique(metadata$temp), collapse = ", "), "\n")
+  cat("  Donors:", paste(unique(metadata$Donor), collapse = ", "), "\n")
+  cat("  Tissues:", paste(levels(metadata$Tissue), collapse = ", "), "\n")
+  cat("  Collection teams:", paste(levels(metadata$collector_team), collapse = ", "), "\n")
+  cat("  Harvest dates:", paste(sort(unique(metadata$harvest_date)), collapse = ", "), "\n")
+  cat("\nTissue counts:\n")
+  print(sort(table(metadata$Tissue), decreasing = TRUE))
+}
+```
+
+## Verify Design Balance
+```{r check_balance}
+cat("\nGenotype × Temperature × Tissue:\n")
+print(with(metadata, table(Genotype, temp, Tissue)))
+
+cat("\nDonor × Genotype (overall):\n")
+print(with(metadata, table(Donor, Genotype)))
+```
+
+## Prepare Count Matrix
+```{r prepare_counts}
+sample_order <- match(colnames(counts_matrix), metadata$Run)
+metadata <- metadata[sample_order, ]
+
+stopifnot(all(colnames(counts_matrix) == metadata$Run))
+
+cat("\nSample order verified\n")
+```
+
+---
+
+# DGEList and Filtering
+
+## Create DGEList with Cell Means Condition Factor
+```{r create_dgelist}
+metadata$condition <- interaction(
+  metadata$Tissue,
+  metadata$Genotype,
+  metadata$temp,
+  sep = "_",
+  drop = TRUE
+)
+
+y <- DGEList(counts = counts_matrix, samples = metadata)
+
+cat("\nDGEList created\n")
+cat("Unique conditions:", nlevels(y$samples$condition), "\n")
+cat("\nCondition factor levels (first 10):\n")
+print(head(levels(y$samples$condition), 10))
+```
+
+## Filter Low-Expression Genes
+```{r filter}
+keep <- filterByExpr(y, group = y$samples$condition)
+y <- y[keep, , keep.lib.sizes = FALSE]
+
+cat("\nGenes retained after filtering:", nrow(y), "\n")
+```
+
+## TMM Normalization
+```{r normalize}
+y <- calcNormFactors(y, method = "TMM")
+
+cat("Normalization factors range:", 
+    round(range(y$samples$norm.factors), 3), "\n")
+```
+
+---
+
+# Design Matrix: Cell Means Model
+
+## Build Design (No Reference Levels for Biological Factors)
+```{r design}
+design <- model.matrix(~ 0 + Donor + condition , data = y$samples)
+
+colnames(design) <- gsub("^condition", "", colnames(design))
+colnames(design) <- gsub("^Donor", "Donor_", colnames(design))
+
+cat("\nDesign matrix:\n")
+cat("  Dimensions:", nrow(design), "samples ×", ncol(design), "coefficients\n")
+cat("\nFirst 15 coefficient names:\n")
+print(head(colnames(design), 15))
+```
+
+## Voom Transformation
+```{r voom}
+voom_obj <- voom(y, design = design, plot = TRUE)
+```
+
+---
+
+# Contrasts: Explicit Biological Comparisons
+
+## Define Contrasts
+````{r contrasts}
+# Verify available conditions
+cat("Available condition coefficients in design matrix:\n")
+cond_names <- grep("^V[0-9]", colnames(design), value = TRUE)
+print(cond_names)
+
+# Build contrasts using actual condition names
+# CTRL = control temperature, cold = cold temperature
+# Note: V1_Root_CTRL_CTRL was dropped as reference level
+
+my_contrasts <- makeContrasts(
+  
+  # Q1 & Q2: Inv4m effect in leaf tissues at CTRL temperature
+  Inv4m_V1Leaf_CTRL = V1_Leaf_Inv4m_CTRL - V1_Leaf_CTRL_CTRL,
+  Inv4m_V3Leaf_CTRL = V3_Leaf_Inv4m_CTRL - V3_Leaf_CTRL_CTRL,
+  Inv4m_V3Tip_CTRL = V3_S2_Leaf_Tip_Inv4m_CTRL - V3_S2_Leaf_Tip_CTRL_CTRL,
+  
+  # Q2: SAM hypothesis
+  Inv4m_SAM_CTRL = V3_SAM_Inv4m_CTRL - V3_SAM_CTRL_CTRL,
+  
+  # Q3: Inv4m effect under cold temperature
+  Inv4m_V1Leaf_cold = V1_Leaf_Inv4m_cold - V1_Leaf_CTRL_cold,
+  Inv4m_V3Leaf_cold = V3_Leaf_Inv4m_cold - V3_Leaf_CTRL_cold,
+  Inv4m_V3Tip_cold = V3_S2_Leaf_Tip_Inv4m_cold - V3_S2_Leaf_Tip_CTRL_cold,
+  Inv4m_SAM_cold = V3_SAM_Inv4m_cold - V3_SAM_CTRL_cold,
+  
+  # Q3: Temperature dependence (cold effect - CTRL effect)
+  Inv4m_V1Leaf_tempDep = 
+    (V1_Leaf_Inv4m_cold - V1_Leaf_CTRL_cold) - 
+    (V1_Leaf_Inv4m_CTRL - V1_Leaf_CTRL_CTRL),
+  
+  Inv4m_V3Leaf_tempDep = 
+    (V3_Leaf_Inv4m_cold - V3_Leaf_CTRL_cold) - 
+    (V3_Leaf_Inv4m_CTRL - V3_Leaf_CTRL_CTRL),
+  
+  Inv4m_V3Tip_tempDep = 
+    (V3_S2_Leaf_Tip_Inv4m_cold - V3_S2_Leaf_Tip_CTRL_cold) - 
+    (V3_S2_Leaf_Tip_Inv4m_CTRL - V3_S2_Leaf_Tip_CTRL_CTRL),
+  
+  Inv4m_SAM_tempDep = 
+    (V3_SAM_Inv4m_cold - V3_SAM_CTRL_cold) - 
+    (V3_SAM_Inv4m_CTRL - V3_SAM_CTRL_CTRL),
+  
+  # Q4: Root validation
+  # V1_Root_CTRL_CTRL is reference level (= 0 in design)
+  Inv4m_V1Root_CTRL = V1_Root_Inv4m_CTRL,
+  
+  Inv4m_V1Root_cold = V1_Root_Inv4m_cold - V1_Root_CTRL_cold,
+  
+  Inv4m_V1Root_tempDep = 
+    (V1_Root_Inv4m_cold - V1_Root_CTRL_cold) - 
+    V1_Root_Inv4m_CTRL,
+  
+  levels = design
+)
+
+cat("\nContrasts successfully defined:\n")
+print(colnames(my_contrasts))
+````
+
+---
+
+# Model Fitting
+
+## Fit Linear Models
+```{r fit}
+fit <- lmFit(voom_obj, design)
+fit2 <- contrasts.fit(fit, my_contrasts)
+fit2 <- eBayes(fit2)
+
+cat("\nModel fitted with", ncol(my_contrasts), "contrasts\n")
+cat("Residual df per gene (summary):\n")
+print(summary(fit2$df.residual))
+```
+
+---
+
+# Results Extraction
+
+## Extract TopTables for All Contrasts
+```{r extract_results}
+extract_results <- function(fit_obj, coef_name) {
+  topTable(fit_obj, coef = coef_name, number = Inf, adjust.method = "BH") %>%
+    mutate(contrast = coef_name) %>%
+    tibble::rownames_to_column("gene_id")
+}
+
+all_contrasts <- colnames(my_contrasts)
+results_list <- lapply(all_contrasts, function(x) extract_results(fit2, x))
+names(results_list) <- all_contrasts
+
+results_combined <- bind_rows(results_list)
+
+cat("\nResults extracted for", length(all_contrasts), "contrasts\n")
+cat("Total rows in combined results:", nrow(results_combined), "\n")
+```
+
+## Summary: Significant DEGs per Contrast
+```{r sig_summary}
+sig_counts <- results_combined %>%
+  filter(adj.P.Val < 0.05) %>%
+  group_by(contrast) %>%
+  summarise(
+    n_sig = n(),
+    n_up = sum(logFC > 0),
+    n_down = sum(logFC < 0)
+  ) %>%
+  arrange(desc(n_sig))
+
+cat("\nSignificant DEGs (adj.P.Val < 0.05) per contrast:\n")
+print(sig_counts)
+```
+
+---
+
+# Question 1: Field-to-Chamber Replication
+
+
+## Load Field DEG List
+```{r load_field_degs}
+# Load differential expression results
+effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+
+# Load curated labels
+curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+  dplyr::select(gene, locus_label)
+
+effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
+
+
+# Merge curated labels
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_curated")) %>%
+  mutate(locus_label = coalesce(locus_label_curated, locus_label)) %>%
+  dplyr::select(-locus_label_curated)
+
+# Curated updates: only gene and locus_label
+curated <- tibble::tribble(
+  ~gene,              ~locus_label,
+  # custom labels for trans network
+  "Zm00001eb384770",  "zcn26",
+  "Zm00001eb192330",  "roc4-1",
+  "Zm00001eb193260",  "trxl2",
+  "Zm00001eb194300",  "paspa",
+  "Zm00001eb213980",  "dywl",
+  "Zm00001eb194080",  "ugt85a2",
+  "Zm00001eb112470",  "engd2",
+  "Zm00001eb332450",  "roc4-2",
+  "Zm00001eb193270",  "trxl5",
+  "Zm00001eb066620",  "tipin",
+  "Zm00001eb241410",  "etfa",
+  "Zm00001eb013800",  "mrlk",
+  "Zm00001eb249540",  "prpl29",
+  "Zm00001eb000540",  "prd3",
+  "Zm00001eb060540",  "actin-1",
+  "Zm00001eb192580",  "map4k8",
+  "Zm00001eb193120",  "o3l1",
+  "Zm00001eb043750",  "cdrk9",
+  # From original curated list
+  "Zm00001eb034810",  "mgd2",
+  "Zm00001eb241920",  "gpx1",
+  "Zm00001eb162710",  "spx4",
+  "Zm00001eb038730",  "pht7",
+  "Zm00001eb370610",  "rfk1",
+  "Zm00001eb386270",  "spx6",
+  "Zm00001eb335670",  "sqd3",
+  "Zm00001eb151650",  "pap1",
+  "Zm00001eb154650",  "ppa1",
+  "Zm00001eb280120",  "pfk1",
+  "Zm00001eb036910",  "gpx3",
+  "Zm00001eb406610",  "glk4",
+  "Zm00001eb048730",  "spx2",
+  "Zm00001eb361620",  "ppa2",
+  "Zm00001eb297970",  "sqd2",
+  "Zm00001eb347070",  "sqd1",
+  "Zm00001eb144680",  "rns1",
+  "Zm00001eb430590",  "nrx3",
+  "Zm00001eb247580",  "ppck3",
+  "Zm00001eb351780",  "ugp3",
+  "Zm00001eb222510",  "pht1",
+  "Zm00001eb126380",  "phos1",
+  "Zm00001eb047070",  "pht2",
+  "Zm00001eb041390",  "rns3",
+  "Zm00001eb116580",  "spd1",
+  "Zm00001eb069630",  "oct4",
+  "Zm00001eb083520",  "dgd1",
+  "Zm00001eb130570",  "sag21",
+  "Zm00001eb239700",  "ppa3",  
+  "Zm00001eb258130",  "mgd3",
+  "Zm00001eb202100",  "pap14",
+  "Zm00001eb144670",  "rns2",
+  "Zm00001eb087720",  "pht13",
+  "Zm00001eb277280",  "gst19",
+  "Zm00001eb339870",  "pld16",
+  "Zm00001eb289800",  "pah1",
+  "Zm00001eb369590",  "nrx1",
+  "Zm00001eb238670",  "pep2"
+)
+
+# Update only the locus_label using curated values
+effects_df <- effects_df %>%
+  left_join(curated, by = "gene", suffix = c("", "_new")) %>%
+  mutate(locus_label = coalesce(locus_label_new, locus_label)) %>%
+  dplyr::select(-locus_label_new)
+
+# Replace with your actual field DEG gene IDs
+field_degs <- effects_df %>% filter(is_hiconf_DEG, predictor=="Inv4m") %>% pull(gene) %>% unique()
+
+cat("\nField DEG list loaded:\n")
+cat("  Total field DEGs:", length(field_degs), "\n")
+```
+
+## Test Replication in Chamber Leaf Tissues
+```{r field_replication}
+leaf_contrasts_CTRL <- c("Inv4m_V1Leaf_CTRL", "Inv4m_V3Leaf_CTRL", "Inv4m_V3Tip_CTRL")
+
+replication_results <- results_combined %>%
+  filter(contrast %in% leaf_contrasts_CTRL, gene_id %in% field_degs) %>%
+  select(gene_id, contrast, logFC, P.Value, adj.P.Val) %>%
+  arrange(gene_id, contrast)
+
+cat("\nField DEGs in chamber leaf tissues (warm):\n")
+# print(replication_results)
+
+rep_summary <- replication_results %>%
+  group_by(contrast) %>%
+  summarise(
+    n_tested = n(),
+    n_sig = sum(adj.P.Val < 0.05),
+    n_same_direction = sum(logFC > 0 & adj.P.Val < 0.05),
+    prop_replicated = n_sig / n_tested
+  )
+
+cat("\nReplication summary:\n")
+print(rep_summary)
+```
+
+## Enrichment Test: Field DEGs in Chamber Leaves
+```{r enrichment_leaves}
+v3tip_CTRL <- results_list[["Inv4m_V3Tip_CTRL"]]
+v3tip_sig <- v3tip_CTRL$gene_id[v3tip_CTRL$adj.P.Val < 0.05]
+
+common_genes <- intersect(field_degs, rownames(voom_obj))
+A <- length(intersect(field_degs, v3tip_sig))
+B <- length(setdiff(field_degs, v3tip_sig))
+C <- length(setdiff(v3tip_sig, field_degs))
+D <- nrow(voom_obj) - (A + B + C)
+
+fisher_mat <- matrix(c(A, B, C, D), nrow = 2,
+                     dimnames = list(
+                       c("In_V3Tip_sig", "Not_in_V3Tip_sig"),
+                       c("In_field_list", "Not_in_field_list")
+                     ))
+
+fisher_test <- fisher.test(fisher_mat)
+
+cat("\nFisher's exact test: Field DEGs vs V3_Tip chamber DEGs\n")
+print(fisher_mat)
+cat("\nOdds ratio:", round(fisher_test$estimate, 2), "\n")
+cat("P-value:", signif(fisher_test$p.value, 3), "\n")
+```
+
+---
+
+# Question 2: SAM Hypothesis
+
+## Test Field DEGs in SAM
+```{r sam_hypothesis}
+sam_CTRL <- results_list[["Inv4m_SAM_CTRL"]]
+
+sam_field_overlap <- sam_CTRL %>%
+  filter(gene_id %in% field_degs) %>%
+  select(gene_id, logFC, AveExpr, P.Value, adj.P.Val) %>%
+  arrange(adj.P.Val)
+
+cat("\nField DEGs in V3_SAM (warm):\n")
+print(sam_field_overlap %>% pull(gene_id))
+
+cat("\nSignificant in SAM:", sum(sam_field_overlap$adj.P.Val < 0.05), "/", 
+    nrow(sam_field_overlap), "\n")
+```
+
+## Enrichment: Field DEGs in SAM
+```{r enrichment_sam}
+sam_sig <- sam_CTRL$gene_id[sam_CTRL$adj.P.Val < 0.05]
+
+A_sam <- length(intersect(field_degs, sam_sig))
+B_sam <- length(setdiff(field_degs, sam_sig))
+C_sam <- length(setdiff(sam_sig, field_degs))
+D_sam <- nrow(voom_obj) - (A_sam + B_sam + C_sam)
+
+fisher_mat_sam <- matrix(c(A_sam, B_sam, C_sam, D_sam), nrow = 2,
+                         dimnames = list(
+                           c("In_SAM_sig", "Not_in_SAM_sig"),
+                           c("In_field_list", "Not_in_field_list")
+                         ))
+
+fisher_test_sam <- fisher.test(fisher_mat_sam)
+
+cat("\nFisher's exact test: Field DEGs vs SAM DEGs\n")
+print(fisher_mat_sam)
+cat("Odds ratio:", round(fisher_test_sam$estimate, 2), "\n")
+cat("P-value:", signif(fisher_test_sam$p.value, 3), "\n")
+```
+
+---
+
+# Question 3: Temperature Sensitivity
+
+## PCNA2 & MCM5 Temperature Dependence in SAM
+```{r fork_genes_temp}
+fork_genes <- c(pcna2="Zm00001eb192050", mcm5 ="Zm00001eb257900")
+
+sam_contrasts <- c("Inv4m_SAM_CTRL", "Inv4m_SAM_cold", "Inv4m_SAM_tempDep")
+
+fork_sam_temp <- results_combined %>%
+  filter(contrast %in% sam_contrasts, gene_id %in% fork_genes) %>%
+  select(gene_id, contrast, logFC, P.Value, adj.P.Val) %>%
+  arrange(gene_id, match(contrast, sam_contrasts))
+
+cat("\nReplication fork genes in SAM across temperatures:\n")
+print(fork_sam_temp)
+```
+
+## Global Temperature Dependence Pattern
+```{r temp_dep_global}
+temp_dep_contrasts <- grep("tempDep$", all_contrasts, value = TRUE)
+
+temp_dep_field <- results_combined %>%
+  filter(contrast %in% temp_dep_contrasts, gene_id %in% field_degs) %>%
+  select(gene_id, contrast, logFC, adj.P.Val) %>%
+  arrange(contrast,adj.P.Val)
+
+cat("\nField DEGs: Temperature dependence (cold - warm effect):\n")
+#print(temp_dep_field)
+
+temp_increase <- temp_dep_field %>%
+  filter(abs(logFC) > 0.5) %>%
+  group_by(contrast) %>%
+  summarise(n_increased = n())
+
+cat("\nField DEGs with increased Inv4m effect in cold:\n")
+# print(temp_increase)
+```
+
+---
+
+# Question 4: Root Validation
+
+## PCNA2 & MCM5 in V1_Root
+```{r root_validation}
+root_contrasts <- c("Inv4m_V1Root_CTRL", "Inv4m_V1Root_cold")
+
+fork_root <- results_combined %>%
+  filter(contrast %in% root_contrasts, gene_id %in% fork_genes) %>%
+  select(gene_id, contrast, logFC, P.Value, adj.P.Val) %>%
+  arrange(gene_id, contrast)
+
+cat("\nReplication fork genes in V1_Root:\n")
+print(fork_root)
+
+cat("\nConclusion for EdU experiment:\n")
+if (any(fork_root$adj.P.Val < 0.05 & fork_root$logFC > 0)) {
+  cat("YES - PCNA2/MCM5 show significant upregulation in roots.\n")
+  cat("Proceed with EdU/confocal validation in root tips.\n")
+} else {
+  cat("NO - No significant upregulation detected in V1_Root.\n")
+  cat("Consider alternative tissues or verify gene IDs.\n")
+}
+```
+
+---
+
+# Visualization
+
+## Volcano Plots: Key Contrasts
+```{r volcano_plots, fig.width=12, fig.height=8}
+plot_volcano <- function(res_df, title, fdr_cut = 0.05, lfc_cut = 0.5) {
+  res_df %>%
+    mutate(
+      sig = case_when(
+        adj.P.Val < fdr_cut & abs(logFC) > lfc_cut ~ "Sig",
+        TRUE ~ "NS"
+      )
+    ) %>%
+    ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = sig)) +
+    geom_point(alpha = 0.6, size = 1.5) +
+    scale_color_manual(values = c("Sig" = "red", "NS" = "gray60")) +
+    geom_vline(xintercept = c(-lfc_cut, lfc_cut), 
+               linetype = "dashed", alpha = 0.5) +
+    geom_hline(yintercept = -log10(0.05), 
+               linetype = "dashed", alpha = 0.5) +
+    labs(title = title, x = "log2 Fold Change", y = "-log10(P-value)") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+}
+
+key_contrasts <- c("Inv4m_V3Tip_CTRL", "Inv4m_SAM_CTRL", 
+                   "Inv4m_V1Root_CTRL", "Inv4m_SAM_tempDep")
+
+for (ctr in key_contrasts) {
+  p <- plot_volcano(results_list[[ctr]], title = ctr)
+  print(p)
+}
+```
+
+## Heatmap: Field DEGs Across Conditions
+```{r heatmap_field_degs, fig.width=10, fig.height=8}
+common_field <- intersect(field_degs, rownames(voom_obj$E))
+
+if (length(common_field) > 0) {
+  expr_matrix <- voom_obj$E[common_field, , drop = FALSE]
+  
+  anno_df <- y$samples %>%
+    select(Tissue, Genotype, temp) %>%
+    as.data.frame()
+  rownames(anno_df) <- colnames(expr_matrix)
+  
+  pheatmap(
+    expr_matrix,
+    annotation_col = anno_df,
+    scale = "row",
+    clustering_distance_rows = "correlation",
+    clustering_distance_cols = "correlation",
+    show_colnames = FALSE,
+    main = "Field DEG Expression Across Crow2020 Conditions"
+  )
+}
+```
+
+---
+
+# Export Results
+
+## Save TopTables
+```{r export_tables}
+output_dir <- "crow2020_reanalysis_results"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+for (ctr in names(results_list)) {
+  write_csv(
+    results_list[[ctr]],
+    file.path(output_dir, paste0(ctr, "_results.csv"))
+  )
+}
+
+write_csv(
+  results_combined,
+  file.path(output_dir, "all_contrasts_combined.csv")
+)
+
+cat("\nResults exported to:", output_dir, "\n")
+```
+
+## Save Key Gene Summary Table
+```{r export_key_genes}
+key_contrasts_summary <- c(
+  "Inv4m_V3Tip_CTRL", "Inv4m_V3Leaf_CTRL", "Inv4m_V1Leaf_CTRL",
+  "Inv4m_SAM_CTRL", "Inv4m_SAM_cold", "Inv4m_SAM_tempDep",
+  "Inv4m_V1Root_CTRL", "Inv4m_V1Root_cold"
+)
+
+key_genes_table <- results_combined %>%
+  filter(contrast %in% key_contrasts_summary, gene_id %in% fork_genes) %>%
+  select(gene_id, contrast, logFC, AveExpr, P.Value, adj.P.Val) %>%
+  arrange(gene_id, contrast)
+
+write_csv(
+  key_genes_table,
+  file.path(output_dir, "PCNA2_MCM5_summary.csv")
+)
+
+cat("\nKey genes summary saved\n")
+```
+
+---
+
+
+# Gene Expression Visualization 
+
+## Function to Plot Gene Expression by Temperature and Donor
+
+```{r define_plot_function}
+#' Plot gene expression across temperatures, faceted by Donor
+#'
+#' Creates boxplot + beeswarm visualization comparing genotypes across
+#' temperatures and donors, with statistical tests.
+#'
+#' @param gene_id Gene identifier (must match rownames in voom_obj$E)
+#' @param tissue_name Tissue to plot (e.g., "V3_SAM")
+#' @param voom_obj Voom object containing log2CPM expression data
+#' @param metadata Sample metadata with columns: Run, Tissue, Genotype, Donor, temp
+#'
+#' @return ggplot object
+plot_gene_temp_comparison_by_donor <- function(gene_id, 
+                                                tissue_name,
+                                                voom_obj, 
+                                                metadata) {
+  
+  stopifnot(
+    gene_id %in% rownames(voom_obj$E),
+    tissue_name %in% metadata$Tissue
+  )
+  
+  expr_data <- data.frame(
+    sample = colnames(voom_obj$E),
+    log2cpm = voom_obj$E[gene_id, ],
+    stringsAsFactors = FALSE
+  )
+  
+  plot_data <- metadata %>%
+    filter(Tissue == tissue_name) %>%
+    left_join(expr_data, by = c("Run" = "sample")) %>%
+    mutate(
+      temp_label = ifelse(temp == "CTRL", "warm", "cold"),
+      temp_label = factor(temp_label, levels = c("warm", "cold"))
+    ) %>%
+    select(Run, Genotype, Donor, temp_label, log2cpm)
+  
+  stat_test <- plot_data %>%
+    group_by(Donor, temp_label) %>%
+    t_test(log2cpm ~ Genotype) %>%
+    add_significance() %>%
+    add_xy_position(x = "Genotype")
+  
+  cat("\n========================================\n")
+  cat("Gene:", gene_id, "| Tissue:", tissue_name, "\n")
+  cat("========================================\n")
+  print(stat_test)
+  
+  p <- ggplot(plot_data, aes(x = Genotype, y = log2cpm, color = Genotype)) +
+    geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.7) +
+    geom_beeswarm(size = 2, alpha = 0.8, cex = 2) +
+    scale_color_manual(
+      values = c("CTRL" = "gold", "Inv4m" = "purple4")
+    ) +
+    facet_grid(temp_label ~ Donor) +
+    labs(
+      title = paste0(gene_id, " expression in ", tissue_name),
+      subtitle = "Warm vs Cold by Donor",
+      x = "Genotype",
+      y = "log2(CPM)"
+    ) +
+    stat_pvalue_manual(
+      stat_test,
+      label = "p = {p}",
+      tip.length = 0.01,
+      bracket.size = 0.5,
+      size = 3.5
+    ) +
+    theme_classic2(base_size = 25) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(face = "bold"),
+      strip.background = element_blank(),
+      panel.grid.major.x = element_blank()
+    )
+  
+  return(p)
+}
+```
+
+
+## Usage Examples
+
+
+```{r V3 sampling, fig.cap='V3 sampling.', echo=FALSE, message=FALSE, warning=FALSE}
+knitr::include_graphics("~/Desktop/V3_sampling.png")
+```
+
+
+
+
+
+### JMJ
+
+```{r plot_jmj4_leaf, fig.width=12, fig.height=12}
+# Single gene
+p1 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191820",
+  tissue_name = "V3_S2_Leaf_Tip",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("JMJ4 Zm00001eb191820  V3_S2_Leaf_Tip")
+
+print(p1)
+```
+
+
+
+```{r plot_jmj4_sam, fig.width=12, fig.height=12}
+# Single gene
+p1 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191820",
+  tissue_name = "V3_SAM",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("JMJ4 Zm00001eb191820  V3_SAM")
+
+print(p1)
+```
+
+```{r plot_pcna2_ROOT, fig.width=12, fig.height=12}
+# Single gene
+p2 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191820",
+  tissue_name = "V1_Root",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("JMJ4 Zm00001eb191820 V1_Root")
+
+print(p2)
+```
+
+### SEC6
+
+```{r plot_sec6_leaf, fig.width=12, fig.height=12}
+# Single gene
+p1 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb194380",
+  tissue_name = "V3_S2_Leaf_Tip",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("SEC6 Zm00001eb193790 V3_S2_Leaf_Tip")
+
+print(p1)
+```
+
+
+
+```{r plot_sec6_sam, fig.width=12, fig.height=12}
+# Single gene
+p1 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb194380",
+  tissue_name = "V3_SAM",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("SEC6 Zm00001eb193790 V3_SAM")
+
+print(p1)
+```
+
+
+```{r plot_SEC6_ROOT, fig.width=12, fig.height=12}
+# Single gene
+p2 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb194380",
+  tissue_name = "V1_Root",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("SEC6 Zm00001eb194380 V1_Root")
+
+print(p2)
+```
+
+
+### PCNA2
+
+```{r plot_pcna2_leaf, fig.width=12, fig.height=12}
+# Single gene
+p2 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb192050",
+  tissue_name = "V3_S2_Leaf_Tip",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("PCNA2 Zm00001eb192050 V3_S2_Leaf_Tip")
+
+print(p2)
+```
+
+
+
+```{r plot_pcna2, fig.width=12, fig.height=12}
+# Single gene
+p2 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb192050",
+  tissue_name = "V3_SAM",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("PCNA2 Zm00001eb192050 V3_SAM")
+
+print(p2)
+```
+
+```{r plot_V3_leaf_mcm5, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb192050",
+  tissue_name = "V1_Root",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("PCNA2 Zm00001eb192050 V1_Root")
+
+print(p3)
+```
+
+### MCM5
+
+
+```{r plot_mcm5_leaf, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb257900",
+  tissue_name = "V3_S2_Leaf_Tip",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("MCM5 Zm00001eb257900 V3_S2_Leaf_Tip")
+
+print(p3)
+```
+
+
+```{r plot_mcm5_sam, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb257900",
+  tissue_name = "V3_SAM",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("MCM5 Zm00001eb257900 V3_SAM")
+
+print(p3)
+```
+
+```{r plot_mcm5_root, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb257900",
+  tissue_name = "V1_Root",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("MCM5 Zm00001eb257900 V1_Root")
+
+print(p3)
+```
+
+### ATG8/Mediator/Fibrillarin-2
+
+```{r plot_atg8_leaf, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191090",
+  tissue_name = "V3_S2_Leaf_Tip",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("ATG8 Zm00001eb191090 V3_S2_Leaf_Tip")
+
+print(p3)
+```
+
+
+```{r plot_atg8_sam, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191090",
+  tissue_name = "V3_SAM",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("ATG8 Zm00001eb191090 V3_SAM")
+
+print(p3)
+```
+
+
+```{r plot_atg8_root, fig.width=12, fig.height=12}
+# Single gene
+p3 <- plot_gene_temp_comparison_by_donor(
+  gene_id = "Zm00001eb191090",
+  tissue_name = "V1_Root",
+  voom_obj = voom_obj,
+  metadata = y$samples
+) + ggtitle("ATG8 Zm00001eb191090 V1_Root")
+
+print(p3)
+```
+
+
+
+```{r plot_multiple_genes, fig.width=12, fig.height=30}
+# # Multiple genes
+# genes_to_plot <- c("Zm00001eb191820", "PCNA2", "MCM5")
+# 
+# plots <- lapply(genes_to_plot, function(gene) {
+#   if (gene %in% rownames(voom_obj$E)) {
+#     plot_gene_temp_comparison_by_donor(
+#       gene_id = gene,
+#       tissue_name = "V3_SAM",
+#       voom_obj = voom_obj,
+#       metadata = y$samples
+#     )
+#   }
+# })
+# 
+# plots <- plots[!sapply(plots, is.null)]
+# 
+# wrap_plots(plots, ncol = 1)
+```
+
+```{r plot_across_tissues, fig.width=12, fig.height=30}
+# # Same gene across tissues
+# tissues <- c("V3_SAM", "V3_S2_Leaf_Tip", "V1_Root")
+# 
+# tissue_plots <- lapply(tissues, function(tissue) {
+#   plot_gene_temp_comparison_by_donor(
+#     gene_id = "Zm00001eb191820",
+#     tissue_name = tissue,
+#     voom_obj = voom_obj,
+#     metadata = y$samples
+#   )
+# })
+# 
+# wrap_plots(tissue_plots, ncol = 1)
+```
+
+# Session Info
+```{r session_info}
+sessionInfo()
+```

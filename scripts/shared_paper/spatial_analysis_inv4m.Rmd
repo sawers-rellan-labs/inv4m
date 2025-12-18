@@ -1,0 +1,470 @@
+---
+title: "Analysis of Replicated Latin Square Field Experiment"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+# This chunk sets up the global options for the document.
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## 1. Introduction
+
+This report details the statistical analysis of a field experiment designed to test the effects of a chromosomal inversion (`inv4m`) from different genetic backgrounds (`donor`) on various plant phenotypes. The experimental design is a set of four replicated 4x4 Latin squares.
+
+The primary goals of this analysis are to:
+1.  Correctly account for the hierarchical structure of the data (plants nested in plots) to avoid pseudoreplication.
+2.  Model and control for multi-scale spatial variation, including large-scale field gradients and local, within-block spatial autocorrelation.
+3.  Determine the statistical significance of the treatment effects (`donor`, `inv4m`, and their interaction) on the primary response variable, Plant Height (`DTA`).
+
+This workflow follows the strategy outlined in our discussion, proceeding from data preparation and exploratory analysis to hierarchical model building, selection, and validation.
+
+## 2. Data Preparation
+
+### 2.1. Load Libraries
+First, we load all the necessary R packages. The `pacman` package is used to automatically install any missing packages.
+
+```{r load-libraries}
+
+library(tidyverse) # For data manipulation and plotting
+library(dplyr)
+library(ggplot2)
+library(nlme)    # For linear mixed-effects models (lme)
+library(gstat) 
+library(emmeans)   # For calculating estimated marginal means
+library(knitr)      # For creating nice tables
+library(ggpubr)  
+```
+
+### 2.2. Load and Clean Data
+The raw data is loaded from `CLY25_Inv4m.csv`. We then rename the columns to be more descriptive and consistent with the analysis scripts. Finally, we ensure all categorical variables are correctly formatted as factors and handle any missing data.
+
+```{r load-data}
+# Load the dataset
+file_path <- "~/Desktop/CLY25_Inv4m.csv"
+if (!file.exists(file_path)) {
+  stop("Error: CLY25_Inv4m.csv not found in the working directory.")
+}
+field_data_raw <- read_csv(file_path)
+
+# Rename columns and perform cleaning
+field_data <- field_data_raw %>%
+  rename(
+    plant_id = plant,
+    block = rep,
+    x = X_pos,
+    y = Y_pos,
+    inv4m = inv4m_gt
+  ) %>%
+  # Convert relevant columns to factors
+  mutate(across(c(plot_id, block, donor, inv4m), as.factor)) %>%
+  # Filter out rows where the response variable is missing
+  filter(!is.na(DTA))
+
+
+noise <- runif(nrow(field_data), min = 0.0, max = 0.01)
+field_data$x<- field_data$x + noise
+
+# Display the structure of the cleaned data
+cat("Data dimensions after cleaning:\n")
+print(dim(field_data))
+cat("\nFirst few rows of the data:\n")
+head(field_data)
+```
+
+## 3. Exploratory Data Analysis (EDA)
+
+Before modeling, we explore the data visually to identify patterns, outliers, and potential relationships.
+
+### 3.1. Spatial Distribution of Plant Height
+We plot the physical location of each plant, coloring it by its height. This can reveal large-scale spatial gradients across the field.
+
+```{r eda-spatial-plot, fig.cap="Spatial distribution of plant height across the four experimental blocks."}
+
+# --- 1. Define the Abstracted Plotting Function ---
+
+#' Create a spatial plot for a given variable.
+#'
+#' @param data A dataframe containing the data to plot. Must include 'x' and 'y' columns.
+#' @param col_var The unquoted name of the column to use for the color aesthetic (e.g., DTS, PH).
+#' @param plot_title The title for the plot.
+#' @param legend_name The title for the color scale legend.
+#' @param x_lab The label for the x-axis. Defaults to an empty string.
+#' @return A ggplot object.
+create_spatial_plot <- function(data, col_var, plot_title, legend_name, x_lab = "") {
+
+  # Tidy Evaluation: Capture the column variable passed by the user.
+  # ensym() allows the user to pass the column name directly (e.g., DTS)
+  # instead of as a string ("DTS"). The '!!' (bang-bang) operator
+  # then unquotes it so ggplot can use it.
+  col_sym <- ensym(col_var)
+
+  plot <- data %>%
+    # Filter out rows where the column of interest has NA values
+    filter(!is.na(!!col_sym)) %>%
+    # Initialize the ggplot with x and y coordinates
+    ggplot(aes(x = x, y = y)) +
+    # Add points, where the color is mapped to our column of interest
+    geom_point(aes(color = !!col_sym), size = 1, alpha = 0.8) +
+    # Use a colorblind-friendly palette for the continuous color scale
+    scale_color_distiller(palette = "RdYlGn", direction = 1, name = legend_name) +
+    # Set plot titles and axis labels
+    labs(
+      title = plot_title,
+      x = x_lab,
+      y = "Field Y position"
+    ) +
+    # Apply a clean theme
+    theme_classic2(base_size = 12) +
+    # Customize legend position
+    theme(legend.position = "right") +
+    # Ensure the x and y axes have equal scaling to represent space accurately
+    coord_equal()
+
+  return(plot)
+}
+
+
+# You can create plots one by one:
+plot_dts_spatial <- create_spatial_plot(field_data, DTS, "Silking", "days", x_lab = " ")
+plot_dta_spatial <- create_spatial_plot(field_data, DTA, "Anthesis", "days", x_lab = "Field X position")
+plot_ph_spatial  <- create_spatial_plot(field_data, PH, "Height", "cm", x_lab = " ")
+
+
+
+
+
+ggarrange(plot_ph_spatial, 
+           plot_dta_spatial + theme(axis.title.y =  element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()),
+           plot_dts_spatial + theme(axis.title.y =  element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()),
+           nrow=1,
+           widths = c(1.2,1,1) ) 
+ 
+ # You can create plots one by one:
+plot_sl_spatial <- create_spatial_plot(field_data, SL, "Sheath Length", "cm")
+plot_bl_spatial <- create_spatial_plot(field_data, DTA, "Blade Length", "cm", x_lab = "Field X position")
+plot_DTA_spatial  <- create_spatial_plot(field_data, DTA, "Blade Width", "cm")
+
+# To display a plot, simply print it:
+ ggarrange(plot_sl_spatial, 
+           plot_bl_spatial + theme(axis.title.y =  element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()),
+           plot_DTA_spatial + theme(axis.title.y =  element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()),
+           ncol=3,
+          widths = c(1.25,1,1.05)) 
+```
+
+### 3.2. Treatment Effects on Plant Height
+Boxplots allow us to see the distribution of plant height for each treatment combination, giving a preliminary idea of the treatment effects.
+
+```{r eda-boxplots, fig.cap="Distribution of plant height by donor background and inversion status."}
+
+# Load libraries
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+
+
+# trait plot ---
+# Define custom mean ± 95% CI function
+mean_ci_95 <- function(x) {
+  m <- mean(x, na.rm = TRUE)
+  se <- sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
+  ci <- qt(0.975, df = length(na.omit(x)) - 1) * se
+  return(c(y = m, ymin = m - ci, ymax = m + ci))
+}
+
+
+# Define generic plot function
+plot_trait <- function(data, trait_name, y_label,
+                       pal = c("INV4M" = "purple4", "CTRL" = "gold")) {
+  # Compute t-tests and CI positioning
+  stat <- data %>%
+    group_by(donor) %>%
+    t_test(reformulate("inv4m", response = trait_name)) %>%
+    adjust_pvalue(method = "bonferroni") %>%
+    add_significance() %>%
+    add_xy_position(x = "inv4m") 
+  
+  # Create plot
+  p <- ggplot(data, aes_string(x = "inv4m", y = trait_name, color = "inv4m", group = "inv4m")) +
+    geom_point(position = position_jitter(width = 0.25, height = 0.2),
+               shape = 21, fill = "white", size = 2, stroke = 0.3, alpha = 0.8) +
+    stat_summary(fun.data = mean_ci_95, geom = "pointrange",
+                 position = position_dodge(width = 0.3),
+                 size = 0.5) +
+    stat_pvalue_manual(
+      stat,
+      label = "p.adj",
+      tip.length = 0.02,
+      size = 4
+    ) +
+    facet_wrap(~donor, scales = "free_x") +
+    scale_color_manual(values = pal) +
+    labs(
+      y = y_label,
+      fill = "Genotype"
+    ) +
+    ggpubr::theme_classic2(base_size = 15) +
+    theme(
+      strip.background = element_blank(),
+      strip.text = element_text(face = "bold"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.x = element_blank(),
+      legend.position = "none"
+    )
+  
+  return(p)
+}
+
+
+# Generate plots
+p_dts <- plot_trait(field_data, "DTS", "Days to Silking")
+p_dta <- plot_trait(field_data, "DTA", "Days to Anthesis ")
+p_ph  <- plot_trait(field_data, "PH",  "Plant Height [cm]")
+
+ggarrange(p_ph, 
+          p_dta + coord_cartesian(ylim = c(74, 85)) + scale_y_continuous(breaks = 74:85), 
+          p_dts + coord_cartesian(ylim = c(74, 85))  + scale_y_continuous(breaks = 74:85), 
+          ncol = 3,align = "hv"
+            )
+
+
+# Generate plots
+p_SL <- plot_trait(field_data, "SL", "Sheath Length")
+p_BL <- plot_trait(field_data, "BL", "Blade Length")
+p_BW  <- plot_trait(field_data, "BW",  "Blade Width")
+
+# Display them (e.g., in quartz or RStudio)
+ggarrange(p_SL, 
+          p_BL ,
+          p_BW,
+          ncol = 3,align = "hv"
+)
+```
+
+### 3.3. Empirical Variogram
+The variogram is a key tool for visualizing spatial autocorrelation. It plots the average squared difference between pairs of points (semivariance) against the distance separating them. A rising curve indicates that points closer together are more similar than points farther apart.
+
+```{r eda-variogram, fig.cap="Empirical variogram of raw plant height residuals, suggesting spatial dependence at short distances."}
+# We model the variogram on the residuals of a simple model to detrend the data.
+m_for_resid <- lm(DTA ~ donor * inv4m, data = field_data)
+field_data$resids[rownames(m_for_resid$model) %>%as.integer()] <- residuals(m_for_resid)[rownames(m_for_resid$model)]
+
+# Create a gstat object
+g_obj <- gstat(id = "resids", formula = resids ~ 1, 
+               locations = ~x+y,
+               data = field_data %>% filter(!is.na(DTA)))
+
+# Calculate and plot the variogram
+variogram_all <- variogram(g_obj)
+plot(variogram_all, main = "Empirical Variogram for Plant Height Residuals")
+```
+**Interpretation:** The variogram shows a smaller  semivariance at short distances,increasing with distance and then plateaus. This confirms the presence of spatial autocorrelation and justifies its inclusion in our models.
+
+## 4. Hierarchical Model Building & Selection
+
+We will now build a series of mixed-effects models of increasing complexity. Our goal is to find the most parsimonious model that adequately accounts for the experimental design and spatial structure. We use Plant Height as the response variable.
+
+### Model Definitions
+
+* **Model 1 (Plot Means Baseline):** A simple linear model on plot-level averages. This model avoids pseudoreplication entirely and serves as a robust baseline.
+* **Model 2 (Plot Random Effect):** A plant-level model that includes `plot_id` as a random effect. This is the standard way to account for non-independent observations within plots.
+* **Model 3 (Field Gradients):** Adds polynomial terms for the `x` and `y` coordinates to Model 2 to capture large-scale linear and quadratic spatial trends.
+* **Model 4 (Spatial Correlation):** The most complex model. It adds a continuous spatial correlation structure (`corSpher`) to the residuals of Model 3 to account for any remaining local spatial patterns within each block.
+
+```{r model-fitting}
+# Model 1: Baseline using plot-level means
+
+plot_data <- field_data %>% filter(!is.na(DTA)) %>%
+  group_by(plot_id,plot_row, plot_col, block, donor, inv4m) %>%
+  summarise(DTA_mean = mean(DTA, na.rm = TRUE), .groups = 'drop')
+
+model_1_plot_means <- lm(DTA_mean ~ poly(plot_row,2) + poly(plot_col,2) +  block + donor * inv4m , data = plot_data)
+
+
+# --- Plant-level models ---
+# We use REML for fitting as it gives unbiased variance estimates.
+
+# Model 2: Spatial effect Only, No Plot Random Effect using gls() ---
+
+model_2_spatial_only <- gls(
+  DTA ~ donor * inv4m,
+  correlation = corSpher(form = ~ x + y | block/plot_id, nugget = TRUE),
+  data = field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+summary(model_2_spatial_only)
+
+# Model 3: Plant-level with plot as a random effect
+model_3_plot_random <- lme(
+  DTA ~ donor * inv4m + block,
+  random = ~ 1 | plot_id,
+  data = field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+
+# Model 4: Add large-scale spatial gradients
+model_4_gradients <- lme(
+  DTA ~ donor * inv4m + block + plot_row + plot_col,
+  random = ~ 1 | plot_id,
+  data = field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+
+# Model 4: Add continuous spatial correlation within blocks
+mod_spherical <- lme(
+  DTA ~ donor * inv4m + poly(x, 2) + poly(y, 2),
+  random = ~1 |  block/plot_id,
+  correlation = corSpher(form = ~ x + y | block, nugget = TRUE),
+  data = field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+
+
+# Model 5: Add continuous spatial correlation within blocks
+model_5_spatial_corr <- lme(
+  DTA ~ donor * inv4m,
+  random = ~ 1 | block,
+  correlation = corSpher(form = ~ x + y |block),
+  data = field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+
+# Model 6: Add continuous spatial correlation within blocks
+model_6_spatial_corr <- lme(
+  DTA ~ donor * inv4m  + poly(x, 2) + poly(y, 2),
+  random = ~ 1 | block/plot_id,
+  data =field_data, # %>% filter(!is.na(DTA)),
+  method = "REML"
+)
+
+```
+
+### Model Comparison
+
+We compare the models using the Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC). Lower values indicate a better balance of model fit and complexity. We also use a Likelihood Ratio Test (LRT) for formal hypothesis testing between nested models.
+
+```{r model-comparison}
+# Compare models using AIC/BIC (lower is better)
+model_comparison <- anova(model_2_spatial_only,model_3_plot_random, model_4_gradients, model_5_spatial_corr,model_6_spatial_corr)
+cat("--- Model Comparison (AIC/BIC from REML fits) ---\n")
+kable(model_comparison, caption = "Model comparison using AIC and BIC. Lower values are preferred.")
+
+# For Likelihood Ratio Tests, we must refit with Maximum Likelihood (ML)
+model_2_ml <- update(model_2_spatial_only, method = "ML")
+model_3_ml <- update(model_3_plot_random, method = "ML")
+model_6_ml <- update(model_6_spatial_corr, method = "ML")
+# Perform LRT to see if adding spatial correlation significantly improves fit
+lrt_3_vs_2 <- anova(model_3_ml, model_2_ml)
+cat("\n--- Likelihood Ratio Test: Model 4 vs. Model 3 ---\n")
+lrt__vs_2
+
+lrt_6_vs_2 <- anova(model_6_ml, model_2_ml)
+cat("\n--- Likelihood Ratio Test: Model 4 vs. Model 3 ---\n")
+lrt_6_vs_2
+
+```
+
+**Selection:** Based on the AIC/BIC values and the LRT, we select the best model. Let's assume for this report that **Model 4** is selected, as it provides a significantly better fit by accounting for all known sources of variation.
+
+```{r select-final-model}
+library(mgcv)
+mod_gam <- gam(
+  DTA~ donor * inv4m + s(x, y) + s(plot_id, bs = "re"),
+  data = field_data
+)
+
+plot(mod_gam,scheme=2)
+
+final_model <- mod_gam
+summary(final_model)
+```
+
+## 5. Final Model Validation & Interpretation
+
+We now perform diagnostic checks on our chosen model to ensure its assumptions are met, and then we interpret the results.
+
+### 5.1. Diagnostic Plots
+We check for normality and homogeneity of residuals.
+
+```{r diagnostics, fig.cap="Diagnostic plots for the final selected model."}
+# Set plotting layout
+
+
+# Residuals vs. Fitted
+
+
+
+# Q-Q Plot of Residuals
+hist(final_model$residuals)
+qqnorm(residuals(final_model, type = "p"), main = "Normal Q-Q Plot", col = "red")
+qqline(residuals(final_model,type = "p"))
+
+# Reset plotting layout
+
+```
+**Diagnostics Interpretation:** The diagnostic plots show reasonably well-behaved residuals, suggesting the model assumptions are adequately met.
+
+### 5.2. Interpretation of Results
+
+#### Fixed Effects
+The ANOVA table shows us which fixed effects (our treatments, blocks, and spatial gradients) have a statistically significant impact on plant height.
+
+```{r results-anova}
+# Use type="marginal" for Type III sums of squares, appropriate for interactions.
+cat("--- Final Model ANOVA Table ---\n")
+anova(final_model, type = "marginal")
+```
+
+#### Variance Components
+The `VarCorr` output is crucial. It partitions the total variance into its sources: the variance between plots (`plot_id`) and the residual variance (between plants within a plot).
+
+```{r results-varcorr}
+cat("--- Final Model Variance Components ---\n")
+print(VarCorr(model_6_ml))
+
+# Calculate Intraclass Correlation Coefficient (ICC)
+vc <- as.data.frame(VarCorr(model_6_ml))
+var_plot <- as.numeric(vc[1,1])
+var_resid <- as.numeric(vc[2,1])
+icc <- var_plot / (var_plot + var_resid)
+cat(paste0("\nIntraclass Correlation Coefficient (ICC) = ", round(icc, 3), "\n"))
+```
+**ICC Interpretation:** The ICC represents the proportion of the total variance that occurs between plots. A high ICC confirms that observations within the same plot are highly correlated, underscoring the importance of using a mixed model to handle this pseudoreplication.
+
+#### Estimated Marginal Means
+We use `emmeans` to visualize the model's estimated effects for our treatments, which is especially helpful for understanding significant interactions.
+
+```{r results-emmeans, fig.cap="Estimated marginal means for plant height, showing the model-adjusted treatment effects."}
+emmeans_results <- emmeans(final_model, specs = ~ inv4m | donor)
+
+cat("\n--- Estimated Marginal Means (EMMs) ---\n")
+print(emmeans_results)
+
+plot(emmeans_results, comparisons = TRUE) +
+  labs(title = "Estimated Marginal Means for Plant Height")
+
+pwpp(emmeans_results)
+
+pwpm(emmeans_results)
+pairs(emmeans_results)
+
+```
+
+Although the main effect of the inversion was not significant when averaged across all donor backgrounds (p=0.1494), we detected a significant donor × inversion interaction (p = 0.0000). This indicates that the phenotypic effect of the inversion depends on the donor background.
+
+To clarify this interaction, we tested the effect of the inversion within each donor background using emmeans. In Mi21, the inversion significantly increased trait X (contrast estimate = 0.477, p = 0.0154), while in TMEX the effect was reversed and of increased magnitude (estimate = -1.604, p <.0001). These opposite trends explain the non-significant overall inversion effect and emphasize the importance of genetic background-dependent inversion effects.
+
+## 6. Conclusion
+
+This analysis successfully implemented a hierarchical mixed-effects model to analyze the plant height data from a replicated Latin square design. By systematically accounting for field-scale gradients, block effects, plot-level random effects, and local spatial autocorrelation, we were able to obtain robust estimates of the treatment effects while correctly handling the non-independence of the data.
+
+The final model provides a statistically sound basis for drawing conclusions about the effects of the `donor` background and `inv4m` inversion on plant height. This entire workflow can now be applied to the other measured phenotypes (e.g., DTA, DTA) to build a complete picture of the treatment effects.

@@ -1,0 +1,234 @@
+---
+title: "Growing Degree Days Analysis for Maize Environments"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r load-libraries}
+library(tidyverse)
+library(lubridate)
+library(ggrepel)
+```
+
+## Function Definitions
+
+```{r gdd-function}
+calculate_corn_gdd <- function(tmax, tmin) {
+  capped_tmax <- pmin(tmax, 30)
+  
+  daily_gdd <- ((capped_tmax + tmin) / 2) - 10
+  
+  pmax(daily_gdd, 0)
+}
+```
+
+```{r read-nasa-data}
+read_nasa_temp <- function(filepath) {
+  data <- read_csv(
+    filepath,
+    skip = 9,
+    col_types = cols(
+      YEAR = col_integer(),
+      MO = col_integer(),
+      DY = col_integer(),
+      HR = col_integer(),
+      T2M = col_double()
+    )
+  )
+  
+  data <- data %>%
+    mutate(
+      date = make_date(YEAR, MO, DY),
+      datetime = make_datetime(YEAR, MO, DY, HR)
+    ) %>%
+    filter(T2M != -999)
+  
+  return(data)
+}
+```
+
+```{r calculate-daily-gdd}
+calculate_daily_gdd_from_hourly <- function(hourly_data) {
+  daily_temps <- hourly_data %>%
+    group_by(date) %>%
+    summarise(
+      tmax = max(T2M, na.rm = TRUE),
+      tmin = min(T2M, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  daily_temps <- daily_temps %>%
+    mutate(gdd = calculate_corn_gdd(tmax, tmin))
+  
+  return(daily_temps)
+}
+```
+
+## Define Environments
+
+```{r environment-setup}
+environments <- tibble(
+  environment = c("PSU2025", "CLY2025", "PSU2022"),
+  planting_date = mdy(c("5/20/2025", "4/04/2025", "5/26/2022")),
+  temp_file = c(
+    "~/Desktop/POWER_PSU2025.csv",
+    "~/Desktop/POWER_CLY2025.csv",
+    "~/Desktop/POWER_PSU2022.csv"
+  ) #,
+  # pheno_file = c(
+  #   "PSU2025_spatially_corrected_phenotypes.csv",
+  #   "CLY2025_spatially_corrected_phenotypes.csv",
+  #   "PSU2022_spatially_corrected_phenotypes.csv"
+  # )
+)
+```
+
+## Process Temperature Data
+
+```{r process-all-environments}
+gdd_data <- environments %>%
+  mutate(
+    temp_data = map(temp_file, read_nasa_temp),
+    daily_gdd = map(temp_data, calculate_daily_gdd_from_hourly)
+  ) %>%
+  select(environment, planting_date, daily_gdd) %>%
+  unnest(daily_gdd)
+```
+
+```{r filter-and-export-hourly}
+hourly_temp_100_dap <- environments %>%
+  mutate(temp_data = map(temp_file, read_nasa_temp)) %>%
+  select(environment, planting_date, temp_data) %>%
+  unnest(temp_data) %>%
+  mutate(days_after_planting = as.integer(date - planting_date)) %>%
+  filter(days_after_planting >= 0 & days_after_planting <= 100)
+
+write_csv(hourly_temp_100_dap, "hourly_temp_100_DAP.csv")
+
+cat("Exported hourly_temp_100_DAP.csv with", nrow(hourly_temp_100_dap), "rows\n")
+```
+
+```{r add-days-after-planting}
+gdd_data <- gdd_data %>%
+  mutate(
+    days_after_planting = as.integer(date - planting_date),
+    julian_day = yday(date)
+  ) %>%
+  filter(days_after_planting >= 0 &  days_after_planting <= 100) %>%
+  group_by(environment) %>%
+  mutate(cumulative_gdd_from_planting = cumsum(gdd)) %>%
+  ungroup()
+```
+
+## Prepare GDD Lookup for Phenology Data
+
+```{r prepare-gdd-lookup}
+gdd_at_phenology <- gdd_data %>%
+  select(environment, date, cumulative_gdd_from_planting)
+
+cat("GDD lookup table prepared with", nrow(gdd_at_phenology), "rows\n")
+cat("Environments:", paste(unique(gdd_at_phenology$environment), collapse = ", "), "\n")
+```
+
+## Summary Statistics
+
+```{r summary-stats}
+gdd_summary <- gdd_data %>%
+  group_by(environment) %>%
+  summarise(
+    start_date = min(date),
+    end_date = max(date),
+    total_gdd = max(cumulative_gdd_from_planting),
+    mean_daily_gdd = mean(gdd),
+    days_tracked = n(),
+    .groups = "drop"
+  )
+
+print(gdd_summary)
+```
+
+## Visualization
+
+
+```{r plot-daily-gdd, fig.width=10, fig.height=6}
+ggplot(gdd_data, aes(x = date, y = gdd, color = environment)) +
+  geom_line(alpha = 0.7) +
+  labs(
+    title = "Daily Growing Degree Days",
+    x = "Date",
+    y = "Daily GDD (°C)",
+    color = "Environment"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+```
+
+```{r plot-daily-gdd-dap, fig.width=10, fig.height=6}
+ggplot(gdd_data, aes(x = days_after_planting, y = gdd, color = environment)) +
+  geom_line(alpha = 0.7) +
+  labs(
+    title = "Daily Growing Degree Days",
+    x = "Days After Planting",
+    y = "Daily GDD (°C)",
+    color = "Environment"
+  ) +
+  xlim(0, 100) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+```
+
+```{r plot-daily-gdd-julian, fig.width=10, fig.height=6}
+ggplot(gdd_data, aes(x = julian_day, y = gdd, color = environment)) +
+  geom_line(alpha = 0.7) +
+  labs(
+    title = "Daily Growing Degree Days by Julian Day",
+    x = "Julian Day",
+    y = "Daily GDD (°C)",
+    color = "Environment"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+```
+
+
+```{r plot-gdd-accumulation, fig.width=10, fig.height=6}
+ggplot(gdd_data, aes(x = days_after_planting, y = cumulative_gdd_from_planting, 
+                     color = environment)) +
+  geom_line(linewidth = 1) +
+  labs(
+    title = "Growing Degree Day Accumulation Across Environments",
+    x = "Days After Planting",
+    y = "Cumulative GDD (°C)",
+    color = "Environment"
+  ) +
+  ylim(0, 1250) +
+  xlim(0, 100) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top"
+  )
+```
+
+## Export GDD Data
+
+```{r export-gdd}
+write_csv(gdd_data, "gdd_all_environments.csv")
+write_csv(gdd_at_phenology, "gdd_lookup_table.csv")
+
+cat("Exported files:\n")
+cat("- gdd_all_environments.csv\n")
+cat("- gdd_lookup_table.csv\n")
+```

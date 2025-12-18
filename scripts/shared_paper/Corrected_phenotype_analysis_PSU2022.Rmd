@@ -1,0 +1,441 @@
+---
+title: "PSU 2022 Spatial Analysis: SpATS Spatial Correction with GDD Integration"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      fig.width = 12, fig.height = 8)
+```
+
+## Overview
+
+This notebook fits a SpATS PSANOVA surface **per phenotype** and returns spatially-corrected plot-level values for each phenotype, including GDD-based traits (GDDA and GDDS). The approach uses `statgenHTP::fitModels()` (which wraps SpATS when provided a TimePoints object) and `getCorrected()` to extract corrected plot-level observations. The workflow:
+
+1. Load GDD lookup table for PSU2022.
+2. Load and clean data (as in prior notebook).
+3. Create `plot_data` (plot-level means) and merge GDD values.
+4. Build a `TimePoints` object for `statgenHTP`.
+5. Loop over usable phenotypes (including GDDA, GDDS) and apply `fitModels()` → `getCorrected()`.
+6. Merge corrected values into a wide table `sp_corrected`.
+7. Save corrected table for downstream analyses.
+
+**Warning:** fitting many SpATS models can be computationally intensive. Run interactively on a machine with sufficient RAM/CPU.
+
+## 1. Load libraries
+
+```{r load-libraries}
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(ggtext)
+library(ggfx)
+library(nlme)
+library(gstat)
+library(rstatix)
+library(ggpubr)
+library(VIM)
+library(knitr)
+library(SpATS)
+library(statgenHTP)
+library(ggbeeswarm)
+```
+
+## 1b. Configuration and load GDD lookup table
+
+```{r config-and-gdd}
+environment_name <- "PSU2022"
+planting_date <- mdy("5/26/2022")
+gdd_lookup_file <- "gdd_lookup_table.csv"
+
+gdd_at_phenology <- read_csv(gdd_lookup_file) %>%
+  filter(environment == environment_name)
+
+cat("Loaded GDD lookup for", environment_name, "with", 
+    nrow(gdd_at_phenology), "dates\n")
+cat("GDD range:", min(gdd_at_phenology$cumulative_gdd_from_planting), "to", 
+    max(gdd_at_phenology$cumulative_gdd_from_planting), "°C\n")
+```
+
+## 2. Load and prepare data
+
+```{r load-data}
+DATA_DIR <- "/Users/fvrodriguez/Desktop/inv4mHighland/data"
+plant_csv <- file.path(DATA_DIR, "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv")
+ear_csv <- file.path(DATA_DIR, "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field_ear_pheno.csv")
+
+field_data_raw <- read.csv(plant_csv, na.strings = c("", "#N/A", "NA"))
+ear_data_raw <- read.csv(ear_csv, na.strings = c("", "n/a", "NA"), skip = 1)
+
+field_data <- field_data_raw %>%
+  filter(P22. >= 3004, P22. <= 4192) %>%
+  rename(
+    rowid = P22.,
+    Genotype = Who.What,
+    PH = Height_Anthesis,
+    STW40 = X40_DAP_dw,
+    STW50 = X50_DAP_dw, 
+    STW60 = X60_DAP_dw,
+    STWHV = harvest_dw
+  ) %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("HighP", "LowP")),
+    Genotype = factor(Genotype),
+    Rep = as.factor(Rep)
+  ) %>%
+  mutate(
+    Treatment = fct_recode(Treatment, "+P" = "HighP", "-P" = "LowP"),
+    Genotype = fct_recode(Genotype, "Inv4m" = "INV4M")
+  )
+
+ear_data <- ear_data_raw %>%
+  select(-description, -RK, -CC, -NIR, ear_rep = rep) %>%
+  rename(rowid = row) %>%
+  arrange(rowid) %>%
+  group_by(rowid) %>%
+  select(-ear_rep) %>%
+  summarise_all(mean, na.rm = TRUE) %>%
+  droplevels()
+
+field_data_complete <- field_data %>%
+  left_join(ear_data, by = "rowid") %>%
+  mutate(HI = TKW / STWHV) %>%
+  mutate(
+    Plot_Column = case_when(
+      Plot == "PlotVIII" ~ Plot_Column + 10,
+      Plot == "PlotVI" ~ Plot_Column,
+      TRUE ~ Plot_Column
+    )
+  ) %>%
+  filter(!is.na(PH)) %>%
+  droplevels()
+
+base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
+ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
+all_phenotypes <- unique(c(base_phenotypes, ear_phenotypes))
+
+cat("Field data dimensions:", dim(field_data_complete), "\n")
+cat("Phenotypes available:", paste(all_phenotypes, collapse = ", "), "\n")
+```
+
+## 3. Create plot-level data with GDD integration
+
+```{r create-plot-data}
+plot_data <- field_data_complete %>%
+  group_by(rowid, Rep, Plot_Row, Plot_Column, Genotype, Treatment) %>%
+  summarise(
+    across(all_of(all_phenotypes), ~ mean(.x, na.rm = TRUE)),
+    n_plants = n(),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    across(all_of(all_phenotypes), ~ ifelse(is.nan(.x), NA, .x)),
+    environment = environment_name,
+    anthesis_date = planting_date + days(round(DTA)),
+    silking_date = planting_date + days(round(DTS))
+  ) %>%
+  left_join(
+    gdd_at_phenology %>% 
+      rename(anthesis_date = date, GDDA = cumulative_gdd_from_planting),
+    by = c("environment", "anthesis_date")
+  ) %>%
+  left_join(
+    gdd_at_phenology %>% 
+      rename(silking_date = date, GDDS = cumulative_gdd_from_planting),
+    by = c("environment", "silking_date")
+  ) %>%
+  select(-environment, -anthesis_date, -silking_date)
+
+plot_data$Plot_Row <- as.numeric(plot_data$Plot_Row)
+plot_data$Plot_Column <- as.numeric(plot_data$Plot_Column)
+plot_data$Rep <- as.factor(plot_data$Rep)
+
+cat("Plot-level summary dimensions:", dim(plot_data), "\n")
+cat("Average plants per plot:", round(mean(plot_data$n_plants, na.rm = TRUE), 1), "\n")
+cat("GDD columns added: GDDA (anthesis), GDDS (silking)\n")
+cat("Plots with GDDA:", sum(!is.na(plot_data$GDDA)), "\n")
+cat("Plots with GDDS:", sum(!is.na(plot_data$GDDS)), "\n")
+```
+
+## 4. Identify usable phenotypes (<50% missing)
+
+```{r missing-summary}
+all_traits <- c(all_phenotypes, "GDDA", "GDDS")
+
+missing_summary <- plot_data %>%
+  select(all_of(all_traits)) %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "phenotype", values_to = "missing_count") %>%
+  mutate(
+    total_obs = nrow(plot_data),
+    missing_pct = round(missing_count / total_obs * 100, 1),
+    available_n = total_obs - missing_count
+  ) %>%
+  arrange(missing_pct)
+
+print(missing_summary)
+
+usable_phenotypes <- missing_summary %>%
+  filter(missing_pct < 50) %>%
+  pull(phenotype)
+
+cat("Usable phenotypes (<50% missing):", paste(usable_phenotypes, collapse = ", "), "\n")
+```
+
+## 5. Build TimePoints object for statgenHTP
+
+```{r make-timepoints}
+single_time <- plot_data %>%
+  mutate(
+    Genotype = as.character(Genotype),
+    Treatment = as.character(Treatment),
+    Rep = as.character(Rep),
+    Plot_Row = as.numeric(Plot_Row),
+    Plot_Column = as.numeric(Plot_Column),
+    time = as.POSIXct("2022-05-22 10:00:00")
+  )
+
+tp_data <- createTimePoints(
+  dat = single_time,
+  experimentName = environment_name,
+  genotype = "Genotype",
+  timePoint = "time",
+  plotId = "rowid",
+  repId = "Rep",
+  rowNum = "Plot_Row",
+  colNum = "Plot_Column",
+  checkGenotypes = c("NUE", "B73"),
+  addCheck = TRUE
+)
+
+summary(tp_data)
+```
+
+## 6. Fit SpATS per phenotype and extract corrected values
+
+```{r fit-all-phenotypes, results='hide'}
+corrected_list <- list()
+fit_info <- list()
+all_models <- list()
+
+for (phen in usable_phenotypes) {
+  message("Fitting SpATS model for: ", phen)
+  
+  no_nas <- single_time %>%
+    filter(!is.na(.data[[phen]]))
+  
+  if (nrow(no_nas) < 10) {
+    message("Insufficient data for ", phen, " (n=", nrow(no_nas), ")")
+    next
+  }
+  
+  fit_try <- try(
+    fitModels(
+      TP = tp_data,
+      trait = phen,
+      extraFixedFactors = c("repId", "Treatment"),
+      timePoints = 1,
+      what = "fixed"
+    ),
+    silent = TRUE
+  )
+  
+  if (inherits(fit_try, "try-error")) {
+    message("Fit failed for ", phen, ": ", fit_try)
+    next
+  }
+  
+  all_models[[phen]] <- fit_try
+  
+  corr <- try(getCorrected(fit_try), silent = TRUE)
+  if (inherits(corr, "try-error") || is.null(corr)) {
+    message("getCorrected() failed for ", phen)
+    next
+  }
+  
+  corr <- corr %>%
+    select(-phen)
+  
+  corrected_list[[phen]] <- corr
+  fit_info[[phen]] <- list(n_obs = nrow(no_nas), status = "success")
+}
+
+sp_corrected <- lapply(
+  corrected_list,
+  function(corr_df) {
+    corr_df %>%
+      select(timeNumber, timePoint, genotype, repId, Treatment, 
+             rowId, colId, plotId)
+  }
+) %>%
+  bind_rows() %>%
+  arrange(plotId) %>%
+  distinct()
+
+for (phen in names(corrected_list)) {
+  phen_corr <- paste0(phen, "_corr")
+  corr_df <- corrected_list[[phen]] %>%
+    select(plotId, all_of(phen_corr))
+  sp_corrected <- left_join(sp_corrected, corr_df, by = "plotId")
+}
+
+colnames(sp_corrected) <- gsub("_corr", "", colnames(sp_corrected))
+
+cat("Final sp_corrected dimensions:", dim(sp_corrected), "\n")
+cat("Corrected traits:", 
+    paste(intersect(usable_phenotypes, colnames(sp_corrected)), 
+          collapse = ", "), "\n")
+print(head(sp_corrected))
+```
+
+## 7. Spatial correction visualization (example for PH and HI)
+
+```{r spats-PH}
+if ("PH" %in% names(all_models)) {
+  plot(all_models$PH, timePoints = 1)
+  plot(all_models$PH, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+```{r spats-HI}
+if ("HI" %in% names(all_models)) {
+  plot(all_models$HI, timePoints = 1)
+  plot(all_models$HI, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+```{r spats-GDDA}
+if ("GDDA" %in% names(all_models)) {
+  cat("\n### Spatial plots for GDDA\n")
+  plot(all_models$GDDA, timePoints = 1)
+  plot(all_models$GDDA, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+```{r spats-GDDS}
+if ("GDDS" %in% names(all_models)) {
+  cat("\n### Spatial plots for GDDS\n")
+  plot(all_models$GDDS, timePoints = 1)
+  plot(all_models$GDDS, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+## 8. Spatially Corrected Inv4m Effects from Combined P Treatments
+
+```{r second-stage-analysis}
+NIL_corrected <- sp_corrected %>%
+  filter(genotype %in% c("Inv4m", "CTRL")) %>%
+  droplevels()
+
+htest <- NIL_corrected %>%
+  pivot_longer(
+    cols = all_of(usable_phenotypes), 
+    names_to = "trait", 
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  group_by(trait) %>%
+  t_test(value ~ genotype) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_y_position(scales = "free") %>%
+  add_significance() %>%
+  arrange(p.adj)
+
+print(htest)
+
+alpha <- 0.05
+sig_traits <- htest %>%
+  filter(p.adj < alpha) %>%
+  arrange(p.adj) %>%
+  pull(trait)
+
+cat("Significant traits (FDR < 0.05):", paste(sig_traits, collapse = ", "), "\n")
+
+pheno_theme2 <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = element_markdown(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 25, face = "bold", color = "black"),
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 20),
+    legend.position = "none"
+  )
+
+if (length(sig_traits) == 0) {
+  warning("No traits significant after FDR correction.")
+} else {
+  plot_data_sig <- NIL_corrected %>%
+    pivot_longer(
+      cols = all_of(usable_phenotypes),
+      names_to = "trait",
+      values_to = "value"
+    ) %>%
+    filter(trait %in% sig_traits, !is.na(value)) %>%
+    mutate(trait = as.character(trait))
+
+  test_to_plot <- htest %>%
+    filter(trait %in% sig_traits)
+
+  diff_plot <- ggplot(plot_data_sig, aes(x = genotype, y = value, color = genotype)) +
+    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>% 
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>% 
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    labs(
+      title = "Inv4m vs CTRL: Spatially Corrected Phenotypes (FDR-Adjusted)",
+      y = "Corrected Value",
+      x = "Genotype"
+    ) +
+    stat_pvalue_manual(
+      test_to_plot,
+      tip.length = 0.01,
+      step.height = 0.08,
+      size = 10,
+      bracket.size = 0.8
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.15))) +
+    facet_wrap(~ factor(trait, levels = sig_traits), scales = "free_y", ncol = 4) +
+    pheno_theme2
+
+  print(diff_plot)
+}
+```
+
+## 9. Summary and export
+
+```{r summary-export}
+cat("\n=== Analysis Summary ===\n")
+cat("Total phenotypes evaluated:", length(all_traits), "\n")
+cat("Usable phenotypes (<50% missing):", length(usable_phenotypes), "\n")
+cat("Successfully fitted models:", length(all_models), "\n")
+
+if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
+  cat("Plots with corrected data:", nrow(sp_corrected), "\n")
+  
+  output_file <- paste0(environment_name, "_spatially_corrected_phenotypes.csv")
+  write_csv(sp_corrected, output_file)
+  cat("Spatially corrected data exported to:", output_file, "\n")
+} else {
+  cat("No corrected data to export\n")
+}
+
+if (length(fit_info) > 0) {
+  cat("\n=== Model Fit Details ===\n")
+  for (trait in names(fit_info)) {
+    info <- fit_info[[trait]]
+    cat(sprintf("%s: n=%d, status=%s\n", trait, info$n_obs, info$status))
+  }
+}
+```
