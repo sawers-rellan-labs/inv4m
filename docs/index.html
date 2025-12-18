@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>inv4m - Phosphorus Paper Analysis</title>
+    <style>
+        :root {
+            --primary: #2c5282;
+            --secondary: #4a5568;
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--secondary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { margin-bottom: 2rem; }
+        h1 { color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { color: var(--secondary); font-size: 1.1rem; }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card h3 { color: var(--primary); margin-bottom: 0.5rem; }
+        .card h3 a { color: inherit; text-decoration: none; }
+        .card h3 a:hover { text-decoration: underline; }
+        .card p { font-size: 0.95rem; }
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--primary);
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+            color: #718096;
+        }
+        footer a { color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>inv4m Analysis Pipeline</h1>
+            <p class="subtitle">Maize Inv4m chromosomal inversion and phosphorus stress response</p>
+        </header>
+
+        <h2 class="section-title">Foundation Analyses</h2>
+
+        <div class="card">
+            <h3><a href="spatial_correction_for_INV4MXP.html">Spatial Correction</a></h3>
+            <p>Spatial correction for field phenotypes using SpATS models to account for field heterogeneity.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="differential_expression_leaf_treatment_model.html">Differential Gene Expression</a></h3>
+            <p>RNA-seq analysis identifying differentially expressed genes under the leaf × phosphorus treatment interaction model.</p>
+        </div>
+
+        <div class="card">
+            <h3>Differential Lipid Analysis</h3>
+            <p>Lipidomics analysis of membrane remodeling under phosphorus stress using MS-DIAL data. <em>(Report pending)</em></p>
+        </div>
+
+        <h2 class="section-title">Phenotype Analyses</h2>
+
+        <div class="card">
+            <h3><a href="PSU2022_growthcurves.html">Growth Curves</a></h3>
+            <p>Longitudinal growth analysis comparing Inv4m and control genotypes under phosphorus treatments.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="PSU2022_ionome.html">Ionome Profiling</a></h3>
+            <p>Mineral nutrient analysis (P, K, Ca, Mg, Fe, Zn, etc.) across genotypes and treatments.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="PSU2022_phenotype_marginal_means.html">Phenotype Marginal Means</a></h3>
+            <p>Estimated marginal means for phenotypic traits with statistical comparisons.</p>
+        </div>
+
+        <h2 class="section-title">Enrichment Analyses</h2>
+
+        <div class="card">
+            <h3><a href="GO_Enrichment_Analysis_of_DEGs.html">GO Enrichment</a></h3>
+            <p>Gene Ontology enrichment analysis of differentially expressed genes.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="KEGG_Pathway_Enrichment_Analysis_of_DEGs.html">KEGG Pathway Enrichment</a></h3>
+            <p>KEGG pathway analysis linking DEGs to metabolic and signaling pathways.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="LION_Lipid_Enrichment_Analysis.html">LION Lipid Enrichment</a></h3>
+            <p>Lipid ontology enrichment for differentially abundant lipids.</p>
+        </div>
+
+        <h2 class="section-title">Synthesis</h2>
+
+        <div class="card">
+            <h3><a href="PSU2022_make_transcription_indices.html">Transcription Indices</a></h3>
+            <p>Gene expression indices for photosynthesis, senescence, and stress response pathways.</p>
+        </div>
+
+        <div class="card">
+            <h3><a href="volcano_plot_analysis.html">Volcano Plots</a></h3>
+            <p>Visualization of differential expression results with annotated significant genes.</p>
+        </div>
+
+        <footer>
+            <p>
+                <a href="https://github.com/sawers-rellan-labs/inv4m">GitHub Repository</a> ·
+                Sawers-Rellan Labs ·
+                v1.0.0
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
