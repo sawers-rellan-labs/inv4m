@@ -16,6 +16,10 @@ knitr::opts_chunk$set(
   fig.width = 12,
   fig.height = 12
 )
+
+# Load project paths
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 ## Overview
@@ -57,8 +61,8 @@ reliable <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
 
 ## Load Spatially Corrected Data
 ```{r load-data}
-# Read spatially corrected mineral concentrations
-ionome <- read.csv("PSU2022_spatially_corrected_both_treatments.csv")
+# Read spatially corrected mineral concentrations (includes ionome data)
+ionome <- read.csv(file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments_with_ionome.csv"))
 
 # Rename for consistency and filter for Inv4m and CTRL genotypes only
 ionome <- ionome %>%
@@ -670,10 +674,10 @@ if (length(all_supp_plots) > 4) {
 ```
 
 ## Save Output
-```{r save-plots, eval=FALSE}
+```{r save-plots}
 # Save main combined figure (content only)
 ggsave(
-  "ionome_main_figure.pdf",
+  file.path(paths$figures, "ionome_main_figure.pdf"),
   plot = p_main_combined,
   width = 12,
   height = 4,
@@ -681,7 +685,7 @@ ggsave(
 )
 
 ggsave(
-  "ionome_main_figure.png",
+  file.path(paths$figures, "ionome_main_figure.png"),
   plot = p_main_combined,
   width = 12,
   height = 4,
@@ -692,15 +696,15 @@ ggsave(
 # Save main figure with ratios (if exists)
 if (exists("p_main_with_ratios")) {
   ggsave(
-    "ionome_main_with_ratios.pdf",
+    file.path(paths$figures, "ionome_main_with_ratios.pdf"),
     plot = p_main_with_ratios,
     width = 12,
     height = 8,
     units = "in"
   )
-  
+
   ggsave(
-    "ionome_main_with_ratios.png",
+    file.path(paths$figures, "ionome_main_with_ratios.png"),
     plot = p_main_with_ratios,
     width = 12,
     height = 8,
@@ -711,7 +715,7 @@ if (exists("p_main_with_ratios")) {
 
 # Save supplementary combined figure (content only)
 ggsave(
-  "ionome_supplementary_figure.pdf",
+  file.path(paths$figures, "ionome_supplementary_figure.pdf"),
   plot = p_supp_combined,
   width = 12,
   height = 4,
@@ -719,7 +723,7 @@ ggsave(
 )
 
 ggsave(
-  "ionome_supplementary_figure.png",
+  file.path(paths$figures, "ionome_supplementary_figure.png"),
   plot = p_supp_combined,
   width = 12,
   height = 4,
@@ -730,15 +734,15 @@ ggsave(
 # Save supplementary figure with ratios (if exists)
 if (exists("p_supp_with_ratios")) {
   ggsave(
-    "ionome_supplementary_with_ratios.pdf",
+    file.path(paths$figures, "ionome_supplementary_with_ratios.pdf"),
     plot = p_supp_with_ratios,
     width = 12,
     height = 8,
     units = "in"
   )
-  
+
   ggsave(
-    "ionome_supplementary_with_ratios.png",
+    file.path(paths$figures, "ionome_supplementary_with_ratios.png"),
     plot = p_supp_with_ratios,
     width = 12,
     height = 8,
@@ -747,14 +751,20 @@ if (exists("p_supp_with_ratios")) {
   )
 }
 
-# Export CSV files
-write.csv(effects, "ionome_linear_model_effects.csv", row.names = FALSE)
-write.csv(significant, "ionome_significant_effects.csv", row.names = FALSE)
-write.csv(interaction_effects, "ionome_interaction_effects.csv", row.names = FALSE)
-write.csv(treatment.t.test, "ionome_treatment_ttests.csv", row.names = FALSE)
+# Export CSV files (remove list columns if present)
+write.csv(effects, file.path(paths$tables, "ionome_linear_model_effects.csv"), row.names = FALSE)
+write.csv(significant, file.path(paths$tables, "ionome_significant_effects.csv"), row.names = FALSE)
+write.csv(interaction_effects, file.path(paths$tables, "ionome_interaction_effects.csv"), row.names = FALSE)
+
+# Remove list columns from t-test results before export
+treatment_export <- treatment.t.test %>%
+  select(where(~!is.list(.)))
+write.csv(treatment_export, file.path(paths$tables, "ionome_treatment_ttests.csv"), row.names = FALSE)
 
 if (nrow(ratio.t.test) > 0) {
-  write.csv(ratio.t.test, "ionome_ratio_ttests.csv", row.names = FALSE)
+  ratio_export <- ratio.t.test %>%
+    select(where(~!is.list(.)))
+  write.csv(ratio_export, file.path(paths$tables, "ionome_ratio_ttests.csv"), row.names = FALSE)
 }
 ```
 
@@ -914,10 +924,10 @@ print(mg_seed_genotype_test)
 cat("\n=== Genotype Effects on Ca (Stover) ===\n")
 print(ca_stover_genotype_test)
 ```
-```{r save-genotype-comparison, eval=FALSE}
+```{r save-genotype-comparison}
 # Save genotype comparison figure
 ggsave(
-  "ionome_genotype_effects.pdf",
+  file.path(paths$figures, "ionome_genotype_effects.pdf"),
   plot = p_genotype_effects,
   width = 8,
   height = 4,
@@ -925,7 +935,7 @@ ggsave(
 )
 
 ggsave(
-  "ionome_genotype_effects.png",
+  file.path(paths$figures, "ionome_genotype_effects.png"),
   plot = p_genotype_effects,
   width = 8,
   height = 4,
@@ -933,10 +943,12 @@ ggsave(
   dpi = 300
 )
 
-# Export genotype comparison statistics
+# Export genotype comparison statistics (remove list columns)
+genotype_export <- genotype.t.test %>%
+  select(where(~!is.list(.)))
 write.csv(
-  genotype.t.test, 
-  "ionome_genotype_comparison_ttests.csv", 
+  genotype_export,
+  file.path(paths$tables, "ionome_genotype_comparison_ttests.csv"),
   row.names = FALSE
 )
 ```

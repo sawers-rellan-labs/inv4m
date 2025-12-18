@@ -18,6 +18,11 @@ knitr::opts_chunk$set(
   fig.height = 6,
   dpi = 300
 )
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 # Overview
@@ -68,7 +73,7 @@ all columns including `is_selected_DEG` for gene labeling.
 predictor_order <- c("Leaf", "-P","Leaf:-P")
 
 # Load DE results with Mahalanobis outlier detection
-effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv") %>%
+effects_df <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv")) %>%
   filter(predictor %in% predictor_order ) %>%
   droplevels()
 
@@ -99,9 +104,8 @@ genes with valid annotations to label in the plot.
 **Expected outcome**: Data frame of genes to label, with custom label text 
 from curated annotations.
 ```{r select_labels}
-# Load curated labels from external file
-# curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
-curated <- read.csv("~/Desktop/selected_DEGs_leaf_interaction_model.csv") %>%
+# Load curated labels from intermediate results
+curated <- read.csv(file.path(paths$intermediate, "selected_DEGs_leaf_interaction_model.csv")) %>%
   select(
     regulation,
     predictor,
@@ -230,27 +234,30 @@ gene_volcano_3 <- effects_df %>%
 
 
 # Load lipid volcano
-if (file.exists("../results/lipid_volcano_3_TIC.rds")) {
-  lipid_volcano_3 <- readRDS("../results/lipid_volcano_3_TIC.rds")
+lipid_volcano_3_file <- file.path(paths$intermediate, "lipid_volcano_3.rds")
+if (file.exists(lipid_volcano_3_file)) {
+  lipid_volcano_3 <- readRDS(lipid_volcano_3_file)
   cat("Loaded lipid volcano plot\n")
 } else {
-  warning("Growth parameter plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
+  warning("Lipid volcano plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
 }
 
 
 # Load transcript MDS
-if (file.exists("../results/transcript_MDS_12.rds")) {
-  p_transcript_MDS <- readRDS("../results/transcript_MDS_12.rds")
-  cat("Loaded growth parameter plot\n")
+transcript_MDS_file <- file.path(paths$intermediate, "transcript_MDS_12.rds")
+if (file.exists(transcript_MDS_file)) {
+  p_transcript_MDS <- readRDS(transcript_MDS_file)
+  cat("Loaded transcript MDS plot\n")
 } else {
-  warning("transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
+  warning("Transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
 }
 
-if (file.exists("../results/lipid_MDS_23.rds")) {
-  p_lipid_MDS <- readRDS("../results/lipid_MDS_23.rds")
-  cat("Loaded fitted curves plot\n")
+lipid_MDS_file <- file.path(paths$intermediate, "lipid_MDS_23.rds")
+if (file.exists(lipid_MDS_file)) {
+  p_lipid_MDS <- readRDS(lipid_MDS_file)
+  cat("Loaded lipid MDS plot\n")
 } else {
-  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+  warning("Lipid MDS plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
 }
 
 
@@ -261,7 +268,7 @@ compound_MDS<- ggpubr::ggarrange(
   align ="hv")
 
 ggsave(
-  filename = "~/Desktop/compound_MDS.png",
+  filename = file.path(paths$figures, "compound_MDS.png"),
   plot = compound_MDS,
   height = 14,
   width = 8,
@@ -277,7 +284,7 @@ compound_volcano<- ggpubr::ggarrange(
   )
 
 ggsave(
-  filename = "~/Desktop/compound_volcano.png",
+  filename = file.path(paths$figures, "compound_volcano.png"),
   plot = compound_volcano,
   height = 12,
   width = 14,
@@ -293,7 +300,7 @@ ggsave(
 )
 
 ggsave(
-  filename = "~/Desktop/compound_plot.png",
+  filename = file.path(paths$figures, "compound_plot.png"),
   plot = compound_plot,
   height = 12,
   width = 20,
@@ -376,99 +383,125 @@ volcano_2panel <- effects_2panel %>%
 ## Print panels
 ```{r,print_panels}
 
-# Load lipid volcano
-if (file.exists("../results/lipid_volcano_2_TIC.rds")) {
-  lipid_volcano_2 <- readRDS("../results/lipid_volcano_2_TIC.rds")
-  cat("Loaded lipid volcano plot\n")
+# Load lipid volcano (2-panel version)
+lipid_volcano_2_file <- file.path(paths$intermediate, "lipid_volcano_2_TIC.rds")
+if (file.exists(lipid_volcano_2_file)) {
+  lipid_volcano_2 <- readRDS(lipid_volcano_2_file)
+  cat("Loaded lipid volcano 2-panel plot\n")
 } else {
-  warning("Growth parameter plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
+  warning("Lipid volcano 2-panel plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
 }
 
 
-# Load transcript MDS
-if (file.exists("../results/transcript_MDS_12.rds")) {
-  p_transcript_MDS <- readRDS("../results/transcript_MDS_12.rds")
-  cat("Loaded growth parameter plot\n")
-} else {
-  warning("transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
+# Load transcript MDS (reuse if already loaded)
+if (!exists("p_transcript_MDS")) {
+  transcript_MDS_file <- file.path(paths$intermediate, "transcript_MDS_12.rds")
+  if (file.exists(transcript_MDS_file)) {
+    p_transcript_MDS <- readRDS(transcript_MDS_file)
+    cat("Loaded transcript MDS plot\n")
+  } else {
+    warning("Transcript MDS plot not found. Run differential_expression_leaf_treatment_model.Rmd first.")
+  }
 }
 
-if (file.exists("../results/lipid_MDS_23.rds")) {
-  p_lipid_MDS <- readRDS("../results/lipid_MDS_23.rds")
-  cat("Loaded fitted curves plot\n")
-} else {
-  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+if (!exists("p_lipid_MDS")) {
+  lipid_MDS_file <- file.path(paths$intermediate, "lipid_MDS_23.rds")
+  if (file.exists(lipid_MDS_file)) {
+    p_lipid_MDS <- readRDS(lipid_MDS_file)
+    cat("Loaded lipid MDS plot\n")
+  } else {
+    warning("Lipid MDS plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
+  }
 }
 
-if (file.exists("../results/lipid_trajectory_6panel.rds")) {
-  p_lipid_examples <- readRDS("../results/lipid_trajectory_6panel.rds")
-  cat("Loaded fitted curves plot\n")
+lipid_trajectory_file <- file.path(paths$intermediate, "lipid_trajectory_6panel.rds")
+if (file.exists(lipid_trajectory_file)) {
+  p_lipid_examples <- readRDS(lipid_trajectory_file)
+  cat("Loaded lipid trajectory 6-panel plot\n")
 } else {
-  warning("Fitted curves plot not found. differential_lipid_analysis_leaf_treatment_interaction_model  first.")
+  warning("Lipid trajectory plot not found. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.")
 }
 
 
-top_panel   <- cowplot::plot_grid(
-  p_transcript_MDS +  theme(plot.margin = margin(l=5.5,r=-15, b=-5, "pt")),
-  volcano_2panel + ggpubr::rremove("xlab"),
-  nrow=1,
-  ncol=2,
-  rel_widths = c(1,2),
-  align = "h", 
-  axis = "tb", 
-  common.legend = TRUE,
-  legend = "left")
+# Only create panels if all required plots exist
+if (exists("p_transcript_MDS") && exists("volcano_2panel")) {
+  top_panel   <- cowplot::plot_grid(
+    p_transcript_MDS +  theme(plot.margin = margin(l=5.5,r=-15, b=-5, "pt")),
+    volcano_2panel + ggpubr::rremove("xlab"),
+    nrow=1,
+    ncol=2,
+    rel_widths = c(1,2),
+    align = "h",
+    axis = "tb",
+    common.legend = TRUE,
+    legend = "left")
 
-ggsave(
-  filename = "~/Desktop/top_panel.png",
-  plot = top_panel,
-  height = 6,
-  width = 18,
-  units = "in",
-  dpi = 150
-)
-cat("Figure saved: top_panel.png (10 x 6 inches @ 300 dpi)\n")
-
-bottom_panel   <- cowplot::plot_grid(
-  p_lipid_MDS +  theme(plot.margin = margin(l=5.5,r=-15, "pt")),
-  lipid_volcano_2 + ggpubr::rremove("xlab"),
-  nrow=1,
-  ncol=2,
-  rel_widths = c(1,2),
-  align = "h", 
-  axis = "tb", 
-  common.legend = TRUE,
-  legend = "left")
-
-
-ggsave(
-  filename = "~/Desktop/bottom_panel.png",
-  plot = bottom_panel,
-  height = 6,
-  width = 18,
-  units = "in",
-  dpi = 150
-)
-cat("Figure saved: bottom_panel.png (10 x 6 inches @150 dpi)\n")
-
-
-cat("Figure saved: volcano_plot_2panel.png (10 x 6 inches @ 150 dpi)\n")
-# The top and bottom panels don't look good on the knitted document
-compound_volcano_2<- ggpubr::ggarrange(
-  volcano_2panel,
-  lipid_volcano_2,
-  ncol=1,
-  align ="v"
+  ggsave(
+    filename = file.path(paths$figures, "top_panel.png"),
+    plot = top_panel,
+    height = 6,
+    width = 18,
+    units = "in",
+    dpi = 150
   )
-compound_MDS<- ggpubr::ggarrange(
-  p_lipid_MDS,
-  p_transcript_MDS,
-  ncol=2,
-  align ="hv")
+  cat("Figure saved: top_panel.png (18 x 6 inches @ 150 dpi)\n")
+} else {
+  cat("Skipping top panel - required plots not available.\n")
+}
 
-# So I print a webpage friendly version for knitting
-print(compound_volcano_2)
-print(compound_MDS)
+if (exists("p_lipid_MDS") && exists("lipid_volcano_2")) {
+  bottom_panel   <- cowplot::plot_grid(
+    p_lipid_MDS +  theme(plot.margin = margin(l=5.5,r=-15, "pt")),
+    lipid_volcano_2 + ggpubr::rremove("xlab"),
+    nrow=1,
+    ncol=2,
+    rel_widths = c(1,2),
+    align = "h",
+    axis = "tb",
+    common.legend = TRUE,
+    legend = "left")
+
+  ggsave(
+    filename = file.path(paths$figures, "bottom_panel.png"),
+    plot = bottom_panel,
+    height = 6,
+    width = 18,
+    units = "in",
+    dpi = 150
+  )
+  cat("Figure saved: bottom_panel.png (18 x 6 inches @150 dpi)\n")
+} else {
+  cat("Skipping bottom panel - required plots not available. Run differential_lipid_analysis_leaf_treatment_interaction_model.Rmd first.\n")
+}
+
+
+# The top and bottom panels don't look good on the knitted document
+# So we print webpage-friendly versions for knitting
+if (exists("volcano_2panel") && exists("lipid_volcano_2")) {
+  compound_volcano_2<- ggpubr::ggarrange(
+    volcano_2panel,
+    lipid_volcano_2,
+    ncol=1,
+    align ="v"
+  )
+  print(compound_volcano_2)
+} else {
+  cat("Skipping compound_volcano_2 - lipid_volcano_2 not available.\n")
+  if (exists("volcano_2panel")) {
+    print(volcano_2panel)
+  }
+}
+
+if (exists("p_lipid_MDS") && exists("p_transcript_MDS")) {
+  compound_MDS<- ggpubr::ggarrange(
+    p_lipid_MDS,
+    p_transcript_MDS,
+    ncol=2,
+    align ="hv")
+  print(compound_MDS)
+} else {
+  cat("Skipping compound_MDS - required plots not available.\n")
+}
 ```
 
 
@@ -528,14 +561,14 @@ volcano_1panel <- effects_1panel %>%
 
 
 ggsave(
-  filename = "~/Desktop/volcano_plot_LeafxP.png",
+  filename = file.path(paths$figures, "volcano_plot_LeafxP.png"),
   plot = volcano_1panel,
   height = 7,
   width = 7,
   units = "in",
   dpi = 150
 )
-cat("Figure saved: volcano_plot_LeafxP.png (6 x 6 inches @ 300 dpi)\n")
+cat("Figure saved: volcano_plot_LeafxP.png (7 x 7 inches @ 150 dpi)\n")
 
 print(volcano_1panel)
 
@@ -583,10 +616,13 @@ for (i in 1:nrow(pred_reg_combinations)) {
   subset_data <- table_data %>%
     filter(predictor == pred, regulation == reg)
   
-  # Create filename
-  filename <- paste0("~/Desktop/DEG_table_", pred, "_", reg, ".tex")
-  filename <- gsub(":", "_", filename)
-  filename <- gsub("-", "minus", filename)  # Replace - with negP for filename
+  # Create filename with sanitized predictor/regulation names
+  pred_clean <- gsub(":", "_", pred)
+  pred_clean <- gsub("-", "minus", pred_clean)
+  reg_clean <- gsub(":", "_", reg)
+  reg_clean <- gsub("-", "minus", reg_clean)
+
+  filename <- file.path(paths$tables, paste0("DEG_table_", pred_clean, "_", reg_clean, ".tex"))
   
   # Generate LaTeX table
   subset_data %>%
@@ -622,7 +658,7 @@ table_data %>%
   ) %>%
   kable_classic(full_width = FALSE, latex_options = c("HOLD_position", "scale_down")) %>%
   collapse_rows(columns = 1:2, latex_hline = "major") %>%
-  save_kable(file = "DEG_table_all_combined.tex", format = "latex")
+  save_kable(file = file.path(paths$tables, "DEG_table_all_combined.tex"), format = "latex")
 
 cat("\nSaved: DEG_table_all_combined.tex (", nrow(table_data), "genes total )\n")
 ```

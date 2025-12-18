@@ -18,6 +18,11 @@ knitr::opts_chunk$set(
   fig.width = 12,
   fig.height = 8
 )
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 ## Overview
@@ -91,7 +96,8 @@ pheno_theme3 <- theme_classic2(base_size = 20) +
 ### Load spatially corrected data
 
 ```{r load_corrected_data}
-sp_corrected_file <- "PSU2022_spatially_corrected_both_treatments.csv"
+# Load spatially corrected data with ionome
+sp_corrected_file <- file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments_with_ionome.csv")
 
 sp_corrected_combined <- read.csv(sp_corrected_file) %>%
   mutate(
@@ -904,15 +910,18 @@ print( p_stw_lag)
 ### Main phenotype panel
 ```{r, load_growth_curve_plots}
 # Load growth curve plots
-if (file.exists("../results/plot_growth_params.rds")) {
-  p_gc <- readRDS("../results/plot_growth_params.rds")
+plot_growth_params_file <- file.path(paths$intermediate, "plot_growth_params.rds")
+plot_fitted_curves_file <- file.path(paths$intermediate, "plot_fitted_curves.rds")
+
+if (file.exists(plot_growth_params_file)) {
+  p_gc <- readRDS(plot_growth_params_file)
   cat("Loaded growth parameter plot\n")
 } else {
   warning("Growth parameter plot not found. Run PSU2022_growthcurves.Rmd first.")
 }
 
-if (file.exists("../results/plot_fitted_curves.rds")) {
-  p_fitted <- readRDS("../results/plot_fitted_curves.rds")
+if (file.exists(plot_fitted_curves_file)) {
+  p_fitted <- readRDS(plot_fitted_curves_file)
   cat("Loaded fitted curves plot\n")
 } else {
   warning("Fitted curves plot not found. Run PSU2022_growthcurves.Rmd first.")
@@ -957,17 +966,22 @@ if (length(plot_list) >= 4) {
 
 ```{r stover_panel, fig.width=15, fig.height=8}
 
-p_stw <- ggarrange(
-  p_dw,
-  p_fitted,
-  nrow = 1,
-  ncol = 2,
-  align="hv",
-  labels = LETTERS[(length(plot_list)+3):(length(plot_list)+4)],
-  font.label = list(size = 30)
-)
+# Only create panel if p_fitted exists
+if (exists("p_fitted") && exists("p_dw")) {
+  p_stw <- ggarrange(
+    p_dw,
+    p_fitted,
+    nrow = 1,
+    ncol = 2,
+    align="hv",
+    labels = LETTERS[(length(plot_list)+3):(length(plot_list)+4)],
+    font.label = list(size = 30)
+  )
 
-print(p_stw)
+  print(p_stw)
+} else {
+  cat("Skipping stover panel - p_fitted or p_dw not available. Run PSU2022_growthcurves.Rmd first.\n")
+}
 ```
 ### Combined figure with time series
 
@@ -983,18 +997,20 @@ if (exists("combined_plot") && exists("p_stw")) {
     #labels = c("", "E"),
     font.label = list(size = 30)
   )
-  
-  print(full_figure)
-}
 
-ggsave(
-  filename = "~/Desktop/pheno.png",
-  plot = full_figure,
-  height = 10,
-  width = 16,
-  units = "in",
-  dpi = 150
-)
+  print(full_figure)
+
+  ggsave(
+    filename = file.path(paths$figures, "pheno.png"),
+    plot = full_figure,
+    height = 10,
+    width = 16,
+    units = "in",
+    dpi = 150
+  )
+} else {
+  cat("Skipping full figure - required plots not available.\n")
+}
 ```
 
 # supplementary figure
@@ -1167,7 +1183,7 @@ supp_global_fdr_plot <- ggarrange(
   font.label = list(size = 30)
 )
 
-ggsave("~/Desktop/supp_global_fdr.png", supp_global_fdr_plot, 
+ggsave(file.path(paths$figures, "supp_global_fdr.png"), supp_global_fdr_plot,
        width = 12, height = 6, units = "in", dpi = 150)
 
 print(supp_global_fdr_plot)
@@ -1176,36 +1192,39 @@ print(supp_global_fdr_plot)
 # Combine supplement
 ```{r, combined_stw_supp, fig.width=15, fig.height=15}
 
-growth_supp_figure <- ggarrange(
-  p_gc,
-  p_stw_lag,
-  nrow = 2,
-  ncol = 1,
-  labels = LETTERS[3:4],
-  font.label = list(size = 35),
-  heights= c(0.75,1)
-)
+if (exists("p_gc") && exists("p_stw_lag") && exists("supp_global_fdr_plot")) {
+  growth_supp_figure <- ggarrange(
+    p_gc,
+    p_stw_lag,
+    nrow = 2,
+    ncol = 1,
+    labels = LETTERS[3:4],
+    font.label = list(size = 35),
+    heights= c(0.75,1)
+  )
 
-full_supp_figure <- ggarrange(
-  supp_global_fdr_plot,
-  growth_supp_figure,
-  ncol = 1,
-  nrow = 2,
-  heights= c(0.5,1),
-  font.label = list(size = 35)
-)
+  full_supp_figure <- ggarrange(
+    supp_global_fdr_plot,
+    growth_supp_figure,
+    ncol = 1,
+    nrow = 2,
+    heights= c(0.5,1),
+    font.label = list(size = 35)
+  )
 
+  print(full_supp_figure)
 
-full_supp_figure
-
-ggsave(
-  filename = "~/Desktop/biomass.png",
-  plot = full_supp_figure,
-  height = 16,
-  width = 12,
-  units = "in",
-  dpi = 150
-)
+  ggsave(
+    filename = file.path(paths$figures, "biomass.png"),
+    plot = full_supp_figure,
+    height = 16,
+    width = 12,
+    units = "in",
+    dpi = 150
+  )
+} else {
+  cat("Skipping supplementary figure - required plots not available. Run PSU2022_growthcurves.Rmd first.\n")
+}
 ```
 
 ## Session Info

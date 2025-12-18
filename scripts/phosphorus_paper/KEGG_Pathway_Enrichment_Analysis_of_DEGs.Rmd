@@ -17,6 +17,10 @@ knitr::opts_chunk$set(
   fig.width = 12,
   fig.height = 8
 )
+
+# Load project paths
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 # Overview
@@ -41,13 +45,13 @@ library(forcats)
 ```{r load_data}
 # Load gene ID cross-reference
 id_map <- read.csv(
-  "/Users/fvrodriguez/Desktop/Gene_xRef.csv",
+  file.path(paths$data, "Gene_xRef.csv"),
   header = FALSE
 )
 colnames(id_map) <- c("gene", "v5")
 
 # Load differential expression results
-effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+effects_df <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"))
 
 cat("Loaded", nrow(id_map), "gene ID mappings\n")
 ```
@@ -277,7 +281,7 @@ print(annotation_plot)
 ```
 
 # Export Plot Data
-```{r export_plot_data, eval=FALSE}
+```{r export_plot_data}
 # Export data used to generate the KEGG plot
 kegg_plot_data <- to_plot %>%
   left_join(
@@ -293,7 +297,7 @@ kegg_plot_data <- to_plot %>%
 
 write.csv(
   kegg_plot_data,
-  file = "~/Desktop/figure_panels/kegg_plot_input_data.csv",
+  file = file.path(paths$tables, "kegg_plot_input_data.csv"),
   row.names = FALSE
 )
 
@@ -301,23 +305,23 @@ cat("Exported", nrow(kegg_plot_data), "KEGG pathways\n")
 ```
 
 # Export
-```{r export_plots, eval=FALSE}
+```{r export_plots}
 # Save for figure assembly
 saveRDS(
   annotation_plot,
-  file = "~/Desktop/figure_panels/kegg_panel.rds"
+  file = file.path(paths$intermediate, "kegg_panel.rds")
 )
 
 ggsave(
   annotation_plot,
-  file = "~/Desktop/figure_panels/kegg_panel.pdf",
+  file = file.path(paths$figures, "kegg_panel.pdf"),
   height = 7,
   width = 16
 )
 
 ggsave(
   annotation_plot,
-  file = "~/Desktop/HC_DEG_KEGG_annotation.svg",
+  file = file.path(paths$figures, "HC_DEG_KEGG_annotation.svg"),
   height = 7,
   width = 12,
   dpi = 150

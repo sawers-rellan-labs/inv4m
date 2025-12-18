@@ -17,6 +17,11 @@ knitr::opts_chunk$set(
   fig.width = 12,
   fig.height = 8
 )
+
+# Load project paths
+library(here)
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 # Overview
@@ -47,10 +52,10 @@ library(tibble)
 # Data Import
 ```{r load_data}
 # Load differential expression results
-effects_df <- read.csv("~/Desktop/predictor_effects_leaf_interaction_model.csv")
+effects_df <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"))
 
 # Load curated labels
-curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+curated <- read.csv(file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv")) %>%
   dplyr::select(gene, locus_label)
 
 effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
@@ -113,13 +118,9 @@ effects_df <- effects_df %>%
 
 
 # Load GO annotation data
-TERM2NAME <- readRDS(
-  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2NAME.rds"
-)
+TERM2NAME <- readRDS(file.path(paths$data, "TERM2NAME.rds"))
 
-TERM2GENE <- readRDS(
-  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
-)
+TERM2GENE <- readRDS(file.path(paths$data, "TERM2GENE.rds"))
 
 # Gene universe
 universe <- union(
@@ -494,10 +495,10 @@ print(final_combined)
 ```
 
 # Export Supplementary Figure
-```{r save_supplementary, eval=FALSE}
+```{r save_supplementary}
 ggsave(
   final_combined,
-  file = "~/Desktop/FigS_DEG_analysis.svg",
+  file = file.path(paths$figures, "FigS_DEG_analysis.svg"),
   width = 14,
   height = 16
 )
@@ -508,7 +509,7 @@ ggsave(
 # Load and apply GO slim filter
 # slim <- read.table("~/Desktop/gobig/gobig_maize/GO_terms/BP_GO_terms.tsv", header= FALSE, sep ="\t")
 # colnames(slim) <- c("ID","ontlogy")
-slim <- read.csv("~/Desktop/slim_to_plot.csv")
+slim <- read.csv(file.path(paths$data, "slim_to_plot.csv"))
 
 
 
@@ -663,12 +664,12 @@ print(annotation_plot)
 # Save for figure assembly
 saveRDS(
   annotation_plot,
-  file = "~/Desktop/figure_panels/go_panel.rds"
+  file = file.path(paths$intermediate, "go_panel.rds")
 )
 
 ggsave(
   annotation_plot,
-  filename = "~/Desktop/figure_panels/go_panel.pdf",
+  filename = file.path(paths$figures, "go_panel.pdf"),
   height = 7,
   width = 16,
   units = "in"
@@ -692,7 +693,7 @@ go_plot_data <- to_plot %>%
 
 write.csv(
   go_plot_data,
-  file = "~/Desktop/figure_panels/go_plot_input_data.csv",
+  file = file.path(paths$tables, "go_plot_input_data.csv"),
   row.names = FALSE
 )
 
@@ -708,22 +709,24 @@ p_annotation <- go_plot_data %>% filter(Description=="cellular response to phosp
   ) 
 
 
-minusP_0016036 <- effects_df %>% 
+minusP_0016036 <- effects_df %>%
   filter(is_hiconf_DEG,gene %in% p_annotation$geneID & predictor=="-P") %>%
   dplyr::select(predictor, regulation,gene,locus_label, logFC, neglogP, desc_merged)
 
 write.csv(
   minusP_0016036,
-  file = "~/Desktop/minusP_0016036_genes.csv"
-) 
+  file = file.path(paths$intermediate, "minusP_0016036_genes.csv"),
+  row.names = FALSE
+)
 
-leafxP_0016036 <- effects_df %>% 
+leafxP_0016036 <- effects_df %>%
   filter(is_hiconf_DEG,gene %in% p_annotation$geneID & predictor=="Leaf:-P") %>%
   dplyr::select(predictor, regulation,gene,locus_label, logFC, neglogP, desc_merged)
 
 write.csv(
   leafxP_0016036,
-  file = "~/Desktop/leafxP_0016036_genes.csv"
+  file = file.path(paths$intermediate, "leafxP_0016036_genes.csv"),
+  row.names = FALSE
 )  
 ```
 
@@ -733,7 +736,7 @@ write.csv(
 library(dplyr)
 
 # Read your gene CSV file
-gene_data <- read.csv("~/Desktop/leafxP_0016036_genes.csv", row.names = NULL)
+gene_data <- read.csv(file.path(paths$intermediate, "leafxP_0016036_genes.csv"), row.names = NULL)
 
 # Prepare gene table data
 gene_table_data <- gene_data %>%
@@ -825,12 +828,12 @@ create_gene_table <- function(df) {
 # Generate and save LaTeX table
 latex_gene_table <- create_gene_table(gene_table_data)
 writeLines(
-  latex_gene_table, 
-  con = "~/Desktop/leaf_p_interaction_genes_table.tex"
+  latex_gene_table,
+  con = file.path(paths$tables, "leaf_p_interaction_genes_table.tex")
 )
 
 
-gene_data <- read.csv("~/Desktop/minusP_0016036_genes.csv", row.names = NULL)
+gene_data <- read.csv(file.path(paths$intermediate, "minusP_0016036_genes.csv"), row.names = NULL)
 
 # Prepare gene table data
 gene_table_data <- gene_data %>%
@@ -852,12 +855,12 @@ gene_table_data <- gene_data %>%
 # Generate and save LaTeX table
 latex_gene_table <- create_gene_table(gene_table_data )
 writeLines(
-  latex_gene_table, 
-  con = "~/Desktop/minusP_genes_table.tex"
+  latex_gene_table,
+  con = file.path(paths$tables, "minusP_genes_table.tex")
 )
 
 cat("✅ Gene LaTeX table saved to: leaf_p_interaction_genes_table.tex\n")
-cat("✅ Gene LaTeX table saved to: lminusP_genes_table.tex\n")
+cat("✅ Gene LaTeX table saved to: minusP_genes_table.tex\n")
 ```
 
 # Session Info

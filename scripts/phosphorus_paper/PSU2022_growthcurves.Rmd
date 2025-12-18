@@ -18,6 +18,11 @@ knitr::opts_chunk$set(
   fig.width = 12,
   fig.height = 8
 )
+
+# Load project paths
+library(here)
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 ## Overview
@@ -96,7 +101,7 @@ pheno_theme3 <- theme_classic2(base_size = 20) +
 ### Load spatially corrected data
 
 ```{r load_corrected_data}
-sp_corrected_file <- "PSU2022_spatially_corrected_both_treatments.csv"
+sp_corrected_file <- file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments.csv")
 
 sp_corrected_combined <- read.csv(sp_corrected_file) %>%
   mutate(
@@ -1365,10 +1370,10 @@ if (exists("p_dw") && exists("growth_plots") && length(growth_plots) > 0) {
 # Save plots
 ```{r, save_plots}
 # Save growth curve plots
-saveRDS(p_gc, "../results/plot_growth_params.rds")
-saveRDS(p_fitted, "../results/plot_fitted_curves.rds")
+saveRDS(p_gc, file.path(paths$intermediate, "plot_growth_params.rds"))
+saveRDS(p_fitted, file.path(paths$intermediate, "plot_fitted_curves.rds"))
 
-cat("Growth curve plots saved to output/\n")
+cat("Growth curve plots saved to:", paths$intermediate, "\n")
 ```
 
 ---

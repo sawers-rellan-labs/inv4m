@@ -17,6 +17,10 @@ knitr::opts_chunk$set(
   fig.width = 10,
   fig.height = 6
 )
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 # Overview
@@ -53,10 +57,10 @@ gene annotations. Curated locus labels are merged to improve gene annotation
 quality.
 ```{r load_data}
 # Load differential expression results
-effects_df <- read.csv("~/Desktop/DEG_effects.csv")
+effects_df <- read.csv(file.path(paths$data, "DEG_effects.csv"))
 
 # Load curated labels from external file
-curated <- read.csv("~/Desktop/selected_DEGs_curated_locus_label_2.csv") %>%
+curated <- read.csv(file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv")) %>%
   select(gene, locus_label)
 
 effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
@@ -69,7 +73,7 @@ effects_df <- effects_df %>%
 
 # Expression data
 normalized_expression <- readRDS(
-  "~/Desktop/normalized_expression_logCPM.rda"
+  file.path(paths$data, "normalized_expression_logCPM.rda")
 )
 
 # Gene universe
@@ -80,7 +84,7 @@ universe <- effects_df %>%
 
 # GO annotations
 TERM2GENE <- readRDS(
-  "/Users/fvrodriguez/Desktop/GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds"
+  file.path(paths$data, "TERM2GENE_Fattel_2024_full.rds")
 )
 
 cat("Expression matrix:", dim(normalized_expression), "\n")
@@ -95,7 +99,7 @@ B73 genome versions need to be cross-referenced to map literature genes to
 the current v5 annotation.
 ```{r load_xref}
 v3_v5 <- read.table(
-  file = "/Users/fvrodriguez/Desktop/B73_gene_xref/B73v3_to_B73v5.tsv",
+  file = file.path(paths$data, "B73v3_to_B73v5.tsv"),
   sep = "\t",
   header = FALSE
 ) %>%
@@ -103,7 +107,7 @@ v3_v5 <- read.table(
   separate_longer_delim(cols = v5, delim = ",")
 
 v4_v5 <- read.table(
-  file = "/Users/fvrodriguez/Desktop/B73_gene_xref/B73v4_to_B73v5.tsv",
+  file = file.path(paths$data, "B73v4_to_B73v5.tsv"),
   sep = "\t",
   header = FALSE
 ) %>%
@@ -120,20 +124,20 @@ We compile senescence-associated genes from multiple literature sources:
 - Natural senescence genes
 ```{r load_senescence_genes}
 # SAG orthologs
-sag_orthologs <- read.csv("~/Desktop/SAG_orthologs.csv") %>%
+sag_orthologs <- read.csv(file.path(paths$data, "SAG_orthologs.csv")) %>%
   janitor::clean_names() %>%
   inner_join(v3_v5, by = c(gene_id_maize = "v3"))
 
 # Staygreen network
 staygreen_network <- read.csv(
-  "~/Desktop/staygreen_network_sekhon2019.csv", 
+  file.path(paths$data, "staygreen_network_sekhon2019.csv"),
   na.strings = ""
 ) %>%
   janitor::clean_names() %>%
   inner_join(v4_v5, by = c(gene = "v4"))
 
 # Natural senescence
-natural_senescence <- read.csv("~/Desktop/natural_senescence.csv") %>%
+natural_senescence <- read.csv(file.path(paths$data, "natural_senescence.csv")) %>%
   janitor::clean_names() %>%
   inner_join(v3_v5, by = c(gene_id = "v3"))
 
@@ -691,7 +695,7 @@ left_panel <- cowplot::plot_grid(
 
 
 ggsave(
-  "~/Desktop/left_panel.png",
+  file.path(paths$figures, "left_panel.png"),
   plot = left_panel,
   width = 9,
   height = 15,
@@ -713,7 +717,7 @@ print(left_panel)
 
 ```{r load_corncyc}
 corncyc <- read.table(
-  "/Users/fvrodriguez/Desktop/corncyc_pathways.20251021",
+  file.path(paths$data, "corncyc_pathways.txt"),
   sep = "\t",
   header = TRUE,
   quote = ""
@@ -1036,7 +1040,7 @@ p_corncyc_pigments <- corncyc_summary %>%
 print(p_corncyc_pigments)
 
 ggsave(
-  "~/Desktop/corncyc_pigment_biosynthesis_indices.png",
+  file.path(paths$figures, "corncyc_pigment_biosynthesis_indices.png"),
   plot = p_corncyc_pigments,
   width = 12,
   height = 8,
@@ -1263,15 +1267,15 @@ get_annotation_degs(
 ```
 
 # Export Results
-```{r export, eval=FALSE}
+```{r export, eval=TRUE}
 write.csv(
   indices,
-  file = "~/Desktop/expression_indices.csv",
+  file = file.path(paths$intermediate, "expression_indices.csv"),
   row.names = FALSE
 )
 write.csv(
   custom_enrichment_results,
-  file = "~/Desktop/custom_enrichment_results.csv",
+  file = file.path(paths$intermediate, "custom_enrichment_results.csv"),
   row.names = FALSE
 )
 ```
