@@ -1686,7 +1686,48 @@ cat("\nSignificant effects per predictor:\n")
 print(with(to_plot, table(predictor, head_group)))
 ```
 
+## Effect Size Plot: All Predictors
 
+```{r effect_plot_all, fig.width=12, fig.height=10}
+pd <- position_dodge(0.4)
+
+effect_plot_all <- to_plot %>%
+  droplevels() %>%
+  mutate(response = fct_reorder(response, .r)) %>%
+  ungroup() %>%
+  ggplot(aes(
+    x = logFC,
+    y = response,
+    col = head_group
+  )) +
+  xlab("Effect (log2 Fold Change)") +
+  geom_vline(xintercept = 0, lty = 2) +
+  geom_point(position = pd, size = 3) +
+  geom_errorbar(
+    aes(xmin = upper, xmax = lower),
+    position = pd,
+    width = 0.2,
+    linewidth = 0.7
+  ) +
+  guides(
+    shape = guide_legend(title = NULL),
+    color = guide_legend(reverse = TRUE)
+  ) +
+  facet_wrap(. ~ predictor, scales = "free", ncol = 4) +
+  scale_y_discrete(limits = rev) +
+  scale_color_manual(values = c("blue", "red", "chartreuse")) +
+  theme_light(base_size = 15) +
+  theme(
+    legend.position = "top",
+    strip.background = element_rect(fill = "white"),
+    strip.text = element_text(color = "black", size = 15),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank()
+  )
+
+print(effect_plot_all)
+```
 
 # Export Results
 
@@ -1720,7 +1761,6 @@ ggsave(
   width = 10
 )
 
-# Save effect plots
 ggsave(
   effect_plot_all,
   file = file.path(paths$figures, "lipid_effects_all.svg"),

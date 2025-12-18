@@ -681,6 +681,9 @@ if (length(all_supp_plots) > 4) {
 ```
 
 ## Save Output
+
+When exporting t-test results to CSV, we remove list columns that arise from using `group_modify()` with `rstatix::add_y_position()`. These list columns store grouping metadata needed for plotting significance brackets but cannot be serialized to CSV format. The full data with `y.position` values remains in memory for plotting.
+
 ```{r save-plots}
 # Save main combined figure (content only)
 ggsave(
@@ -758,12 +761,12 @@ if (exists("p_supp_with_ratios")) {
   )
 }
 
-# Export CSV files (remove list columns if present)
+# Export CSV files
 write.csv(effects, file.path(paths$intermediate, "ionome_linear_model_effects.csv"), row.names = FALSE)
 write.csv(significant, file.path(paths$intermediate, "ionome_significant_effects.csv"), row.names = FALSE)
 write.csv(interaction_effects, file.path(paths$intermediate, "ionome_interaction_effects.csv"), row.names = FALSE)
 
-# Remove list columns from t-test results before export
+# Drop y position list columns - CSV cannot serialize them
 treatment_export <- treatment.t.test %>%
   select(where(~!is.list(.)))
 write.csv(treatment_export, file.path(paths$intermediate, "ionome_treatment_ttests.csv"), row.names = FALSE)
@@ -950,7 +953,7 @@ ggsave(
   dpi = 300
 )
 
-# Export genotype comparison statistics (remove list columns)
+# Drop y position list columns - CSV cannot serialize them
 genotype_export <- genotype.t.test %>%
   select(where(~!is.list(.)))
 write.csv(
