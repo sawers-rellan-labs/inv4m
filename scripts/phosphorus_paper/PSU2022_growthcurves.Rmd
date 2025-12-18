@@ -2,12 +2,19 @@
 title: "PSU 2022 Inv4m Phenotype Analysis with Growth Curve Parameters"
 author: "Fausto Rodriguez"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
-output: 
+output:
   html_document:
     toc: true
     toc_float: true
     code_folding: show
     theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}

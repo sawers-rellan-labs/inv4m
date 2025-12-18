@@ -2,12 +2,19 @@
 title: "Differential Expression Volcano Plot Analysis"
 author: "Your Name"
 date: "`r Sys.Date()`"
-output: 
+output:
   html_document:
     toc: true
     toc_float: true
     code_folding: show
     theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(

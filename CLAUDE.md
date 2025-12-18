@@ -24,7 +24,10 @@ inv4m/
 │   ├── shared_paper/            # Foundation scripts used by BOTH papers
 │   └── utils/                   # Shared R utilities
 ├── data/                        # Raw data and annotations (git-ignored, symlink)
-├── results/                     # All outputs (git-ignored)
+├── docs/                        # GitHub Pages (HTML reports)
+│   ├── index.html               # Landing page
+│   └── phosphorus_paper/        # Paper-specific reports
+├── results/                     # Intermediate outputs (git-ignored)
 └── .gitignore                   # Configured for large data/results
 ```
 
@@ -54,8 +57,9 @@ inv4m/
 results/phosphorus_paper/
 ├── intermediate/    # 29 CSV files (processed data)
 ├── figures/         # 28 files (PDF, PNG, SVG)
-├── tables/          # 11 .tex files (LaTeX only)
-└── reports/         # 11 HTML reports
+└── tables/          # 11 .tex files (LaTeX only)
+
+docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 ```
 
 ### Infrastructure
@@ -65,9 +69,8 @@ results/phosphorus_paper/
 - `paths$intermediate` - Processed CSV/RDS files
 - `paths$figures` - Publication figures
 - `paths$tables` - LaTeX tables only
-- `paths$reports` - Rendered notebooks
 
-✅ **render_notebook.R** - Generic rendering utility
+✅ **render_notebook.R** - Renders notebooks to `docs/{paper}/` for GitHub Pages
 
 ✅ **.gitignore** - Properly configured
 
@@ -78,7 +81,7 @@ results/phosphorus_paper/
 - [x] Zero hard-coded paths (`~/Desktop/`, `/Users/fvrodriguez/`) in any Rmd file
 - [x] All files use `here::here()` for path construction
 - [x] All notebooks render successfully from project root
-- [x] Clear separation: raw data → `data/`, intermediates → `results/*/intermediate/`, reports → `results/*/reports/`
+- [x] Clear separation: raw data → `data/`, intermediates → `results/*/intermediate/`, reports → `docs/*/`
 - [x] Project runs on any machine without path modifications
 - [x] `grep -r "~/Desktop" scripts/phosphorus_paper/*.Rmd` returns nothing
 
@@ -103,15 +106,24 @@ results/
 ├── phosphorus_paper/
 │   ├── intermediate/    # CSV/RDS processed data files
 │   ├── figures/         # PDF, PNG, SVG publication figures
-│   ├── tables/          # LaTeX tables ONLY (.tex files)
-│   └── reports/         # Rendered HTML notebooks
+│   └── tables/          # LaTeX tables ONLY (.tex files)
 ├── inversion_paper/
 │   └── [same structure]
 └── shared_paper/
     └── [same structure]
 ```
 
-**Key Convention:** `tables/` contains LaTeX (.tex) files only. All CSV outputs go to `intermediate/`.
+### Docs Directory (GitHub Pages)
+
+```
+docs/
+├── index.html              # Landing page (root level)
+└── phosphorus_paper/       # Paper-specific HTML reports
+    ├── GO_Enrichment_Analysis_of_DEGs.html
+    └── ...
+```
+
+**Key Convention:** `tables/` contains LaTeX (.tex) files only. All CSV outputs go to `intermediate/`. HTML reports go to `docs/{paper}/`.
 
 
 ---
@@ -125,7 +137,7 @@ results/
 Rscript scripts/utils/render_notebook.R "scripts/phosphorus_paper/GO_Enrichment_Analysis_of_DEGs.Rmd"
 ```
 
-Output will appear in: `results/phosphorus_paper/reports/GO_Enrichment_Analysis_of_DEGs.html`
+Output will appear in: `docs/phosphorus_paper/GO_Enrichment_Analysis_of_DEGs.html`
 
 ### Path Setup in Rmd Files
 
@@ -134,7 +146,17 @@ Every Rmd should start with:
 ```r
 ---
 title: "Analysis Title"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 
 # Setup project paths
@@ -142,7 +164,7 @@ library(here)
 source(here("scripts", "utils", "setup_paths.R"))
 paths <- setup_project_paths("phosphorus_paper")
 
-# Now use paths$data, paths$shared, paths$intermediate, paths$figures, etc.
+# Now use paths$data, paths$intermediate, paths$figures, etc.
 ```
 
 ### Available Path Variables
@@ -153,7 +175,8 @@ After sourcing `setup_paths.R`, use:
 - `paths$intermediate` - `results/phosphorus_paper/intermediate/`
 - `paths$figures` - `results/phosphorus_paper/figures/`
 - `paths$tables` - `results/phosphorus_paper/tables/`
-- `paths$reports` - `results/phosphorus_paper/reports/`
+
+Note: HTML reports are routed to `docs/{paper}/` via the `knit:` field in YAML headers.
 
 ---
 
@@ -264,7 +287,7 @@ git push origin main
    - CSV files → `paths$intermediate`
    - LaTeX tables → `paths$tables`
    - Figures → `paths$figures`
-   - Reports auto-routed by render_notebook.R
+   - HTML reports → `docs/{paper}/` (via YAML `knit:` field or render_notebook.R)
 
 2. **Path management:** All scripts use `setup_paths.R` utility with `here::here()`
 

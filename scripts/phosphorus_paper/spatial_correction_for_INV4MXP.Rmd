@@ -10,6 +10,13 @@ output:
     code_folding: hide
     fig_width: 12
     fig_height: 8
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}

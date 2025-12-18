@@ -12,7 +12,7 @@ paper_folder <- basename(dirname(input_path))
 
 # Define the root results directory relative to project root
 # We assume the user runs this from the 'inv4m' project root
-output_dir <- file.path("results", paper_folder, "reports")
+output_dir <- file.path("docs", paper_folder)
 
 # Create the results directory if it doesn't exist
 if (!dir.exists(output_dir)) {

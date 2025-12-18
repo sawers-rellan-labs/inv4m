@@ -18,17 +18,17 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 | Notebook | Description |
 |----------|-------------|
-| [Spatial Correction](https://sawers-rellan-labs.github.io/inv4m/spatial_correction_for_INV4MXP.html) | Spatial correction for field phenotypes |
-| [Differential Expression](https://sawers-rellan-labs.github.io/inv4m/differential_expression_leaf_treatment_model.html) | DEG analysis (leaf × treatment interaction) |
+| [Spatial Correction](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/spatial_correction_for_INV4MXP.html) | Spatial correction for field phenotypes |
+| [Differential Expression](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/differential_expression_leaf_treatment_model.html) | DEG analysis (leaf × treatment interaction) |
 | Differential Lipid Analysis | Differential lipid abundance *(report pending)* |
-| [Growth Curves](https://sawers-rellan-labs.github.io/inv4m/PSU2022_growthcurves.html) | Growth curve analysis |
-| [Ionome](https://sawers-rellan-labs.github.io/inv4m/PSU2022_ionome.html) | Mineral nutrient profiling |
-| [Transcription Indices](https://sawers-rellan-labs.github.io/inv4m/PSU2022_make_transcription_indices.html) | Gene expression indices |
-| [Phenotype Marginal Means](https://sawers-rellan-labs.github.io/inv4m/PSU2022_phenotype_marginal_means.html) | Phenotype marginal means |
-| [GO Enrichment](https://sawers-rellan-labs.github.io/inv4m/GO_Enrichment_Analysis_of_DEGs.html) | GO term enrichment |
-| [KEGG Enrichment](https://sawers-rellan-labs.github.io/inv4m/KEGG_Pathway_Enrichment_Analysis_of_DEGs.html) | KEGG pathway enrichment |
-| [LION Enrichment](https://sawers-rellan-labs.github.io/inv4m/LION_Lipid_Enrichment_Analysis.html) | Lipid ontology enrichment |
-| [Volcano Plots](https://sawers-rellan-labs.github.io/inv4m/volcano_plot_analysis.html) | Volcano plots for DEGs |
+| [Growth Curves](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_growthcurves.html) | Growth curve analysis |
+| [Ionome](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_ionome.html) | Mineral nutrient profiling |
+| [Transcription Indices](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_make_transcription_indices.html) | Gene expression indices |
+| [Phenotype Marginal Means](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_phenotype_marginal_means.html) | Phenotype marginal means |
+| [GO Enrichment](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/GO_Enrichment_Analysis_of_DEGs.html) | GO term enrichment |
+| [KEGG Enrichment](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/KEGG_Pathway_Enrichment_Analysis_of_DEGs.html) | KEGG pathway enrichment |
+| [LION Enrichment](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/LION_Lipid_Enrichment_Analysis.html) | Lipid ontology enrichment |
+| [Volcano Plots](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/volcano_plot_analysis.html) | Volcano plots for DEGs |
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 # Render a single notebook
 Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_Analysis_of_DEGs.Rmd
 
-# Output appears in results/phosphorus_paper/reports/
+# Output appears in docs/phosphorus_paper/
 ```
 
 ## Repository Structure

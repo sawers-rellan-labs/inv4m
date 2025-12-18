@@ -37,16 +37,15 @@ setup_project_paths <- function(paper = "phosphorus_paper") {
     results = here::here("results", paper),
     intermediate = here::here("results", paper, "intermediate"),
     figures = here::here("results", paper, "figures"),
-    tables = here::here("results", paper, "tables"),
-    reports = here::here("results", paper, "reports")
+    tables = here::here("results", paper, "tables")
   )
 
   # Create missing result directories (cannot modify data/)
+  # Note: HTML reports go to docs/{paper}/ via YAML knit: field
   result_dirs <- c(
     paths$intermediate,
     paths$figures,
-    paths$tables,
-    paths$reports
+    paths$tables
   )
 
   for (dir_path in result_dirs) {

@@ -2,11 +2,18 @@
 title: "Inv4m Ionome Treatment Effects"
 author: "Your Name"
 date: "`r Sys.Date()`"
-output: 
+output:
   html_document:
     theme: cosmo
     toc: true
     toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
