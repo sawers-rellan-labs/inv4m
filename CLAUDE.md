@@ -41,7 +41,7 @@ inv4m/
 |------|---------|--------|
 | `spatial_correction_for_INV4MXP.Rmd` | Spatial correction for phenotypes | ✅ |
 | `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
-| `differential_lipid_analysis_leaf_treatment_interaction_model.Rmd` | Differential lipid analysis | ✅ |
+| `Lipid_differential_abundance.Rmd` | Differential lipid analysis | ✅ |
 | `PSU2022_growthcurves.Rmd` | Growth curve analysis | ✅ |
 | `PSU2022_ionome.Rmd` | Ionome analysis | ✅ |
 | `PSU2022_make_transcription_indices.Rmd` | Transcription indices | ✅ |
@@ -186,7 +186,7 @@ Based on previous I/O mapping analysis, notebooks have dependencies:
 
 ### Batch 1: Foundational (Generate Intermediates)
 These create intermediate files needed by later analyses:
-- `differential_lipid_analysis_leaf_treatment_interaction_model.Rmd` → Creates lipid results
+- `Lipid_differential_abundance.Rmd` → Creates lipid results
 - Any notebook that generates expression matrices or DEG lists
 
 ### Batch 2: Analytic (Consume Intermediates)
