@@ -20,7 +20,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 |----------|-------------|
 | [Spatial Correction](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/spatial_correction_for_INV4MXP.html) | Spatial correction for field phenotypes |
 | [Differential Expression](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/differential_expression_leaf_treatment_model.html) | DEG analysis (leaf × treatment interaction) |
-| Differential Lipid Analysis | Differential lipid abundance *(report pending)* |
+| [Differential Lipid Analysis](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/Lipid_differential_abundance.html) | Differential lipid abundance |
 | [Growth Curves](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_growthcurves.html) | Growth curve analysis |
 | [Ionome](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_ionome.html) | Mineral nutrient profiling |
 | [Transcription Indices](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/PSU2022_make_transcription_indices.html) | Gene expression indices |
