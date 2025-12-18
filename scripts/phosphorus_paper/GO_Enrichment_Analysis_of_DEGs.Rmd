@@ -693,7 +693,7 @@ go_plot_data <- to_plot %>%
 
 write.csv(
   go_plot_data,
-  file = file.path(paths$tables, "go_plot_input_data.csv"),
+  file = file.path(paths$intermediate, "go_plot_input_data.csv"),
   row.names = FALSE
 )
 

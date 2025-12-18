@@ -18,8 +18,8 @@ The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its eff
 ```
 inv4m/
 ├── scripts/
-│   ├── 00_agent_work/          # AI agent sandbox (git-ignored)
-│   ├── 01_hpc_pipelines/        # SLURM/HPC processing scripts
+│   ├── 00_agent_work/           # AI agent sandbox (git-ignored)
+│   ├── 01_hpc_pipelines/        # LSF/HPC processing scripts
 │   ├── 02_genomics_foundation/  # Mapping and synteny
 │   ├── inversion_paper/         # Paper 1 analysis notebooks
 │   ├── phosphorus_paper/        # Paper 2 analysis notebooks
@@ -126,19 +126,28 @@ results/
 
 ## Planned Directory Structure
 
-### Simplified Paper-Level Organization
+### Critical Constraint: data/ is a Symlink
+
+**IMPORTANT:** `data/` is a symbolic link to `../inv4mRNA/data` (shared across projects).
+- ❌ **Cannot** create subdirectories in `data/`
+- ✅ **Can** read files from flat `data/` structure
+- ✅ **Can** organize `results/` however we want
+
+### Actual Structure
 
 ```
-data/
-├── phosphorus_paper/        # Phosphorus-specific input data (~20 files)
-├── inversion_paper/          # Inversion-specific input data (~15 files)
-└── shared_paper/             # Cross-paper resources (GO, gene xrefs, GOMAP)
+data/  → ../inv4mRNA/data (symlink, flat structure, ~30 files)
+├── 22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv
+├── inv4mRNAseq_gene_sample_exp.csv
+├── PSU-PHO22_Metadata.csv
+├── B73v4_to_B73v5.tsv
+└── ... (all files at root level)
 
 results/
 ├── phosphorus_paper/
 │   ├── intermediate/         # Generated data (normalized_expression, DEG effects, etc.)
 │   ├── figures/              # Publication figures (PDF, PNG, SVG)
-│   ├── tables/               # Publication tables (CSV, LaTeX)
+│   ├── tables/               # Publication tables (LaTeX)
 │   └── reports/              # Knitted HTML/PDF notebooks
 ├── inversion_paper/
 │   └── [same structure]
@@ -148,31 +157,32 @@ results/
 ```
 
 **Design Philosophy:**
-- **Flat paper-level folders** - no deep nesting by data type
-- **Mirrors script structure** - `scripts/phosphorus_paper/` ↔ `data/phosphorus_paper/`
-- **Clear data flow** - raw data → intermediate results → final reports
-- **Shared resources extracted** - GO annotations, gene cross-references in `shared_paper/`
+- **Flat `data/` folder** - read-only, shared across projects
+- **Organized `results/`** - paper-specific subdirectories with clear output types
+- **Clear data flow** - `data/` (input) → `results/*/intermediate/` (processed) → `results/*/reports/` (final)
 
 ---
 
 ## Implementation Strategy
 
-### Phase 1: Setup & Migration (Current Phase)
+### Phase 1: Setup & File Migration (Current Phase)
 
 **Focus:** phosphorus_paper only
 
 1. **Create directory structure**
-   - `data/phosphorus_paper/`, `data/shared_paper/`
-   - `results/phosphorus_paper/{intermediate,figures,tables}/`
+   - `results/phosphorus_paper/{intermediate,figures,tables}/` (reports/ already exists)
+   - Note: Cannot modify `data/` (it's a symlink to shared directory)
 
-2. **Migrate files from Desktop**
-   - Categorize 20+ Desktop files as phosphorus-specific vs. shared
-   - Copy to appropriate `data/` subdirectories
+2. **Audit and migrate Desktop files**
+   - Identify 20+ files currently referenced from `~/Desktop/` in Rmds
+   - Copy missing files to flat `data/` directory (if they don't already exist)
    - Backup Desktop before migration: `tar -czf ~/Desktop_backup_$(date +%F).tar.gz ~/Desktop/`
+   - Work with existing flat structure (no subdirectories)
 
 3. **Create path configuration utility**
    - `scripts/utils/setup_paths.R` with `setup_project_paths()` function
    - Returns named list of standardized paths using `here::here()`
+   - Points to flat `data/` structure
    - Every Rmd sources this at the top
 
 ### Phase 2: Rmd Refactoring
@@ -192,8 +202,11 @@ library(here)
 source(here("scripts", "utils", "setup_paths.R"))
 paths <- setup_project_paths("phosphorus_paper")
 
+# All data files referenced from flat data/ directory
 effects_df <- read.csv(file.path(paths$data, "predictor_effects_leaf_interaction_model.csv"))
-TERM2GENE <- readRDS(file.path(paths$shared, "GOMAP_TERM2GENE.rds"))
+TERM2GENE <- readRDS(file.path(paths$data, "GOMAP_TERM2GENE.rds"))
+
+# Outputs organized in results/
 ggsave(file.path(paths$figures, "go_panel.pdf"), plot = p)
 ```
 
@@ -215,27 +228,27 @@ ggsave(file.path(paths$figures, "go_panel.pdf"), plot = p)
 
 ## File Classification (Phosphorus Paper)
 
-### Input Files (To be moved to `data/`)
+### Input Files (Flat `data/` directory)
 
-**Phosphorus-Specific** → `data/phosphorus_paper/`
+**Files that should exist in `data/`** (copied from Desktop if missing):
 - `predictor_effects_leaf_interaction_model.csv` - DEG analysis results
-- `selected_DEGs_curated_locus_label_2.csv` - Curated gene annotations
+- `selected_DEGs_curated_locus_label_2.csv` - Curated gene annotations ✅ (already exists)
 - `selected_DEGs_leaf_interaction_model.csv` - Final DEG list
 - `DEG_effects.csv` - Effect sizes
 - `normalized_expression_logCPM.rda` - Normalized expression matrix
 - `PSU2022_spatially_corrected_both_treatments.csv` - Phenotypes
-- `22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv` - Field data
-- `PSU_RawData_MSDial_NewStdInt_240422.csv` - MS-Dial lipid data
+- `22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv` - Field data ✅ (already exists)
+- `PSU_RawData_MSDial_NewStdInt_240422.csv` - MS-Dial lipid data ✅ (already exists)
 - `LION-enrichment_LowPVSHighP.csv` - LION enrichment
-- `inv4mRNAseq_metadata.csv` - RNA-seq metadata
-- `PSU-PHO22_ms_order.csv` - MS injection order
+- `inv4mRNAseq_metadata.csv` - RNA-seq metadata ✅ (already exists)
+- `PSU-PHO22_ms_order.csv` - MS injection order ✅ (already exists)
 
-**Shared Resources** → `data/shared_paper/`
-- `GOMAP_maize_B73_NAM5/TERM2NAME.rds` - GO term names
-- `GOMAP_maize_B73_NAM5/TERM2GENE_Fattel_2024_full.rds` - GO mappings
-- `B73_gene_xref/B73v3_to_B73v5.tsv` - Gene version mapping
-- `B73_gene_xref/B73v4_to_B73v5.tsv` - Gene version mapping
-- `corncyc_pathways.20251021` - CornCyc pathways
+**Annotation files** (flat in `data/`, rename if needed):
+- `TERM2NAME.rds` - GO term names (from Desktop GOMAP folder)
+- `TERM2GENE.rds` - GO mappings (from Desktop GOMAP folder)
+- `B73v3_to_B73v5.tsv` - Gene version mapping
+- `B73v4_to_B73v5.tsv` - Gene version mapping ✅ (already exists)
+- `corncyc_pathways.txt` - CornCyc pathways
 - `slim_to_plot.csv` - GO slim filter
 - `SAG_orthologs.csv` - Senescence genes
 - `staygreen_network_sekhon2019.csv` - Staygreen genes
@@ -296,8 +309,7 @@ paths <- setup_project_paths("phosphorus_paper")
 
 After sourcing `setup_paths.R`, use:
 
-- `paths$data` - `data/phosphorus_paper/`
-- `paths$shared` - `data/shared_paper/`
+- `paths$data` - `data/` (flat, symlinked directory - read-only)
 - `paths$intermediate` - `results/phosphorus_paper/intermediate/`
 - `paths$figures` - `results/phosphorus_paper/figures/`
 - `paths$tables` - `results/phosphorus_paper/tables/`

@@ -297,7 +297,7 @@ kegg_plot_data <- to_plot %>%
 
 write.csv(
   kegg_plot_data,
-  file = file.path(paths$tables, "kegg_plot_input_data.csv"),
+  file = file.path(paths$intermediate, "kegg_plot_input_data.csv"),
   row.names = FALSE
 )
 

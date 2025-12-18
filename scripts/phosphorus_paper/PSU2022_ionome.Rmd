@@ -752,19 +752,19 @@ if (exists("p_supp_with_ratios")) {
 }
 
 # Export CSV files (remove list columns if present)
-write.csv(effects, file.path(paths$tables, "ionome_linear_model_effects.csv"), row.names = FALSE)
-write.csv(significant, file.path(paths$tables, "ionome_significant_effects.csv"), row.names = FALSE)
-write.csv(interaction_effects, file.path(paths$tables, "ionome_interaction_effects.csv"), row.names = FALSE)
+write.csv(effects, file.path(paths$intermediate, "ionome_linear_model_effects.csv"), row.names = FALSE)
+write.csv(significant, file.path(paths$intermediate, "ionome_significant_effects.csv"), row.names = FALSE)
+write.csv(interaction_effects, file.path(paths$intermediate, "ionome_interaction_effects.csv"), row.names = FALSE)
 
 # Remove list columns from t-test results before export
 treatment_export <- treatment.t.test %>%
   select(where(~!is.list(.)))
-write.csv(treatment_export, file.path(paths$tables, "ionome_treatment_ttests.csv"), row.names = FALSE)
+write.csv(treatment_export, file.path(paths$intermediate, "ionome_treatment_ttests.csv"), row.names = FALSE)
 
 if (nrow(ratio.t.test) > 0) {
   ratio_export <- ratio.t.test %>%
     select(where(~!is.list(.)))
-  write.csv(ratio_export, file.path(paths$tables, "ionome_ratio_ttests.csv"), row.names = FALSE)
+  write.csv(ratio_export, file.path(paths$intermediate, "ionome_ratio_ttests.csv"), row.names = FALSE)
 }
 ```
 
@@ -948,7 +948,7 @@ genotype_export <- genotype.t.test %>%
   select(where(~!is.list(.)))
 write.csv(
   genotype_export,
-  file.path(paths$tables, "ionome_genotype_comparison_ttests.csv"),
+  file.path(paths$intermediate, "ionome_genotype_comparison_ttests.csv"),
   row.names = FALSE
 )
 ```

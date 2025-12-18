@@ -220,7 +220,7 @@ ggsave(
 # Export processed data
 write.csv(
   sig_enrichment,
-  file = file.path(paths$tables, "LION_enrichment_significant.csv"),
+  file = file.path(paths$intermediate, "LION_enrichment_significant.csv"),
   row.names = FALSE
 )
 ```

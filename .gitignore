@@ -25,3 +25,4 @@ scripts/00_agent_work/
 *plan.sh
 migration_audit.md
 .gemini/
+.claude/
