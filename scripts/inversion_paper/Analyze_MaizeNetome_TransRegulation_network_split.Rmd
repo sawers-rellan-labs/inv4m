@@ -63,9 +63,6 @@ library(rtracklayer)
 library(GenomicRanges)
 library(igraph)
 library(visNetwork)
-
-if (!dir.exists("results/phosphorus_paper/intermediate")) dir.create("results/phosphorus_paper/intermediate", recursive = TRUE)
-
 ```
 
 # Helper Functions
