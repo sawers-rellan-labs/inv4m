@@ -747,6 +747,12 @@ bipartite_edges <- data.frame(
 )
 
 cat("Bipartite network edges:", nrow(bipartite_edges), "\n")
+
+# Export bipartite edges for downstream analysis
+write.csv(bipartite_edges,
+          file.path(paths$intermediate, "inv4m_bipartite_edges.csv"),
+          row.names = FALSE)
+cat("Exported bipartite edges to intermediate/\n")
 ```
 
 ---

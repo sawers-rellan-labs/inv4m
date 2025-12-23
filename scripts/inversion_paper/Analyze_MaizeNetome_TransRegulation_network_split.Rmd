@@ -495,7 +495,7 @@ cat("Genes in flanking regions:", length(flanking_introgression_gene_ids),
 
 ```{r load_field_degs}
 effects_df <- read.csv(
-  "results/phosphorus_paper/intermediate/predictor_effects_leaf_interaction_model.csv", 
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
   na.strings = c("NA", NA, "")
 ) %>%
   filter(predictor == "Inv4m")

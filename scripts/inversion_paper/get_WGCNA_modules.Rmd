@@ -1112,7 +1112,7 @@ if (nrow(cis_enriched_inv4m) > 0) {
 ```{r load_trans_network}
 cat("Loading trans co-expression network...\n")
 
-trans_edges <- read_csv(file.path(paths$data, "inv4m_bipartite_edges.csv"))
+trans_edges <- read_csv(file.path(paths$intermediate, "inv4m_bipartite_edges.csv"))
 
 cat("Trans network edges loaded:", nrow(trans_edges), "\n")
 cat("Columns:", paste(colnames(trans_edges), collapse = ", "), "\n")

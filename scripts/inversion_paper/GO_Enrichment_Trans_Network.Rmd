@@ -559,7 +559,7 @@ print(table(slim_top@compareClusterResult$Cluster))
 # Identify Terms with Known Genes
 
 **Purpose**: Filter to GO terms that include genes with characterized symbols for annotation.
-```{r identify_known_genes}
+```{r identify_known_genes_viz}
 # Get effects with gene symbols for labeling
 effects_symbol <- effects_df %>%
   filter(is_DEG) %>%
