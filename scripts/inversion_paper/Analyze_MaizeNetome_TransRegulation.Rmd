@@ -373,7 +373,7 @@ visualize_trans_network <- function(edges,
 # Define Genomic Regions
 
 ```{r load_v5_annotations}
-v5_gff <- "~/ref/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+v5_gff <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
 v5 <- rtracklayer::import(v5_gff) %>%
   subset(type == "gene" & seqnames %in% 1:10)
 
@@ -428,7 +428,7 @@ cat("Genes in flanking regions:", length(flanking_introgression_gene_ids), "\n")
 # Load Differential Expression Results
 
 ```{r load_field_degs}
-effects_df <- read.csv(file.path(paths$data, "predictor_effects_leaf_interaction_model.csv"),
+effects_df <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
                        na.strings = c("NA", NA, "")) %>%
   filter(predictor == "Inv4m")
 
@@ -687,13 +687,13 @@ cat("Reference edges from MaizeNetome:", nrow(reference_edges_maizenetome), "\n"
 # Calculate Bipartite Trans Co-expression Network
 
 ```{r load_expression_data}
-voomR <- readRDS(file.path(paths$data, "normalized_expression_voom_object.rda"))
+voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
 cat("Expression matrix:", nrow(voomR$E), "genes x", ncol(voomR$E), "samples\n")
 ```
 
 ```{r filter_ld_linked_genes}
-linked <- read.table("inv4m_linked_genes_to_filter.txt", header = TRUE)
+linked <- read.table(file.path(paths$intermediate, "inv4m_linked_genes_to_filter.txt"), header = TRUE)
 
 cat("LD-linked genes loaded:", nrow(linked), "\n")
 

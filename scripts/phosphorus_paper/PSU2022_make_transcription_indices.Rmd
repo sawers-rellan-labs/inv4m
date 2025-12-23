@@ -80,7 +80,7 @@ effects_df <- effects_df %>%
   select(-locus_label_curated)
 
 normalized_expression <- readRDS(
-  file.path(paths$data, "normalized_expression_logCPM.rda")
+  file.path(paths$data, "normalized_expression_logCPM.rds")
 )
 
 universe <- effects_df %>%
@@ -1077,7 +1077,7 @@ print(p_top_panel)
 
 ## Panel C: Marker Gene  Ilustration
 
-```{r left_panel_c, fig.width=9, fig.height=7.5}
+```{r left_panel_c, fig.width=9, fig.height=6}
 marker_genes <- data.frame(
   locus_label = c("pep1", "salt1",
                   "ssu1", "mir3",
@@ -2158,7 +2158,7 @@ print(p_combined_pooled_separate_legends)
 ```
 ## Panel C: Marker Gene Ilustration with black facet labels
 
-```{r left_panel_c_black_labels, fig.width=9, fig.height=7.5}
+```{r left_panel_c_black_labels, fig.width=9, fig.height=7}
 
 marker_genes <- data.frame(
   locus_label = c("pep1", "salt1",
@@ -2302,7 +2302,7 @@ print(p_markers)
 ```
 ## Print left panel 2
 
-```{r}
+```{r, fig.height=15, fig.width=9}
 left_panel <- cowplot::plot_grid(
   p_combined_pooled_separate_legends  +
   theme(plot.margin = margin(5.5, 80, up, 5.5, "pt")), 

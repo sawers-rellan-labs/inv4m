@@ -151,11 +151,17 @@ counts <- read.csv(file.path(paths$data, "inv4mRNAseq_gene_sample_exp.csv"))
 ## Load Sample Metadata
 
 ```{r load_metadata}
-sampleInfo <- read.csv(file.path(paths$data, "PSU-PHO22_Metadata.csv"))
-sampleInfo$Treatment <- factor(sampleInfo$Treatment)
-levels(sampleInfo$Treatment) <- c("+P", "-P")
-sampleInfo$Genotype <- factor(sampleInfo$Genotype)
-levels(sampleInfo$Genotype) <- c("CTRL", "Inv4m")
+sampleInfo <- read.csv(file.path(paths$data, "inv4mRNAseq_metadata.csv"))
+# Recode Treatment: High_P -> +P, Low_P -> -P
+sampleInfo$Treatment <- factor(sampleInfo$Treatment,
+                               levels = c("High_P", "Low_P"),
+                               labels = c("+P", "-P"))
+# Recode genotype: CTRL -> CTRL, INV4 -> Inv4m (note: column is lowercase)
+sampleInfo$Genotype <- factor(sampleInfo$genotype,
+                              levels = c("CTRL", "INV4"),
+                              labels = c("CTRL", "Inv4m"))
+# Create alias for RNA_Plant from NCSU_RNA_plant
+sampleInfo$RNA_Plant <- sampleInfo$NCSU_RNA_plant
 {
   cat("\nSample meta\n")
   cat("  Total samples:", nrow(sampleInfo), "\n")
@@ -167,10 +173,6 @@ levels(sampleInfo$Genotype) <- c("CTRL", "Inv4m")
 ## Prepare Count Matrix
 
 ```{r prepare_counts}
-# Create sample ID mapping
-tag <- sampleInfo$side_tag
-names(tag) <- sampleInfo$library
-
 # Extract gene IDs
 gene_ids <- data.frame(gene = counts[, 2])
 
@@ -178,16 +180,15 @@ gene_ids <- data.frame(gene = counts[, 2])
 counts <- as.matrix(counts[, -c(1:2)])
 rownames(counts) <- gene_ids$gene
 
-# Map sample names using tags
-sampleNames <- tag[colnames(counts)]
-colnames(counts) <- sampleNames
+# Use library column for sample matching (side_tag has Excel errors)
+sampleNames <- colnames(counts)
 
 # Reorder metadata to match count matrix column order
-sampleInfo <- sampleInfo[match(sampleNames, sampleInfo$side_tag), ]
+sampleInfo <- sampleInfo[match(sampleNames, sampleInfo$library), ]
 
 {
   cat("\nAll samples in metadata:",
-      all(sampleNames %in% sampleInfo$side_tag), "\n")
+      all(sampleNames %in% sampleInfo$library), "\n")
   cat("Count matrix prepared:\n")
   cat("  Genes:", nrow(counts), "\n")
   cat("  Samples:", ncol(counts), "\n")
@@ -324,7 +325,7 @@ mds <- plotMDS(
 
   y_filtered_bySample,
   pch = 21,
-  label = y_filtered_bySample$samples$side_tag,
+  label = y_filtered_bySample$samples$library,
   plot = FALSE
 )
 
@@ -555,8 +556,8 @@ design <- model.matrix(
 voomR <- voom(y_filtered_bySample, design = design, plot = FALSE)
 
 # Save normalized expression for downstream analyses
-saveRDS(voomR$E, file = file.path(paths$intermediate, "normalized_expression_logCPM_leaf_trt.rda"))
-saveRDS(voomR, file = file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rda"))
+saveRDS(voomR$E, file = file.path(paths$intermediate, "normalized_expression_logCPM_leaf_trt.rds"))
+saveRDS(voomR, file = file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
 {
   cat("Normalization factors range:",
@@ -867,7 +868,7 @@ gene_pannzer <- gene_symbol_unique %>%
   dplyr::select(gene_model, locus_symbol, locus_name, desc)
 
 # Genomic coordinates (GRanges + data.frame)
-v5_gff_file <- "/Users/fvrodriguez/ref/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+v5_gff_file <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
 genes_gr <- rtracklayer::import(v5_gff_file) %>%
   subset(type == "gene" & seqnames %in% 1:10)
 genes <- as.data.frame(genes_gr)
@@ -1417,7 +1418,7 @@ interaction_selected <- selected_degs %>%
 
 ```{r spaghetti_plot, fig.width=12, fig.height=10}
 # Load normalized expression data
-voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rda"))
+voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
 # Define genes of interest - High_confidence interaction genes
 interaction_highconf <- effects_df %>%

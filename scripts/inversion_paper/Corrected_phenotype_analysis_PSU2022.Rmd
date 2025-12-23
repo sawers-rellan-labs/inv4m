@@ -68,7 +68,7 @@ library(ggbeeswarm)
 ```{r config-and-gdd}
 environment_name <- "PSU2022"
 planting_date <- mdy("5/26/2022")
-gdd_lookup_file <- "gdd_lookup_table.csv"
+gdd_lookup_file <- file.path(paths$intermediate, "gdd_lookup_table.csv")
 
 gdd_at_phenology <- read_csv(gdd_lookup_file) %>%
   filter(environment == environment_name)

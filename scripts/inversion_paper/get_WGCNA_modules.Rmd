@@ -57,7 +57,7 @@ library(pheatmap)
 ## Normalized Expression
 
 ```{r load_expression}
-voomR <- readRDS(file.path(paths$data, "normalized_expression_voom_object_leaf_trt.rda"))
+voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
 cat("Expression data loaded:\n")
 cat("  Genes:", nrow(voomR$E), "\n")
@@ -68,7 +68,7 @@ cat("  Samples:", ncol(voomR$E), "\n")
 
 ```{r load_degs}
 effects_df <- read_csv(
-  "  file.path(paths$data, "predictor_effects_leaf_interaction_model.csv")"
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv")
 )
 
 inv4m_degs <- effects_df %>%

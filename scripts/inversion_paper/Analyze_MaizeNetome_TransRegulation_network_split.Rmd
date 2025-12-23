@@ -438,7 +438,7 @@ visualize_trans_network <- function(edges,
 # Define Genomic Regions
 
 ```{r load_v5_annotations}
-v5_gff <- "data/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+v5_gff <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
 v5 <- rtracklayer::import(v5_gff) %>%
   subset(type == "gene" & seqnames %in% 1:10)
 
@@ -500,7 +500,7 @@ effects_df <- read.csv(
 ) %>%
   filter(predictor == "Inv4m")
 
-curated <- read.csv("data/selected_DEGs_curated_locus_label_2.csv", 
+curated <- read.csv(file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv"),
                     na.strings = c("NA", NA, "")) %>%
   dplyr::select(gene, locus_label)
 
@@ -646,11 +646,11 @@ cat("Odds ratio:", round(inv4m_flanking_test$estimate, 3), "\n\n")
 # Load MaizeNetome Reference Data
 
 ```{r load_maizenetome}
-left_flanking_maizenetome <- read.csv("data/left_flanking_maizenetome.csv")
+left_flanking_maizenetome <- read.csv(file.path(paths$data, "left_MaizeNetome_coexpression_edges.csv"))
 
-Inv4m_maizenetome <- read.csv("data/Inv4m_maizenetome.csv")
+Inv4m_maizenetome <- read.csv(file.path(paths$data, "inv4m_MaizeNetome_coexpression_edges.csv"))
 
-right_flanking_maizenetome <- read.csv("data/right_flanking_maizenetome.csv")
+right_flanking_maizenetome <- read.csv(file.path(paths$data, "right_MaizeNetome_coexpression_edges.csv"))
 
 MaizeNetome <- rbind(
   left_flanking_maizenetome %>%
@@ -673,12 +673,9 @@ cat("Total MaizeNetome edges:", nrow(MaizeNetome), "\n")
 # Convert Gene IDs from v4 to v5
 
 ```{r load_v4_v5_xref}
-v4_v5 <- read.table(
-  file = "data/v4_v5_gene_ids.txt", 
-  sep = "\t", 
-  header = FALSE
+v4_v5 <- read.csv(
+  file = file.path(paths$data, "v4_v5_2.csv")
 ) %>%
-  dplyr::rename(v4 = V1, v5 = V2) %>%
   separate_longer_delim(cols = v5, delim = ",")
 
 cat("v4 to v5 mappings:", nrow(v4_v5), "\n")
@@ -759,7 +756,7 @@ cat("Reference edges from MaizeNetome:", nrow(reference_edges_maizenetome),
 # Calculate Bipartite Trans Co-expression Network
 
 ```{r load_expression_data}
-voomR <- readRDS("results/phosphorus_paper/intermediate/normalized_expression_voom_object_leaf_trt.rda")
+voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
 n_samples <- ncol(voomR$E)
 
@@ -768,7 +765,7 @@ cat("Expression matrix:", nrow(voomR$E), "genes x", ncol(voomR$E),
 ```
 
 ```{r filter_ld_linked_genes}
-linked <- read.table("data/inv4m_linked_genes_to_filter.txt", header = TRUE)
+linked <- read.table(file.path(paths$intermediate, "inv4m_linked_genes_to_filter.txt"), header = TRUE)
 
 cat("LD-linked genes loaded:", nrow(linked), "\n")
 
