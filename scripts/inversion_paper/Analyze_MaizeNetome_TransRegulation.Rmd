@@ -896,6 +896,84 @@ write.csv(novel_edges,
 cat("Network modules exported to paths$intermediate\n")
 ```
 
+## Export Combined Network Files
+
+**Purpose**: Create combined network files for downstream GO enrichment analysis.
+
+```{r export_combined_network}
+# Combine novel and reference edges with annotations
+all_edges <- bind_rows(
+  novel_edges %>% mutate(network_module = "Novel"),
+  reference_edges %>% mutate(network_module = "Reference")
+) %>%
+  mutate(
+    regulator_region = case_when(
+      from %in% inv4m_regulators ~ "inv4m",
+      from %in% flanking_regulators ~ "flanking",
+      TRUE ~ "other"
+    )
+  )
+
+# Extract unique regulators (cis genes) with region info
+trans_regulators <- data.frame(
+  gene = unique(all_edges$from)
+) %>%
+  left_join(
+    effects_df %>% select(gene, locus_label, locus_symbol, desc_merged, logFC, adj.P.Val),
+    by = "gene"
+  ) %>%
+  mutate(
+    node_type = "regulator",
+    region = case_when(
+      gene %in% inv4m_regulators ~ "inv4m",
+      gene %in% flanking_regulators ~ "flanking",
+      TRUE ~ "other"
+    )
+  ) %>%
+  distinct()
+
+# Extract unique targets (trans genes)
+trans_targets <- data.frame(
+  gene = unique(all_edges$to)
+) %>%
+  left_join(
+    effects_df %>% select(gene, locus_label, locus_symbol, desc_merged, logFC, adj.P.Val),
+    by = "gene"
+  ) %>%
+  mutate(
+    node_type = "target",
+    region = "trans"
+  ) %>%
+  distinct()
+
+# All genes in network with node type and region
+trans_network_all <- bind_rows(
+  trans_regulators,
+  trans_targets
+) %>%
+  distinct()
+
+# Export combined files
+write.csv(trans_regulators,
+          file.path(paths$intermediate, "trans_network_regulators.csv"),
+          row.names = FALSE)
+write.csv(trans_targets,
+          file.path(paths$intermediate, "trans_network_targets.csv"),
+          row.names = FALSE)
+write.csv(trans_network_all,
+          file.path(paths$intermediate, "trans_network_all_genes.csv"),
+          row.names = FALSE)
+write.csv(all_edges,
+          file.path(paths$intermediate, "trans_network_edges_annotated.csv"),
+          row.names = FALSE)
+
+cat("\nCombined network files exported:\n")
+cat("  Regulators (cis):", nrow(trans_regulators), "\n")
+cat("  Targets (trans):", nrow(trans_targets), "\n")
+cat("  All genes:", nrow(trans_network_all), "\n")
+cat("  All edges:", nrow(all_edges), "\n")
+```
+
 ---
 
 # Session Information

@@ -75,10 +75,10 @@ library(DOSE)
 
 ```{r load_network_genes}
 # Load network gene sets
-trans_regulators <- read.csv(file.path(paths$data, "trans_network_regulators.csv"))
-trans_targets <- read.csv(file.path(paths$data, "trans_network_targets.csv"))
-trans_network_all <- read.csv(file.path(paths$data, "trans_network_all_genes.csv"))
-trans_edges <- read.csv(file.path(paths$data, "trans_network_edges_annotated.csv"))
+trans_regulators <- read.csv(file.path(paths$intermediate, "trans_network_regulators.csv"))
+trans_targets <- read.csv(file.path(paths$intermediate, "trans_network_targets.csv"))
+trans_network_all <- read.csv(file.path(paths$intermediate, "trans_network_all_genes.csv"))
+trans_edges <- read.csv(file.path(paths$intermediate, "trans_network_edges_annotated.csv"))
 
 cat("Network composition:\n")
 cat("  Regulators:", nrow(trans_regulators), "\n")
@@ -93,7 +93,7 @@ cat("  Edges:", nrow(trans_edges), "\n")
 
 ```{r load_effects}
 effects_df <- read.csv(
-  file.path(paths$data, "predictor_effects_leaf_interaction_model.csv")
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv")
 ) %>%
   filter(predictor == "Inv4m") %>%
   group_by(gene) %>%
