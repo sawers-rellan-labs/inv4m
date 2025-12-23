@@ -1,16 +1,16 @@
 # inv4m Project Guide
 
-**Last Updated:** 2025-12-22
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Ready to Start
+**Last Updated:** 2025-12-23
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Complete ✅
 **Version:** v1.1.0
 
 ---
 
 ## Project Overview
 
-The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its effects on phosphorus stress response. The codebase contains R/Rmarkdown analysis scripts for two planned papers:
+The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its effects on phosphorus stress response. The codebase contains R/Rmarkdown analysis scripts for two papers:
 
-1. **Inversion Paper** - Characterizes Inv4m effects across field environments (not started)
+1. **Inversion Paper** - Characterizes Inv4m effects across field environments ✅
 2. **Phosphorus Paper** - Analyzes phosphorus stress response and Inv4m interactions ✅
 
 ### Repository Structure
@@ -76,47 +76,43 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
-## Inversion Paper - Ready to Start
+## Inversion Paper - Complete ✅
 
-### Handover Document
+### Scripts (8 Rmd files in `scripts/inversion_paper/`)
 
-See `scripts/00_agent_work/HANDOVER_INVERSION_PAPER.md` for detailed setup instructions.
+| File | Purpose | Status |
+|------|---------|--------|
+| `Annotation_assembly.Rmd` | Inv4m delimitation, breakpoints | ✅ |
+| `plot_genotype_get_correlated_loci.Rmd` | SNP distribution and correlation | ✅ |
+| `Corrected_phenotype_analysis_PSU2022.Rmd` | Corrected phenotype analysis | ✅ |
+| `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
+| `Analyze_MaizeNetome_TransRegulation.Rmd` | Trans coexpression network | ✅ |
+| `get_WGCNA_modules.Rmd` | WGCNA network analysis | ✅ |
+| `GO_Enrichment_Trans_Network.Rmd` | Network GO analysis | ✅ |
+| `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis | ✅ |
 
-### Key Tasks
+### Generated Outputs
 
-1. **Read the paper LaTeX source:** `docs/inversion_paper/main.tex`
-2. **Create directory structure:**
-   ```bash
-   mkdir -p scripts/inversion_paper
-   mkdir -p docs/inversion_paper
-   mkdir -p results/inversion_paper/{intermediate,figures,tables}
-   ```
-3. **Recover scripts from git history:**
-   ```bash
-   git show b2dd1488:scripts/shared_paper/  # List available scripts
-   ```
-4. **Map figures/tables to scripts** (same methodology as phosphorus paper)
-5. **Update all paths to use `setup_paths.R`**
+```
+results/inversion_paper/
+├── intermediate/    # Processed data files
+├── figures/         # Publication figures
+└── tables/          # LaTeX tables only
 
-### Special Instructions
-
-**Differential Expression Script:** Copy (not symlink) to `scripts/inversion_paper/` for independent refinement:
-```bash
-cp scripts/phosphorus_paper/differential_expression_leaf_treatment_model.Rmd \
-   scripts/inversion_paper/differential_expression_leaf_treatment_model.Rmd
+docs/inversion_paper/   # HTML reports (GitHub Pages)
 ```
 
-### Likely Needed Scripts (from git history)
+### Infrastructure
 
-| Script | Purpose |
-|--------|---------|
-| `genotype_by_environment_analysis.Rmd` | GxE analysis |
-| `inv4mGxE_2025.Rmd` | Inv4m GxE analysis |
-| `inv4mGxE_3_env.Rmd` | Multi-environment analysis |
-| `inv4m_field_modelling.Rmd` | Field modeling |
-| `spatial_analysis_inv4m.Rmd` | Spatial analysis |
-| `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis |
-| `get_WGCNA_modules.Rmd` | WGCNA network analysis |
+✅ **setup_paths.R** - Path configuration utility providing:
+- `paths$data` - Input data (symlinked)
+- `paths$intermediate` - Processed CSV/RDS files
+- `paths$figures` - Publication figures
+- `paths$tables` - LaTeX tables only
+
+✅ **render_notebook.R** - Renders notebooks to `docs/{paper}/` for GitHub Pages
+
+✅ **.gitignore** - Properly configured
 
 ---
 
@@ -326,15 +322,15 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper ⏳ Ready to Start
-- [ ] Read `docs/inversion_paper/main.tex` and extract figures/tables
-- [ ] Create `scripts/inversion_paper/` directory structure
-- [ ] Recover needed scripts from git history (`b2dd1488`)
-- [ ] Map figures/tables to scripts (coverage checklist)
-- [ ] Copy differential expression script for independent refinement
-- [ ] Update all paths to use `setup_paths.R`
-- [ ] Test rendering all notebooks
-- [ ] Add coverage table to README.md
+### Inversion Paper ✅ Complete
+- [x] Read `docs/inversion_paper/main.tex` and extract figures/tables
+- [x] Create `scripts/inversion_paper/` directory structure
+- [x] Recover needed scripts from git history (`b2dd1488`)
+- [x] Map figures/tables to scripts (coverage checklist)
+- [x] Copy differential expression script for independent refinement
+- [x] Update all paths to use `setup_paths.R`
+- [x] Test rendering all notebooks
+- [x] Add coverage table to README.md
 
 ---
 
