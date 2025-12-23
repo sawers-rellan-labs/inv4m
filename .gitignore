@@ -14,6 +14,9 @@ results/
 *.log
 *.aln
 
+# Allow HTML files in docs/ directory for GitHub Pages
+!docs/**/*.html
+
 # System files
 .DS_Store
 .Rhistory
