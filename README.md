@@ -88,6 +88,24 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 **Status Legend:** ✅ Ready | ⚠️ Needs work | ❌ Missing
 
+---
+
+## Recent Updates
+
+**2025-12-23:** All inversion paper analysis scripts (8/8) are now fully operational and path-standardized:
+- ✅ Fixed `Crow2020_reanalysis.Rmd` - Removed hard-coded server paths
+- ✅ Standardized all output paths to use `paths$intermediate`
+- ✅ Removed vestigial directory creation code
+- ✅ All scripts render successfully with outputs in correct locations
+- ✅ 100% conformance to project directory structure
+
+**2025-12-22:** Completed phosphorus paper analysis pipeline:
+- ✅ All 12 scripts path-standardized and rendering successfully
+- ✅ Complete figure/table coverage mapped and verified
+- ✅ Infrastructure utilities (`setup_paths.R`, `render_notebook.R`) in place
+
+---
+
 ## Quick Start
 
 ```bash
@@ -102,13 +120,13 @@ Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_A
 ```
 inv4m/
 ├── scripts/
-│   ├── phosphorus_paper/    # Paper 2 analysis notebooks (11 Rmd files) ✅
-│   ├── inversion_paper/     # Paper 1 analysis notebooks (9 Rmd files) ⚠️
+│   ├── phosphorus_paper/    # Paper 2 analysis notebooks (12 Rmd files) ✅
+│   ├── inversion_paper/     # Paper 1 analysis notebooks (8 Rmd files) ✅
 │   └── utils/               # Shared utilities (setup_paths.R, render_notebook.R)
 ├── data/                    # Input data (symlink, not tracked)
 ├── docs/                    # Published HTML reports (GitHub Pages)
-│   ├── phosphorus_paper/    # Paper 2 reports
-│   └── inversion_paper/     # Paper 1 reports (to be generated)
+│   ├── phosphorus_paper/    # Paper 2 reports (12 HTML files)
+│   └── inversion_paper/     # Paper 1 reports (8 HTML files)
 └── results/                 # Generated outputs (not tracked)
     ├── phosphorus_paper/
     └── inversion_paper/
