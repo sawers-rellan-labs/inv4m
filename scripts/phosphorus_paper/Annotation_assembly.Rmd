@@ -11,7 +11,7 @@ output:
 knit: (function(input, ...) {
     rmarkdown::render(
       input,
-      output_dir = here::here("docs", "inversion_paper"),
+      output_dir = here::here("docs", "phosphorus_paper"),
       envir = globalenv()
     )
   })
@@ -29,7 +29,7 @@ knitr::opts_chunk$set(
 # Load project paths
 library(here)
 source(here("scripts", "utils", "setup_paths.R"))
-paths <- setup_project_paths("inversion_paper")
+paths <- setup_project_paths("phosphorus_paper")
 ```
 
 # Overview
@@ -78,7 +78,7 @@ combined_fig_v1 <- ggpubr::ggarrange(
   ncol = 1,
   # widths = c(2, 1),
   labels = c("A", "B","C"),
-  font.label =list(size=35) 
+  font.label =list(size=35)
 )
 
 print(combined_fig_v1)
