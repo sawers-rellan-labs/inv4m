@@ -85,7 +85,7 @@ print(combined_fig_v1)
 ```
 
 # Export Combined Figure
-```{r export_combined, eval=FALSE}
+```{r export_combined}
 
 # Export as SVG (editable in Illustrator)
 ggsave(
