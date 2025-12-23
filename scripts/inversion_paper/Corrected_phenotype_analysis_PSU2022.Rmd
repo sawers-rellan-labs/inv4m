@@ -435,8 +435,8 @@ cat("Successfully fitted models:", length(all_models), "\n")
 
 if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
   cat("Plots with corrected data:", nrow(sp_corrected), "\n")
-  
-  output_file <- paste0(environment_name, "_spatially_corrected_phenotypes.csv")
+
+  output_file <- file.path(paths$intermediate, paste0(environment_name, "_spatially_corrected_phenotypes.csv"))
   write_csv(sp_corrected, output_file)
   cat("Spatially corrected data exported to:", output_file, "\n")
 } else {

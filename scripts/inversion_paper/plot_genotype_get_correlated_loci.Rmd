@@ -637,7 +637,7 @@ cat("  Outside dispersed:", sum(gene_classification$classification == "outside_d
 cat("  Outside anti-correlated:", sum(gene_classification$classification == "outside_anticorrelated"), "\n")
 
 # Save filter list (only outside genes)
-saveRDS(outside_inv4m_genes, "inv4m_linked_genes_to_filter.rds")
+saveRDS(outside_inv4m_genes, file.path(paths$intermediate, "inv4m_linked_genes_to_filter.rds"))
 write.table(
   data.frame(gene_id = outside_inv4m_genes),
   file = file.path(paths$intermediate, "inv4m_linked_genes_to_filter.txt"),
@@ -648,12 +648,12 @@ write.table(
 # Save complete classification table
 write.table(
   gene_classification,
-  file = "inv4m_correlated_genes_classification.txt",
+  file = file.path(paths$intermediate, "inv4m_correlated_genes_classification.txt"),
   row.names = FALSE,
   quote = FALSE,
   sep = "\t"
 )
-saveRDS(gene_classification, "inv4m_correlated_genes_classification.rds")
+saveRDS(gene_classification, file.path(paths$intermediate, "inv4m_correlated_genes_classification.rds"))
 
 cat("\nFiles saved:\n")
 cat("  Filter list (outside genes only):\n")

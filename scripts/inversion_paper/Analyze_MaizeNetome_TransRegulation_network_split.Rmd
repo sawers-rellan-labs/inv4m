@@ -1059,11 +1059,11 @@ reference_gene_info <- effects_df %>%
   distinct() %>%
   mutate(gene_location = ifelse(gene %in% cis_genes, "cis", "trans"))
 
-write.csv(reference_gene_info, 
-          "results/phosphorus_paper/intermediate/reference_trans_network_genes.csv", 
+write.csv(reference_gene_info,
+          file.path(paths$intermediate, "reference_trans_network_genes.csv"),
           row.names = FALSE)
-write.csv(reference_edges, 
-          "results/phosphorus_paper/intermediate/reference_trans_network_edges.csv", 
+write.csv(reference_edges,
+          file.path(paths$intermediate, "reference_trans_network_edges.csv"),
           row.names = FALSE)
 
 novel_gene_info <- effects_df %>%
@@ -1072,11 +1072,11 @@ novel_gene_info <- effects_df %>%
   distinct() %>%
   mutate(gene_location = ifelse(gene %in% cis_genes, "cis", "trans"))
 
-write.csv(novel_gene_info, 
-          "results/phosphorus_paper/intermediate/novel_trans_network_genes.csv", 
+write.csv(novel_gene_info,
+          file.path(paths$intermediate, "novel_trans_network_genes.csv"),
           row.names = FALSE)
-write.csv(novel_edges, 
-          "results/phosphorus_paper/intermediate/novel_trans_network_edges.csv", 
+write.csv(novel_edges,
+          file.path(paths$intermediate, "novel_trans_network_edges.csv"),
           row.names = FALSE)
 
 cat("Network modules exported to paths$intermediate\n")
