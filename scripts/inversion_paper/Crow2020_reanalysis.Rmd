@@ -127,15 +127,16 @@ counts <- read.csv(file.path(paths$data, "crow2020_gene_xp.csv"))
 
 ## Load Sample Metadata
 ```{r load_metadata}
-quant_dir <- "/Volumes/DOE_CAREER/inv4m/run/results_quantify/kallisto_quant"
-
-# Define paths
-sra_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/SraRunTable.csv"
-sample_submission_file <- "/Volumes/DOE_CAREER/inv4m/crow2020/gc7_sample_submission.csv"
-
 # Load data
-sra_meta <- read.csv(sra_file, stringsAsFactors = FALSE, check.names = FALSE)
-submission_meta <- read.csv(sample_submission_file, stringsAsFactors = FALSE)
+sra_meta <- read.csv(
+  file.path(paths$data, "SraRunTable.csv"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+submission_meta <- read.csv(
+  file.path(paths$data, "gc7_sample_submission.csv"),
+  stringsAsFactors = FALSE
+)
 
 # Standardize SRA metadata
 sra_meta <- sra_meta %>%
@@ -573,8 +574,8 @@ design <- model.matrix(
 voomR <- voom(y_filtered, design = design, plot = TRUE)
 
 # Save normalized expression
-saveRDS(voomR$E, file = "../results/normalized_expression_logCPM_crow2020.rds")
-saveRDS(voomR, file = "../results/normalized_expression_voom_object_crow2020.rds")
+saveRDS(voomR$E, file = file.path(paths$intermediate, "normalized_expression_logCPM_crow2020.rds"))
+saveRDS(voomR, file = file.path(paths$intermediate, "normalized_expression_voom_object_crow2020.rds"))
 
 {
   cat("Normalization factors range:", 
@@ -605,8 +606,8 @@ corrected_logCPM <- removeBatchEffect(
 
 # Save for downstream visualization
 saveRDS(
-  corrected_logCPM, 
-  "../results/normalized_expression_batch_corrected_crow2020.rds"
+  corrected_logCPM,
+  file.path(paths$intermediate, "normalized_expression_batch_corrected_crow2020.rds")
 )
 
 {
@@ -857,7 +858,7 @@ effects_df <- add_mahalanobis_outliers(
 ```{r load_annotations}
 # Gene symbols and locus names
 gene_symbol <- read.table(
-  "../data/gene_symbol.tab",
+  file.path(paths$data, "gene_symbol.tab"),
   quote = "",
   header = TRUE,
   sep = "\t",
@@ -866,7 +867,7 @@ gene_symbol <- read.table(
 
 # Pannzer functional annotations
 pannzer <- read.table(
-  "../data/PANNZER_DESC.tab",
+  file.path(paths$data, "PANNZER_DESC.tab"),
   quote = "",
   header = TRUE,
   sep = "\t"
@@ -1068,9 +1069,10 @@ overall_summary <- effects_df %>%
 overall_summary
 ```
 
-```{r, check_trans_network_effects}
-
-trans_effects <- read.csv(file.path(paths$data, "network_effects.csv")) 
+```{r check_trans_network_effects, eval=FALSE}
+# NOTE: This chunk is disabled - network_effects.csv is not available
+# and trans_effects is not used elsewhere in this script
+trans_effects <- read.csv(file.path(paths$data, "network_effects.csv"))
 
 ```
 
@@ -1105,21 +1107,21 @@ selected_degs <- effects_df %>%
 # Full effects table
 write.csv(
   effects_df,
-  file = "../results/predictor_effects_crow2020.csv",
+  file = file.path(paths$intermediate, "predictor_effects_crow2020.csv"),
   row.names = FALSE
 )
 
 # Selected DEGs
 write.csv(
-  dplyr::selected_degs,
-  file = "../results/selected_DEGs_crow2020.csv",
+  selected_degs,
+  file = file.path(paths$intermediate, "selected_DEGs_crow2020.csv"),
   row.names = FALSE
 )
 
 {
   cat("\nResults exported:\n")
   cat("  predictor_effects_crow2020.csv\n")
-  cat("  dplyr::selected_DEGs_crow2020.csv\n")
+  cat("  selected_DEGs_crow2020.csv\n")
 }
 ```
 
