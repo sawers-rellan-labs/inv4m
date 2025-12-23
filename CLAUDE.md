@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2025-12-18
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Not Started
-**Version:** v1.0.0
+**Last Updated:** 2025-12-22
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Ready to Start
+**Version:** v1.1.0
 
 ---
 
@@ -76,6 +76,50 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
+## Inversion Paper - Ready to Start
+
+### Handover Document
+
+See `scripts/00_agent_work/HANDOVER_INVERSION_PAPER.md` for detailed setup instructions.
+
+### Key Tasks
+
+1. **Read the paper LaTeX source:** `docs/inversion_paper/main.tex`
+2. **Create directory structure:**
+   ```bash
+   mkdir -p scripts/inversion_paper
+   mkdir -p docs/inversion_paper
+   mkdir -p results/inversion_paper/{intermediate,figures,tables}
+   ```
+3. **Recover scripts from git history:**
+   ```bash
+   git show b2dd1488:scripts/shared_paper/  # List available scripts
+   ```
+4. **Map figures/tables to scripts** (same methodology as phosphorus paper)
+5. **Update all paths to use `setup_paths.R`**
+
+### Special Instructions
+
+**Differential Expression Script:** Copy (not symlink) to `scripts/inversion_paper/` for independent refinement:
+```bash
+cp scripts/phosphorus_paper/differential_expression_leaf_treatment_model.Rmd \
+   scripts/inversion_paper/differential_expression_leaf_treatment_model.Rmd
+```
+
+### Likely Needed Scripts (from git history)
+
+| Script | Purpose |
+|--------|---------|
+| `genotype_by_environment_analysis.Rmd` | GxE analysis |
+| `inv4mGxE_2025.Rmd` | Inv4m GxE analysis |
+| `inv4mGxE_3_env.Rmd` | Multi-environment analysis |
+| `inv4m_field_modelling.Rmd` | Field modeling |
+| `spatial_analysis_inv4m.Rmd` | Spatial analysis |
+| `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis |
+| `get_WGCNA_modules.Rmd` | WGCNA network analysis |
+
+---
+
 ## Success Criteria (All Met ✅)
 
 - [x] Zero hard-coded paths (`~/Desktop/`, `/Users/fvrodriguez/`) in any Rmd file
@@ -85,9 +129,24 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 - [x] Project runs on any machine without path modifications
 - [x] `grep -r "~/Desktop" scripts/phosphorus_paper/*.Rmd` returns nothing
 
-### Future Work
+### Figure/Table Coverage (Verified)
 
-- ⏳ Refactor inversion_paper scripts (separate phase)
+All figures and tables in the phosphorus paper have been mapped to their generating scripts. See `README.md` for the complete coverage table.
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Main Figures | 5 | ✅ |
+| Supplementary Figures | 7 | ✅ |
+| Supplementary Tables | 7 | ✅ |
+| S1 File (Senescence DEGs) | 1 | ✅ |
+
+### Key Script: Transcription Indices
+
+`PSU2022_make_transcription_indices.Rmd` (2,399 lines) includes:
+- CornCyc chlorophyll synthesis/degradation pathways
+- Ojeda2026 SAG hub genes and photosynthesis genes
+- S1 File generation (senescence-associated DEGs)
+- Four gene set expression indices matching paper Figure 5
 
 ---
 
@@ -274,8 +333,15 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Not Started ⏳
-- [ ] Refactor inversion_paper scripts (Future phase)
+### Inversion Paper ⏳ Ready to Start
+- [ ] Read `docs/inversion_paper/main.tex` and extract figures/tables
+- [ ] Create `scripts/inversion_paper/` directory structure
+- [ ] Recover needed scripts from git history (`b2dd1488`)
+- [ ] Map figures/tables to scripts (coverage checklist)
+- [ ] Copy differential expression script for independent refinement
+- [ ] Update all paths to use `setup_paths.R`
+- [ ] Test rendering all notebooks
+- [ ] Add coverage table to README.md
 
 ---
 
