@@ -35,7 +35,7 @@ inv4m/
 
 ## Phosphorus Paper - Complete ✅
 
-### Scripts (11 Rmd files in `scripts/phosphorus_paper/`)
+### Scripts (12 Rmd files in `scripts/phosphorus_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -50,6 +50,7 @@ inv4m/
 | `KEGG_Pathway_Enrichment_Analysis_of_DEGs.Rmd` | KEGG pathway enrichment | ✅ |
 | `LION_Lipid_Enrichment_Analysis.Rmd` | Lipid enrichment analysis | ✅ |
 | `volcano_plot_analysis.Rmd` | Volcano plots | ✅ |
+| `Annotation_assembly.Rmd` | GO/KEGG/LION enrichment panels | ✅ |
 
 ### Generated Outputs
 
@@ -78,11 +79,10 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ## Inversion Paper - Complete ✅
 
-### Scripts (8 Rmd files in `scripts/inversion_paper/`)
+### Scripts (7 Rmd files in `scripts/inversion_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `Annotation_assembly.Rmd` | Inv4m delimitation, breakpoints | ✅ |
 | `plot_genotype_get_correlated_loci.Rmd` | SNP distribution and correlation | ✅ |
 | `Corrected_phenotype_analysis_PSU2022.Rmd` | Corrected phenotype analysis | ✅ |
 | `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
@@ -331,6 +331,7 @@ git push origin main
 - [x] Update all paths to use `setup_paths.R`
 - [x] Test rendering all notebooks
 - [x] Add coverage table to README.md
+- [x] Move `Annotation_assembly.Rmd` to phosphorus paper (now handles GO/KEGG/LION enrichment panels for phosphorus paper)
 
 ---
 
