@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/Inv4m_cover.png" alt="Inv4m Cover" width="400"/>
+</div>
+
 # inv4m
 
 Analysis pipeline for the maize chromosomal inversion Inv4m and its effects on phosphorus stress response.
