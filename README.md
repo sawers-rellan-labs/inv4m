@@ -64,7 +64,29 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 ## Inversion Paper: Figure/Table Coverage
 
-*Not started - to be added*
+| Figure/Table | Content | Script | Status |
+|--------------|---------|--------|--------|
+| **Main Figures** | | | |
+| Figure 1 | Inv4m delimitation, breakpoints, breeding design | `Annotation_assembly.Rmd` + `plot_genotype_get_correlated_loci.Rmd` | ✅ |
+| Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI | `Corrected_phenotype_analysis_PSU2022.Rmd` | ✅ |
+| Figure 3 | Global and local transcriptomic effects | `differential_expression_leaf_treatment_model.Rmd` | ✅ |
+| Figure 4 | Volcano plots for DEGs | `differential_expression_leaf_treatment_model.Rmd` | ✅ |
+| Figure 5 | Trans coexpression network of Inv4m DEGs | `Analyze_MaizeNetome_TransRegulation.Rmd` | ✅ |
+| Figure 6 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
+| **Main Tables** | | | |
+| Table 1 | Inv4m breakpoints | `Annotation_assembly.Rmd` | ✅ |
+| Table 2 | FT/PH gene candidates | `differential_expression_leaf_treatment_model.Rmd` | ✅ |
+| **Supplementary Figures** | | | |
+| Figure S1 | SNP distribution and correlation | `plot_genotype_get_correlated_loci.Rmd` | ✅ |
+| **Supplementary Tables** | | | |
+| Table S1 | Inv4m breakpoints and knob repeats | `Annotation_assembly.Rmd` | ✅ |
+| Table S2 | Effect of conditions on gene expression | `differential_expression_leaf_treatment_model.Rmd` | ✅ |
+| **Supporting Scripts** | | | |
+| WGCNA modules | Co-expression network analysis | `get_WGCNA_modules.Rmd` | ✅ |
+| GO enrichment (network) | Network GO analysis | `GO_Enrichment_Trans_Network.Rmd` | ✅ |
+| Crow 2020 reanalysis | Reference dataset reanalysis | `Crow2020_reanalysis.Rmd` | ✅ |
+
+**Status Legend:** ✅ Ready | ⚠️ Needs work | ❌ Missing
 
 ## Quick Start
 
@@ -80,11 +102,16 @@ Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_A
 ```
 inv4m/
 ├── scripts/
-│   ├── phosphorus_paper/    # Analysis notebooks (11 Rmd files)
-│   └── utils/               # Shared utilities
+│   ├── phosphorus_paper/    # Paper 2 analysis notebooks (11 Rmd files) ✅
+│   ├── inversion_paper/     # Paper 1 analysis notebooks (9 Rmd files) ⚠️
+│   └── utils/               # Shared utilities (setup_paths.R, render_notebook.R)
 ├── data/                    # Input data (symlink, not tracked)
 ├── docs/                    # Published HTML reports (GitHub Pages)
+│   ├── phosphorus_paper/    # Paper 2 reports
+│   └── inversion_paper/     # Paper 1 reports (to be generated)
 └── results/                 # Generated outputs (not tracked)
+    ├── phosphorus_paper/
+    └── inversion_paper/
 ```
 
 ## Requirements

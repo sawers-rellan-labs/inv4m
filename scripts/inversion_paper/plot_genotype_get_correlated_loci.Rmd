@@ -1,0 +1,880 @@
+---
+title: "NIL Genotype Plotting and Genotype Correlation Analysis of Inv4m Introgression"
+author: "Fausto Rodriguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+# Load project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Plot genotype per NIL.
+Characterize linkage disequilibrium between the Inv4m chromosomal 
+inversion and genome-wide markers in maize near-isogenic lines.
+
+**Approach**: Calculate Spearman correlations between a tagging SNP within Inv4m
+(S4_181558683) and all genotyped markers across the genome. Identify regions 
+with significant LD and visualize genotype structure.
+
+**Expected outcome**: Identify the physical extent of linkage with Inv4m, 
+detect recombination breakpoints, and characterize flanking introgression 
+segments.
+
+# Load Libraries
+
+```{r libraries}
+library(vcfR)
+library(dplyr)
+library(ggplot2)
+library(ggtext)
+library(rtracklayer)
+library(GenomicRanges)
+library(cowplot)
+```
+
+# Define Genomic Regions
+
+**Purpose**: Establish coordinates for Inv4m inversion and shared introgression.
+
+**Approach**: Extract gene boundaries from B73 v5.0 annotation to define 
+inversion breakpoints identified in MCScan analysis.
+
+```{r regions}
+# Load B73 annotation
+myGFF <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
+B73 <- rtracklayer::import(myGFF) %>%
+  subset(type == "gene" & seqnames %in% 1:10)
+
+genes <- as.data.frame(B73)
+genes$ID <- gsub("gene:", "", genes$ID)
+
+# Inv4m boundaries (from MCScan)
+inv4m_start <- genes[genes$ID == "Zm00001eb190470", "start"]
+inv4m_end <- genes[genes$ID == "Zm00001eb194800", "end"]
+
+# Shared introgression boundaries (empirical)
+introgression_start <- 157012149
+introgression_end <- 195900523
+
+# Create GRanges objects
+inv4m <- GRanges(
+  seqnames = "4",
+  ranges = IRanges(start = inv4m_start, end = inv4m_end),
+  strand = "+"
+)
+
+shared_introgression <- GRanges(
+  seqnames = "4",
+  ranges = IRanges(start = introgression_start, end = introgression_end),
+  strand = "+"
+)
+
+# Region sizes
+inv4m_size <- round((inv4m_end - inv4m_start) / 1e6, 1)
+introgression_size <- round((introgression_end - introgression_start) / 1e6, 1)
+
+# Count genes in regions
+olap_inv4m <- findOverlaps(inv4m, B73, ignore.strand = TRUE)
+inv4m_gene_ids <- genes$ID[subjectHits(olap_inv4m)]
+
+olap_introgression <- findOverlaps(shared_introgression, B73, ignore.strand = TRUE)
+shared_introgression_gene_ids <- genes$ID[subjectHits(olap_introgression)]
+
+flanking_introgression_gene_ids <- shared_introgression_gene_ids[
+  !(shared_introgression_gene_ids %in% inv4m_gene_ids)
+]
+
+cat("Inv4m inversion:", inv4m_size, "Mb |", length(inv4m_gene_ids), "genes\n")
+cat("Shared introgression:", introgression_size, "Mb |", 
+    length(shared_introgression_gene_ids), "genes\n")
+cat("Flanking regions:", 
+    round(introgression_size - inv4m_size, 1), "Mb |", 
+    length(flanking_introgression_gene_ids), "genes\n")
+```
+
+# Import and Process VCF
+
+**Purpose**: Load genotype data and convert to numeric matrix.
+
+**Approach**: Read VCF, extract GT field, recode genotypes as 0/1/2 for 
+B73/Het/Mi21.
+
+```{r vcf_import}
+# Read VCF
+vcf <- read.vcfR(file.path(paths$data, "inv4m_PSU_imputed.vcf"))
+gt <- extract.gt(vcf, element = "GT")
+
+# Recode genotypes
+gt[gt == "0/0"] <- 0
+gt[gt == "0/1" | gt == "1/0"] <- 1
+gt[gt == "1/1"] <- 2
+
+# Convert to numeric matrix
+ngt <- matrix(as.integer(gt), ncol = ncol(gt))
+colnames(ngt) <- colnames(gt)
+rownames(ngt) <- rownames(gt)
+
+# Sample ordering (CTRL then INV4 carriers, alphabetically within group)
+sample_order <- c(
+  sort(c("3095", "3113", "4113", "3083", "4107", "4122")),
+  sort(c("3092", "3080", "3059", "3131", "4125", "4080", "4131"))
+)
+
+ngt <- ngt[, sample_order] %>% t()
+
+# Genotype distribution (by site)
+total_sites <- ncol(ngt) * nrow(ngt)
+geno_freq <- table(ngt) / total_sites
+cat("Genotype frequencies (by site):\n")
+cat("  B73/B73 (0):", round(geno_freq["0"], 3), "\n")
+cat("  B73/Mi21 (1):", round(geno_freq["1"], 3), "\n")
+cat("  Mi21/Mi21 (2):", round(geno_freq["2"], 3), "\n")
+cat("  Missing:", round(sum(is.na(ngt)) / total_sites, 4), "\n")
+cat("Dimensions:", nrow(ngt), "samples ×", ncol(ngt), "markers\n")
+```
+
+# Genotype Run Analysis
+
+**Purpose**: Quantify introgression content across samples.
+
+**Approach**: Calculate run-length encoding of genotypes, sum by allelic state.
+
+```{r genotype_runs}
+get_genotype_runs <- function(x, sample_order) {
+  result <- data.frame()
+  chr_levels <- paste0("S", 1:10)
+  
+  for (ind_idx in sample_order) {
+    result_ind <- data.frame()
+    
+    for (chr_idx in 1:10) {
+      chr_prefix <- paste0("S", chr_idx, "_")
+      chr_name <- paste0("S", chr_idx)
+      chr <- x[grepl(chr_prefix, rownames(x), perl = TRUE), ]
+      runs <- rle(chr[, ind_idx])
+      
+      chr_long <- data.frame(
+        ind = ind_idx,
+        chr = chr_name,
+        pos = as.integer(gsub(chr_prefix, "", names(runs$values))),
+        gt = runs$values
+      ) %>%
+        group_by(ind, chr) %>%
+        mutate(
+          lag = lag(pos, default = 0),
+          span = (pos - lag) / 1e6,
+          chr = factor(chr, levels = chr_levels),
+          ind = factor(ind, levels = sample_order),
+          missing = is.na(gt),
+          missing_length = missing * span,
+          B73 = as.numeric(gt == 0),
+          B73_length = B73 * span,
+          Het = as.numeric(gt == 1),
+          Het_length = Het * span,
+          Mi21 = as.numeric(gt == 2),
+          Mi21_length = Mi21 * span
+        )
+      
+      result_ind <- rbind(result_ind, chr_long)
+    }
+    
+    result <- rbind(result, result_ind)
+  }
+  result
+}
+
+# Calculate runs
+m <- t(ngt)
+gt_runs <- get_genotype_runs(m, sample_order)
+
+# Add grouping
+gt_runs$group <- case_when(
+  gt_runs$ind %in% c("3092", "3080", "3059", "3131", "4125", "4080", "4131") ~ 
+    "Inv4m",
+  .default = "CTRL"
+)
+
+# Genome size
+chr_length <- gt_runs %>%
+  group_by(chr) %>%
+  summarise(chr_length = max(pos) / 1e6)
+genome_size <- sum(chr_length$chr_length)
+
+# Summarize by genotype
+by_length <- gt_runs %>%
+  inner_join(chr_length, by = "chr") %>%
+  ungroup() %>%
+  group_by(ind) %>%
+  summarise(
+    B73 = sum(B73_length, na.rm = TRUE),
+    Het = sum(Het_length, na.rm = TRUE),
+    Mi21 = sum(Mi21_length, na.rm = TRUE),
+    missing = sum(missing_length, na.rm = TRUE),
+    group = group[1]
+  ) %>%
+  mutate(group = factor(group, levels = c("CTRL", "Inv4m"))) %>%
+  tidyr::pivot_longer(
+    cols = c("B73", "Het", "Mi21", "missing"),
+    names_to = "Genotype",
+    values_to = "length"
+  ) %>%
+  mutate(pct = 100 * length / genome_size)
+
+cat("Genome size:", round(genome_size, 1), "Mb\n")
+cat("\nGenotype run length summary (Mb):\n")
+by_length %>%
+  group_by(Genotype) %>%
+  summarise(
+    mean_Mb = round(mean(length), 1),
+    mean_pct = round(mean(pct), 2)
+  ) %>%
+  print()
+
+cat("\nBy introgression group:\n")
+by_length %>%
+  group_by(group, Genotype) %>%
+  summarise(
+    mean_Mb = round(mean(length), 1),
+    mean_pct = round(mean(pct), 2),
+    .groups = "drop"
+  ) %>%
+  print()
+```
+
+# Genotype Visualization
+
+**Purpose**: Create chromosome-wide haplotype plots.
+
+**Approach**: Plot genotype runs as colored bars across chromosomes.
+
+```{r genotype_plot, fig.height=5}
+# Genotype color breaks
+breaks <- c(0, 1.5, 2.5)
+names(breaks) <- c("B73/B73", "B73/Mi21", "Mi21/Mi21")
+
+# Selection marker triangle
+triangle <- data.frame(
+  pos = 0,
+  span = 181.6,
+  ind = sample_order[length(sample_order)],
+  chr = "4",
+  label = factor("Selection marker<br>group")
+)
+
+# Coordinate limits
+inversion_limit <- round(c(inv4m_start, inv4m_end) / 1e6, 2)
+introgression_limit <- round(c(introgression_start, introgression_end) / 1e6, 2)
+
+gt_plot <- gt_runs %>%
+  ungroup() %>%
+  mutate(chr = gsub("S", "", chr)) %>%
+  ggplot(aes(y = ind, x = span, fill = gt)) +
+  geom_col(width = 1) +
+  scale_fill_viridis_b(
+    breaks = breaks,
+    limits = c(-0.5, 2.5),
+    show.limits = TRUE,
+    na.value = "gray85",
+    direction = -1
+  ) +
+  geom_point(
+    data = triangle,
+    mapping = aes(shape = label),
+    position = position_nudge(y = 2),
+    size = 1,
+    color = "#43137D",
+    fill = "#43137D"
+  ) +
+  scale_shape_manual(values = 25) +
+  facet_wrap(factor(chr, 1:10) ~ ., strip.position = "left", ncol = 1) +
+  coord_cartesian(xlim = c(0, 450), expand = FALSE) +
+  xlab("Position [Mb]") +
+  ylab("Chromosome") +
+  labs(fill = "Genotype") +
+  guides(
+    fill = guide_colorsteps(
+      order = 1,
+      label.position = "left",
+      label.hjust = 1,
+      theme = theme(
+        legend.title = element_text(size = 8, hjust = 0),
+        legend.text = element_text(size = 8, vjust = 1.5),
+        legend.key.width = unit(1, "lines"),
+        legend.key.height = unit(2.7, "lines")
+      )
+    ),
+    shape = guide_legend(
+      order = 2,
+      override.aes = list(size = 4),
+      label.position = "left",
+      label.hjust = 1,
+      theme = theme(
+        legend.title = element_blank(),
+        legend.text = element_markdown(size = 8),
+        legend.key.width = unit(1, "lines")
+      )
+    )
+  ) +
+  ggpubr::theme_classic2(base_size = 4) +
+  theme(
+    legend.position = c(0.9, 0.85),
+    legend.spacing.y = unit(0.1, "lines"),
+    legend.box.just = "right",
+    strip.background = element_blank(),
+    strip.text.y.left = element_text(size = 12, angle = 0),
+    axis.text = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank()
+  )
+
+gt_plot
+```
+
+```{r genotype_chr4_inset, fig.height=5}
+# Chr4 detailed inset
+inlay <- gt_runs %>%
+  filter(chr == "S4") %>%
+  ungroup() %>%
+  mutate(chr = gsub("S", "", chr)) %>%
+  ggplot(aes(x = span, y = ind, fill = gt)) +
+  geom_col(width = 1) +
+  scale_fill_viridis_b(
+    breaks = breaks,
+    limits = c(-0.5, 2.5),
+    show.limits = TRUE,
+    na.value = "gray85",
+    direction = -1
+  ) +
+  annotate("point",
+    x = 181.6, y = 14.4,
+    shape = 25, size = 4, color = "#43137D", fill = "#43137D"
+  ) +
+  annotate("text",
+    x = c(inversion_limit, introgression_limit), y = 14.4,
+    label = rep("|", 4), size = 4, color = "#43137D"
+  ) +
+  coord_cartesian(xlim = c(150, 200)) +
+  xlab("Chromosome 4") +
+  ggpubr::theme_classic2(base_size = 8) +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    plot.title = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    plot.background = element_rect(fill = "transparent", color = NA)
+  )
+
+# Combine plots
+plot_with_inset <- ggdraw() +
+  draw_plot(gt_plot) +
+  draw_plot(inlay,
+    x = 0.45, y = 0.03,
+    width = 0.6, height = 0.6,
+    scale = 0.8
+  )
+
+plot_with_inset
+```
+
+
+```{r genotype_summary, fig.height=4}
+# Background means
+bg_mean <- by_length %>%
+  ungroup() %>%
+  group_by(Genotype) %>%
+  summarise_at(.vars = c("length", "pct"), .funs = mean)
+
+p_genotype <- by_length %>%
+  ggplot(aes(x = group, y = pct)) +
+  geom_hline(data = bg_mean, aes(yintercept = pct), linetype = 2) +
+  geom_boxplot(outlier.colour = "white", width = 0.25) +
+  ggbeeswarm::geom_quasirandom(size = 2) +
+  facet_wrap(. ~ Genotype, scales = "free_y", ncol = 4) +
+  xlab("Introgression group") +
+  ylab("% of genome length") +
+  ggpubr::theme_classic2(base_size = 20) +
+  theme(strip.background = element_blank())
+
+p_genotype
+```
+
+# Calculate Linkage Disequilibrium
+
+**Purpose**: Quantify correlation between tagging SNP and all genome-wide 
+markers.
+
+**Approach**: Spearman correlation with S4_181558683 (within Inv4m). FDR 
+correction for multiple testing.
+
+```{r ld_calculation}
+# Calculate correlations
+tagging_snp <- "S4_181558683"
+cor_matrix <- cor(
+  ngt[, tagging_snp, drop = FALSE],
+  ngt,
+  use = "pairwise.complete.obs"
+) %>% t()
+
+# Statistical testing
+cor_pvalues <- apply(ngt, 2, function(x) {
+  cor.test(x, y = ngt[, tagging_snp], method = "spearman")$p.value
+})
+
+# Combine results
+significance_threshold <- 0.01
+inv4m_cor <- data.frame(
+  marker = rownames(cor_matrix),
+  r = cor_matrix[, 1]
+) %>%
+  tidyr::separate(marker, into = c("CHR", "BP"), sep = "_") %>%
+  mutate(
+    BP = as.numeric(BP),
+    CHR = gsub("S", "", CHR) %>% factor(levels = as.character(1:10)),
+    p = cor_pvalues,
+    FDR = p.adjust(p, method = "fdr"),
+    R2 = r^2,
+    is_significant = FDR < significance_threshold
+  ) %>%
+  tibble::rownames_to_column("ID")
+
+cat("Total markers:", nrow(inv4m_cor), "\n")
+cat("Significant (FDR <", significance_threshold, "):", 
+    sum(inv4m_cor$is_significant, na.rm = TRUE), 
+    sprintf("(%.1f%%)", 100 * mean(inv4m_cor$is_significant, na.rm = TRUE)), "\n")
+cat("Perfect LD (R² = 1):", sum(inv4m_cor$R2 == 1, na.rm = TRUE), "\n")
+```
+
+```{r ld_r2_histogram, fig.height=5, fig.width=7}
+hist(inv4m_cor$R2, 
+     main = "R² distribution with Inv4m tagging marker\n19,861 markers total",
+     xlab = "R²", 
+     ylim = c(0, 8000),
+     col = "skyblue",
+     breaks = 30)
+```
+
+# Identify Correlated Regions
+
+**Purpose**: Map SNPs with significant LD to genomic features.
+
+**Approach**: Create GRanges from significant SNPs, classify by position 
+relative to introgression boundaries.
+
+```{r correlated_regions}
+# All significant SNPs
+correlated_SNP <- with(inv4m_cor %>% filter(is_significant), {
+  GRanges(
+    seqnames = CHR,
+    ranges = IRanges(start = BP, end = BP),
+    ID = ID
+  )
+})
+
+# Outside shared introgression
+outside_correlated <- inv4m_cor %>%
+  filter(is_significant) %>%
+  filter(!(CHR == 4 & BP >= introgression_start & BP <= introgression_end))
+
+# Anti-correlated region (upstream of introgression)
+anticorrelated_start <- 154283637
+anticorrelated_end <- 156985577
+
+anticorrelated <- correlated_SNP %>%
+  subset(seqnames == 4 & start >= anticorrelated_start & end <= anticorrelated_end)
+
+# Inside Inv4m
+inside_correlated <- correlated_SNP %>%
+  subset(seqnames == 4 & start >= introgression_start & end <= inv4m_end)
+
+cat("Correlated SNPs by location:\n")
+cat("  Total significant:", length(correlated_SNP), "\n")
+cat("  Inside shared introgression (35 Mb):", length(inside_correlated), 
+    sprintf("(%.1f%%)", 100 * length(inside_correlated) / length(correlated_SNP)), 
+    "\n")
+cat("  Outside shared introgression:", nrow(outside_correlated), 
+    sprintf("(%.1f%%)", 100 * nrow(outside_correlated) / length(correlated_SNP)), 
+    "\n")
+cat("  Anti-correlated upstream (2.7 Mb):", length(anticorrelated), "\n")
+
+# Chromosome distribution of significant markers
+cat("\nSignificant markers by chromosome:\n")
+sig_by_chr <- with(inv4m_cor %>% filter(is_significant), table(CHR))
+print(sig_by_chr)
+```
+
+# Gene Overlap Analysis
+
+**Purpose**: Identify genes overlapping Inv4m-correlated regions to create 
+filter list for downstream analyses.
+
+**Approach**: Use GenomicRanges::findOverlaps to map significant SNPs to gene 
+annotations. Classify genes by location: inside shared introgression, 
+dispersed background, or anti-correlated upstream.
+
+**Expected outcome**: Generate comprehensive list of genes to exclude from 
+analyses aimed at identifying trans-regulatory effects of Inv4m.
+
+```{r gene_overlap}
+# Load transcript annotations
+transcripts_gff <- rtracklayer::import(myGFF) %>%
+  subset(type == "mRNA" & seqnames %in% 1:10)
+
+transcripts <- as.data.frame(transcripts_gff)
+transcripts$gene_id <- gsub("transcript:", "", transcripts$ID)
+transcripts$gene_id <- gsub("_.*", "", transcripts$gene_id, perl = TRUE)
+
+# Convert SNP sets to GRanges for overlap
+outside_correlated_gr <- with(outside_correlated, {
+  GRanges(
+    seqnames = CHR,
+    ranges = IRanges(start = BP, end = BP),
+    ID = ID
+  )
+})
+
+# 1. Outside shared introgression (dispersed background)
+olap_outside <- findOverlaps(outside_correlated_gr, transcripts_gff, 
+                              ignore.strand = TRUE)
+outside_correlated_genes <- transcripts$gene_id[subjectHits(olap_outside)] %>%
+  sort() %>%
+  unique()
+
+cat("Outside shared introgression:\n")
+cat("  SNPs:", length(outside_correlated_gr), "\n")
+cat("  Unique SNP positions:", length(unique(queryHits(olap_outside))), "\n")
+cat("  Genes overlapped:", length(outside_correlated_genes), "\n")
+
+# 2. Anti-correlated upstream region (154.3-157.0 Mb)
+olap_anti <- findOverlaps(anticorrelated, transcripts_gff, 
+                           ignore.strand = TRUE)
+anticorrelated_genes <- transcripts$gene_id[subjectHits(olap_anti)] %>%
+  sort() %>%
+  unique()
+
+cat("\nAnti-correlated upstream (154.3-157.0 Mb):\n")
+cat("  SNPs:", length(anticorrelated), "\n")
+cat("  Unique SNP positions:", length(unique(queryHits(olap_anti))), "\n")
+cat("  Genes overlapped:", length(anticorrelated_genes), "\n")
+
+# 3. Inside shared introgression (157.0-195.9 Mb, 35 Mb)
+olap_inside <- findOverlaps(inside_correlated, transcripts_gff, 
+                             ignore.strand = TRUE)
+inside_correlated_genes <- transcripts$gene_id[subjectHits(olap_inside)] %>%
+  sort() %>%
+  unique()
+
+cat("\nInside shared introgression (157.0-195.9 Mb):\n")
+cat("  SNPs:", length(inside_correlated), "\n")
+cat("  Unique SNP positions:", length(unique(queryHits(olap_inside))), "\n")
+cat("  Genes overlapped:", length(inside_correlated_genes), "\n")
+
+# 4. Create filter list and classification table
+# Only filter genes OUTSIDE the introgression that are correlated
+# Note: anticorrelated genes are a SUBSET of outside_correlated genes
+# (they're outside the introgression, specifically in the upstream region)
+
+# Filter list is simply all outside genes (includes anticorrelated as subset)
+outside_inv4m_genes <- outside_correlated_genes
+
+cat("\nGenes to filter out (outside Inv4m but correlated):", 
+    length(outside_inv4m_genes), "\n")
+cat("  Total outside (includes anti-correlated):", length(outside_correlated_genes), "\n")
+cat("  Anti-correlated subset:", length(anticorrelated_genes), 
+    sprintf("(%.1f%% of outside)", 100 * length(anticorrelated_genes) / length(outside_correlated_genes)), 
+    "\n")
+
+# Create classification table for all correlated genes
+# Anti-correlated genes get their own label even though they're subset of outside
+gene_classification <- data.frame(
+  gene_id = c(inside_correlated_genes, 
+              outside_correlated_genes),
+  classification = c(
+    rep("inside_introgression", length(inside_correlated_genes)),
+    rep("outside_dispersed", length(outside_correlated_genes))
+  )
+) %>%
+  distinct() %>%
+  mutate(
+    classification = ifelse(
+      gene_id %in% anticorrelated_genes,
+      "outside_anticorrelated",
+      classification
+    )
+  )
+
+cat("\nTotal genes correlated with Inv4m:", nrow(gene_classification), "\n")
+cat("  Inside introgression:", sum(gene_classification$classification == "inside_introgression"), "\n")
+cat("  Outside dispersed:", sum(gene_classification$classification == "outside_dispersed"), "\n")
+cat("  Outside anti-correlated:", sum(gene_classification$classification == "outside_anticorrelated"), "\n")
+
+# Save filter list (only outside genes)
+saveRDS(outside_inv4m_genes, "inv4m_linked_genes_to_filter.rds")
+write.table(
+  data.frame(gene_id = outside_inv4m_genes),
+  file = file.path(paths$intermediate, "inv4m_linked_genes_to_filter.txt"),
+  row.names = FALSE,
+  quote = FALSE
+)
+
+# Save complete classification table
+write.table(
+  gene_classification,
+  file = "inv4m_correlated_genes_classification.txt",
+  row.names = FALSE,
+  quote = FALSE,
+  sep = "\t"
+)
+saveRDS(gene_classification, "inv4m_correlated_genes_classification.rds")
+
+cat("\nFiles saved:\n")
+cat("  Filter list (outside genes only):\n")
+cat("    - inv4m_linked_genes_to_filter.rds\n")
+cat("    - inv4m_linked_genes_to_filter.txt\n")
+cat("  Classification table (all correlated genes):\n")
+cat("    - inv4m_correlated_genes_classification.txt\n")
+cat("    - inv4m_correlated_genes_classification.rds\n")
+```
+
+## Example: Applying Filter to DE Results
+
+```{r filter_example, eval=FALSE}
+# Example showing how to filter DE results to exclude Inv4m-linked genes
+# This removes genes outside Inv4m that show linkage (trans-effects/background)
+
+# Load your DE results (example structure)
+# de_results <- read.csv("differential_expression_results.csv")
+
+# Filter out genes outside Inv4m that are correlated with it
+de_filtered <- de_results %>%
+  filter(!gene %in% outside_inv4m_genes)
+
+# Compare before/after
+cat("DE results before filtering:", nrow(de_results), "genes\n")
+cat("DE results after filtering:", nrow(de_filtered), "genes\n")
+cat("Genes removed:", nrow(de_results) - nrow(de_filtered), "\n")
+
+# This filtered set excludes background linkage effects
+# Genes inside Inv4m are retained (cis-regulatory effects of interest)
+```
+
+# SNP Distribution Analysis
+
+**Purpose**: Compare genome-wide vs. Inv4m-linked marker distributions.
+
+**Approach**: Calculate chromosome-specific proportions for all SNPs and 
+significant Inv4m-correlated SNPs.
+
+```{r snp_distribution}
+inv4_distro <- data.frame(
+  CHR = factor(1:10, levels = 1:10),
+  all = with(inv4m_cor, table(CHR)) %>% as.numeric(),
+  inv4m = with(inv4m_cor %>% filter(is_significant), table(CHR)) %>% 
+    as.numeric()
+) %>%
+  mutate(
+    all_pct = 100 * all / sum(all),
+    inv4m_pct = 100 * inv4m / sum(inv4m)
+  )
+
+cat("SNP distribution:\n")
+cat("  Chr4 contains", inv4_distro$all[4], "SNPs (", 
+    round(inv4_distro$all_pct[4], 1), "% of total)\n")
+cat("  Chr4 Inv4m-linked:", inv4_distro$inv4m[4], "SNPs (",
+    round(inv4_distro$inv4m_pct[4], 1), "% of significant)\n")
+cat("  Other chromosomes average:", 
+    round(mean(inv4_distro$all[-4]), 0), "SNPs per chromosome\n")
+
+p_distribution <- inv4_distro %>%
+  tidyr::pivot_longer(
+    cols = c("all_pct", "inv4m_pct"),
+    names_to = "marker_type",
+    values_to = "pct"
+  ) %>%
+  ggplot(aes(y = pct, x = CHR, group = marker_type, fill = marker_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(
+    labels = c(
+      sprintf("All SNPs (n=%s)", format(sum(inv4_distro$all), big.mark = ",")),
+      sprintf("Inv4m-correlated (n=%s)", format(sum(inv4_distro$inv4m), big.mark = ","))
+    ),
+    values = c("gold", "purple4")
+  ) +
+  ylab("%") +
+  ggpubr::theme_classic2(base_size = 20) +
+  theme(
+    legend.position = c(0.7, 0.8),
+    legend.title = element_blank(),
+    axis.title.x = element_blank()
+  )
+
+p_distribution
+```
+
+# Manhattan Plots
+
+**Purpose**: Visualize genome-wide LD patterns.
+
+**Approach**: Plot -log10(FDR) and correlation coefficients across chromosomes.
+
+```{r manhattan_prep}
+# Calculate cumulative positions
+manhattan <- inv4m_cor %>%
+  group_by(CHR) %>%
+  summarise(chr_len = max(BP)) %>%
+  mutate(tot = cumsum(chr_len) - chr_len) %>%
+  select(-chr_len) %>%
+  left_join(inv4m_cor, ., by = "CHR") %>%
+  arrange(CHR, BP) %>%
+  mutate(BPcum = BP + tot)
+
+# Chromosome centers for x-axis
+axisdf <- manhattan %>%
+  group_by(CHR) %>%
+  summarize(center = (max(BPcum) + min(BPcum)) / 2)
+
+# Handle zero FDR values
+manhattan$FDR[manhattan$FDR == 0] <- 1e-8
+```
+
+```{r manhattan_fdr, fig.height=4}
+p_fdr <- manhattan %>%
+  ggplot(aes(x = BPcum, y = -log10(FDR))) +
+  geom_point(aes(color = as.factor(CHR)), alpha = 0.8, size = 1.3) +
+  scale_color_manual(values = rep(c("gold", "purple4"), 22)) +
+  geom_hline(yintercept = -log10(significance_threshold), col = "red") +
+  scale_x_continuous(label = axisdf$CHR, breaks = axisdf$center) +
+  coord_cartesian(ylim = c(0, 10)) +
+  theme_bw(base_size = 20) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+p_fdr
+```
+
+```{r manhattan_r, fig.height=4}
+p_r <- manhattan %>%
+  ggplot(aes(x = BPcum, y = r)) +
+  geom_point(aes(color = as.factor(CHR)), size = 1.3) +
+  geom_point(
+    data = manhattan %>% filter(FDR >= significance_threshold),
+    aes(color = as.factor(CHR)),
+    fill = "white",
+    shape = 21,
+    size = 1.3
+  ) +
+  scale_color_manual(values = rep(c("gold", "purple4"), 22)) +
+  xlab("Chromosome") +
+  scale_x_continuous(label = axisdf$CHR, breaks = axisdf$center) +
+  coord_cartesian(ylim = c(-1.1, 1.1)) +
+  theme_bw(base_size = 20) +
+  theme(
+    legend.position = "none",
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+p_r
+```
+
+
+# Combined Figure
+
+```{r combined_figure, fig.height=12, fig.width=10}
+combined <- ggpubr::ggarrange(
+  p_distribution,
+  p_fdr,
+  p_r,
+  p_genotype,
+  nrow = 4,
+  align = "hv",
+  heights = c(2, 2, 3, 3)
+)
+
+combined
+```
+
+# Summary
+
+```{r summary_stats}
+# LD statistics
+ld_summary <- inv4m_cor %>%
+  group_by(CHR) %>%
+  summarise(
+    total = n(),
+    significant = sum(is_significant, na.rm = TRUE),
+    pct_sig = round(100 * significant / total, 1),
+    mean_r = round(mean(r, na.rm = TRUE), 3),
+    mean_R2 = round(mean(R2, na.rm = TRUE), 3)
+  )
+
+knitr::kable(ld_summary, caption = "LD summary by chromosome")
+
+# Genotype composition
+geno_summary <- by_length %>%
+  group_by(group, Genotype) %>%
+  summarise(
+    mean_length = round(mean(length), 1),
+    mean_pct = round(mean(pct), 1),
+    .groups = "drop"
+  )
+
+knitr::kable(geno_summary, caption = "Mean genotype composition")
+```
+
+## Key Findings
+
+1. **Chromosome 4 enrichment**: 
+   `r round(inv4_distro$inv4m_pct[4], 1)`% of Inv4m-correlated SNPs map to Chr4
+
+2. **Perfect LD markers**: 
+   `r sum(inv4m_cor$R2 == 1, na.rm = TRUE)` SNPs show R² = 1 with tagging marker
+
+3. **Genes outside Inv4m to filter**: 
+   `r length(outside_correlated_genes) + length(anticorrelated_genes)` genes 
+   (dispersed + anti-correlated regions)
+
+4. **Introgression extent**: Shared segment spans 
+   `r introgression_size` Mb vs. `r inv4m_size` Mb for Inv4m core
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

@@ -140,13 +140,6 @@ All figures and tables in the phosphorus paper have been mapped to their generat
 | Supplementary Tables | 7 | ✅ |
 | S1 File (Senescence DEGs) | 1 | ✅ |
 
-### Key Script: Transcription Indices
-
-`PSU2022_make_transcription_indices.Rmd` (2,399 lines) includes:
-- CornCyc chlorophyll synthesis/degradation pathways
-- Ojeda2026 SAG hub genes and photosynthesis genes
-- S1 File generation (senescence-associated DEGs)
-- Four gene set expression indices matching paper Figure 5
 
 ---
 
@@ -245,7 +238,7 @@ Based on previous I/O mapping analysis, notebooks have dependencies:
 
 ### Batch 1: Foundational (Generate Intermediates)
 These create intermediate files needed by later analyses:
-- `Lipid_differential_abundance.Rmd` → Creates lipid results
+- `differential_expression_leaf_treatment_model.Rmd` → Creates DEG list including Inv4m and Inv4m x Leaf
 - Any notebook that generates expression matrices or DEG lists
 
 ### Batch 2: Analytic (Consume Intermediates)

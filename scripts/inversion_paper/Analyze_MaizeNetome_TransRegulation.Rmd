@@ -36,7 +36,10 @@ paths <- setup_project_paths("inversion_paper")
 
 # Overview
 
-**Purpose**: Identify and characterize trans-regulatory networks mediated by genes within the Inv4m introgression region. This analysis integrates differential expression results with co-expression data from MaizeNetome to construct regulatory networks.
+**Purpose**: Identify and characterize trans-regulatory networks mediated by
+genes within the Inv4m introgression region. This analysis integrates 
+differential expression results with co-expression data from MaizeNetome to 
+construct regulatory networks.
 
 **Approach**: 
 1. Define genomic regions (Inv4m inversion, flanking introgression, background)
@@ -63,64 +66,21 @@ library(rtracklayer)
 library(GenomicRanges)
 library(igraph)
 library(visNetwork)
-
-if (!dir.exists("results/phosphorus_paper/intermediate")) dir.create("results/phosphorus_paper/intermediate", recursive = TRUE)
-
 ```
 
 # Helper Functions
 
 ```{r helper_functions}
-#' Calculate mutual information from correlation coefficient
-#'
-#' Converts Pearson correlation to mutual information estimate.
-#'
-#' @param r Correlation coefficient
-#'
-#' @return Mutual information estimate
-mutual_info <- function(r) {
-  0.5 * log2(1 / (1 - r^2))
-}
-
-#' Calculate robust distance metric
-#'
-#' Distance metric from https://doi.org/10.1186/s12859-023-05161-y
-#'
-#' @param r Correlation coefficient
-#' @param n Sample size
-#'
-#' @return Robust distance metric
-robust_dist <- function(r, n) {
-  sqrt(1 - abs(r))
-}
-
-#' Calculate standardized euclidean distance for MST construction
-#'
-#' For standardized data this is the euclidean distance between vectors
-#' https://cmci.colorado.edu/classes/INFO-1301/files/borgatti.htm
-#' Approach follows Chenxin Li: 
-#' https://github.com/cxli233/SimpleTidy_GeneCoEx#z-score
-#'
-#' @param r_scaled Correlation coefficient from scaled expression data
-#' @param n Sample size
-#'
-#' @return Standardized euclidean distance
-std_dist <- function(r_scaled, n) {
-  sqrt(2 * n *(1 -  abs(r_scaled)))
-}
-
 #' Format nodes for network visualization
 #'
-#' Creates standardized node data frame with region colors, labels, and 
-#' styling.
+#' Creates standardized node data frame with region colors, labels, and styling.
 #'
 #' @param node_ids Character vector of gene IDs
 #' @param effects_df Data frame with gene expression data
 #' @param custom_labels Named vector of custom gene labels
 #'
 #' @return Data frame with formatted node attributes
-format_network_nodes <- function(node_ids, effects_df, 
-                                 custom_labels = NULL) {
+format_network_nodes <- function(node_ids, effects_df, custom_labels = NULL) {
   nodes <- data.frame(id = node_ids) %>%
     left_join(
       effects_df %>%
@@ -152,6 +112,7 @@ format_network_nodes <- function(node_ids, effects_df,
       label = coalesce(locus_label, id)
     )
   
+  # Check for duplicate locus_label values (excluding NA)
   dup_labels <- nodes %>%
     filter(!is.na(locus_label), locus_label != "") %>%
     group_by(locus_label) %>%
@@ -186,17 +147,17 @@ format_network_nodes <- function(node_ids, effects_df,
 #'
 #' Builds minimum spanning tree and creates interactive visNetwork plot.
 #'
-#' @param edges Data frame with from, to, r, corr_std, robust_dist, std_dist, 
-#'   mi columns
+#' @param edges Data frame with from, to, distance, r, color, weight columns
 #' @param nodes Data frame with formatted node attributes
 #' @param effects_df Data frame with logFC for arrow type calculation
-#' @param layout igraph layout algorithm name (used if edges >= 100)
+#' @param layout igraph layout algorithm name
 #' @param font_size Node label font size
 #'
 #' @return visNetwork htmlwidget
 visualize_mst <- function(edges, nodes, effects_df, 
                           layout = "layout_nicely", font_size = 20) {
   
+  # DIAGNOSTIC: Check for duplicate labels
   cat("\n=== DIAGNOSTIC: Checking node labels ===\n")
   cat("Total nodes:", nrow(nodes), "\n")
   cat("Unique node IDs:", length(unique(nodes$id)), "\n")
@@ -215,8 +176,7 @@ visualize_mst <- function(edges, nodes, effects_df,
     for (i in 1:nrow(dup_info)) {
       cat(sprintf("  %s | locus_label: %s | label: %s\n", 
                   dup_info$id[i], 
-                  ifelse(is.na(dup_info$locus_label[i]), "NA", 
-                         dup_info$locus_label[i]),
+                  ifelse(is.na(dup_info$locus_label[i]), "NA", dup_info$locus_label[i]),
                   dup_info$label[i]))
     }
     cat("\n")
@@ -225,17 +185,17 @@ visualize_mst <- function(edges, nodes, effects_df,
   }
   
   g <- graph_from_data_frame(
-    d = edges %>% dplyr::select(from, to, r, corr_std, robust_dist, 
-                                 std_dist, mi),
+    d = edges %>% dplyr::select(from, to, distance, r, color, weight),
     directed = TRUE,
     vertices = nodes
   )
   
-  g_mst <- mst(g, weights = E(g)$std_dist)
+  g_mst <- mst(g, weights = E(g)$distance)
   
   cat("MST - Edges:", length(E(g_mst)), "| Nodes:", length(V(g_mst)), "\n")
+  cat("Sample labels:", head(V(g_mst)$label, 10), "\n")
   
-  mst_edges <- igraph::as_data_frame(g_mst, what = "edges") %>%
+  mst_edges <- as_data_frame(g_mst, what = "edges") %>%
     left_join(
       effects_df %>% 
         group_by(gene) %>%
@@ -253,66 +213,52 @@ visualize_mst <- function(edges, nodes, effects_df,
       by = c("to" = "gene")
     ) %>%
     mutate(
-      is_concordant = sign(logFC_from) == sign(logFC_to),
-      width = mi
+      concordant = sign(logFC_from) == sign(logFC_to),
+      color = ifelse(is.na(color), "lightgrey", color)
     )
   
   g_mst_vis <- g_mst %>%
     set_edge_attr(
       "arrows.to.type", 
-      value = ifelse(mst_edges$is_concordant, "arrow", "bar")
+      value = ifelse(mst_edges$concordant, "arrow", "bar")
     ) %>%
-    set_edge_attr("width", value = mst_edges$width) %>%
-    set_edge_attr("color", value = "DarkGray")
+    set_edge_attr("width", value = 3) %>%
+    set_edge_attr("color", value = mst_edges$color)
   
   V(g_mst_vis)$name <- V(g_mst_vis)$label
   
-  if (length(E(g_mst)) < 100) {
-    cat("Using visNetwork with default physics (MST edges < 100)\n")
-    
-    # Filter nodes to only those in the MST
-    mst_node_ids <- unique(c(mst_edges$from, mst_edges$to))
-    mst_nodes <- nodes %>% filter(id %in% mst_node_ids)
-    
-    mst_edges_vis <- mst_edges %>%
-      mutate(
-        arrows.to.type = ifelse(is_concordant, "arrow", "bar"),
-        color = "DarkGray"
-      ) %>%
-      dplyr::select(from, to, width, arrows.to.type, color)
-    
-    visNetwork(mst_nodes, mst_edges_vis) %>%
-      visNodes(font = list(size = font_size, multi = "html")) %>%
-      visEdges(arrows = "to") %>%
-      visOptions(
-        highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
-        nodesIdSelection = TRUE
-      )
-  } else {
-    cat("Using igraph layout (MST edges >= 100)\n")
-    visIgraph(g_mst_vis) %>%
-      visNodes(font = list(size = font_size, multi = "html")) %>%
-      visIgraphLayout(layout = layout) %>%
-      visOptions(
-        highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
-        nodesIdSelection = TRUE
-      )
-  }
+  visIgraph(g_mst_vis) %>%
+    visNodes(font = list(size = font_size, multi = "html")) %>%
+    visIgraphLayout(layout = layout) %>%
+    visOptions(
+      highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
+      nodesIdSelection = TRUE
+    )
 }
 
 #' Visualize full network (non-MST)
 #'
 #' Creates interactive network visualization for smaller networks.
 #'
-#' @param edges Data frame with from, to, mi columns
+#' @param edges Data frame with from, to, r, color columns
 #' @param nodes Data frame with formatted node attributes
 #' @param effects_df Data frame with logFC for arrow type calculation
+#' @param layout igraph layout algorithm name
 #' @param font_size Node label font size
 #'
 #' @return visNetwork htmlwidget
-visualize_full_network <- function(edges, nodes, effects_df, font_size = 20) {
+visualize_full_network <- function(edges, nodes, effects_df,
+                                   layout = "layout_nicely", font_size = 20) {
+  g <- graph_from_data_frame(
+    d = edges %>% dplyr::select(from, to, r, color, weight = distance),
+    directed = TRUE,
+    vertices = nodes
+  )
   
-  edge_df <- edges %>%
+  cat("Full Network - Edges:", length(E(g)), "| Nodes:", length(V(g)), "\n")
+  cat("Sample labels:", head(V(g)$label, 10), "\n")
+  
+  edge_df <- as_data_frame(g, what = "edges") %>%
     left_join(
       effects_df %>% 
         group_by(gene) %>%
@@ -330,18 +276,23 @@ visualize_full_network <- function(edges, nodes, effects_df, font_size = 20) {
       by = c("to" = "gene")
     ) %>%
     mutate(
-      is_concordant = sign(logFC_from) == sign(logFC_to),
-      arrows.to.type = ifelse(is_concordant, "arrow", "bar"),
-      color = "DarkGray",
-      width = mi
+      concordant = sign(logFC_from) == sign(logFC_to),
+      color = ifelse(is.na(color), "lightgrey", color)
+    )
+  
+  g_vis <- g %>%
+    set_edge_attr(
+      "arrows.to.type", 
+      value = ifelse(edge_df$concordant, "arrow", "bar")
     ) %>%
-    dplyr::select(from, to, width, arrows.to.type, color)
+    set_edge_attr("width", value = 3) %>%
+    set_edge_attr("color", value = edge_df$color)
   
-  cat("Full Network - Edges:", nrow(edge_df), "| Nodes:", nrow(nodes), "\n")
+  V(g_vis)$name <- V(g_vis)$label
   
-  visNetwork(nodes, edge_df) %>%
+  visIgraph(g_vis) %>%
     visNodes(font = list(size = font_size, multi = "html")) %>%
-    visEdges(arrows = "to") %>%
+    visIgraphLayout(layout = layout) %>%
     visOptions(
       highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
       nodesIdSelection = TRUE
@@ -350,20 +301,15 @@ visualize_full_network <- function(edges, nodes, effects_df, font_size = 20) {
 
 #' Main network visualization wrapper
 #'
-#' Filters edges by variant, prepares nodes, and calls appropriate 
-#' visualization.
+#' Filters edges by variant, prepares nodes, and calls appropriate visualization.
 #'
-#' @param edges Data frame with from, to, r, corr_std columns 
-#'   (bipartite: cis → trans)
+#' @param edges Data frame with from, to, r columns (bipartite: cis → trans)
 #' @param effects_df Data frame with DEG statistics
 #' @param variant Character: "full", "flanking", or "inv4m"
 #' @param module_name Character: network title prefix
 #' @param custom_labels Named vector of custom gene labels
 #' @param edge_threshold Threshold for switching to MST
 #' @param font_size Font size for labels
-#' @param n_samples Sample size for distance calculation
-#' @param use_mst_below_100 If TRUE, use MST for networks < 100 edges; 
-#'   if FALSE, show full network
 #'
 #' @return visNetwork htmlwidget
 visualize_trans_network <- function(edges, 
@@ -371,10 +317,8 @@ visualize_trans_network <- function(edges,
                                     variant = c("full", "flanking", "inv4m"),
                                     module_name = "Network",
                                     custom_labels = NULL,
-                                    edge_threshold = 100,
-                                    font_size = 20,
-                                    n_samples,
-                                    use_mst_below_100 = TRUE) {
+                                    edge_threshold = 200,
+                                    font_size = 20) {
   variant <- match.arg(variant)
   
   filtered_edges <- switch(
@@ -408,22 +352,13 @@ visualize_trans_network <- function(edges,
   
   prepared_edges <- filtered_edges %>%
     mutate(
-      robust_dist = robust_dist(r, n_samples),
-      std_dist = std_dist(corr_std, n_samples),
-      mi = mutual_info(r)
+      distance = 1 - abs(r),
+      color = ifelse(r > 0, "#4DAF4A", "#E41A1C"),
+      weight = abs(r)
     )
   
-  if (nrow(filtered_edges) < 100) {
-    if (use_mst_below_100) {
-      cat("Using MST with visNetwork physics (edges < 100)\n")
-      visualize_mst(prepared_edges, nodes, effects_df, font_size = font_size)
-    } else {
-      cat("Showing full network with physics (edges < 100)\n")
-      visualize_full_network(prepared_edges, nodes, effects_df, 
-                             font_size = font_size)
-    }
-  } else if (nrow(filtered_edges) >= edge_threshold) {
-    cat("Using MST with igraph layout (edges >=", edge_threshold, ")\n")
+  if (nrow(filtered_edges) >= edge_threshold) {
+    cat("Using MST (edges >=", edge_threshold, ")\n")
     visualize_mst(prepared_edges, nodes, effects_df, font_size = font_size)
   } else {
     cat("Showing full network\n")
@@ -438,7 +373,7 @@ visualize_trans_network <- function(edges,
 # Define Genomic Regions
 
 ```{r load_v5_annotations}
-v5_gff <- "data/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
+v5_gff <- "~/ref/zea/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"
 v5 <- rtracklayer::import(v5_gff) %>%
   subset(type == "gene" & seqnames %in% 1:10)
 
@@ -485,8 +420,7 @@ flanking_introgression_gene_ids <- cis_introgression_gene_ids[
   !cis_introgression_gene_ids %in% inv4m_gene_ids
 ]
 
-cat("Genes in flanking regions:", length(flanking_introgression_gene_ids), 
-    "\n")
+cat("Genes in flanking regions:", length(flanking_introgression_gene_ids), "\n")
 ```
 
 ---
@@ -494,13 +428,11 @@ cat("Genes in flanking regions:", length(flanking_introgression_gene_ids),
 # Load Differential Expression Results
 
 ```{r load_field_degs}
-effects_df <- read.csv(
-  "results/phosphorus_paper/intermediate/predictor_effects_leaf_interaction_model.csv", 
-  na.strings = c("NA", NA, "")
-) %>%
+effects_df <- read.csv(file.path(paths$data, "predictor_effects_leaf_interaction_model.csv"),
+                       na.strings = c("NA", NA, "")) %>%
   filter(predictor == "Inv4m")
 
-curated <- read.csv("data/selected_DEGs_curated_locus_label_2.csv", 
+curated <- read.csv(file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv"),
                     na.strings = c("NA", NA, "")) %>%
   dplyr::select(gene, locus_label)
 
@@ -576,10 +508,7 @@ effects_df <- effects_df %>%
   mutate(locus_label = coalesce(locus_label_new, locus_label)) %>%
   dplyr::select(-locus_label_new)
 
-field_degs <- effects_df %>% 
-  filter(is_hiconf_DEG) %>% 
-  pull(gene) %>% 
-  unique()
+field_degs <- effects_df %>% filter(is_hiconf_DEG) %>% pull(gene) %>% unique()
 
 cat("Total field DEGs:", length(field_degs), "\n")
 ```
@@ -594,8 +523,7 @@ cis_trans_test <- fisher.test(cis_trans_table)
 
 cat("=== CIS VS TRANS ENRICHMENT ===\n")
 print(cis_trans_table)
-cat("\nFisher's p-value:", format(cis_trans_test$p.value, scientific = TRUE), 
-    "\n")
+cat("\nFisher's p-value:", format(cis_trans_test$p.value, scientific = TRUE), "\n")
 cat("Odds ratio:", round(cis_trans_test$estimate, 3), "\n\n")
 ```
 
@@ -608,8 +536,7 @@ inv4m_trans_test <- fisher.test(inv4m_trans_table)
 
 cat("=== INV4M VS TRANS ENRICHMENT ===\n")
 print(inv4m_trans_table)
-cat("\nFisher's p-value:", format(inv4m_trans_test$p.value, scientific = TRUE), 
-    "\n")
+cat("\nFisher's p-value:", format(inv4m_trans_test$p.value, scientific = TRUE), "\n")
 cat("Odds ratio:", round(inv4m_trans_test$estimate, 3), "\n\n")
 ```
 
@@ -622,8 +549,7 @@ flanking_trans_test <- fisher.test(flanking_trans_table)
 
 cat("=== FLANKING VS TRANS ENRICHMENT ===\n")
 print(flanking_trans_table)
-cat("\nFisher's p-value:", format(flanking_trans_test$p.value, 
-                                   scientific = TRUE), "\n")
+cat("\nFisher's p-value:", format(flanking_trans_test$p.value, scientific = TRUE), "\n")
 cat("Odds ratio:", round(flanking_trans_test$estimate, 3), "\n\n")
 ```
 
@@ -636,8 +562,7 @@ inv4m_flanking_test <- fisher.test(inv4m_flanking_table)
 
 cat("=== INV4M VS FLANKING ENRICHMENT ===\n")
 print(inv4m_flanking_table)
-cat("\nFisher's p-value:", format(inv4m_flanking_test$p.value, 
-                                   scientific = TRUE), "\n")
+cat("\nFisher's p-value:", format(inv4m_flanking_test$p.value, scientific = TRUE), "\n")
 cat("Odds ratio:", round(inv4m_flanking_test$estimate, 3), "\n\n")
 ```
 
@@ -646,11 +571,17 @@ cat("Odds ratio:", round(inv4m_flanking_test$estimate, 3), "\n\n")
 # Load MaizeNetome Reference Data
 
 ```{r load_maizenetome}
-left_flanking_maizenetome <- read.csv("data/left_flanking_maizenetome.csv")
+left_flanking_maizenetome <- read.csv(
+  file.path(paths$data, "left_MaizeNetome_coexpression_edges.csv")
+)
 
-Inv4m_maizenetome <- read.csv("data/Inv4m_maizenetome.csv")
+Inv4m_maizenetome <- read.csv(
+  file.path(paths$data, "inv4m_MaizeNetome_coexpression_edges.csv")
+)
 
-right_flanking_maizenetome <- read.csv("data/right_flanking_maizenetome.csv")
+right_flanking_maizenetome <- read.csv(
+  file.path(paths$data, "right_MaizeNetome_coexpression_edges.csv")
+)
 
 MaizeNetome <- rbind(
   left_flanking_maizenetome %>%
@@ -674,8 +605,8 @@ cat("Total MaizeNetome edges:", nrow(MaizeNetome), "\n")
 
 ```{r load_v4_v5_xref}
 v4_v5 <- read.table(
-  file = "data/v4_v5_gene_ids.txt", 
-  sep = "\t", 
+  file = file.path(paths$data, "B73v4_to_B73v5.tsv"),
+  sep = "\t",
   header = FALSE
 ) %>%
   dplyr::rename(v4 = V1, v5 = V2) %>%
@@ -732,9 +663,7 @@ cis_genes_all <- cis_degs$gene %>% sort() %>% unique()
 trans_genes_all <- trans_degs$gene %>% sort() %>% unique()
 
 inv4m_regulators <- cis_genes_all[cis_genes_all %in% inv4m_gene_ids]
-flanking_regulators <- cis_genes_all[
-  cis_genes_all %in% flanking_introgression_gene_ids
-]
+flanking_regulators <- cis_genes_all[cis_genes_all %in% flanking_introgression_gene_ids]
 
 cat("Inv4m regulators:", length(inv4m_regulators), "\n")
 cat("Flanking regulators:", length(flanking_regulators), "\n")
@@ -750,8 +679,7 @@ reference_edges_maizenetome <- MaizeNetome_v5 %>%
   ) %>%
   dplyr::select(cis_gene, trans_gene, network)
 
-cat("Reference edges from MaizeNetome:", nrow(reference_edges_maizenetome), 
-    "\n")
+cat("Reference edges from MaizeNetome:", nrow(reference_edges_maizenetome), "\n")
 ```
 
 ---
@@ -759,16 +687,13 @@ cat("Reference edges from MaizeNetome:", nrow(reference_edges_maizenetome),
 # Calculate Bipartite Trans Co-expression Network
 
 ```{r load_expression_data}
-voomR <- readRDS("results/phosphorus_paper/intermediate/normalized_expression_voom_object_leaf_trt.rda")
+voomR <- readRDS(file.path(paths$data, "normalized_expression_voom_object.rda"))
 
-n_samples <- ncol(voomR$E)
-
-cat("Expression matrix:", nrow(voomR$E), "genes x", ncol(voomR$E), 
-    "samples\n")
+cat("Expression matrix:", nrow(voomR$E), "genes x", ncol(voomR$E), "samples\n")
 ```
 
 ```{r filter_ld_linked_genes}
-linked <- read.table("data/inv4m_linked_genes_to_filter.txt", header = TRUE)
+linked <- read.table("inv4m_linked_genes_to_filter.txt", header = TRUE)
 
 cat("LD-linked genes loaded:", nrow(linked), "\n")
 
@@ -780,8 +705,7 @@ cat("Trans genes after LD filtering:", length(trans_genes_filtered), "\n")
 reference_edges_maizenetome <- reference_edges_maizenetome %>%
   filter(trans_gene %in% trans_genes_filtered)
 
-cat("Reference edges after LD filtering:", nrow(reference_edges_maizenetome), 
-    "\n")
+cat("Reference edges after LD filtering:", nrow(reference_edges_maizenetome), "\n")
 ```
 
 ```{r build_bipartite_network}
@@ -791,18 +715,12 @@ trans_genes <- trans_genes_filtered[trans_genes_filtered %in% rownames(voomR$E)]
 cat("Cis genes in expression data:", length(cis_genes), "\n")
 cat("Trans genes in expression data:", length(trans_genes), "\n")
 
-# Original correlations (for visualization and robust_dist)
 expr_cis <- t(voomR$E)[, cis_genes]
 expr_trans <- t(voomR$E)[, trans_genes]
+
 corr_bipartite <- cor(expr_cis, expr_trans, use = "pairwise.complete.obs")
 
-# Scaled correlations for std_dist MST construction
-# Following Chenxin Li: https://github.com/cxli233/SimpleTidy_GeneCoEx#z-score
-expr_cis_scaled <- scale(expr_cis)
-expr_trans_scaled <- scale(expr_trans)
-corr_bipartite_scaled <- cor(expr_cis_scaled, expr_trans_scaled, 
-                              use = "pairwise.complete.obs")
-
+n_samples <- nrow(expr_cis)
 p_values <- matrix(NA, nrow = nrow(corr_bipartite), ncol = ncol(corr_bipartite))
 
 for (i in 1:nrow(corr_bipartite)) {
@@ -825,8 +743,7 @@ edges_idx <- which(corr_bipartite_filtered != 0, arr.ind = TRUE)
 bipartite_edges <- data.frame(
   from = rownames(corr_bipartite_filtered)[edges_idx[, 1]],
   to = colnames(corr_bipartite_filtered)[edges_idx[, 2]],
-  r = corr_bipartite_filtered[edges_idx],
-  corr_std = corr_bipartite_scaled[edges_idx]
+  r = corr_bipartite_filtered[edges_idx]
 )
 
 cat("Bipartite network edges:", nrow(bipartite_edges), "\n")
@@ -852,12 +769,6 @@ bipartite_edges$network_module <- ifelse(
   "Novel"
 )
 
-write.csv(
-    bipartite_edges %>% filter(from %in% inv4m_regulators),
-    file.path(paths$intermediate, "inv4m_bipartite_edges.csv"),
-    row.names = FALSE
-)
-
 cat("Edge classification:\n")
 print(table(bipartite_edges$network_module))
 
@@ -870,147 +781,38 @@ cat("Novel module edges:", nrow(novel_edges), "\n")
 
 ---
 
-# Visualize Whole Trans Networks
-
-```{r whole_full_network}
-visualize_trans_network(
-  edges = bipartite_edges,
-  effects_df = effects_df,
-  variant = "full",
-  module_name = "Trans Coexpression",
-  n_samples = n_samples
-)
-```
-
-```{r compute_novel_only_inv4m}
-reference_inv4m_edges <- reference_edges %>% 
-  filter(from %in% inv4m_regulators)
-novel_inv4m_edges <- novel_edges %>% 
-  filter(from %in% inv4m_regulators)
-
-ref_inv4m_nodes <- unique(c(reference_inv4m_edges$from, 
-                             reference_inv4m_edges$to))
-novel_inv4m_nodes <- unique(c(novel_inv4m_edges$from, novel_inv4m_edges$to))
-novel_only_nodes <- setdiff(novel_inv4m_nodes, ref_inv4m_nodes)
-
-novel_only_edges <- novel_inv4m_edges %>%
-  filter(from %in% novel_only_nodes & to %in% novel_only_nodes)
-```
-
-```{r novel_only_subgraph}
-visualize_trans_network(
-  edges = novel_only_edges,
-  effects_df = effects_df,
-  variant = "full",
-  module_name = "NOVEL-ONLY (Inv4m, excluding reference nodes)",
-  edge_threshold = 100,
-  font_size = 18,
-  n_samples = n_samples
-)
-```
-
-```{r whole_flanking_network}
-visualize_trans_network(
-  edges = bipartite_edges,
-  effects_df = effects_df,
-  variant = "flanking",
-  module_name = "Trans Coexpression",
-  n_samples = n_samples
-)
-```
-
-```{r whole_inv4m_network}
-visualize_trans_network(
-  edges = bipartite_edges,
-  effects_df = effects_df,
-  variant = "inv4m",
-  module_name = "Trans Coexpression",
-  n_samples = n_samples
-)
-```
-
-```{r inv4m_no_flanking_connections}
-targets_with_flanking <- bipartite_edges %>%
-  filter(from %in% flanking_regulators) %>%
-  pull(to) %>%
-  unique()
-
-edges_no_flanking_targets <- bipartite_edges %>%
-  filter(
-    from %in% inv4m_regulators,
-    !to %in% targets_with_flanking
-  )
-
-visualize_trans_network(
-  edges = edges_no_flanking_targets,
-  effects_df = effects_df,
-  variant = "full",
-  module_name = "Inv4m → No Flanking Connections",
-  edge_threshold = 100,
-  font_size = 18,
-  n_samples = n_samples
-)
-```
-
-```{r inv4m_strongest_nonflanking}
-strongest_edge_per_target <- bipartite_edges %>%
-  mutate(abs_r = abs(r)) %>%
-  group_by(to) %>%
-  slice_max(abs_r, n = 1, with_ties = FALSE) %>%
-  ungroup()
-
-targets_strongest_nonflanking <- strongest_edge_per_target %>%
-  filter(!from %in% flanking_regulators) %>%
-  pull(to)
-
-edges_strongest_nonflanking_inv4m <- bipartite_edges %>%
-  filter(
-    to %in% targets_strongest_nonflanking,
-    from %in% inv4m_regulators
-  )
-
-visualize_trans_network(
-  edges = edges_strongest_nonflanking_inv4m,
-  effects_df = effects_df,
-  variant = "full",
-  module_name = "Inv4m → Strongest Regulator Not Flanking",
-  edge_threshold = 100,
-  font_size = 18,
-  n_samples = n_samples
-)
-```
-
----
-
 # Visualize Novel Trans Networks
+
+## Novel: Full Trans Co-expression Network
 
 ```{r novel_full_network}
 visualize_trans_network(
   edges = novel_edges,
   effects_df = effects_df,
   variant = "full",
-  module_name = "NOVEL",
-  n_samples = n_samples
+  module_name = "NOVEL"
 )
 ```
+
+## Novel: Flanking Trans Co-expression Network
 
 ```{r novel_flanking_network}
 visualize_trans_network(
   edges = novel_edges,
   effects_df = effects_df,
   variant = "flanking",
-  module_name = "NOVEL",
-  n_samples = n_samples
+  module_name = "NOVEL"
 )
 ```
+
+## Novel: Inv4m Trans Co-expression Network
 
 ```{r novel_inv4m_network}
 visualize_trans_network(
   edges = novel_edges,
   effects_df = effects_df,
   variant = "inv4m",
-  module_name = "NOVEL",
-  n_samples = n_samples
+  module_name = "NOVEL"
 )
 ```
 
@@ -1018,33 +820,36 @@ visualize_trans_network(
 
 # Visualize Reference Trans Networks
 
+## Reference: Full Trans Co-expression Network
+
 ```{r reference_full_network}
 visualize_trans_network(
   edges = reference_edges,
   effects_df = effects_df,
   variant = "full",
-  module_name = "REFERENCE",
-  n_samples = n_samples
+  module_name = "REFERENCE"
 )
 ```
+
+## Reference: Flanking Trans Co-expression Network
 
 ```{r reference_flanking_network}
 visualize_trans_network(
   edges = reference_edges,
   effects_df = effects_df,
   variant = "flanking",
-  module_name = "REFERENCE",
-  n_samples = n_samples
+  module_name = "REFERENCE"
 )
 ```
+
+## Reference: Inv4m Trans Co-expression Network
 
 ```{r reference_inv4m_network}
 visualize_trans_network(
   edges = reference_edges,
   effects_df = effects_df,
   variant = "inv4m",
-  module_name = "REFERENCE",
-  n_samples = n_samples
+  module_name = "REFERENCE"
 )
 ```
 
@@ -1062,11 +867,11 @@ reference_gene_info <- effects_df %>%
   distinct() %>%
   mutate(gene_location = ifelse(gene %in% cis_genes, "cis", "trans"))
 
-write.csv(reference_gene_info, 
-          "results/phosphorus_paper/intermediate/reference_trans_network_genes.csv", 
+write.csv(reference_gene_info,
+          file.path(paths$intermediate, "reference_trans_network_genes.csv"),
           row.names = FALSE)
-write.csv(reference_edges, 
-          "results/phosphorus_paper/intermediate/reference_trans_network_edges.csv", 
+write.csv(reference_edges,
+          file.path(paths$intermediate, "reference_trans_network_edges.csv"),
           row.names = FALSE)
 
 novel_gene_info <- effects_df %>%
@@ -1075,11 +880,11 @@ novel_gene_info <- effects_df %>%
   distinct() %>%
   mutate(gene_location = ifelse(gene %in% cis_genes, "cis", "trans"))
 
-write.csv(novel_gene_info, 
-          "results/phosphorus_paper/intermediate/novel_trans_network_genes.csv", 
+write.csv(novel_gene_info,
+          file.path(paths$intermediate, "novel_trans_network_genes.csv"),
           row.names = FALSE)
-write.csv(novel_edges, 
-          "results/phosphorus_paper/intermediate/novel_trans_network_edges.csv", 
+write.csv(novel_edges,
+          file.path(paths$intermediate, "novel_trans_network_edges.csv"),
           row.names = FALSE)
 
 cat("Network modules exported to paths$intermediate\n")

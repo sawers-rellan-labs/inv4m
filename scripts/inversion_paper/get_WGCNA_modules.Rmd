@@ -1,0 +1,1393 @@
+---
+title: "WGCNA Analysis: Inv4m DEG Networks"
+author: "Fausto Rodríguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8,
+  cache = FALSE
+)
+
+# Load project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+Apply WGCNA to Inv4m DEGs to identify co-expression modules.
+
+**Approach**: Unsigned networks with power = 12, minModuleSize = 10, better
+suited for identifying regulatory hubs like JMJ genes that can both activate
+and repress targets.
+
+# Libraries
+
+```{r libraries}
+library(SummarizedExperiment)
+library(tidyverse)
+library(WGCNA)
+library(pheatmap)
+```
+
+# Load Data
+
+## Normalized Expression
+
+```{r load_expression}
+voomR <- readRDS(file.path(paths$data, "normalized_expression_voom_object_leaf_trt.rda"))
+
+cat("Expression data loaded:\n")
+cat("  Genes:", nrow(voomR$E), "\n")
+cat("  Samples:", ncol(voomR$E), "\n")
+```
+
+## DEG Results
+
+```{r load_degs}
+effects_df <- read_csv(
+  "  file.path(paths$data, "predictor_effects_leaf_interaction_model.csv")"
+)
+
+inv4m_degs <- effects_df %>%
+  filter(
+    predictor == "Inv4m",
+    is_DEG == TRUE
+  ) %>%
+  pull(gene) %>%
+  unique()
+
+cat("Inv4m DEGs identified:", length(inv4m_degs), "\n")
+cat("  Upregulated:", 
+    sum(effects_df$predictor == "Inv4m" & 
+        effects_df$is_DEG & 
+        effects_df$regulation == "Upregulated"), "\n")
+cat("  Downregulated:", 
+    sum(effects_df$predictor == "Inv4m" & 
+        effects_df$is_DEG & 
+        effects_df$regulation == "Downregulated"), "\n")
+```
+
+# Prepare Data
+
+## Filter Expression Matrix
+
+```{r filter_expression}
+expr_matrix_degs <- t(voomR$E[inv4m_degs, ])
+
+cat("Expression matrix dimensions:", dim(expr_matrix_degs), "\n")
+cat("  Samples (rows):", nrow(expr_matrix_degs), "\n")
+cat("  Genes (columns):", ncol(expr_matrix_degs), "\n")
+```
+
+## Sample Metadata
+
+```{r prepare_metadata}
+sample_table <- voomR$targets %>%
+  as.data.frame() %>%
+  rownames_to_column("Sample") %>%
+  select(
+    Sample,
+    Genotype,
+    leaf_tissue,
+    Treatment
+  ) %>%
+  mutate(
+    Genotype = factor(Genotype, levels = c("CTRL", "Inv4m")),
+    leaf_tissue = factor(leaf_tissue)
+  )
+
+rownames(sample_table) <- sample_table$Sample
+
+cat("Sample distribution:\n")
+with(sample_table, {
+  cat("Genotype × Leaf tissue:\n")
+  print(table(Genotype, leaf_tissue))
+  cat("\nGenotype × Treatment:\n")
+  print(table(Genotype, Treatment))
+})
+```
+
+# Network Construction
+
+## Combined Network (All Samples)
+
+```{r prepare_datExpr}
+datExpr <- expr_matrix_degs
+
+cat("Expression data prepared for WGCNA:\n")
+cat("  Samples (rows):", nrow(datExpr), "\n")
+cat("  Genes (columns):", ncol(datExpr), "\n")
+```
+
+```{r soft_threshold_all}
+powers <- c(1:20)
+
+sft_all <- pickSoftThreshold(
+  datExpr,
+  powerVector = powers,
+  networkType = "unsigned",
+  verbose = 5
+)
+
+par(mfrow = c(1, 2))
+plot(
+  sft_all$fitIndices[, 1],
+  -sign(sft_all$fitIndices[, 3]) * sft_all$fitIndices[, 2],
+  xlab = "Soft Threshold (power)",
+  ylab = "Scale Free Topology Model Fit, signed R^2",
+  main = "Scale Independence - All Samples",
+  type = "n"
+)
+text(
+  sft_all$fitIndices[, 1],
+  -sign(sft_all$fitIndices[, 3]) * sft_all$fitIndices[, 2],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+abline(h = 0.80, col = "blue")
+
+plot(
+  sft_all$fitIndices[, 1],
+  sft_all$fitIndices[, 5],
+  xlab = "Soft Threshold (power)",
+  ylab = "Mean Connectivity",
+  main = "Mean Connectivity - All Samples",
+  type = "n"
+)
+text(
+  sft_all$fitIndices[, 1],
+  sft_all$fitIndices[, 5],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+
+pow_all <- sft_all$powerEstimate
+if (is.na(pow_all)) {
+  pow_all <- sft_all$fitIndices %>%
+    filter(-sign(Slope) * SFT.R.sq > 0.80) %>%
+    slice_head(n = 1) %>%
+    pull(Power)
+  
+  if (length(pow_all) == 0) {
+    pow_all <- 12
+    cat("\nWarning: No power achieved R^2 > 0.80, using default power = 12\n")
+  }
+}
+
+cat("\nSelected soft-thresholding power (all samples):", pow_all, "\n")
+cat("Scale-free topology fit R^2:", 
+    sft_all$fitIndices[sft_all$fitIndices$Power == pow_all, "SFT.R.sq"], "\n")
+```
+
+```{r construct_network_all}
+cat("Building UNSIGNED network with blockwiseModules:\n")
+
+net_all <- blockwiseModules(
+  datExpr,
+  power = pow_all,
+  networkType = "unsigned",
+  TOMType = "unsigned",
+  minModuleSize = 10,
+  maxBlockSize = 25000,
+  reassignThreshold = 0,
+  mergeCutHeight = 0,
+  numericLabels = TRUE,
+  pamRespectsDendro = FALSE,
+  deepSplit = 4,
+  verbose = 3
+)
+
+wgcna_all <- list(
+  combined = structure(
+    list(
+      datExpr = datExpr,
+      moduleColors = net_all$colors,
+      MEs = net_all$MEs,
+      sampleTable = sample_table
+    ),
+    class = "WGCNA"
+  )
+)
+
+cat("\nNetwork built successfully\n")
+cat("  Modules:", length(unique(net_all$colors)), "\n")
+cat("  Genes:", length(net_all$colors), "\n")
+```
+
+## Genotype-Specific Networks
+
+```{r prepare_genotype_datExpr}
+ctrl_samples <- rownames(sample_table)[sample_table$Genotype == "CTRL"]
+inv4m_samples <- rownames(sample_table)[sample_table$Genotype == "Inv4m"]
+
+datExpr_ctrl <- datExpr[ctrl_samples, ]
+datExpr_inv4m <- datExpr[inv4m_samples, ]
+
+cat("CTRL expression data:\n")
+cat("  Samples:", nrow(datExpr_ctrl), "\n")
+cat("  Genes:", ncol(datExpr_ctrl), "\n")
+cat("\nInv4m expression data:\n")
+cat("  Samples:", nrow(datExpr_inv4m), "\n")
+cat("  Genes:", ncol(datExpr_inv4m), "\n")
+```
+
+```{r soft_threshold_genotypes}
+sft_ctrl <- pickSoftThreshold(
+  datExpr_ctrl,
+  powerVector = powers,
+  networkType = "unsigned",
+  verbose = 5
+)
+
+sft_inv4m <- pickSoftThreshold(
+  datExpr_inv4m,
+  powerVector = powers,
+  networkType = "unsigned",
+  verbose = 5
+)
+
+par(mfrow = c(2, 2))
+
+plot(
+  sft_ctrl$fitIndices[, 1],
+  -sign(sft_ctrl$fitIndices[, 3]) * sft_ctrl$fitIndices[, 2],
+  xlab = "Soft Threshold (power)",
+  ylab = "Scale Free Topology Fit R^2",
+  main = "Scale Independence - CTRL",
+  type = "n"
+)
+text(
+  sft_ctrl$fitIndices[, 1],
+  -sign(sft_ctrl$fitIndices[, 3]) * sft_ctrl$fitIndices[, 2],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+abline(h = 0.80, col = "blue")
+
+plot(
+  sft_ctrl$fitIndices[, 1],
+  sft_ctrl$fitIndices[, 5],
+  xlab = "Soft Threshold (power)",
+  ylab = "Mean Connectivity",
+  main = "Mean Connectivity - CTRL",
+  type = "n"
+)
+text(
+  sft_ctrl$fitIndices[, 1],
+  sft_ctrl$fitIndices[, 5],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+
+plot(
+  sft_inv4m$fitIndices[, 1],
+  -sign(sft_inv4m$fitIndices[, 3]) * sft_inv4m$fitIndices[, 2],
+  xlab = "Soft Threshold (power)",
+  ylab = "Scale Free Topology Fit R^2",
+  main = "Scale Independence - Inv4m",
+  type = "n"
+)
+text(
+  sft_inv4m$fitIndices[, 1],
+  -sign(sft_inv4m$fitIndices[, 3]) * sft_inv4m$fitIndices[, 2],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+abline(h = 0.80, col = "blue")
+
+plot(
+  sft_inv4m$fitIndices[, 1],
+  sft_inv4m$fitIndices[, 5],
+  xlab = "Soft Threshold (power)",
+  ylab = "Mean Connectivity",
+  main = "Mean Connectivity - Inv4m",
+  type = "n"
+)
+text(
+  sft_inv4m$fitIndices[, 1],
+  sft_inv4m$fitIndices[, 5],
+  labels = powers,
+  cex = 0.9,
+  col = "red"
+)
+
+pow_ctrl <- sft_ctrl$powerEstimate
+if (is.na(pow_ctrl)) {
+  pow_ctrl <- sft_ctrl$fitIndices %>%
+    filter(-sign(Slope) * SFT.R.sq > 0.80) %>%
+    slice_head(n = 1) %>%
+    pull(Power)
+  
+  if (length(pow_ctrl) == 0) {
+    pow_ctrl <- 12
+    cat("\nWarning: CTRL - No power achieved R^2 > 0.80, using default = 12\n")
+  }
+}
+
+pow_inv4m <- sft_inv4m$powerEstimate
+if (is.na(pow_inv4m)) {
+  pow_inv4m <- sft_inv4m$fitIndices %>%
+    filter(-sign(Slope) * SFT.R.sq > 0.80) %>%
+    slice_head(n = 1) %>%
+    pull(Power)
+  
+  if (length(pow_inv4m) == 0) {
+    pow_inv4m <- 12
+    cat("\nWarning: Inv4m - No power achieved R^2 > 0.80, using default = 12\n")
+  }
+}
+
+cat("\nSelected powers:\n")
+cat("  CTRL:", pow_ctrl, 
+    "(R^2 =", sft_ctrl$fitIndices[sft_ctrl$fitIndices$Power == pow_ctrl, "SFT.R.sq"], ")\n")
+cat("  Inv4m:", pow_inv4m, 
+    "(R^2 =", sft_inv4m$fitIndices[sft_inv4m$fitIndices$Power == pow_inv4m, "SFT.R.sq"], ")\n")
+```
+
+```{r construct_network_ctrl}
+cat("Building CTRL network:\n")
+
+net_ctrl <- blockwiseModules(
+  datExpr_ctrl,
+  power = pow_ctrl,
+  networkType = "unsigned",
+  TOMType = "unsigned",
+  minModuleSize = 10,
+  maxBlockSize = 25000,
+  reassignThreshold = 0,
+  mergeCutHeight = 0,
+  numericLabels = TRUE,
+  pamRespectsDendro = FALSE,
+  deepSplit = 4,
+  verbose = 3
+)
+
+wgcna_ctrl <- list(
+  ctrl = structure(
+    list(
+      datExpr = datExpr_ctrl,
+      moduleColors = net_ctrl$colors,
+      MEs = net_ctrl$MEs,
+      sampleTable = sample_table[ctrl_samples, ]
+    ),
+    class = "WGCNA"
+  )
+)
+
+cat("\nCTRL network built\n")
+cat("  Modules:", length(unique(net_ctrl$colors)), "\n")
+cat("  Genes:", length(net_ctrl$colors), "\n")
+```
+
+```{r construct_network_inv4m}
+cat("Building Inv4m network:\n")
+
+net_inv4m <- blockwiseModules(
+  datExpr_inv4m,
+  power = pow_inv4m,
+  networkType = "unsigned",
+  TOMType = "unsigned",
+  minModuleSize = 10,
+  maxBlockSize = 25000,
+  reassignThreshold = 0,
+  mergeCutHeight = 0,
+  numericLabels = TRUE,
+  pamRespectsDendro = FALSE,
+  deepSplit = 4,
+  verbose = 3
+)
+
+wgcna_inv4m <- list(
+  inv4m = structure(
+    list(
+      datExpr = datExpr_inv4m,
+      moduleColors = net_inv4m$colors,
+      MEs = net_inv4m$MEs,
+      sampleTable = sample_table[inv4m_samples, ]
+    ),
+    class = "WGCNA"
+  )
+)
+
+cat("\nInv4m network built\n")
+cat("  Modules:", length(unique(net_inv4m$colors)), "\n")
+cat("  Genes:", length(net_inv4m$colors), "\n")
+```
+
+## Network Summary
+
+```{r network_summary_all}
+n_modules_all <- length(unique(net_all$colors))
+module_sizes_all <- table(net_all$colors)
+
+cat("\nCombined network (all samples):\n")
+cat("  Total modules:", n_modules_all, "\n")
+cat("  Total genes:", length(net_all$colors), "\n")
+cat("\nModule sizes:\n")
+print(sort(module_sizes_all, decreasing = TRUE))
+
+saveRDS(wgcna_all, file.path(paths$intermediate, "wgcna_all.rds"))
+cat("\nNetwork saved to wgcna_all.rds\n")
+```
+
+```{r network_summary_genotypes}
+n_modules_ctrl <- length(unique(net_ctrl$colors))
+module_sizes_ctrl <- table(net_ctrl$colors)
+
+n_modules_inv4m <- length(unique(net_inv4m$colors))
+module_sizes_inv4m <- table(net_inv4m$colors)
+
+cat("\nCTRL network:\n")
+cat("  Total modules:", n_modules_ctrl, "\n")
+cat("  Total genes:", length(net_ctrl$colors), "\n")
+cat("\nModule sizes:\n")
+print(sort(module_sizes_ctrl, decreasing = TRUE))
+
+cat("\n\nInv4m network:\n")
+cat("  Total modules:", n_modules_inv4m, "\n")
+cat("  Total genes:", length(net_inv4m$colors), "\n")
+cat("\nModule sizes:\n")
+print(sort(module_sizes_inv4m, decreasing = TRUE))
+
+saveRDS(wgcna_ctrl, file.path(paths$intermediate, "wgcna_ctrl.rds"))
+saveRDS(wgcna_inv4m, file.path(paths$intermediate, "wgcna_inv4m.rds"))
+cat("\nGenotype-specific networks saved\n")
+```
+
+# Differential Module Expression
+
+```{r dme_analysis}
+MEs_all <- net_all$MEs
+
+ME_data_all <- MEs_all %>%
+  as.data.frame() %>%
+  rownames_to_column("Sample") %>%
+  left_join(
+    sample_table %>% select(Sample, Genotype, leaf_tissue, Treatment),
+    by = "Sample"
+  )
+
+module_names_all <- grep("^ME", colnames(MEs_all), value = TRUE)
+
+dme_results <- map_dfr(module_names_all, function(mod) {
+  me_values <- ME_data_all[[mod]]
+  genotype <- ME_data_all$Genotype
+  
+  inv4m_vals <- me_values[genotype == "Inv4m"]
+  ctrl_vals <- me_values[genotype == "CTRL"]
+  
+  t_result <- t.test(inv4m_vals, ctrl_vals)
+  
+  tibble(
+    module = mod,
+    mean_Inv4m = mean(inv4m_vals),
+    mean_CTRL = mean(ctrl_vals),
+    diff = mean_Inv4m - mean_CTRL,
+    t_statistic = t_result$statistic,
+    p_value = t_result$p.value
+  )
+})
+
+dme_results <- dme_results %>%
+  mutate(fdr = p.adjust(p_value, method = "fdr")) %>%
+  arrange(p_value)
+
+cat("Differential module expression results:\n")
+print(dme_results)
+
+sig_modules <- dme_results %>%
+  filter(fdr < 0.05)
+
+cat("\nSignificant genotype-associated modules (FDR < 0.05):", 
+    nrow(sig_modules), "\n")
+
+if (nrow(sig_modules) > 0) {
+  print(sig_modules)
+}
+```
+
+# Visualization
+
+## Module Eigengene Heatmap
+
+```{r me_heatmap, fig.width=10, fig.height=8}
+ME_heatmap_data <- ME_data_all %>%
+  select(Sample, Genotype, leaf_tissue, Treatment, all_of(module_names_all))
+
+anno_df <- ME_heatmap_data %>%
+  select(Sample, Genotype, leaf_tissue, Treatment) %>%
+  column_to_rownames("Sample")
+
+ME_matrix <- ME_heatmap_data %>%
+  select(all_of(module_names_all)) %>%
+  as.matrix()
+
+rownames(ME_matrix) <- ME_heatmap_data$Sample
+
+pheatmap(
+  t(ME_matrix),
+  annotation_col = anno_df,
+  scale = "row",
+  clustering_distance_rows = "correlation",
+  clustering_distance_cols = "euclidean",
+  main = "Module Eigengenes by Sample",
+  fontsize = 10
+)
+```
+
+## Module-Genotype Association
+
+```{r module_genotype_plot, fig.width=8, fig.height=6}
+sig_module_plots <- sig_modules %>%
+  pull(module) %>%
+  head(4)
+
+if (length(sig_module_plots) > 0) {
+  plot_data <- ME_data_all %>%
+    select(Sample, Genotype, leaf_tissue, all_of(sig_module_plots)) %>%
+    pivot_longer(
+      cols = all_of(sig_module_plots),
+      names_to = "module",
+      values_to = "eigengene"
+    )
+  
+  ggplot(plot_data, aes(x = Genotype, y = eigengene, fill = Genotype)) +
+    geom_boxplot() +
+    geom_jitter(width = 0.2, alpha = 0.5) +
+    facet_wrap(~ module, scales = "free_y") +
+    theme_classic(base_size = 12) +
+    labs(
+      title = "Top Genotype-Associated Modules",
+      y = "Module Eigengene",
+      x = NULL
+    ) +
+    theme(legend.position = "none")
+}
+```
+
+# Module Annotation
+
+## Combined Network Modules
+
+```{r annotate_modules_all}
+mod_all <- data.frame(
+  gene = names(net_all$colors),
+  module = paste0("ME", net_all$colors)
+)
+
+module_deg_stats_all <- mod_all %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, logFC, adj.P.Val, regulation, in_Inv4m, in_cis),
+    by = "gene"
+  )
+
+cat("Module assignments (all samples) with DEG statistics:\n")
+cat("  Total genes:", nrow(module_deg_stats_all), "\n")
+cat("  Genes with stats:", sum(!is.na(module_deg_stats_all$logFC)), "\n")
+```
+
+## Genotype-Specific Modules
+
+```{r annotate_modules_genotypes}
+mod_ctrl <- data.frame(
+  gene = names(net_ctrl$colors),
+  module = paste0("ME", net_ctrl$colors)
+)
+
+module_deg_stats_ctrl <- mod_ctrl %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, logFC, adj.P.Val, regulation, in_Inv4m, in_cis),
+    by = "gene"
+  )
+
+mod_inv4m <- data.frame(
+  gene = names(net_inv4m$colors),
+  module = paste0("ME", net_inv4m$colors)
+)
+
+module_deg_stats_inv4m <- mod_inv4m %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, logFC, adj.P.Val, regulation, in_Inv4m, in_cis),
+    by = "gene"
+  )
+
+cat("\nModule assignments (CTRL) with DEG statistics:\n")
+cat("  Total genes:", nrow(module_deg_stats_ctrl), "\n")
+cat("  Genes with stats:", sum(!is.na(module_deg_stats_ctrl$logFC)), "\n")
+
+cat("\nModule assignments (Inv4m) with DEG statistics:\n")
+cat("  Total genes:", nrow(module_deg_stats_inv4m), "\n")
+cat("  Genes with stats:", sum(!is.na(module_deg_stats_inv4m$logFC)), "\n")
+```
+
+## Build Edge Lists
+
+```{r build_edge_list_all}
+cat("\nCalculating adjacency matrix (all samples)...\n")
+adj_all <- adjacency(
+  datExpr,
+  power = pow_all,
+  type = "unsigned"
+)
+
+cat("Adjacency matrix dimensions:", dim(adj_all), "\n")
+
+edge_indices_all <- which(adj_all > 0 & upper.tri(adj_all, diag = FALSE), 
+                          arr.ind = TRUE)
+
+edge_list_all <- data.frame(
+  from = rownames(adj_all)[edge_indices_all[, 1]],
+  to = colnames(adj_all)[edge_indices_all[, 2]],
+  weight = adj_all[edge_indices_all]
+) %>%
+  arrange(desc(weight))
+
+cat("Total edges (weight > 0):", nrow(edge_list_all), "\n")
+```
+
+```{r build_edge_list_genotypes}
+cat("\nCalculating adjacency matrices (genotype-specific)...\n")
+
+adj_ctrl <- adjacency(
+  datExpr_ctrl,
+  power = pow_ctrl,
+  type = "unsigned"
+)
+
+adj_inv4m <- adjacency(
+  datExpr_inv4m,
+  power = pow_inv4m,
+  type = "unsigned"
+)
+
+cat("CTRL adjacency dimensions:", dim(adj_ctrl), "\n")
+cat("Inv4m adjacency dimensions:", dim(adj_inv4m), "\n")
+```
+
+## Module Summary Statistics
+
+### Combined Network
+
+```{r module_summary_all}
+modules_all_summary <- module_deg_stats_all %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_upregulated = sum(regulation == "Upregulated", na.rm = TRUE),
+    n_downregulated = sum(regulation == "Downregulated", na.rm = TRUE),
+    mean_logFC = mean(logFC, na.rm = TRUE),
+    median_logFC = median(logFC, na.rm = TRUE),
+    n_in_inv4m = sum(in_Inv4m, na.rm = TRUE),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    pct_in_cis = 100 * n_in_cis / n_genes,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(abs(mean_logFC)))
+
+cat("Module summary (all samples):\n")
+print(modules_all_summary)
+
+write_csv(modules_all_summary, file.path(paths$intermediate, "modules_all_summary.csv"))
+```
+
+### Genotype-Specific Networks
+
+```{r module_summary_genotypes}
+modules_ctrl_summary <- module_deg_stats_ctrl %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_upregulated = sum(regulation == "Upregulated", na.rm = TRUE),
+    n_downregulated = sum(regulation == "Downregulated", na.rm = TRUE),
+    mean_logFC = mean(logFC, na.rm = TRUE),
+    median_logFC = median(logFC, na.rm = TRUE),
+    n_in_inv4m = sum(in_Inv4m, na.rm = TRUE),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    pct_in_cis = 100 * n_in_cis / n_genes,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(abs(mean_logFC)))
+
+modules_inv4m_summary <- module_deg_stats_inv4m %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_upregulated = sum(regulation == "Upregulated", na.rm = TRUE),
+    n_downregulated = sum(regulation == "Downregulated", na.rm = TRUE),
+    mean_logFC = mean(logFC, na.rm = TRUE),
+    median_logFC = median(logFC, na.rm = TRUE),
+    n_in_inv4m = sum(in_Inv4m, na.rm = TRUE),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    pct_in_cis = 100 * n_in_cis / n_genes,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(abs(mean_logFC)))
+
+cat("\nModule summary (CTRL):\n")
+print(modules_ctrl_summary)
+
+cat("\nModule summary (Inv4m):\n")
+print(modules_inv4m_summary)
+
+write_csv(modules_ctrl_summary, file.path(paths$intermediate, "modules_ctrl_summary.csv"))
+write_csv(modules_inv4m_summary, file.path(paths$intermediate, "modules_inv4m_summary.csv"))
+```
+
+## Identify Hub Genes
+
+### Combined Network
+
+```{r calculate_connectivity_all}
+cat("\nCalculating intramodular connectivity (all samples)...\n")
+
+connectivity_all <- intramodularConnectivity(adj_all, net_all$colors)
+
+hubs_all <- mod_all %>%
+  mutate(
+    module_numeric = as.numeric(gsub("ME", "", module))
+  ) %>%
+  left_join(
+    connectivity_all %>%
+      rownames_to_column("gene") %>%
+      as_tibble(),
+    by = "gene"
+  ) %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, locus_label, desc_merged, logFC, adj.P.Val, 
+             regulation, in_Inv4m, in_cis),
+    by = "gene"
+  ) %>%
+  arrange(module, desc(kWithin))
+
+cat("Hub genes calculated (all samples)\n")
+cat("  Mean kWithin:", round(mean(hubs_all$kWithin, na.rm = TRUE), 3), "\n")
+cat("  Median kWithin:", round(median(hubs_all$kWithin, na.rm = TRUE), 3), "\n")
+```
+
+```{r top_hubs_all}
+hubs_all_top <- hubs_all %>%
+  filter(abs(logFC) >= 1.5) %>%
+  group_by(module) %>%
+  arrange(desc(kWithin)) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+cat("\nTop 10 hub genes per module (all samples):\n")
+print(hubs_all_top %>% 
+        select(module, gene, locus_label, kWithin, logFC, in_cis))
+
+write_csv(hubs_all, file.path(paths$intermediate, "hubs_all.csv"))
+write_csv(hubs_all_top, file.path(paths$intermediate, "hubs_all_top.csv"))
+
+cat("\nHub gene files exported (all samples)\n")
+```
+
+```{r cis_hub_genes_all}
+connectivity_threshold_all <- quantile(hubs_all$kWithin, 0.75, na.rm = TRUE)
+
+hubs_all_cis <- hubs_all %>%
+  filter(in_cis == TRUE, kWithin > connectivity_threshold_all) %>%
+  arrange(desc(kWithin))
+
+cat("\nCis hub genes (all samples, kWithin > 75th percentile =", 
+    round(connectivity_threshold_all, 2), "):", nrow(hubs_all_cis), "\n")
+if (nrow(hubs_all_cis) > 0) {
+  print(hubs_all_cis %>% 
+          select(module, gene, locus_label, kWithin, logFC, in_Inv4m))
+  
+  write_csv(hubs_all_cis, file.path(paths$intermediate, "hubs_all_cis.csv"))
+}
+```
+
+### Genotype-Specific Networks
+
+```{r calculate_connectivity_genotypes}
+cat("\nCalculating intramodular connectivity (genotype-specific)...\n")
+
+connectivity_ctrl <- intramodularConnectivity(adj_ctrl, net_ctrl$colors)
+connectivity_inv4m <- intramodularConnectivity(adj_inv4m, net_inv4m$colors)
+
+hubs_ctrl <- mod_ctrl %>%
+  mutate(
+    module_numeric = as.numeric(gsub("ME", "", module))
+  ) %>%
+  left_join(
+    connectivity_ctrl %>%
+      rownames_to_column("gene") %>%
+      as_tibble(),
+    by = "gene"
+  ) %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, locus_label, desc_merged, logFC, adj.P.Val, 
+             regulation, in_Inv4m, in_cis),
+    by = "gene"
+  ) %>%
+  arrange(module, desc(kWithin))
+
+hubs_inv4m <- mod_inv4m %>%
+  mutate(
+    module_numeric = as.numeric(gsub("ME", "", module))
+  ) %>%
+  left_join(
+    connectivity_inv4m %>%
+      rownames_to_column("gene") %>%
+      as_tibble(),
+    by = "gene"
+  ) %>%
+  left_join(
+    effects_df %>%
+      filter(predictor == "Inv4m") %>%
+      select(gene, locus_label, desc_merged, logFC, adj.P.Val, 
+             regulation, in_Inv4m, in_cis),
+    by = "gene"
+  ) %>%
+  arrange(module, desc(kWithin))
+
+cat("Hub genes calculated\n")
+cat("  CTRL - Mean kWithin:", round(mean(hubs_ctrl$kWithin, na.rm = TRUE), 3), "\n")
+cat("  CTRL - Median kWithin:", round(median(hubs_ctrl$kWithin, na.rm = TRUE), 3), "\n")
+cat("  Inv4m - Mean kWithin:", round(mean(hubs_inv4m$kWithin, na.rm = TRUE), 3), "\n")
+cat("  Inv4m - Median kWithin:", round(median(hubs_inv4m$kWithin, na.rm = TRUE), 3), "\n")
+```
+
+```{r top_hubs_genotypes}
+hubs_ctrl_top <- hubs_ctrl %>%
+  filter(abs(logFC) >= 1.5) %>%
+  group_by(module) %>%
+  arrange(desc(kWithin)) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+hubs_inv4m_top <- hubs_inv4m %>%
+  filter(abs(logFC) >= 1.5) %>%
+  group_by(module) %>%
+  arrange(desc(kWithin)) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+cat("\nTop 10 hub genes per module (CTRL):\n")
+print(hubs_ctrl_top %>% 
+        select(module, gene, locus_label, kWithin, logFC, in_cis))
+
+cat("\nTop 10 hub genes per module (Inv4m):\n")
+print(hubs_inv4m_top %>% 
+        select(module, gene, locus_label, kWithin, logFC, in_cis))
+
+write_csv(hubs_ctrl, file.path(paths$intermediate, "hubs_ctrl.csv"))
+write_csv(hubs_ctrl_top, file.path(paths$intermediate, "hubs_ctrl_top.csv"))
+write_csv(hubs_inv4m, file.path(paths$intermediate, "hubs_inv4m.csv"))
+write_csv(hubs_inv4m_top, file.path(paths$intermediate, "hubs_inv4m_top.csv"))
+
+cat("\nHub gene files exported (genotype-specific)\n")
+```
+
+```{r cis_hub_genes_genotypes}
+connectivity_threshold_ctrl <- quantile(hubs_ctrl$kWithin, 0.75, na.rm = TRUE)
+connectivity_threshold_inv4m <- quantile(hubs_inv4m$kWithin, 0.75, na.rm = TRUE)
+
+hubs_ctrl_cis <- hubs_ctrl %>%
+  filter(in_cis == TRUE, kWithin > connectivity_threshold_ctrl) %>%
+  arrange(desc(kWithin))
+
+hubs_inv4m_cis <- hubs_inv4m %>%
+  filter(in_cis == TRUE, kWithin > connectivity_threshold_inv4m) %>%
+  arrange(desc(kWithin))
+
+cat("\nCis hub genes (CTRL, kWithin > 75th percentile =", 
+    round(connectivity_threshold_ctrl, 2), "):", nrow(hubs_ctrl_cis), "\n")
+if (nrow(hubs_ctrl_cis) > 0) {
+  print(hubs_ctrl_cis %>% 
+          select(module, gene, locus_label, kWithin, logFC, in_Inv4m))
+  
+  write_csv(hubs_ctrl_cis, file.path(paths$intermediate, "hubs_ctrl_cis.csv"))
+}
+
+cat("\nCis hub genes (Inv4m, kWithin > 75th percentile =", 
+    round(connectivity_threshold_inv4m, 2), "):", nrow(hubs_inv4m_cis), "\n")
+if (nrow(hubs_inv4m_cis) > 0) {
+  print(hubs_inv4m_cis %>% 
+          select(module, gene, locus_label, kWithin, logFC, in_Inv4m))
+  
+  write_csv(hubs_inv4m_cis, file.path(paths$intermediate, "hubs_inv4m_cis.csv"))
+}
+```
+
+## Cis Enrichment Analysis
+
+### Combined Network
+
+```{r cis_enrichment_all}
+total_cis_all <- sum(module_deg_stats_all$in_cis, na.rm = TRUE)
+total_genes_all <- nrow(module_deg_stats_all)
+
+module_cis_enrichment_all <- module_deg_stats_all %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rowwise() %>%
+  mutate(
+    fisher_p = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_all - a
+      d <- (total_genes_all - total_cis_all) - b
+      
+      contingency <- matrix(c(a, b, c, d), nrow = 2)
+      fisher.test(contingency)$p.value
+    },
+    odds_ratio = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_all - a
+      d <- (total_genes_all - total_cis_all) - b
+      
+      (a * d) / (b * c)
+    }
+  ) %>%
+  ungroup() %>%
+  mutate(
+    fisher_fdr = p.adjust(fisher_p, method = "fdr")
+  ) %>%
+  arrange(fisher_p)
+
+cat("Cis enrichment analysis (all samples):\n")
+print(module_cis_enrichment_all)
+
+cat("\nModules enriched for cis genes (FDR < 0.05):\n")
+cis_enriched_all <- module_cis_enrichment_all %>%
+  filter(fisher_fdr < 0.05)
+
+if (nrow(cis_enriched_all) > 0) {
+  print(cis_enriched_all)
+} else {
+  cat("  None\n")
+}
+```
+
+### Genotype-Specific Networks
+
+```{r cis_enrichment_genotypes}
+total_cis_ctrl <- sum(module_deg_stats_ctrl$in_cis, na.rm = TRUE)
+total_genes_ctrl <- nrow(module_deg_stats_ctrl)
+
+module_cis_enrichment_ctrl <- module_deg_stats_ctrl %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rowwise() %>%
+  mutate(
+    fisher_p = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_ctrl - a
+      d <- (total_genes_ctrl - total_cis_ctrl) - b
+      
+      contingency <- matrix(c(a, b, c, d), nrow = 2)
+      fisher.test(contingency)$p.value
+    },
+    odds_ratio = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_ctrl - a
+      d <- (total_genes_ctrl - total_cis_ctrl) - b
+      
+      (a * d) / (b * c)
+    }
+  ) %>%
+  ungroup() %>%
+  mutate(
+    fisher_fdr = p.adjust(fisher_p, method = "fdr")
+  ) %>%
+  arrange(fisher_p)
+
+total_cis_inv4m <- sum(module_deg_stats_inv4m$in_cis, na.rm = TRUE)
+total_genes_inv4m <- nrow(module_deg_stats_inv4m)
+
+module_cis_enrichment_inv4m <- module_deg_stats_inv4m %>%
+  group_by(module) %>%
+  summarise(
+    n_genes = n(),
+    n_in_cis = sum(in_cis, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rowwise() %>%
+  mutate(
+    fisher_p = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_inv4m - a
+      d <- (total_genes_inv4m - total_cis_inv4m) - b
+      
+      contingency <- matrix(c(a, b, c, d), nrow = 2)
+      fisher.test(contingency)$p.value
+    },
+    odds_ratio = {
+      a <- n_in_cis
+      b <- n_genes - n_in_cis
+      c <- total_cis_inv4m - a
+      d <- (total_genes_inv4m - total_cis_inv4m) - b
+      
+      (a * d) / (b * c)
+    }
+  ) %>%
+  ungroup() %>%
+  mutate(
+    fisher_fdr = p.adjust(fisher_p, method = "fdr")
+  ) %>%
+  arrange(fisher_p)
+
+cat("\nCis enrichment analysis (CTRL):\n")
+print(module_cis_enrichment_ctrl)
+
+cat("\nModules enriched for cis genes (CTRL, FDR < 0.05):\n")
+cis_enriched_ctrl <- module_cis_enrichment_ctrl %>%
+  filter(fisher_fdr < 0.05)
+
+if (nrow(cis_enriched_ctrl) > 0) {
+  print(cis_enriched_ctrl)
+} else {
+  cat("  None\n")
+}
+
+cat("\nCis enrichment analysis (Inv4m):\n")
+print(module_cis_enrichment_inv4m)
+
+cat("\nModules enriched for cis genes (Inv4m, FDR < 0.05):\n")
+cis_enriched_inv4m <- module_cis_enrichment_inv4m %>%
+  filter(fisher_fdr < 0.05)
+
+if (nrow(cis_enriched_inv4m) > 0) {
+  print(cis_enriched_inv4m)
+} else {
+  cat("  None\n")
+}
+```
+
+# Match Trans Network Edges to WGCNA Modules
+
+```{r load_trans_network}
+cat("Loading trans co-expression network...\n")
+
+trans_edges <- read_csv(file.path(paths$data, "inv4m_bipartite_edges.csv"))
+
+cat("Trans network edges loaded:", nrow(trans_edges), "\n")
+cat("Columns:", paste(colnames(trans_edges), collapse = ", "), "\n")
+```
+
+```{r match_trans_to_modules_all}
+module_lookup_all <- mod_all %>%
+  select(gene, module)
+
+trans_edges$in_wgcna_all <- mapply(
+  function(f, t) {
+    exists_forward <- any(edge_list_all$from == f & edge_list_all$to == t)
+    exists_reverse <- any(edge_list_all$from == t & edge_list_all$to == f)
+    
+    exists_forward | exists_reverse
+  },
+  trans_edges$from,
+  trans_edges$to
+)
+
+trans_edges$wgcna_weight_all <- mapply(
+  function(f, t) {
+    forward_match <- edge_list_all %>%
+      filter(from == f & to == t) %>%
+      pull(weight)
+    
+    reverse_match <- edge_list_all %>%
+      filter(from == t & to == f) %>%
+      pull(weight)
+    
+    if (length(forward_match) > 0) {
+      return(forward_match[1])
+    } else if (length(reverse_match) > 0) {
+      return(reverse_match[1])
+    } else {
+      return(NA_real_)
+    }
+  },
+  trans_edges$from,
+  trans_edges$to
+)
+
+trans_edges_all <- trans_edges %>%
+  left_join(
+    module_lookup_all,
+    by = c("to" = "gene")
+  ) %>%
+  rename(module_all = module)
+
+cat("\nTrans edges in WGCNA network (all samples):", 
+    sum(trans_edges$in_wgcna_all), "out of", nrow(trans_edges), "\n")
+
+trans_summary_all <- trans_edges_all %>%
+  filter(!is.na(module_all)) %>%
+  group_by(module_all) %>%
+  summarise(
+    n_trans_edges = n(),
+    n_in_wgcna = sum(in_wgcna_all, na.rm = TRUE),
+    pct_in_wgcna = 100 * n_in_wgcna / n_trans_edges,
+    n_unique_trans_genes = n_distinct(to),
+    n_unique_cis_regulators = n_distinct(from),
+    mean_abs_r = mean(abs(r)),
+    mean_wgcna_weight = mean(wgcna_weight_all, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_trans_edges))
+
+cat("\nTrans edges per WGCNA module (all samples):\n")
+print(trans_summary_all)
+
+write_csv(trans_edges_all, file.path(paths$intermediate, "trans_modules_all.csv"))
+write_csv(trans_summary_all, file.path(paths$intermediate, "trans_summary_all.csv"))
+
+cat("\nExported:\n")
+cat("  trans_modules_all.csv\n")
+cat("  trans_summary_all.csv\n")
+```
+
+# Adjacency Matrix Visualizations
+
+## Combined Network (All Samples)
+
+```{r tom_all_samples}
+cat("Calculating TOM (all samples)...\n")
+TOM_all <- TOMsimilarity(adj_all)
+rownames(TOM_all) <- rownames(adj_all)
+colnames(TOM_all) <- colnames(adj_all)
+
+cat("Using WGCNA dendrogram ordering...\n")
+all_genes <- colnames(TOM_all)
+genes_with_modules <- names(net_all$colors)[net_all$colors != 0]
+
+TOM_all_filtered <- TOM_all[genes_with_modules, genes_with_modules]
+
+if (!is.null(net_all$dendrograms) && length(net_all$dendrograms) > 0) {
+  full_order <- net_all$dendrograms[[1]]$order
+  all_genes_ordered <- all_genes[full_order]
+  genes_in_modules_ordered <- all_genes_ordered[all_genes_ordered %in% genes_with_modules]
+  gene_order_all <- match(genes_in_modules_ordered, colnames(TOM_all_filtered))
+} else {
+  gene_order_all <- order(net_all$colors[genes_with_modules], genes_with_modules)
+}
+
+TOM_all_ordered <- TOM_all_filtered[gene_order_all, gene_order_all]
+TOM_all_ordered_rev <- TOM_all_ordered[nrow(TOM_all_ordered):1, ]
+
+gene_names_ordered_all <- colnames(TOM_all_filtered)[gene_order_all]
+gene_names_ordered_all_rev <- rev(gene_names_ordered_all)
+
+gene_module_annotation_all <- mod_all %>%
+  filter(gene %in% gene_names_ordered_all_rev) %>%
+  select(gene, module) %>%
+  mutate(gene = factor(gene, levels = gene_names_ordered_all_rev)) %>%
+  arrange(gene) %>%
+  column_to_rownames("gene")
+
+pheatmap(
+  TOM_all_ordered_rev,
+  annotation_row = gene_module_annotation_all,
+  annotation_col = gene_module_annotation_all,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE,
+  main = paste0("WGCNA TOM Similarity - All Samples\n(power = ", 
+                pow_all, ")"),
+  breaks = seq(0, 1, length.out = 101),
+  color = colorRampPalette(c("white", "red"))(100)
+)
+
+write_csv(
+  as.data.frame(TOM_all_ordered_rev) %>% rownames_to_column("gene"),
+  file.path(paths$intermediate, "tom_all.csv")
+)
+
+cat("\nWGCNA TOM matrix exported (all samples)\n")
+```
+
+## Genotype-Specific Split TOM Matrices
+
+```{r tom_genotypes}
+cat("Calculating TOM (genotype-specific)...\n")
+TOM_ctrl <- TOMsimilarity(adj_ctrl)
+rownames(TOM_ctrl) <- rownames(adj_ctrl)
+colnames(TOM_ctrl) <- colnames(adj_ctrl)
+
+TOM_inv4m <- TOMsimilarity(adj_inv4m)
+rownames(TOM_inv4m) <- rownames(adj_inv4m)
+colnames(TOM_inv4m) <- colnames(adj_inv4m)
+
+cat("TOM matrices calculated\n")
+```
+
+```{r split_tom_inv4m_order}
+all_genes_inv4m <- colnames(TOM_inv4m)
+genes_with_modules_inv4m <- names(net_inv4m$colors)[net_inv4m$colors != 0]
+
+TOM_inv4m_filtered <- TOM_inv4m[genes_with_modules_inv4m, genes_with_modules_inv4m]
+TOM_ctrl_filtered <- TOM_ctrl[genes_with_modules_inv4m, genes_with_modules_inv4m]
+
+cat("Using Inv4m WGCNA dendrogram ordering...\n")
+if (!is.null(net_inv4m$dendrograms) && length(net_inv4m$dendrograms) > 0) {
+  full_order_inv4m <- net_inv4m$dendrograms[[1]]$order
+  all_genes_ordered_inv4m <- all_genes_inv4m[full_order_inv4m]
+  genes_in_modules_ordered_inv4m <- all_genes_ordered_inv4m[all_genes_ordered_inv4m %in% genes_with_modules_inv4m]
+  gene_order_inv4m <- match(genes_in_modules_ordered_inv4m, colnames(TOM_inv4m_filtered))
+} else {
+  gene_order_inv4m <- order(net_inv4m$colors[genes_with_modules_inv4m], genes_with_modules_inv4m)
+}
+
+TOM_ctrl_ordered_inv4m <- TOM_ctrl_filtered[gene_order_inv4m, gene_order_inv4m]
+TOM_inv4m_ordered_inv4m <- TOM_inv4m_filtered[gene_order_inv4m, gene_order_inv4m]
+
+combined_tom_inv4m <- TOM_ctrl_ordered_inv4m
+combined_tom_inv4m[lower.tri(combined_tom_inv4m)] <- 
+  TOM_inv4m_ordered_inv4m[lower.tri(TOM_inv4m_ordered_inv4m)]
+
+combined_tom_inv4m_t <- t(combined_tom_inv4m)
+combined_tom_inv4m_rev <- combined_tom_inv4m_t[nrow(combined_tom_inv4m_t):1, ]
+
+gene_names_ordered_inv4m <- colnames(TOM_inv4m_filtered)[gene_order_inv4m]
+gene_names_ordered_inv4m_rev <- rev(gene_names_ordered_inv4m)
+
+gene_module_annotation_inv4m <- mod_inv4m %>%
+  filter(gene %in% gene_names_ordered_inv4m_rev) %>%
+  select(gene, module) %>%
+  mutate(gene = factor(gene, levels = gene_names_ordered_inv4m_rev)) %>%
+  arrange(gene) %>%
+  column_to_rownames("gene")
+
+pheatmap(
+  combined_tom_inv4m_rev,
+  annotation_row = gene_module_annotation_inv4m,
+  annotation_col = gene_module_annotation_inv4m,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE,
+  main = paste0("WGCNA TOM Similarity (Upper: CTRL [pow=", pow_ctrl, 
+                "], Lower: Inv4m [pow=", pow_inv4m, "])\nClustered by Inv4m"),
+  breaks = seq(0, 1, length.out = 101),
+  color = colorRampPalette(c("white", "red"))(100)
+)
+
+write_csv(
+  as.data.frame(TOM_ctrl_ordered_inv4m) %>% rownames_to_column("gene"),
+  file.path(paths$intermediate, "tom_ctrl_inv4m_order.csv")
+)
+
+write_csv(
+  as.data.frame(TOM_inv4m_ordered_inv4m) %>% rownames_to_column("gene"),
+  file.path(paths$intermediate, "tom_inv4m_inv4m_order.csv")
+)
+```
+
+```{r split_tom_ctrl_order}
+all_genes_ctrl <- colnames(TOM_ctrl)
+genes_with_modules_ctrl <- names(net_ctrl$colors)[net_ctrl$colors != 0]
+
+TOM_ctrl_filtered_ctrl <- TOM_ctrl[genes_with_modules_ctrl, genes_with_modules_ctrl]
+TOM_inv4m_filtered_ctrl <- TOM_inv4m[genes_with_modules_ctrl, genes_with_modules_ctrl]
+
+cat("Using CTRL WGCNA dendrogram ordering...\n")
+if (!is.null(net_ctrl$dendrograms) && length(net_ctrl$dendrograms) > 0) {
+  full_order_ctrl <- net_ctrl$dendrograms[[1]]$order
+  all_genes_ordered_ctrl <- all_genes_ctrl[full_order_ctrl]
+  genes_in_modules_ordered_ctrl <- all_genes_ordered_ctrl[all_genes_ordered_ctrl %in% genes_with_modules_ctrl]
+  gene_order_ctrl <- match(genes_in_modules_ordered_ctrl, colnames(TOM_ctrl_filtered_ctrl))
+} else {
+  gene_order_ctrl <- order(net_ctrl$colors[genes_with_modules_ctrl], genes_with_modules_ctrl)
+}
+
+TOM_ctrl_ordered_ctrl <- TOM_ctrl_filtered_ctrl[gene_order_ctrl, gene_order_ctrl]
+TOM_inv4m_ordered_ctrl <- TOM_inv4m_filtered_ctrl[gene_order_ctrl, gene_order_ctrl]
+
+combined_tom_ctrl <- TOM_inv4m_ordered_ctrl
+combined_tom_ctrl[lower.tri(combined_tom_ctrl)] <- 
+  TOM_ctrl_ordered_ctrl[lower.tri(TOM_ctrl_ordered_ctrl)]
+
+combined_tom_ctrl_t <- t(combined_tom_ctrl)
+combined_tom_ctrl_rev <- combined_tom_ctrl_t[nrow(combined_tom_ctrl_t):1, ]
+
+gene_names_ordered_ctrl <- colnames(TOM_ctrl_filtered_ctrl)[gene_order_ctrl]
+gene_names_ordered_ctrl_rev <- rev(gene_names_ordered_ctrl)
+
+gene_module_annotation_ctrl <- mod_ctrl %>%
+  filter(gene %in% gene_names_ordered_ctrl_rev) %>%
+  select(gene, module) %>%
+  mutate(gene = factor(gene, levels = gene_names_ordered_ctrl_rev)) %>%
+  arrange(gene) %>%
+  column_to_rownames("gene")
+
+pheatmap(
+  combined_tom_ctrl_rev,
+  annotation_row = gene_module_annotation_ctrl,
+  annotation_col = gene_module_annotation_ctrl,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE,
+  main = paste0("WGCNA TOM Similarity (Upper: Inv4m [pow=", pow_inv4m, 
+                "], Lower: CTRL [pow=", pow_ctrl, "])\nClustered by CTRL"),
+  breaks = seq(0, 1, length.out = 101),
+  color = colorRampPalette(c("white", "red"))(100)
+)
+
+write_csv(
+  as.data.frame(TOM_ctrl_ordered_ctrl) %>% rownames_to_column("gene"),
+  file.path(paths$intermediate, "tom_ctrl_ctrl_order.csv")
+)
+
+write_csv(
+  as.data.frame(TOM_inv4m_ordered_ctrl) %>% rownames_to_column("gene"),
+  file.path(paths$intermediate, "tom_inv4m_ctrl_order.csv")
+)
+
+cat("\nGenotype-specific TOM matrices exported\n")
+```
