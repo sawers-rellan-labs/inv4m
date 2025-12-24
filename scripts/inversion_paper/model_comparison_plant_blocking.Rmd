@@ -1,0 +1,837 @@
+---
+title: "Model Comparison: Spatial vs Plant Blocking for Differential Expression"
+author: "Fausto Rodriguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+This analysis compares two mixed-effects model specifications for differential gene expression analysis, focusing on **Inv4m genotype effects**. The goal is to determine whether accounting for within-plant leaf correlation (plant blocking) vs. spatial field structure (row/column terms) substantively changes inference about the Inv4m inversion.
+
+## Model Specifications
+
+### Model A: Spatial Correction Model (Current Approach)
+
+For log-transformed response $Y_{ijrs}$ (gene expression) from leaf stage $s$, in plant $r$, under phosphorus treatment $i$, with Inv4m genotype $j$:
+
+$$
+\begin{aligned}
+Y_{ijrs} = {}& \beta_0 + \beta_1 \text{Row}_\ell + \beta_2 \text{Leaf}_s + \beta_3 \text{P}_i + \beta_4 \text{Inv4m}_j \\
+& + \beta_5 [\text{Leaf} \times \text{P}]_{si} + \beta_6 [\text{P} \times \text{Inv4m}]_{ij} \\
+& + \beta_7 [\text{Leaf} \times \text{Inv4m}]_{sj} + u_c + \varepsilon_{ijrs}
+\end{aligned}
+$$
+
+with random effect $u_c \sim \mathcal{N}(0, \sigma^2_u)$ for column nested within treatment.
+
+### Model B: Plant Blocking Model (New Approach)
+
+$$
+\begin{aligned}
+Y_{ijrs} = {}& \beta_0 + \beta_2 \text{Leaf}_s + \beta_3 \text{P}_i + \beta_4 \text{Inv4m}_j \\
+& + \beta_5 [\text{Leaf} \times \text{P}]_{si} + \beta_6 [\text{P} \times \text{Inv4m}]_{ij} \\
+& + \beta_7 [\text{Leaf} \times \text{Inv4m}]_{sj} + u_r + \varepsilon_{ijrs}
+\end{aligned}
+$$
+
+with random effect $u_r \sim \mathcal{N}(0, \sigma^2_u)$ for plant identity.
+
+**Key difference**: Model B removes the fixed Row effect ($\beta_1$) and replaces column blocking with plant blocking to account for within-plant correlation among leaves.
+
+## Coefficients of Interest
+
+Focus on three Inv4m-related effects:
+
+- $\beta_4$: `Genotype` - Main effect of Inv4m
+- $\beta_6$: `Genotype:Treatment-P` - Inv4m modifies phosphorus response
+- $\beta_7$: `Genotype:leaf_tissue_c` - Inv4m effect varies with leaf development
+
+# Libraries
+
+```{r libraries}
+library(edgeR)
+library(limma)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(ggpubr)
+```
+
+# Data Import
+
+## Load Expression Counts
+
+```{r load_counts}
+counts <- read.csv(file.path(paths$data, "inv4mRNAseq_gene_sample_exp.csv"))
+
+cat("Loaded expression data\n")
+cat("  Dimensions:", dim(counts), "\n")
+cat("  Genes:", nrow(counts), "\n")
+cat("  Samples:", ncol(counts) - 2, "\n")
+```
+
+## Load Sample Metadata
+
+```{r load_metadata}
+sampleInfo <- read.csv(file.path(paths$data, "inv4mRNAseq_metadata.csv"))
+
+# Recode Treatment: High_P -> +P, Low_P -> -P
+sampleInfo$Treatment <- factor(sampleInfo$Treatment,
+                               levels = c("High_P", "Low_P"),
+                               labels = c("+P", "-P"))
+
+# Recode genotype: CTRL -> CTRL, INV4 -> Inv4m
+sampleInfo$Genotype <- factor(sampleInfo$genotype,
+                              levels = c("CTRL", "INV4"),
+                              labels = c("CTRL", "Inv4m"))
+
+# Create alias for RNA_Plant from NCSU_RNA_plant
+sampleInfo$RNA_Plant <- sampleInfo$NCSU_RNA_plant
+
+cat("\nSample metadata loaded\n")
+cat("  Total samples:", nrow(sampleInfo), "\n")
+cat("  Genotypes:", paste(unique(sampleInfo$Genotype), collapse = ", "), "\n")
+cat("  Treatments:", paste(unique(sampleInfo$Treatment), collapse = ", "), "\n")
+```
+
+## Prepare Count Matrix
+
+```{r prepare_counts}
+# Extract gene IDs
+gene_ids <- data.frame(gene = counts[, 2])
+
+# Convert to matrix and set row names
+counts <- as.matrix(counts[, -c(1:2)])
+rownames(counts) <- gene_ids$gene
+
+# Get sample names from count matrix columns
+sampleNames <- colnames(counts)
+
+# Reorder metadata to match count matrix column order
+sampleInfo <- sampleInfo[match(sampleNames, sampleInfo$library), ]
+
+cat("\nSample matching verified:", all(sampleNames %in% sampleInfo$library), "\n")
+cat("Count matrix: ", nrow(counts), "genes x", ncol(counts), "samples\n")
+```
+
+## Create DGEList Object
+
+```{r create_dgelist}
+# Create DGEList with counts and sample information
+y <- DGEList(counts = counts, samples = sampleInfo)
+
+# Define groups from Treatment and Genotype interaction
+y$group <- interaction(y$samples$Treatment, y$samples$Genotype)
+
+cat("\nDGEList object created\n")
+cat("Groups:", paste(levels(y$group), collapse = ", "), "\n")
+```
+
+# Expression Filtering and Sample QC
+
+## Filter Genes by Expression Level
+
+```{r filter_expression}
+# Keep genes with sufficient expression
+keep <- filterByExpr(y, group = y$group)
+y_filtered <- y[keep, ]
+
+cat("\nExpression filtering:\n")
+cat("  Genes before:", nrow(y), "\n")
+cat("  Genes after:", nrow(y_filtered), "\n")
+cat("  Genes removed:", sum(!keep), "\n")
+```
+
+## Filter Low Quality Libraries
+
+Samples with library size < 20 million reads are considered low quality.
+
+```{r filter_samples}
+# Flag low count libraries
+y_filtered$samples$lowCount <- y_filtered$samples$lib.size < 2e7
+
+# Remove low quality samples
+y_filtered_bySample <- y_filtered[, !y_filtered$samples$lowCount]
+
+cat("\nLibrary size filtering:\n")
+cat("  Low quality samples removed:", sum(y_filtered$samples$lowCount), "\n")
+cat("  Samples retained:", ncol(y_filtered_bySample), "\n")
+```
+
+## Sample Distribution Verification
+
+```{r sample_verification}
+d <- y_filtered_bySample$samples
+
+cat("\n=== Sample Distribution After QC ===\n")
+cat("\n-- Treatment x Genotype --\n")
+print(table(d$Treatment, d$Genotype))
+cat("\n-- Leaf tissue distribution --\n")
+print(table(d$leaf_tissue))
+```
+
+# Construct Plant_ID Variable
+
+Create the plant identifier for Model B blocking structure.
+
+```{r construct_plant_id}
+# Derive PlantRep within each Treatment-Genotype combination
+d <- d %>%
+  group_by(Treatment, Genotype) %>%
+  mutate(PlantRep = match(RNA_Plant, unique(RNA_Plant))) %>%
+  ungroup()
+
+# Create Plant_ID (should yield 16 unique levels)
+d$Plant_ID <- factor(paste(d$Treatment, d$Genotype, d$PlantRep, sep = "_"))
+
+cat("\nPlant_ID construction:\n")
+cat("  Unique plants:", length(unique(d$Plant_ID)), "\n")
+cat("  Plant_ID levels:\n")
+print(table(d$Plant_ID))
+```
+
+## Center Leaf Tissue Variable
+
+```{r center_leaf}
+# Center the continuous leaf stage variable
+d$leaf_tissue_c <- scale(d$leaf_tissue, center = TRUE, scale = FALSE)
+
+cat("\nLeaf tissue centered: mean =", round(mean(d$leaf_tissue), 2), "\n")
+```
+
+# Normalization
+
+Apply TMM normalization to both models using the same filtered gene set.
+
+```{r normalization}
+# Calculate TMM normalization factors
+y_filtered_bySample <- calcNormFactors(y_filtered_bySample)
+
+cat("TMM normalization factors range:",
+    round(range(y_filtered_bySample$samples$norm.factors), 4), "\n")
+```
+
+# Model A: Spatial Correction Model
+
+## Design Matrix
+
+```{r model_a_design}
+# Define block: column nested within treatment
+block_spatial <- interaction(d$Treatment, d$Plot_Column)
+
+# Design matrix with Plot_Row fixed effect
+design_spatial <- model.matrix(
+  ~ Plot_Row + leaf_tissue_c * Treatment + Genotype * Treatment + Genotype * leaf_tissue_c,
+  data = d
+)
+
+cat("Model A Design Matrix:\n")
+cat("  Samples:", nrow(design_spatial), "\n")
+cat("  Coefficients:", ncol(design_spatial), "\n")
+cat("  Coefficient names:\n")
+print(colnames(design_spatial))
+
+cat("\nSpatial blocking structure:\n")
+cat("  Unique blocks:", length(unique(block_spatial)), "\n")
+```
+
+## Voom Transformation and Model Fitting
+
+```{r model_a_fit}
+# Voom transformation
+voomR_spatial <- voom(y_filtered_bySample, design = design_spatial, plot = TRUE)
+title("Model A: Voom Mean-Variance Trend")
+
+# Estimate within-block correlation
+corfit_spatial <- duplicateCorrelation(voomR_spatial, design_spatial, block = block_spatial)
+
+cat("\nModel A: Spatial blocking correlation\n")
+cat("  Consensus correlation:", round(corfit_spatial$consensus.correlation, 4), "\n")
+
+# Fit linear model with block correlation
+fit_spatial <- lmFit(voomR_spatial, design_spatial,
+                     block = block_spatial,
+                     correlation = corfit_spatial$consensus.correlation)
+
+# Empirical Bayes moderation
+eb_spatial <- eBayes(fit_spatial)
+
+cat("Model A fitted:", nrow(eb_spatial$coefficients), "genes\n")
+```
+
+# Model B: Plant Blocking Model
+
+## Design Matrix
+
+```{r model_b_design}
+# Design matrix WITHOUT Plot_Row (absorbed into plant random effect)
+design_plant <- model.matrix(
+  ~ leaf_tissue_c * Treatment + Genotype * Treatment + Genotype * leaf_tissue_c,
+  data = d
+)
+
+cat("Model B Design Matrix:\n")
+cat("  Samples:", nrow(design_plant), "\n")
+cat("  Coefficients:", ncol(design_plant), "\n")
+cat("  Coefficient names:\n")
+print(colnames(design_plant))
+
+cat("\nPlant blocking structure:\n")
+cat("  Unique plants:", length(unique(d$Plant_ID)), "\n")
+```
+
+## Voom Transformation and Model Fitting
+
+```{r model_b_fit}
+# Voom transformation (same normalization, different design)
+voomR_plant <- voom(y_filtered_bySample, design = design_plant, plot = TRUE)
+title("Model B: Voom Mean-Variance Trend")
+
+# Estimate within-plant correlation
+corfit_plant <- duplicateCorrelation(voomR_plant, design_plant, block = d$Plant_ID)
+
+cat("\nModel B: Plant blocking correlation\n")
+cat("  Consensus correlation:", round(corfit_plant$consensus.correlation, 4), "\n")
+
+# Fit linear model with plant blocking
+fit_plant <- lmFit(voomR_plant, design_plant,
+                   block = d$Plant_ID,
+                   correlation = corfit_plant$consensus.correlation)
+
+# Empirical Bayes moderation
+eb_plant <- eBayes(fit_plant)
+
+cat("Model B fitted:", nrow(eb_plant$coefficients), "genes\n")
+```
+
+# Extract Inv4m-Related DEG Results
+
+## Define Coefficient Names
+
+```{r coefficient_mapping}
+# Model A coefficient names for Inv4m effects
+coef_spatial <- list(
+  genotype = "GenotypeInv4m",
+  genotype_trt = "Treatment-P:GenotypeInv4m",
+  genotype_leaf = "leaf_tissue_c:GenotypeInv4m"
+)
+
+# Model B coefficient names for Inv4m effects
+coef_plant <- list(
+  genotype = "GenotypeInv4m",
+  genotype_trt = "Treatment-P:GenotypeInv4m",
+  genotype_leaf = "leaf_tissue_c:GenotypeInv4m"
+)
+
+# Verify coefficients exist
+cat("Model A available coefficients:\n")
+print(colnames(coef(eb_spatial)))
+
+cat("\nModel B available coefficients:\n")
+print(colnames(coef(eb_plant)))
+```
+
+## Extract Results
+
+```{r extract_results}
+fdr_threshold <- 0.05
+
+# Function to extract DEG results for a coefficient
+extract_deg_results <- function(eb_fit, coef_name, fdr = 0.05) {
+  tt <- topTable(eb_fit, coef = coef_name, number = Inf, sort.by = "none")
+  tt$gene <- rownames(tt)
+  tt$is_sig <- tt$adj.P.Val < fdr
+  return(tt)
+}
+
+# Model A results
+results_spatial <- list(
+  genotype = extract_deg_results(eb_spatial, coef_spatial$genotype),
+  genotype_trt = extract_deg_results(eb_spatial, coef_spatial$genotype_trt),
+  genotype_leaf = extract_deg_results(eb_spatial, coef_spatial$genotype_leaf)
+)
+
+# Model B results
+results_plant <- list(
+  genotype = extract_deg_results(eb_plant, coef_plant$genotype),
+  genotype_trt = extract_deg_results(eb_plant, coef_plant$genotype_trt),
+  genotype_leaf = extract_deg_results(eb_plant, coef_plant$genotype_leaf)
+)
+
+# Identify significant genes
+sig_spatial <- lapply(results_spatial, function(x) x$gene[x$is_sig])
+sig_plant <- lapply(results_plant, function(x) x$gene[x$is_sig])
+
+cat("\nDEGs detected (FDR < 0.05):\n")
+cat("\n-- Model A (Spatial) --\n")
+sapply(sig_spatial, length)
+
+cat("\n-- Model B (Plant) --\n")
+sapply(sig_plant, length)
+```
+
+# Comparison Metrics
+
+## DEG Count Comparison
+
+```{r deg_counts}
+comparison_counts <- tibble(
+  coefficient = c("Genotype", "Genotype:Treatment", "Genotype:Leaf"),
+  n_spatial = c(length(sig_spatial$genotype),
+                length(sig_spatial$genotype_trt),
+                length(sig_spatial$genotype_leaf)),
+  n_plant = c(length(sig_plant$genotype),
+              length(sig_plant$genotype_trt),
+              length(sig_plant$genotype_leaf))
+) %>%
+  mutate(
+    difference = n_spatial - n_plant,
+    pct_change = round(100 * (n_plant - n_spatial) / n_spatial, 1)
+  )
+
+cat("\n=== DEG Count Comparison ===\n")
+print(comparison_counts)
+
+# Save comparison counts
+write.csv(comparison_counts,
+          file.path(paths$intermediate, "deg_counts_comparison.csv"),
+          row.names = FALSE)
+```
+
+## Overlap Analysis
+
+```{r overlap_analysis}
+# Calculate overlaps for each coefficient
+calculate_overlap <- function(sig_a, sig_b, coef_name) {
+  both <- intersect(sig_a, sig_b)
+  spatial_only <- setdiff(sig_a, sig_b)
+  plant_only <- setdiff(sig_b, sig_a)
+
+  tibble(
+    coefficient = coef_name,
+    n_both = length(both),
+    n_spatial_only = length(spatial_only),
+    n_plant_only = length(plant_only),
+    jaccard = length(both) / (length(both) + length(spatial_only) + length(plant_only))
+  )
+}
+
+overlap_summary <- bind_rows(
+  calculate_overlap(sig_spatial$genotype, sig_plant$genotype, "Genotype"),
+  calculate_overlap(sig_spatial$genotype_trt, sig_plant$genotype_trt, "Genotype:Treatment"),
+  calculate_overlap(sig_spatial$genotype_leaf, sig_plant$genotype_leaf, "Genotype:Leaf")
+)
+
+cat("\n=== Overlap Summary ===\n")
+print(overlap_summary)
+
+# Save overlap summary
+write.csv(overlap_summary,
+          file.path(paths$intermediate, "deg_overlap_summary.csv"),
+          row.names = FALSE)
+```
+
+## Overlap Visualization
+
+```{r overlap_barplot, fig.width=10, fig.height=6}
+# Create bar plot showing overlap categories
+overlap_long <- overlap_summary %>%
+  pivot_longer(
+    cols = c(n_both, n_spatial_only, n_plant_only),
+    names_to = "category",
+    values_to = "count"
+  ) %>%
+  mutate(
+    category = factor(category,
+                      levels = c("n_spatial_only", "n_both", "n_plant_only"),
+                      labels = c("Spatial only", "Both models", "Plant only"))
+  )
+
+p_overlap <- ggplot(overlap_long, aes(x = coefficient, y = count, fill = category)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = count), position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 4) +
+  scale_fill_manual(values = c("Spatial only" = "#E69F00",
+                               "Both models" = "#009E73",
+                               "Plant only" = "#56B4E9")) +
+  labs(
+    title = "DEG Overlap Between Models",
+    x = "Coefficient",
+    y = "Number of Genes",
+    fill = "Detected by"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 15, hjust = 1))
+
+p_overlap
+```
+
+## Standard Error Comparison
+
+```{r se_comparison}
+# Calculate SE for Genotype coefficient in both models
+se_spatial_genotype <- sqrt(eb_spatial$s2.post) *
+                       eb_spatial$stdev.unscaled[, "GenotypeInv4m"]
+se_plant_genotype <- sqrt(eb_plant$s2.post) *
+                     eb_plant$stdev.unscaled[, "GenotypeInv4m"]
+
+se_comparison <- tibble(
+  gene = names(se_spatial_genotype),
+  se_spatial = se_spatial_genotype,
+  se_plant = se_plant_genotype,
+  se_ratio = se_plant / se_spatial,
+  logFC_spatial = results_spatial$genotype$logFC,
+  logFC_plant = results_plant$genotype$logFC
+)
+
+cat("\n=== Standard Error Comparison (Genotype coefficient) ===\n")
+cat("SE ratio summary (Plant / Spatial):\n")
+print(summary(se_comparison$se_ratio))
+
+cat("\nInterpretation:\n")
+cat("  SE ratio > 1: Plant model has larger SEs (more conservative)\n")
+cat("  SE ratio < 1: Spatial model has larger SEs\n")
+```
+
+## Correlation Structure Comparison
+
+```{r correlation_comparison}
+correlation_estimates <- tibble(
+  model = c("Model A (Spatial)", "Model B (Plant)"),
+  block_structure = c("Treatment:Column", "Plant_ID"),
+  n_blocks = c(length(unique(block_spatial)), length(unique(d$Plant_ID))),
+  consensus_correlation = c(corfit_spatial$consensus.correlation,
+                            corfit_plant$consensus.correlation)
+)
+
+cat("\n=== Correlation Structure Comparison ===\n")
+print(correlation_estimates)
+
+# Save correlation estimates
+write.csv(correlation_estimates,
+          file.path(paths$intermediate, "correlation_estimates.csv"),
+          row.names = FALSE)
+```
+
+# Diagnostic Visualizations
+
+## Volcano Plot Comparison
+
+```{r volcano_comparison, fig.width=12, fig.height=5}
+# Prepare data for volcano plots
+volcano_data <- bind_rows(
+  results_spatial$genotype %>%
+    mutate(model = "Model A (Spatial)", gene = rownames(results_spatial$genotype)),
+  results_plant$genotype %>%
+    mutate(model = "Model B (Plant)", gene = rownames(results_plant$genotype))
+) %>%
+  mutate(
+    significance = case_when(
+      adj.P.Val < 0.05 & logFC > 0 ~ "Up",
+      adj.P.Val < 0.05 & logFC < 0 ~ "Down",
+      TRUE ~ "NS"
+    )
+  )
+
+p_volcano <- ggplot(volcano_data, aes(x = logFC, y = -log10(adj.P.Val))) +
+  geom_point(aes(color = significance), alpha = 0.5, size = 1) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +
+  scale_color_manual(values = c("Down" = "#56B4E9", "NS" = "grey70", "Up" = "#E69F00")) +
+  facet_wrap(~model, ncol = 2) +
+  labs(
+    title = "Volcano Plots: Genotype Effect (Inv4m vs CTRL)",
+    x = expression(log[2] ~ "Fold Change"),
+    y = expression(-log[10] ~ "(FDR)"),
+    color = "Significance"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "bottom")
+
+p_volcano
+
+ggsave(file.path(paths$figures, "volcano_genotype_comparison.pdf"),
+       plot = p_volcano, width = 12, height = 5)
+```
+
+## SE Ratio Distribution
+
+```{r se_ratio_plot, fig.width=8, fig.height=6}
+p_se_ratio <- ggplot(se_comparison, aes(x = se_ratio)) +
+  geom_histogram(bins = 50, fill = "#009E73", color = "white", alpha = 0.7) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red", linewidth = 1) +
+  geom_vline(xintercept = median(se_comparison$se_ratio),
+             linetype = "solid", color = "blue", linewidth = 1) +
+  annotate("text", x = median(se_comparison$se_ratio) + 0.02, y = Inf,
+           label = paste("Median:", round(median(se_comparison$se_ratio), 3)),
+           vjust = 2, hjust = 0, color = "blue") +
+  labs(
+    title = "Standard Error Ratio Distribution (Genotype Coefficient)",
+    subtitle = "SE(Plant Model) / SE(Spatial Model)",
+    x = "SE Ratio",
+    y = "Number of Genes"
+  ) +
+  theme_classic(base_size = 14)
+
+p_se_ratio
+
+ggsave(file.path(paths$figures, "se_ratio_distribution.pdf"),
+       plot = p_se_ratio, width = 8, height = 6)
+```
+
+## P-value Comparison
+
+```{r pvalue_comparison, fig.width=8, fig.height=8}
+pval_comparison <- tibble(
+  gene = results_spatial$genotype$gene,
+  neglogP_spatial = -log10(results_spatial$genotype$adj.P.Val),
+  neglogP_plant = -log10(results_plant$genotype$adj.P.Val),
+  sig_spatial = results_spatial$genotype$is_sig,
+  sig_plant = results_plant$genotype$is_sig
+) %>%
+  mutate(
+    category = case_when(
+      sig_spatial & sig_plant ~ "Both",
+      sig_spatial & !sig_plant ~ "Spatial only",
+      !sig_spatial & sig_plant ~ "Plant only",
+      TRUE ~ "Neither"
+    )
+  )
+
+p_pval <- ggplot(pval_comparison, aes(x = neglogP_spatial, y = neglogP_plant)) +
+  geom_point(aes(color = category), alpha = 0.3, size = 1) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey40") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dotted", color = "red", alpha = 0.5) +
+  geom_vline(xintercept = -log10(0.05), linetype = "dotted", color = "red", alpha = 0.5) +
+  scale_color_manual(values = c(
+    "Both" = "#009E73",
+    "Spatial only" = "#E69F00",
+    "Plant only" = "#56B4E9",
+    "Neither" = "grey80"
+  )) +
+  labs(
+    title = "P-value Comparison: Genotype Effect",
+    x = expression(-log[10] ~ "(FDR) Model A (Spatial)"),
+    y = expression(-log[10] ~ "(FDR) Model B (Plant)"),
+    color = "Significant in"
+  ) +
+  coord_fixed() +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "bottom")
+
+p_pval
+
+ggsave(file.path(paths$figures, "pvalue_comparison_scatterplot.pdf"),
+       plot = p_pval, width = 8, height = 8)
+```
+
+# Export Gene Lists
+
+```{r export_gene_lists}
+# Function to save gene lists
+save_gene_list <- function(genes, filename, results_df = NULL) {
+  if (length(genes) > 0 && !is.null(results_df)) {
+    df <- results_df %>% filter(gene %in% genes)
+  } else {
+    df <- tibble(gene = genes)
+  }
+  write.csv(df, file.path(paths$intermediate, filename), row.names = FALSE)
+  cat("Saved:", filename, "(", length(genes), "genes)\n")
+}
+
+cat("\n=== Exporting Gene Lists ===\n")
+
+# Genotype effect
+save_gene_list(
+  intersect(sig_spatial$genotype, sig_plant$genotype),
+  "deg_both_models_genotype.csv",
+  results_spatial$genotype
+)
+save_gene_list(
+  setdiff(sig_spatial$genotype, sig_plant$genotype),
+  "deg_spatial_only_genotype.csv",
+  results_spatial$genotype
+)
+save_gene_list(
+  setdiff(sig_plant$genotype, sig_spatial$genotype),
+  "deg_plant_only_genotype.csv",
+  results_plant$genotype
+)
+
+# Genotype:Treatment effect
+save_gene_list(
+  intersect(sig_spatial$genotype_trt, sig_plant$genotype_trt),
+  "deg_both_models_genotype_trt.csv",
+  results_spatial$genotype_trt
+)
+save_gene_list(
+  setdiff(sig_spatial$genotype_trt, sig_plant$genotype_trt),
+  "deg_spatial_only_genotype_trt.csv",
+  results_spatial$genotype_trt
+)
+save_gene_list(
+  setdiff(sig_plant$genotype_trt, sig_spatial$genotype_trt),
+  "deg_plant_only_genotype_trt.csv",
+  results_plant$genotype_trt
+)
+
+# Genotype:Leaf effect
+save_gene_list(
+  intersect(sig_spatial$genotype_leaf, sig_plant$genotype_leaf),
+  "deg_both_models_genotype_leaf.csv",
+  results_spatial$genotype_leaf
+)
+save_gene_list(
+  setdiff(sig_spatial$genotype_leaf, sig_plant$genotype_leaf),
+  "deg_spatial_only_genotype_leaf.csv",
+  results_spatial$genotype_leaf
+)
+save_gene_list(
+  setdiff(sig_plant$genotype_leaf, sig_spatial$genotype_leaf),
+  "deg_plant_only_genotype_leaf.csv",
+  results_plant$genotype_leaf
+)
+```
+
+## Save Intermediate Objects
+
+```{r save_objects}
+# Save all comparison objects for later analysis
+saveRDS(
+  list(
+    eb_spatial = eb_spatial,
+    eb_plant = eb_plant,
+    results_spatial = results_spatial,
+    results_plant = results_plant,
+    sig_spatial = sig_spatial,
+    sig_plant = sig_plant,
+    overlap_summary = overlap_summary,
+    se_comparison = se_comparison,
+    correlation_estimates = correlation_estimates
+  ),
+  file.path(paths$intermediate, "model_comparison_objects.rds")
+)
+
+cat("\nSaved: model_comparison_objects.rds\n")
+```
+
+# Interpretation
+
+## Summary Statistics
+
+```{r interpretation}
+cat("\n", paste(rep("=", 60), collapse = ""), "\n")
+cat("MODEL COMPARISON SUMMARY\n")
+cat(paste(rep("=", 60), collapse = ""), "\n\n")
+
+cat("1. CORRELATION STRUCTURE\n")
+cat("   - Spatial blocking correlation:",
+    round(corfit_spatial$consensus.correlation, 4), "\n")
+cat("   - Plant blocking correlation:",
+    round(corfit_plant$consensus.correlation, 4), "\n")
+
+if (corfit_plant$consensus.correlation > corfit_spatial$consensus.correlation) {
+  cat("   -> Plant model captures higher within-block correlation\n\n")
+} else {
+  cat("   -> Spatial model captures higher within-block correlation\n\n")
+}
+
+cat("2. DEG DETECTION\n")
+for (i in 1:nrow(comparison_counts)) {
+  cat("   ", comparison_counts$coefficient[i], ":\n")
+  cat("      Spatial:", comparison_counts$n_spatial[i], "DEGs\n")
+  cat("      Plant:", comparison_counts$n_plant[i], "DEGs\n")
+  cat("      Change:", comparison_counts$pct_change[i], "%\n")
+}
+
+cat("\n3. STANDARD ERROR INFLATION\n")
+cat("   Median SE ratio (Plant/Spatial):",
+    round(median(se_comparison$se_ratio), 3), "\n")
+
+if (median(se_comparison$se_ratio) > 1) {
+  cat("   -> Plant model is more conservative (larger SEs)\n")
+} else {
+  cat("   -> Spatial model is more conservative (larger SEs)\n")
+}
+
+cat("\n4. OVERLAP ANALYSIS\n")
+for (i in 1:nrow(overlap_summary)) {
+  cat("   ", overlap_summary$coefficient[i], ":\n")
+  cat("      Jaccard index:", round(overlap_summary$jaccard[i], 3), "\n")
+  cat("      Both models:", overlap_summary$n_both[i], "genes\n")
+  cat("      Spatial only:", overlap_summary$n_spatial_only[i], "genes\n")
+  cat("      Plant only:", overlap_summary$n_plant_only[i], "genes\n")
+}
+```
+
+## Interpretation Guidelines
+
+Based on the handover document:
+
+```{r interpretation_guidelines}
+# Determine interpretation based on results
+pct_reduction_genotype <- comparison_counts$pct_change[1]
+plant_cor <- corfit_plant$consensus.correlation
+
+cat("\n", paste(rep("=", 60), collapse = ""), "\n")
+cat("INTERPRETATION\n")
+cat(paste(rep("=", 60), collapse = ""), "\n\n")
+
+if (pct_reduction_genotype < -30) {
+  cat("FINDING: Model B detects substantially fewer DEGs (",
+      abs(pct_reduction_genotype), "% reduction)\n\n")
+  cat("INTERPRETATION: Within-plant leaf correlation was substantial.\n")
+  cat("Model A was anti-conservative, treating pseudo-replicates as independent.\n")
+  cat("Model B provides correct inference.\n\n")
+  cat("RECOMMENDATION: Adopt Model B (plant blocking) for publication.\n")
+} else if (abs(pct_reduction_genotype) < 10) {
+  cat("FINDING: Both models detect similar numbers of DEGs\n\n")
+  cat("INTERPRETATION: Within-plant correlation is modest or well-handled\n")
+  cat("by both blocking approaches.\n\n")
+  cat("RECOMMENDATION: Either model is acceptable. Consider biological\n")
+  cat("interpretation for final choice.\n")
+} else {
+  cat("FINDING: Models show moderate differences in DEG detection\n\n")
+  cat("INTERPRETATION: Blocking structure matters for inference.\n")
+  cat("Examine genes unique to each model for biological plausibility.\n")
+}
+
+if (plant_cor > 0.5) {
+  cat("\nNOTE: High within-plant correlation (rho =", round(plant_cor, 3), ")\n")
+  cat("strongly supports using Model B (plant blocking).\n")
+}
+```
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```
