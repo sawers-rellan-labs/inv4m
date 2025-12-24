@@ -1683,20 +1683,19 @@ cat(&quot;Loaded expression data\n&quot;)</code></pre>
 </div>
 <div id="load-sample-metadata" class="section level2">
 <h2>Load Sample Metadata</h2>
-<pre class="r"><code>sampleInfo &lt;- read.csv(file.path(paths$data, &quot;inv4mRNAseq_metadata.csv&quot;))
+<pre class="r"><code>sampleInfo &lt;- read.csv(file.path(paths$data, &quot;PSU2022_metadata.csv&quot;))
 
 # Recode Treatment: High_P -&gt; +P, Low_P -&gt; -P
 sampleInfo$Treatment &lt;- factor(sampleInfo$Treatment,
                                levels = c(&quot;High_P&quot;, &quot;Low_P&quot;),
                                labels = c(&quot;+P&quot;, &quot;-P&quot;))
 
-# Recode genotype: CTRL -&gt; CTRL, INV4 -&gt; Inv4m
-sampleInfo$Genotype &lt;- factor(sampleInfo$genotype,
-                              levels = c(&quot;CTRL&quot;, &quot;INV4&quot;),
+# Recode Genotype: CTRL -&gt; CTRL, INV4m -&gt; Inv4m
+sampleInfo$Genotype &lt;- factor(sampleInfo$Genotype,
+                              levels = c(&quot;CTRL&quot;, &quot;INV4m&quot;),
                               labels = c(&quot;CTRL&quot;, &quot;Inv4m&quot;))
 
-# Create alias for RNA_Plant from NCSU_RNA_plant
-sampleInfo$RNA_Plant &lt;- sampleInfo$NCSU_RNA_plant
+# RNA_Plant already exists in new metadata (actual plant field IDs)
 
 cat(&quot;\nSample metadata loaded\n&quot;)</code></pre>
 <pre><code>## 

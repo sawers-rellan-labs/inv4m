@@ -105,25 +105,27 @@ psu <- read.csv(plant_csv) %>%
   filter(Genotype %in% c("CTRL", "INV4M")) %>%
   droplevels()
 
-sampleInfo <- read.csv(file.path(paths$data, "inv4mRNAseq_metadata.csv")) %>%
-  dplyr::rename(Genotype = genotype, rowid = row)
+sampleInfo <- read.csv(file.path(paths$data, "PSU2022_metadata.csv")) %>%
+  dplyr::rename(rowid = row)
 
+# New metadata already has Rep, Plot_Row, Plot_Column - only get DTA/DTS from psu
 sampleInfo <- psu %>%
-  select(rowid, Rep, Plot_Row, Plot_Column, DTA, DTS) %>%
-  inner_join(sampleInfo) %>%
+  select(rowid, DTA, DTS) %>%
+  inner_join(sampleInfo, by = "rowid") %>%
   filter(!is.na(DTA))
 
 sampleInfo$leaf_group <- NA
 sampleInfo$leaf_group[sampleInfo$leaf_tissue < 3] <- "apical"
 sampleInfo$leaf_group[sampleInfo$leaf_tissue > 2] <- "basal"
 
-sampleInfo$tube <- gsub("L|R", "S", sampleInfo$tube, perl = TRUE)
+sampleInfo$tube <- gsub("L|R", "S", sampleInfo$top_tag, perl = TRUE)
 
 ms_order <- read.csv(file.path(paths$data, "PSU-PHO22_ms_order.csv"))
 ms_order$tube <- gsub("L|R", "S", ms_order$top_tag, perl = TRUE)
 
+# Only get injection_order from ms_order to avoid duplicate columns
 sampleInfo <- sampleInfo %>%
-  dplyr::right_join(ms_order) %>%
+  dplyr::inner_join(ms_order %>% select(tube, injection_order), by = "tube") %>%
   distinct()
 
 cat("Sample info loaded:", nrow(sampleInfo), "samples\n")

@@ -151,17 +151,16 @@ counts <- read.csv(file.path(paths$data, "inv4mRNAseq_gene_sample_exp.csv"))
 ## Load Sample Metadata
 
 ```{r load_metadata}
-sampleInfo <- read.csv(file.path(paths$data, "inv4mRNAseq_metadata.csv"))
+sampleInfo <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
 # Recode Treatment: High_P -> +P, Low_P -> -P
 sampleInfo$Treatment <- factor(sampleInfo$Treatment,
                                levels = c("High_P", "Low_P"),
                                labels = c("+P", "-P"))
-# Recode genotype: CTRL -> CTRL, INV4 -> Inv4m (note: column is lowercase)
-sampleInfo$Genotype <- factor(sampleInfo$genotype,
-                              levels = c("CTRL", "INV4"),
+# Recode Genotype: CTRL -> CTRL, INV4m -> Inv4m
+sampleInfo$Genotype <- factor(sampleInfo$Genotype,
+                              levels = c("CTRL", "INV4m"),
                               labels = c("CTRL", "Inv4m"))
-# Create alias for RNA_Plant from NCSU_RNA_plant
-sampleInfo$RNA_Plant <- sampleInfo$NCSU_RNA_plant
+# RNA_Plant already exists in new metadata (actual plant field IDs)
 {
   cat("\nSample meta\n")
   cat("  Total samples:", nrow(sampleInfo), "\n")
