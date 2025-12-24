@@ -48,47 +48,52 @@ The analysis uses the **limma-voom** pipeline to identify genes that respond to:
 
 ## Linear Model Specification for Gene Expression Analysis
 
-This model describes the log-transformed expression $y_{g,i}$ of gene $g$ in sample $i$ as a function of spatial, developmental, and treatment effects.
+This model describes the log-transformed expression $Y_{ijrs}$ of gene $g$ in sample from leaf stage $s$, plant $r$, under phosphorus treatment $i$, with Inv4m genotype $j$.
 Each gene is fitted separately using a common design matrix, producing gene-specific regression coefficients.
 
 $$
 \begin{aligned}
-y_{g,i} &= \beta_{g,0} + \beta_{g,R}\text{Row}_i + \beta_{g,L}\text{leafc}_i + \beta_{g,T}T_i \\
-&\quad + \beta_{g,L\times T}(\text{leafc}_i \times T_i) + \beta_{g,G}G_i \\
-&\quad + \beta_{g,G\times T}(G_i \times T_i) + \beta_{g,G\times L}(G_i \times \text{leafc}_i) \\
-&\quad + u_{g,\text{col}(i):T(i)} + \varepsilon_{g,i}
+Y_{ijrs} = {}& \beta_0 + \beta_1 \text{Leaf}_s + \beta_2 \text{P}_i + \beta_3 \text{Inv4m}_j \\
+& + \beta_4 [\text{Leaf} \times \text{P}]_{si} + \beta_5 [\text{P} \times \text{Inv4m}]_{ij} \\
+& + \beta_6 [\text{Leaf} \times \text{Inv4m}]_{sj} + u_r + \varepsilon_{ijrs}
 \end{aligned}
 $$
 
-with,
+with random effect and residuals:
 
 $$
-u_{g,\text{col}(i):T(i)} \sim N(0,\sigma^2_{u,g}), \quad \varepsilon_{g,i} \sim N(0,\phi_i \sigma^2_g)
+u_r \sim \mathcal{N}(0, \sigma^2_u), \quad \varepsilon_{ijrs} \sim \mathcal{N}(0, \phi_{ijrs}\sigma^2)
 $$
 
 ### Explanation of Model Components
 
 | Symbol | Description | Varies Over | Notes |
 |--------|-------------|-------------|-------|
-| $y_{g,i}$ | $\log_2$(CPM) expression of gene $g$ in sample $i$ | genes, samples | Response variable |
-| $\beta_{g,0}$ | Intercept (mean expression at centered leaf stage, +P treatment) | genes | Baseline expression |
-| $\beta_{g,R}$ | Fixed effect of plot row | genes | Corrects for field spatial gradients |
-| $\beta_{g,L}$ | Slope for leaf developmental stage (centered) | genes | Represents linear change with leaf age |
-| $\beta_{g,T}$ | Effect of phosphorus treatment (−P vs. +P) | genes | Treatment main effect |
-| $\beta_{g,L\times T}$ | Interaction between leaf stage and treatment | genes | Tests whether developmental slope differs under P deficiency |
-| $\beta_{g,G}$ | Effect of inversion genotype | genes | Genotypic main effect |
-| $\beta_{g,G\times T}$ | Interaction between inversion and treatment | genes | Tests whether inversion modifies P response |
-| $\beta_{g,G\times L}$ | Interaction between inversion and leaf | genes | Tests whether the effect of the leaf depends on Inv4m |
-| $u_{g,\text{col}(i):T(i)}$ | Random effect of plot column nested within treatment | samples (within treatment) | Accounts for spatial autocorrelation unique to each treatment field |
-| $\varepsilon_{g,i}$ | Residual error with voom-derived precision weights | samples | Captures heteroskedastic measurement error |
+| $Y_{ijrs}$ | $\log_2$(CPM) expression in sample | samples | Response variable |
+| $\beta_0$ | Intercept (mean expression at centered leaf stage, +P, reference genotype) | genes | Baseline expression |
+| $\beta_1$ | Slope for leaf developmental stage (centered) | genes | Linear change with leaf age |
+| $\beta_2$ | Effect of phosphorus treatment (−P vs. +P) | genes | Treatment main effect |
+| $\beta_3$ | **Effect of Inv4m genotype** | genes | **Genotype main effect** |
+| $\beta_4$ | Interaction: leaf stage × treatment | genes | Tests if developmental slope differs under P deficiency |
+| $\beta_5$ | **Interaction: phosphorus × Inv4m** | genes | **Tests if Inv4m modifies P response** |
+| $\beta_6$ | **Interaction: leaf stage × Inv4m** | genes | **Tests if developmental slope depends on Inv4m** |
+| $u_r$ | Random effect of plant | samples (within plant) | Accounts for within-plant correlation among leaves |
+| $\phi_{ijrs}$ | Voom-derived precision weights | samples | Captures heteroskedastic measurement error |
+| $\varepsilon_{ijrs}$ | Residual error | samples | Random error term |
+
+**Subscript indexing:**
+- $i$: Treatment level (+P or −P)
+- $j$: Genotype (Inv4m present or absent)
+- $r$: Plant replicate (1-4 per treatment × genotype)
+- $s$: Leaf developmental stage (continuous, centered)
 
 ### Notes on Indexing and Interpretation
 
-- $i$ indexes samples, not genes. Predictors like `Row`, `leaf_c`, `T`, and `G` vary at the sample level.
-- $g$ indexes genes, with each gene having its own set of regression coefficients $\beta_{g,*}$.
-- The term $u_{g,\text{col}(i):T(i)}$ introduces a treatment-specific random spatial correction, avoiding confounding between column and treatment.
-- The residual term $\varepsilon_{g,i}$ incorporates precision weights from the voom transformation, where samples with lower measurement variance receive higher weight.
-- This parametrization improves interpretability by centering `leaf_c` (so the intercept represents average expression) and nesting the spatial correction by treatment rather than imposing a global linear spatial trend.
+- Subscripts index experimental design levels, not individual observations. Each gene has its own set of regression coefficients.
+- The term $u_r$ represents a plant-level random effect that accounts for non-independence among leaves sampled from the same individual. This approach correctly treats plants (n=4 per treatment×genotype) as biological replicates, with leaves as technical sub-samples.
+- The fixed Row effect from the spatial model is removed because spatial field gradients are absorbed into the plant-level random effect (each plant occupies a unique field position).
+- The residual term $\varepsilon_{ijrs}$ incorporates precision weights from the voom transformation, where samples with lower measurement variance receive higher weight.
+- This parametrization improves interpretability by centering `leaf_c` (so the intercept represents average expression at mean leaf stage).
 
 ## Fold Change Thresholds
 
@@ -533,7 +538,7 @@ mds_cor_results
 
 # Normalization and Design Matrix
 
-Apply TMM (Trimmed Mean of M-values) normalization to account for sequencing depth differences, then fit a linear model including spatial covariates (`Plot_Row`, `Plot_Column`), biological factors (`Genotype`, `leaf_tissue`, `Treatment`), and the `leaf_tissue:Treatment` interaction. Voom transformation estimates mean-variance relationships and computes precision weights for each observation.
+Apply TMM (Trimmed Mean of M-values) normalization to account for sequencing depth differences, then fit a linear model with plant blocking to account for within-plant correlation. The model includes biological factors (`Genotype`, `leaf_tissue`, `Treatment`) and their interactions. Voom transformation estimates mean-variance relationships and computes precision weights for each observation.
 
 ```{r linear_modelling}
 # Center the continuous leaf stage variable
@@ -543,12 +548,23 @@ Apply TMM (Trimmed Mean of M-values) normalization to account for sequencing dep
 #   - and collinearity between leaf age and Treatment is minimized.
 d$leaf_tissue_c <- scale(d$leaf_tissue, center = TRUE, scale = FALSE)
 
-# Define block: column nested within treatment
-block <- interaction(d$Treatment, d$Plot_Column)
+# Construct Plant_ID for blocking
+# Derive PlantRep within each Treatment-Genotype combination
+d <- d %>%
+  group_by(Treatment, Genotype) %>%
+  mutate(PlantRep = match(RNA_Plant, unique(RNA_Plant))) %>%
+  ungroup()
 
-# Design matrix: spatial covariates + biological factors + interactions
+# Create Plant_ID (unique identifier for each plant)
+d$Plant_ID <- factor(paste(d$Treatment, d$Genotype, d$PlantRep, sep = "_"))
+
+cat("Plant blocking structure:\n")
+cat("  Unique plants:", length(unique(d$Plant_ID)), "\n")
+print(table(d$Plant_ID))
+
+# Design matrix: biological factors + interactions (NO Plot_Row)
 design <- model.matrix(
-  ~ Plot_Row + leaf_tissue_c * Treatment + Genotype * Treatment + Genotype * leaf_tissue_c,
+  ~ leaf_tissue_c * Treatment + Genotype * Treatment + Genotype * leaf_tissue_c,
   d
 )
 
@@ -572,14 +588,17 @@ saveRDS(voomR, file = file.path(paths$intermediate, "normalized_expression_voom_
 
 # Linear Model Fitting
 
-Fit linear model to voom-transformed data, then apply robust empirical Bayes moderation to stabilize variance estimates and improve power for differential expression testing.
+Fit linear model to voom-transformed data with plant blocking to account for within-plant correlation, then apply robust empirical Bayes moderation to stabilize variance estimates and improve power for differential expression testing.
 
 ```{r fit_linear_model}
-# Estimate consensus correlation for blocks
-corfit <- duplicateCorrelation(voomR, design, block = block)
+# Estimate within-plant correlation
+corfit <- duplicateCorrelation(voomR, design, block = d$Plant_ID)
 
-# Fit linear model accounting for block correlation
-fit <- lmFit(voomR, design, block = block, correlation = corfit$consensus.correlation)
+cat("Plant blocking correlation:\n")
+cat("  Consensus correlation:", round(corfit$consensus.correlation, 4), "\n")
+
+# Fit linear model with plant blocking
+fit <- lmFit(voomR, design, block = d$Plant_ID, correlation = corfit$consensus.correlation)
 
 # Apply empirical Bayes moderation
 ebfit <- eBayes(fit)
@@ -596,7 +615,7 @@ ebfit <- eBayes(fit)
 
 ## Extract Coefficients of Interest
 
-We focus on biological effects while accounting for spatial covariates.
+We focus on biological effects with plant blocking to account for within-plant correlation.
 
 ```{r extract_coefficients}
 # Define predictors of interest with ORIGINAL names from model
@@ -1793,7 +1812,7 @@ This analysis identified differentially expressed genes across four main effects
   - Dimension 1 correlates with phosphorus treatment
   - Dimension 2 correlates with leaf tissue position
   - Dimension 3 correlates with genotype
-- Spatial covariates (`Plot_Row`, `Plot_Column`) were included to account for field position effects
+- **Plant blocking** was used to account for within-plant correlation among leaves (plants are biological replicates, leaves are technical sub-samples)
 - **Region enrichment**: DEGs show enrichment in the Inv4m region, with patterns observed across both inversion and flanking regions
 
 ## Three-tier classification:
