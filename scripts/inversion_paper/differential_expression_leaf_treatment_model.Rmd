@@ -547,19 +547,10 @@ Apply TMM (Trimmed Mean of M-values) normalization to account for sequencing dep
 #   - and collinearity between leaf age and Treatment is minimized.
 d$leaf_tissue_c <- scale(d$leaf_tissue, center = TRUE, scale = FALSE)
 
-# Construct Plant_ID for blocking
-# Derive PlantRep within each Treatment-Genotype combination
-d <- d %>%
-  group_by(Treatment, Genotype) %>%
-  mutate(PlantRep = match(RNA_Plant, unique(RNA_Plant))) %>%
-  ungroup()
-
-# Create Plant_ID (unique identifier for each plant)
-d$Plant_ID <- factor(paste(d$Treatment, d$Genotype, d$PlantRep, sep = "_"))
-
+# RNA_Plant is already a unique plant identifier in metadata
 cat("Plant blocking structure:\n")
-cat("  Unique plants:", length(unique(d$Plant_ID)), "\n")
-print(table(d$Plant_ID))
+cat("  Unique plants:", length(unique(d$RNA_Plant)), "\n")
+print(table(d$RNA_Plant))
 
 # Design matrix: biological factors + interactions (NO Plot_Row)
 design <- model.matrix(
@@ -591,13 +582,13 @@ Fit linear model to voom-transformed data with plant blocking to account for wit
 
 ```{r fit_linear_model}
 # Estimate within-plant correlation
-corfit <- duplicateCorrelation(voomR, design, block = d$Plant_ID)
+corfit <- duplicateCorrelation(voomR, design, block = d$RNA_Plant)
 
 cat("Plant blocking correlation:\n")
 cat("  Consensus correlation:", round(corfit$consensus.correlation, 4), "\n")
 
 # Fit linear model with plant blocking
-fit <- lmFit(voomR, design, block = d$Plant_ID, correlation = corfit$consensus.correlation)
+fit <- lmFit(voomR, design, block = d$RNA_Plant, correlation = corfit$consensus.correlation)
 
 # Apply empirical Bayes moderation
 ebfit <- eBayes(fit)
