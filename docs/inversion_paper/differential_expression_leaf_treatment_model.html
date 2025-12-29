@@ -2709,7 +2709,7 @@ add_mahalanobis_outliers &lt;- function(
 ##             is_mh_outlier
 ## predictor    FALSE  TRUE
 ##   Leaf       19388  4861
-##   -P         19542  4707
+##   -P         19540  4709
 ##   Leaf:-P    21008  3241
 ##   Inv4m      23783   466
 ##   Inv4m:-P   24249     0
@@ -3265,16 +3265,16 @@ deg_tests &lt;- bind_rows(
 ## # Groups:   predictor, regulation [9]
 ##    predictor regulation gene  locus_symbol desc_merged logFC neglogP mahalanobis
 ##    &lt;fct&gt;     &lt;chr&gt;      &lt;chr&gt; &lt;chr&gt;        &lt;chr&gt;       &lt;dbl&gt;   &lt;dbl&gt;       &lt;dbl&gt;
-##  1 Inv4m     Downregul… Zm00… jmj2         JUMONJI-tr… -3.49    21.9      36226.
-##  2 Inv4m     Downregul… Zm00… jmj4         JUMONJI-tr… -2.84    19.7      29490.
-##  3 Inv4m     Downregul… Zm00… &lt;NA&gt;         Methionyl-… -2.86    17.5      23077.
-##  4 Inv4m     Downregul… Zm00… &lt;NA&gt;         SUMO-activ… -1.98    17.5      23602.
-##  5 Inv4m     Upregulat… Zm00… &lt;NA&gt;         &lt;NA&gt;         6.50    16.9      31320.
-##  6 Inv4m     Upregulat… Zm00… &lt;NA&gt;         Exocyst co…  2.87    16.5      25470.
-##  7 Inv4m     Downregul… Zm00… IDP4515      DnaJ-like … -1.50    15.9      19735.
-##  8 Inv4m     Downregul… Zm00… &lt;NA&gt;         CCT-alpha   -1.69    15.8      19281.
-##  9 Inv4m     Downregul… Zm00… cl19648_2a   ADP-ribosy… -2.78    15.8      18568.
-## 10 Inv4m     Upregulat… Zm00… cl19799_1    &lt;NA&gt;         1.97    15.6      22010.
+##  1 Inv4m     Downregul… Zm00… jmj2         JUMONJI-tr… -3.49    21.9      36194.
+##  2 Inv4m     Downregul… Zm00… jmj4         JUMONJI-tr… -2.84    19.7      29464.
+##  3 Inv4m     Downregul… Zm00… &lt;NA&gt;         Methionyl-… -2.86    17.5      23056.
+##  4 Inv4m     Downregul… Zm00… &lt;NA&gt;         SUMO-activ… -1.98    17.5      23582.
+##  5 Inv4m     Upregulat… Zm00… &lt;NA&gt;         &lt;NA&gt;         6.50    16.9      31312.
+##  6 Inv4m     Upregulat… Zm00… &lt;NA&gt;         Exocyst co…  2.87    16.5      25457.
+##  7 Inv4m     Downregul… Zm00… IDP4515      DnaJ-like … -1.50    15.9      19719.
+##  8 Inv4m     Downregul… Zm00… &lt;NA&gt;         CCT-alpha   -1.69    15.8      19265.
+##  9 Inv4m     Downregul… Zm00… cl19648_2a   ADP-ribosy… -2.78    15.8      18551.
+## 10 Inv4m     Upregulat… Zm00… cl19799_1    &lt;NA&gt;         1.97    15.6      21997.
 ## # ℹ 71 more rows</code></pre>
 </div>
 <div id="deg-summary-statistics" class="section level2">
@@ -3975,33 +3975,34 @@ combinations</strong>.</p>
 ## [33] stringi_1.8.7               RColorBrewer_1.1-3         
 ## [35] car_3.1-3                   jquerylib_0.1.4            
 ## [37] Rcpp_1.1.0                  SummarizedExperiment_1.40.0
-## [39] knitr_1.50                  Matrix_1.7-4               
-## [41] splines_4.5.2               tidyselect_1.2.1           
-## [43] abind_1.4-8                 yaml_2.3.12                
-## [45] codetools_0.2-20            curl_7.0.0                 
-## [47] lattice_0.22-7              tibble_3.3.0               
-## [49] Biobase_2.70.0              withr_3.0.2                
-## [51] S7_0.2.1                    evaluate_1.0.5             
-## [53] xml2_1.5.1                  Biostrings_2.78.0          
-## [55] pillar_1.11.1               MatrixGenerics_1.22.0      
-## [57] carData_3.0-5               rprojroot_2.1.1            
-## [59] RCurl_1.98-1.17             commonmark_2.0.0           
-## [61] scales_1.4.0                glue_1.8.0                 
-## [63] tools_4.5.2                 BiocIO_1.20.0              
-## [65] locfit_1.5-9.12             ggsignif_0.6.4             
-## [67] GenomicAlignments_1.46.0    forcats_1.0.1              
-## [69] XML_3.99-0.20               cowplot_1.2.0              
-## [71] grid_4.5.2                  nlme_3.1-168               
-## [73] restfulr_0.0.16             Formula_1.2-5              
-## [75] cli_3.6.5                   textshaping_1.0.4          
-## [77] S4Arrays_1.10.1             viridisLite_0.4.2          
-## [79] gtable_0.3.6                DEoptimR_1.1-4             
-## [81] rstatix_0.7.3               sass_0.4.10                
-## [83] digest_0.6.39               SparseArray_1.10.6         
-## [85] rjson_0.2.23                farver_2.1.2               
-## [87] htmltools_0.5.9             lifecycle_1.0.4            
-## [89] httr_1.4.7                  here_1.0.2                 
-## [91] statmod_1.5.1               gridtext_0.1.5</code></pre>
+## [39] knitr_1.50                  splines_4.5.2              
+## [41] Matrix_1.7-4                tidyselect_1.2.1           
+## [43] rstudioapi_0.17.1           abind_1.4-8                
+## [45] yaml_2.3.12                 codetools_0.2-20           
+## [47] curl_7.0.0                  lattice_0.22-7             
+## [49] tibble_3.3.0                Biobase_2.70.0             
+## [51] withr_3.0.2                 S7_0.2.1                   
+## [53] evaluate_1.0.5              xml2_1.5.1                 
+## [55] Biostrings_2.78.0           pillar_1.11.1              
+## [57] MatrixGenerics_1.22.0       carData_3.0-5              
+## [59] rprojroot_2.1.1             RCurl_1.98-1.17            
+## [61] commonmark_2.0.0            scales_1.4.0               
+## [63] glue_1.8.0                  tools_4.5.2                
+## [65] BiocIO_1.20.0               locfit_1.5-9.12            
+## [67] ggsignif_0.6.4              GenomicAlignments_1.46.0   
+## [69] forcats_1.0.1               XML_3.99-0.20              
+## [71] cowplot_1.2.0               grid_4.5.2                 
+## [73] nlme_3.1-168                restfulr_0.0.16            
+## [75] Formula_1.2-5               cli_3.6.5                  
+## [77] textshaping_1.0.4           S4Arrays_1.10.1            
+## [79] viridisLite_0.4.2           gtable_0.3.6               
+## [81] DEoptimR_1.1-4              rstatix_0.7.3              
+## [83] sass_0.4.10                 digest_0.6.39              
+## [85] SparseArray_1.10.6          rjson_0.2.23               
+## [87] farver_2.1.2                htmltools_0.5.9            
+## [89] lifecycle_1.0.4             httr_1.4.7                 
+## [91] here_1.0.2                  statmod_1.5.1              
+## [93] gridtext_0.1.5</code></pre>
 </div>
 
 
