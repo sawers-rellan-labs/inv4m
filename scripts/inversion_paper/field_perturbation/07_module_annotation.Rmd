@@ -15,7 +15,7 @@ params:
 
 <!--
 To render this document with output in the proper directory, use:
-Rscript -e "rmarkdown::render('scripts/07_field_perturbation/07_functional.Rmd', output_dir='output/perturbation_YYYYMMDD/07_functional', params=list(run_dir='output/perturbation_YYYYMMDD'))"
+Rscript -e "rmarkdown::render('scripts/inversion_paper/field_perturbation/07_module_annotation.Rmd', output_dir='output/perturbation_YYYYMMDD/07_module_annotation', params=list(run_dir='output/perturbation_YYYYMMDD'))"
 -->
 
 ```{r setup, include=FALSE}
@@ -70,7 +70,7 @@ PRESERVATION_DIR <- here::here(params$run_dir, "06_preservation")
 CONSENSUS_DIR <- here::here(params$run_dir, "04_consensus_networks")
 BOOTSTRAP_DIR <- here::here(params$run_dir, "05_bootstrap_support")
 FILTER_DIR <- here::here(params$run_dir, "02_gene_filter")
-OUTPUT_DIR <- here::here(params$run_dir, "07_functional")
+OUTPUT_DIR <- here::here(params$run_dir, "07_module_annotation")
 dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
 {
