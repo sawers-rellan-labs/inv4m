@@ -1,0 +1,700 @@
+---
+title: "Field-Only Perturbation Analysis: Functional Characterization"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/perturbation_test"
+  n_permutations: 200
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/07_functional.Rmd', output_dir='output/perturbation_YYYYMMDD/07_functional', params=list(run_dir='output/perturbation_YYYYMMDD'))"
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Functionally characterize ALL CTRL consensus modules using GO
+enrichment (BP only), hub gene analysis, and integration with support metrics.
+
+**Approach**:
+1. Run GO BP enrichment for ALL CTRL modules using full filtered expression as universe
+2. Identify hub genes (top 5 by kWithin) for ALL modules
+3. Check which hubs lost connectivity in Inv4m
+4. Integrate support metrics (LFP) with preservation status
+5. Summarize biological themes and disruption classification
+
+**Expected outcome**: Functional annotation of all modules with
+consensus support metrics, preservation status, and hub gene connectivity.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(clusterProfiler)
+  library(here)
+  library(patchwork)
+})
+
+set.seed(123)
+```
+
+```{r setup_directories}
+# Input/output directories
+PRESERVATION_DIR <- here::here(params$run_dir, "06_preservation")
+CONSENSUS_DIR <- here::here(params$run_dir, "04_consensus_networks")
+BOOTSTRAP_DIR <- here::here(params$run_dir, "05_bootstrap_support")
+FILTER_DIR <- here::here(params$run_dir, "02_gene_filter")
+OUTPUT_DIR <- here::here(params$run_dir, "07_functional")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n\n")
+}
+```
+
+---
+
+# Load Data
+
+```{r load_data}
+# Load preservation summary (with all metrics)
+preservation_summary <- readRDS(file.path(PRESERVATION_DIR, "preservation_summary.rds"))
+
+# Load disrupted modules
+disrupted_modules <- read_csv(
+  file.path(PRESERVATION_DIR, "disrupted_modules.csv"),
+  show_col_types = FALSE
+)
+
+# Load CTRL consensus modules
+ctrl_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+
+# Load delta kWithin (gene-level)
+delta_k <- read_csv(
+  file.path(PRESERVATION_DIR, "delta_kWithin_genes.csv"),
+  show_col_types = FALSE
+)
+
+# Load bootstrap support
+ctrl_support <- read_csv(
+  file.path(BOOTSTRAP_DIR, "ctrl", "module_support.csv"),
+  show_col_types = FALSE
+)
+
+# Load gene annotations from filter step
+gene_info <- read_csv(
+  file.path(FILTER_DIR, "deg_neighborhood_genes.csv"),
+  show_col_types = FALSE
+)
+
+# Load GO annotations
+TERM2GENE <- readRDS(here("data", "TERM2GENE.rds"))
+TERM2NAME <- readRDS(here("data", "TERM2NAME.rds"))
+
+{
+  cat("=== INPUT DATA ===\n")
+  cat("Preservation summary:", nrow(preservation_summary), "modules\n")
+  cat("Disrupted modules:", nrow(disrupted_modules), "\n")
+  cat("Genes with module assignments:", nrow(ctrl_modules), "\n")
+  cat("Genes with delta_k:", nrow(delta_k), "\n")
+  cat("GO term-gene mappings:", nrow(TERM2GENE), "\n\n")
+
+  if (nrow(disrupted_modules) > 0) {
+    cat("Disrupted modules:\n")
+    print(disrupted_modules %>%
+            dplyr::select(module, color, n_genes, adjacency_correlation,
+                          median_delta_k, ctrl_stability))
+  } else {
+    cat("No disrupted modules identified.\n")
+    cat("Will analyze modules with weakest preservation.\n")
+  }
+}
+```
+
+---
+
+# Prepare Module Gene Lists for GO Analysis
+
+```{r prepare_gene_lists}
+# Load combined expression (merged experiments, low-expression filtered)
+DATA_PREP_DIR <- here::here(params$run_dir, "01_data_prep")
+expr_combined <- readRDS(file.path(DATA_PREP_DIR, "combined_expression.rds"))
+
+# Universe = ALL genes after merging + low-expression filtering (~18K genes)
+universe <- rownames(expr_combined)
+
+cat("=== GENE UNIVERSE ===\n")
+cat("Universe genes (merged + filtered):", length(universe), "\n")
+
+# Get ALL CTRL modules (excluding grey/0)
+all_modules <- ctrl_modules %>%
+  filter(module != 0) %>%
+  distinct(module, color) %>%
+  arrange(module)
+
+cat("CTRL modules to analyze:", nrow(all_modules), "\n\n")
+
+# Create named list of gene vectors for each module (by color)
+module_gene_lists <- split(
+  ctrl_modules %>% filter(module != 0) %>% pull(gene),
+  ctrl_modules %>% filter(module != 0) %>% pull(color)
+)
+
+# Report module sizes
+cat("Module sizes:\n")
+print(sapply(module_gene_lists, length))
+```
+
+---
+
+# GO Enrichment Analysis (Biological Process)
+
+**Approach**: Run GO BP enrichment for ALL CTRL consensus modules using
+`compareCluster` for comparative analysis.
+
+```{r enrichment_function}
+#' Perform GO Enrichment Analysis (BP only)
+#'
+#' @param x Character vector of gene IDs
+#' @param ontology GO ontology (default: "BP")
+#' @return enrichResult object
+ego <- function(x, ontology = "BP") {
+  enricher(
+    gene = x,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "none",
+    universe = universe,
+    minGSSize = 10,
+    maxGSSize = 500,
+    qvalueCutoff = 0.2,
+    TERM2GENE = TERM2GENE[TERM2GENE$GO %in% TERM2NAME[[ontology]]$go_id, ],
+    TERM2NAME = TERM2NAME[[ontology]]
+  )
+}
+```
+
+```{r run_enrichment}
+# Run comparative GO enrichment for all modules
+cat("Running GO BP enrichment for all modules...\n")
+
+compGO_BP <- compareCluster(
+  geneCluster = module_gene_lists,
+  fun = ego
+)
+
+# Set factor levels to preserve module order
+cluster_order <- names(module_gene_lists)
+levels(compGO_BP@compareClusterResult$Cluster) <- cluster_order
+
+{
+  cat("\n=== GO ENRICHMENT RESULTS ===\n")
+  cat("Enriched terms per module:\n")
+  print(table(compGO_BP@compareClusterResult$Cluster))
+}
+
+# Save full results
+go_results <- as.data.frame(compGO_BP@compareClusterResult) %>%
+  rename(module_color = Cluster) %>%
+  arrange(module_color, pvalue)
+
+write_csv(
+  go_results,
+  file.path(OUTPUT_DIR, "all_modules_GO_BP.csv")
+)
+
+# Save the compareCluster object for later use
+saveRDS(compGO_BP, file.path(OUTPUT_DIR, "compareCluster_GO_BP.rds"))
+
+cat("\nTotal enriched terms:", nrow(go_results), "\n")
+```
+
+---
+
+# Top GO Terms Summary
+
+```{r go_summary}
+if (nrow(go_results) > 0) {
+  # Top 5 terms per module
+  go_summary <- go_results %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(module_color, ID, Description, GeneRatio, pvalue, Count) %>%
+    mutate(pvalue = signif(pvalue, 3))
+
+  write_csv(
+    go_summary,
+    file.path(OUTPUT_DIR, "go_summary_table.csv")
+  )
+
+  {
+    cat("\n=== TOP GO TERMS PER MODULE ===\n")
+    print(go_summary, n = 50)
+  }
+} else {
+  go_summary <- tibble()
+  cat("\nNo significant GO enrichment found.\n")
+}
+```
+
+---
+
+# Hub Gene Analysis
+
+**Approach**: Identify hub genes using CTRL consensus kWithin, then check
+connectivity change in Inv4m. Analyze ALL modules (excluding grey/0).
+
+```{r hub_analysis}
+# Merge module assignments with delta kWithin (all modules except grey)
+hub_data <- ctrl_modules %>%
+  filter(module != 0) %>%
+  inner_join(
+    delta_k %>% dplyr::select(gene, kWithin_ctrl, kWithin_inv4m, delta_kWithin),
+    by = "gene"
+  )
+
+# Top 5 hub genes per module by CTRL kWithin
+hub_genes <- hub_data %>%
+  group_by(module, color) %>%
+  slice_max(kWithin_ctrl, n = 5) %>%
+  ungroup()
+
+# Add gene annotations
+hub_genes <- hub_genes %>%
+  left_join(
+    gene_info %>% dplyr::select(gene, logFC, regulation, in_cis, in_Inv4m),
+    by = "gene"
+  ) %>%
+  mutate(
+    hub_disrupted = delta_kWithin < -0.05,
+    connectivity_change = case_when(
+      delta_kWithin < -0.1 ~ "Strong loss",
+      delta_kWithin < -0.02 ~ "Moderate loss",
+      delta_kWithin > 0.02 ~ "Gain",
+      TRUE ~ "Stable"
+    )
+  ) %>%
+  arrange(module, desc(kWithin_ctrl))
+
+# Save hub genes
+write_csv(
+  hub_genes,
+  file.path(OUTPUT_DIR, "hub_genes_all_modules.csv")
+)
+
+{
+  cat("\n=== HUB GENES (ALL MODULES) ===\n")
+  cat("Total hub genes:", nrow(hub_genes), "\n")
+  cat("Hubs with connectivity loss:", sum(hub_genes$hub_disrupted, na.rm = TRUE), "\n\n")
+
+  print(
+    hub_genes %>%
+      dplyr::select(module, color, gene, kWithin_ctrl, delta_kWithin,
+                    connectivity_change, regulation)
+  )
+}
+```
+
+---
+
+# Hub Gene Connectivity Plot
+
+```{r hub_connectivity, fig.width=10, fig.height=6}
+if (nrow(hub_genes) > 0) {
+  p_hub <- ggplot(
+    hub_genes,
+    aes(x = kWithin_ctrl, y = kWithin_inv4m, color = color)
+  ) +
+    geom_point(aes(size = abs(logFC)), alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+    geom_text(
+      aes(label = gene),
+      size = 2.5,
+      hjust = -0.1,
+      vjust = 0.5,
+      check_overlap = TRUE
+    ) +
+    scale_color_identity() +
+    theme_minimal(base_size = 12) +
+    labs(
+      title = "Hub Gene Connectivity Change (Consensus Adjacency)",
+      subtitle = "Points below diagonal = connectivity loss in Inv4m",
+      x = "kWithin (CTRL)",
+      y = "kWithin (Inv4m)",
+      size = "|logFC|"
+    )
+
+  print(p_hub)
+
+  ggsave(
+    file.path(OUTPUT_DIR, "hub_connectivity_plot.pdf"),
+    p_hub,
+    width = 10, height = 6
+  )
+}
+```
+
+---
+
+# Module Theme Summary with Support Metrics
+
+```{r biological_themes}
+# Create comprehensive summary for ALL modules using preservation_summary
+module_themes <- preservation_summary %>%
+  dplyr::select(
+    module, color, n_genes, adjacency_correlation, median_delta_k,
+    pct_decreased, ctrl_lfp, ctrl_stability, jaccard, preservation_status
+  )
+
+# Add top GO term (BP only - from new structure with module_color)
+if (nrow(go_results) > 0) {
+  top_bp <- go_results %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(color = module_color, top_BP = Description, bp_pval = pvalue)
+
+  module_themes <- module_themes %>%
+    left_join(top_bp, by = "color")
+}
+
+# Add top hub gene
+if (nrow(hub_genes) > 0) {
+  top_hubs <- hub_genes %>%
+    group_by(module) %>%
+    slice_max(kWithin_ctrl, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(module, top_hub = gene, hub_delta_k = delta_kWithin,
+                  hub_regulation = regulation)
+
+  module_themes <- module_themes %>%
+    left_join(top_hubs, by = "module")
+}
+
+# Save theme summary
+write_csv(
+  module_themes,
+  file.path(OUTPUT_DIR, "module_theme_summary.csv")
+)
+
+{
+  cat("\n=== MODULE BIOLOGICAL THEMES WITH SUPPORT ===\n")
+  print(module_themes %>%
+          dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
+                        adjacency_correlation, preservation_status, top_BP))
+}
+```
+
+---
+
+# GO Enrichment Visualization
+
+```{r go_visualization, fig.width=12, fig.height=10}
+if (nrow(go_results) > 0) {
+  n_modules <- length(unique(go_results$module_color))
+
+  # Top 5 terms per module for plotting
+  go_plot_data <- go_results %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
+    ungroup() %>%
+    mutate(
+      Description = str_trunc(Description, 40),
+      GeneRatio_num = sapply(strsplit(GeneRatio, "/"), function(x) {
+        as.numeric(x[1]) / as.numeric(x[2])
+      })
+    )
+
+  if (nrow(go_plot_data) > 0 && n_modules <= 12) {
+    p_go <- ggplot(
+      go_plot_data,
+      aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
+          color = -log10(pvalue), size = Count)
+    ) +
+      geom_point() +
+      facet_wrap(~module_color, scales = "free_y", ncol = 3) +
+      scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
+      theme_minimal(base_size = 10) +
+      theme(
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(size = 7)
+      ) +
+      labs(
+        title = "GO Biological Process Enrichment (All Modules)",
+        x = "Gene Ratio",
+        y = NULL,
+        size = "Gene Count"
+      )
+
+    print(p_go)
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_plot.pdf"),
+      p_go,
+      width = 12, height = max(8, n_modules * 0.8)
+    )
+  } else if (n_modules > 12) {
+    cat("Many modules (", n_modules, "). Full plot saved to PDF.\n")
+    # Save a larger plot for many modules
+    p_go <- ggplot(
+      go_plot_data,
+      aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
+          color = -log10(pvalue), size = Count)
+    ) +
+      geom_point() +
+      facet_wrap(~module_color, scales = "free_y", ncol = 4) +
+      scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
+      theme_minimal(base_size = 8) +
+      theme(
+        strip.text = element_text(face = "bold", size = 7),
+        axis.text.y = element_text(size = 6)
+      ) +
+      labs(
+        title = "GO Biological Process Enrichment (All Modules)",
+        x = "Gene Ratio",
+        y = NULL,
+        size = "Count"
+      )
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_plot.pdf"),
+      p_go,
+      width = 16, height = max(12, n_modules * 0.6)
+    )
+  }
+}
+```
+
+---
+
+# Integration with Inv4m Direction
+
+```{r inv4m_direction}
+# Check direction bias in ALL modules (excluding grey)
+direction_summary <- ctrl_modules %>%
+  filter(module != 0) %>%
+  left_join(
+    gene_info %>% dplyr::select(gene, regulation, in_cis, in_Inv4m),
+    by = "gene"
+  ) %>%
+  group_by(module, color) %>%
+  summarise(
+    n_genes = n(),
+    n_upregulated = sum(regulation == "Upregulated", na.rm = TRUE),
+    n_downregulated = sum(regulation == "Downregulated", na.rm = TRUE),
+    pct_upregulated = round(n_upregulated / n_genes * 100, 1),
+    n_cis = sum(in_cis, na.rm = TRUE),
+    pct_cis = round(n_cis / n_genes * 100, 1),
+    n_in_inv4m = sum(in_Inv4m, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(
+  direction_summary,
+  file.path(OUTPUT_DIR, "module_direction_summary.csv")
+)
+
+{
+  cat("\n=== INV4M DIRECTION IN MODULES ===\n")
+  print(direction_summary)
+}
+```
+
+---
+
+# Comprehensive Module Summary Table
+
+```{r comprehensive_summary}
+# Create final comprehensive summary
+comprehensive_summary <- preservation_summary %>%
+  left_join(
+    ctrl_support %>% dplyr::select(module, mean_entropy, n_genes_support = n_genes),
+    by = "module"
+  ) %>%
+  left_join(
+    direction_summary %>% dplyr::select(module, pct_upregulated, pct_cis),
+    by = "module"
+  )
+
+# Add GO term counts (using module_color from new structure)
+if (nrow(go_results) > 0) {
+  go_counts <- go_results %>%
+    count(module_color, name = "n_go_terms") %>%
+    rename(color = module_color)
+
+  comprehensive_summary <- comprehensive_summary %>%
+    left_join(go_counts, by = "color")
+} else {
+  comprehensive_summary <- comprehensive_summary %>%
+    mutate(n_go_terms = 0)
+}
+
+# Classify final disruption status
+comprehensive_summary <- comprehensive_summary %>%
+  mutate(
+    disrupted_final = case_when(
+      adjacency_correlation < 0.3 ~ "Strong",
+      adjacency_correlation < 0.5 ~ "Moderate",
+      adjacency_correlation < 0.7 & median_delta_k < -0.05 ~ "Weak",
+      TRUE ~ "Not disrupted"
+    ),
+    disrupted_final = factor(
+      disrupted_final,
+      levels = c("Strong", "Moderate", "Weak", "Not disrupted")
+    )
+  )
+
+write_csv(
+  comprehensive_summary,
+  file.path(OUTPUT_DIR, "comprehensive_module_summary.csv")
+)
+
+{
+  cat("\n=== COMPREHENSIVE MODULE SUMMARY ===\n")
+  cat("\nDisruption classification:\n")
+  print(table(comprehensive_summary$disrupted_final))
+
+  cat("\nTop disrupted modules:\n")
+  print(
+    comprehensive_summary %>%
+      filter(disrupted_final != "Not disrupted") %>%
+      dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
+                    adjacency_correlation, disrupted_final, pct_upregulated) %>%
+      arrange(adjacency_correlation)
+  )
+}
+```
+
+---
+
+# Save Final Summary Statistics
+
+```{r save_summary}
+n_modules_analyzed <- nrow(all_modules)
+n_modules_with_go <- length(unique(go_results$module_color))
+
+summary_stats <- tibble(
+  metric = c(
+    "Total CTRL modules analyzed",
+    "GO BP terms enriched (total)",
+    "Modules with GO enrichment",
+    "Hub genes identified",
+    "Hub genes with connectivity loss",
+    "Strong disruption modules",
+    "Moderate disruption modules",
+    "Weak disruption modules"
+  ),
+  value = c(
+    n_modules_analyzed,
+    nrow(go_results),
+    n_modules_with_go,
+    nrow(hub_genes),
+    sum(hub_genes$hub_disrupted, na.rm = TRUE),
+    sum(comprehensive_summary$disrupted_final == "Strong", na.rm = TRUE),
+    sum(comprehensive_summary$disrupted_final == "Moderate", na.rm = TRUE),
+    sum(comprehensive_summary$disrupted_final == "Weak", na.rm = TRUE)
+  )
+)
+
+write_csv(
+  summary_stats,
+  file.path(OUTPUT_DIR, "functional_analysis_summary.csv")
+)
+
+{
+  cat("\n=== SAVED OUTPUTS ===\n")
+  cat("all_modules_GO_BP.csv: GO BP enrichment for all modules\n")
+  cat("compareCluster_GO_BP.rds: compareCluster object for visualization\n")
+  cat("go_summary_table.csv: top GO terms per module\n")
+  cat("hub_genes_all_modules.csv: hub genes with connectivity change\n")
+  cat("module_theme_summary.csv: biological themes with support metrics\n")
+  cat("module_direction_summary.csv: Inv4m direction summary\n")
+  cat("comprehensive_module_summary.csv: all modules with all metrics\n")
+  cat("go_enrichment_plot.pdf: GO enrichment visualization\n")
+  cat("hub_connectivity_plot.pdf: hub gene connectivity\n")
+  cat("functional_analysis_summary.csv: summary statistics\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Modules analyzed
+  cat("Check 1: Modules analyzed\n")
+  cat("  Modules:", nrow(all_modules), "\n")
+  stopifnot(nrow(all_modules) > 0)
+
+  # Check 2: GO enrichment ran
+  cat("\nCheck 2: GO enrichment executed\n")
+  cat("  Terms found:", nrow(go_results), "\n")
+
+  # Check 3: Hub genes identified
+  cat("\nCheck 3: Hub genes identified\n")
+  cat("  Hub genes:", nrow(hub_genes), "\n")
+  stopifnot(nrow(hub_genes) > 0)
+
+  # Check 4: Comprehensive summary complete
+  cat("\nCheck 4: Comprehensive summary\n")
+  cat("  Modules in summary:", nrow(comprehensive_summary), "\n")
+  stopifnot(nrow(comprehensive_summary) == nrow(preservation_summary))
+
+  # Check 5: All outputs saved
+  cat("\nCheck 5: Output files created\n")
+  expected_files <- c(
+    "all_modules_GO_BP.csv",
+    "hub_genes_all_modules.csv",
+    "functional_analysis_summary.csv",
+    "comprehensive_module_summary.csv"
+  )
+  for (f in expected_files) {
+    exists <- file.exists(file.path(OUTPUT_DIR, f))
+    cat("  ", f, ":", ifelse(exists, "OK", "MISSING"), "\n")
+  }
+
+  cat("\n=== ALL CHECKS PASSED ===\n")
+}
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

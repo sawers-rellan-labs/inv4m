@@ -1,0 +1,268 @@
+---
+title: "Field-Only Perturbation Analysis: Data Preparation"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/field_perturbation_test"
+  n_permutations: 200
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/01_data_prep.Rmd', output_dir='output/field_perturbation_YYYYMMDD/01_data_prep', params=list(run_dir='output/field_perturbation_YYYYMMDD'))"
+
+Note: This script is typically run via run_field_perturbation.sh which handles
+output directories automatically.
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Load PSU 2022 field data only (no Crow 2020 data), prepare for
+network construction without batch correction.
+
+**Approach**:
+1. Load pre-normalized voom object (already TMM + voom normalized)
+2. Extract expression matrix and sample metadata
+3. Recode genotypes (B73 = CTRL, Inv4m = Inv4m)
+4. QC with PCA
+5. No batch correction needed (single experiment)
+
+**Expected outcome**: Expression matrix (43 samples, ~20k genes) ready for
+gene filtering and network construction.
+
+**Key Difference from Joint Pipeline**: Uses only PSU 2022 field data and
+skips batch correction since there is only one experiment.
+
+---
+
+# Setup and Data Loading
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(patchwork)
+})
+
+set.seed(123)
+```
+
+```{r setup_output}
+# Output directory
+OUTPUT_DIR <- here::here(params$run_dir, "01_data_prep")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n")
+  cat("Analysis type: PSU 2022 field-only (no batch correction)\n\n")
+}
+```
+
+## Load PSU 2022 Normalized Data
+
+```{r load_psu_data}
+# Load pre-normalized voom object (43 QC'd samples)
+psu_voom <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
+
+# Extract expression matrix (genes x samples)
+expr_matrix <- psu_voom$E
+
+# Extract sample metadata
+sample_info <- psu_voom$targets %>%
+  as.data.frame() %>%
+  rownames_to_column("sample_id") %>%
+  mutate(
+    # Recode B73 to CTRL for consistency
+    Genotype = recode(Genotype, "B73" = "CTRL"),
+    Tissue = "Leaf",
+    Experiment = "PSU2022"
+  ) %>%
+  dplyr::select(sample_id, Genotype, Tissue, Experiment, Treatment, lib.size)
+
+{
+  cat("=== PSU 2022 DATA ===\n")
+  cat("Expression matrix:", nrow(expr_matrix), "genes x",
+      ncol(expr_matrix), "samples\n")
+  cat("\nGenotype breakdown:\n")
+  print(table(sample_info$Genotype))
+  cat("\nTreatment breakdown:\n")
+  print(table(sample_info$Treatment))
+  cat("\nLibrary size range (M):", round(range(sample_info$lib.size) / 1e6, 1), "\n\n")
+}
+```
+
+---
+
+# Quality Control: PCA
+
+```{r pca_qc, fig.width=12, fig.height=5}
+# PCA
+pca_result <- prcomp(t(expr_matrix), scale. = TRUE)
+var_explained <- summary(pca_result)$importance[2, 1:2] * 100
+
+pca_df <- tibble(
+  sample_id = sample_info$sample_id,
+  Genotype = sample_info$Genotype,
+  Treatment = sample_info$Treatment,
+  PC1 = pca_result$x[, 1],
+  PC2 = pca_result$x[, 2]
+)
+
+# PCA by Genotype
+p1 <- ggplot(pca_df, aes(PC1, PC2, color = Genotype, shape = Treatment)) +
+  geom_point(size = 3, alpha = 0.8) +
+  scale_color_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "PSU 2022 Field Data (by Genotype)",
+    x = sprintf("PC1 (%.1f%%)", var_explained[1]),
+    y = sprintf("PC2 (%.1f%%)", var_explained[2])
+  )
+
+# PCA by Treatment
+p2 <- ggplot(pca_df, aes(PC1, PC2, color = Treatment, shape = Genotype)) +
+  geom_point(size = 3, alpha = 0.8) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "PSU 2022 Field Data (by Treatment)",
+    x = sprintf("PC1 (%.1f%%)", var_explained[1]),
+    y = sprintf("PC2 (%.1f%%)", var_explained[2])
+  )
+
+p1 + p2
+
+ggsave(
+  file.path(OUTPUT_DIR, "pca_qc.pdf"),
+  p1 + p2,
+  width = 12, height = 5
+)
+```
+
+## Quantify Genotype Effect
+
+```{r genotype_effect}
+# R-squared for PC1 ~ Genotype
+r2_geno <- summary(lm(PC1 ~ Genotype, data = pca_df))$r.squared
+
+{
+  cat("=== GENOTYPE EFFECT ===\n")
+  cat("PC1 ~ Genotype R-squared:", round(r2_geno, 3), "\n")
+  cat("This represents the variance explained by Inv4m genotype.\n\n")
+}
+```
+
+---
+
+# Save Outputs
+
+```{r save_outputs}
+# Save expression matrix (genes x samples, as in joint pipeline)
+saveRDS(
+  expr_matrix,
+  file.path(OUTPUT_DIR, "combined_expression.rds")
+)
+
+# Save sample metadata
+write_csv(
+  sample_info,
+  file.path(OUTPUT_DIR, "sample_metadata.csv")
+)
+
+# Save summary statistics
+summary_stats <- tibble(
+  metric = c(
+    "Total samples",
+    "CTRL samples",
+    "Inv4m samples",
+    "Total genes",
+    "R2 Genotype (PC1)"
+  ),
+  value = c(
+    nrow(sample_info),
+    sum(sample_info$Genotype == "CTRL"),
+    sum(sample_info$Genotype == "Inv4m"),
+    nrow(expr_matrix),
+    round(r2_geno, 3)
+  )
+)
+
+write_csv(
+  summary_stats,
+  file.path(OUTPUT_DIR, "data_prep_summary.csv")
+)
+
+{
+  cat("=== SAVED OUTPUTS ===\n")
+  cat("combined_expression.rds:", nrow(expr_matrix), "genes x",
+      ncol(expr_matrix), "samples\n")
+  cat("sample_metadata.csv:", nrow(sample_info), "samples\n")
+  cat("pca_qc.pdf: QC plot\n")
+  cat("data_prep_summary.csv: summary statistics\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Sample counts
+  cat("Check 1: Sample counts\n")
+  cat("  Total:", nrow(sample_info), "(expected: 43)\n")
+  stopifnot(nrow(sample_info) == 43)
+
+  # Check 2: Genotype balance
+  cat("\nCheck 2: Genotype balance\n")
+  geno_table <- table(sample_info$Genotype)
+  print(geno_table)
+  stopifnot(geno_table["CTRL"] > 15)
+  stopifnot(geno_table["Inv4m"] > 15)
+
+  # Check 3: Expression matrix dimensions
+  cat("\nCheck 3: Expression dimensions\n")
+  cat("  Genes:", nrow(expr_matrix), "\n")
+  cat("  Samples:", ncol(expr_matrix), "\n")
+  stopifnot(ncol(expr_matrix) == nrow(sample_info))
+
+  # Check 4: No missing values
+  cat("\nCheck 4: Missing values\n")
+  n_na <- sum(is.na(expr_matrix))
+  cat("  NA values:", n_na, "\n")
+  stopifnot(n_na == 0)
+
+  cat("\n=== ALL CHECKS PASSED ===\n")
+}
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

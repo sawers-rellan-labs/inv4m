@@ -1,0 +1,762 @@
+---
+title: "Field-Only Perturbation Analysis: Consensus-Based Preservation"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/perturbation_test"
+  n_permutations: 200
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/06_preservation.Rmd', output_dir='output/perturbation_YYYYMMDD/06_preservation', params=list(run_dir='output/perturbation_YYYYMMDD', n_permutations=200))"
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Compare CTRL and Inv4m consensus networks to identify modules
+that are disrupted by the Inv4m inversion.
+
+**Approach**:
+1. Compare consensus adjacency matrices between conditions
+2. Compute module-level adjacency preservation (correlation)
+3. Calculate delta kWithin (connectivity change) from consensus adjacency
+4. Map modules between conditions using gene overlap
+5. Integrate with bootstrap support metrics
+
+**Key Metrics**:
+- **Adjacency Correlation**: Cor(A_ctrl, A_inv4m) within module - <0.5 = disrupted
+- **Mean Adjacency Delta**: Mean(A_inv4m - A_ctrl) - negative = weakened connections
+- **Delta kWithin**: kWithin_inv4m - kWithin_ctrl - negative = lost connectivity
+
+**Expected outcome**: List of disrupted modules with preservation and support metrics.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(WGCNA)
+  library(here)
+  library(patchwork)
+  library(ggrepel)
+})
+
+# Enable multi-threading
+allowWGCNAThreads()
+
+set.seed(123)
+```
+
+```{r setup_directories}
+# Input/output directories
+CONSENSUS_DIR <- here::here(params$run_dir, "04_consensus_networks")
+BOOTSTRAP_DIR <- here::here(params$run_dir, "05_bootstrap_support")
+DATA_PREP_DIR <- here::here(params$run_dir, "01_data_prep")
+OUTPUT_DIR <- here::here(params$run_dir, "06_preservation")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n")
+  cat("Permutations:", params$n_permutations, "\n\n")
+}
+```
+
+---
+
+# Load Data
+
+```{r load_consensus}
+# Load consensus adjacency matrices
+A_ctrl <- readRDS(file.path(CONSENSUS_DIR, "ctrl", "consensus_adjacency.rds"))
+A_inv4m <- readRDS(file.path(CONSENSUS_DIR, "inv4m", "consensus_adjacency.rds"))
+
+# Load consensus modules
+ctrl_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+inv4m_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "inv4m", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+
+{
+  cat("=== CONSENSUS NETWORKS ===\n")
+  cat("CTRL adjacency:", nrow(A_ctrl), "x", ncol(A_ctrl), "\n")
+  cat("Inv4m adjacency:", nrow(A_inv4m), "x", ncol(A_inv4m), "\n")
+  cat("CTRL modules:", length(unique(ctrl_modules$module[ctrl_modules$module != 0])), "\n")
+  cat("Inv4m modules:", length(unique(inv4m_modules$module[inv4m_modules$module != 0])), "\n")
+}
+```
+
+```{r load_support}
+# Load bootstrap support metrics
+ctrl_support <- read_csv(
+  file.path(BOOTSTRAP_DIR, "ctrl", "module_support.csv"),
+  show_col_types = FALSE
+)
+inv4m_support <- read_csv(
+  file.path(BOOTSTRAP_DIR, "inv4m", "module_support.csv"),
+  show_col_types = FALSE
+)
+
+{
+  cat("\n=== BOOTSTRAP SUPPORT ===\n")
+  cat("CTRL stable modules:", sum(ctrl_support$stability == "Stable"), "\n")
+  cat("Inv4m stable modules:", sum(inv4m_support$stability == "Stable"), "\n")
+}
+```
+
+---
+
+# Validate Gene Alignment
+
+```{r validate_genes}
+# Check genes are aligned
+stopifnot(
+  "Genes must match between adjacency matrices" =
+    all(rownames(A_ctrl) == rownames(A_inv4m))
+)
+
+gene_names <- rownames(A_ctrl)
+n_genes <- length(gene_names)
+
+cat("Genes aligned:", n_genes, "\n")
+```
+
+---
+
+# Compute Consensus kWithin
+
+**kWithin from Consensus Adjacency**: Mean adjacency of a gene to other genes
+in its module, using the consensus adjacency matrix.
+
+```{r consensus_kwithin}
+#' Compute intramodular connectivity from consensus adjacency
+#'
+#' @param A Consensus adjacency matrix
+#' @param modules Named vector of module assignments
+#'
+#' @return Named vector of kWithin values
+compute_consensus_kWithin <- function(A, modules) {
+  genes <- names(modules)
+
+  kWithin <- sapply(genes, function(g) {
+    mod <- modules[g]
+    if (mod == 0) return(NA)
+
+    mod_genes <- names(modules)[modules == mod]
+    # Mean adjacency to other genes in module (exclude self)
+    other_genes <- setdiff(mod_genes, g)
+    if (length(other_genes) == 0) return(0)
+    mean(A[g, other_genes])
+  })
+
+  return(kWithin)
+}
+
+# Create named module vectors
+ctrl_mod_vec <- setNames(ctrl_modules$module, ctrl_modules$gene)
+
+# Compute kWithin using CTRL modules as reference
+k_ctrl <- compute_consensus_kWithin(A_ctrl, ctrl_mod_vec)
+k_inv4m <- compute_consensus_kWithin(A_inv4m, ctrl_mod_vec)
+
+# Gene-level delta kWithin
+delta_k <- tibble(
+  gene = names(k_ctrl),
+  module = ctrl_mod_vec[names(k_ctrl)],
+  kWithin_ctrl = k_ctrl,
+  kWithin_inv4m = k_inv4m,
+  delta_kWithin = k_inv4m - k_ctrl
+) %>%
+  filter(!is.na(module), module != 0)
+
+# Add module colors
+delta_k <- delta_k %>%
+  left_join(ctrl_modules %>% dplyr::select(gene, color), by = "gene")
+
+write_csv(delta_k, file.path(OUTPUT_DIR, "delta_kWithin_genes.csv"))
+
+{
+  cat("=== DELTA kWITHIN (GENE-LEVEL) ===\n")
+  cat("Genes analyzed:", nrow(delta_k), "\n")
+  cat("Genes with decreased connectivity:", sum(delta_k$delta_kWithin < 0, na.rm = TRUE), "\n")
+  cat("Genes with increased connectivity:", sum(delta_k$delta_kWithin > 0, na.rm = TRUE), "\n")
+  cat("\nDelta kWithin distribution:\n")
+  print(summary(delta_k$delta_kWithin))
+}
+```
+
+---
+
+# Module-Level Adjacency Preservation
+
+**Approach**: For each CTRL module, compute:
+1. Correlation of within-module adjacency values between A_ctrl and A_inv4m
+2. Mean change in adjacency
+
+```{r module_adjacency}
+#' Compare module adjacency between conditions
+#'
+#' @param A_ctrl CTRL consensus adjacency
+#' @param A_inv4m Inv4m consensus adjacency
+#' @param modules_ctrl Named vector of CTRL module assignments
+#'
+#' @return Data frame with preservation metrics per module
+compare_module_adjacency <- function(A_ctrl, A_inv4m, modules_ctrl) {
+  modules <- sort(unique(as.integer(modules_ctrl[modules_ctrl != 0])))
+
+  # Get genes present in both adjacency matrices
+  shared_genes <- intersect(rownames(A_ctrl), rownames(A_inv4m))
+
+  preservation_list <- lapply(modules, function(mod) {
+    mod_genes <- names(modules_ctrl)[modules_ctrl == mod]
+
+    # Filter to genes in both adjacency matrices
+    genes <- intersect(mod_genes, shared_genes)
+
+    if (length(genes) < 3) {
+      return(data.frame(
+        module = as.integer(mod),
+        n_genes = as.integer(length(mod_genes)),
+        n_genes_analyzed = as.integer(length(genes)),
+        adjacency_correlation = NA_real_,
+        mean_adjacency_delta = NA_real_,
+        mean_adjacency_ctrl = NA_real_,
+        mean_adjacency_inv4m = NA_real_,
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    # Extract within-module adjacency (lower triangle only)
+    A_ctrl_mod <- A_ctrl[genes, genes]
+    A_inv4m_mod <- A_inv4m[genes, genes]
+
+    ctrl_vals <- A_ctrl_mod[lower.tri(A_ctrl_mod)]
+    inv4m_vals <- A_inv4m_mod[lower.tri(A_inv4m_mod)]
+
+    # Correlation of adjacency values
+    cor_adj <- as.numeric(cor(ctrl_vals, inv4m_vals, use = "pairwise.complete.obs"))
+
+    # Mean adjacency values
+    mean_ctrl <- as.numeric(mean(ctrl_vals, na.rm = TRUE))
+    mean_inv4m <- as.numeric(mean(inv4m_vals, na.rm = TRUE))
+
+    data.frame(
+      module = as.integer(mod),
+      n_genes = as.integer(length(mod_genes)),
+      n_genes_analyzed = as.integer(length(genes)),
+      adjacency_correlation = cor_adj,
+      mean_adjacency_delta = as.numeric(mean_inv4m - mean_ctrl),
+      mean_adjacency_ctrl = mean_ctrl,
+      mean_adjacency_inv4m = mean_inv4m,
+      stringsAsFactors = FALSE
+    )
+  })
+
+  # Combine all results
+  result <- do.call(rbind, preservation_list)
+
+  # Report on gene coverage
+  total_genes <- sum(result$n_genes)
+  analyzed_genes <- sum(result$n_genes_analyzed)
+  if (analyzed_genes < total_genes) {
+    message(sprintf("Note: %d/%d genes analyzed (%.1f%% - some genes not in both adjacencies)",
+                    analyzed_genes, total_genes, 100 * analyzed_genes / total_genes))
+  }
+
+  result
+}
+
+# Compute module-level adjacency preservation
+adjacency_preservation <- compare_module_adjacency(A_ctrl, A_inv4m, ctrl_mod_vec)
+
+# Add module colors
+adjacency_preservation <- adjacency_preservation %>%
+  left_join(
+    ctrl_modules %>% distinct(module, color),
+    by = "module"
+  )
+
+{
+  cat("\n=== ADJACENCY PRESERVATION ===\n")
+  cat("Modules analyzed:", nrow(adjacency_preservation), "\n")
+  cat("\nAdjacency correlation distribution:\n")
+  print(summary(adjacency_preservation$adjacency_correlation))
+}
+```
+
+---
+
+# Module-Level Delta kWithin
+
+```{r module_delta_k}
+# Aggregate to module level
+module_delta_k <- delta_k %>%
+  group_by(module, color) %>%
+  summarise(
+    n_genes = n(),
+    median_delta_k = median(delta_kWithin, na.rm = TRUE),
+    mean_delta_k = mean(delta_kWithin, na.rm = TRUE),
+    sd_delta_k = sd(delta_kWithin, na.rm = TRUE),
+    pct_decreased = mean(delta_kWithin < 0, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+write_csv(module_delta_k, file.path(OUTPUT_DIR, "delta_kWithin_modules.csv"))
+
+{
+  cat("\n=== MODULE-LEVEL DELTA kWITHIN ===\n")
+  print(module_delta_k %>% arrange(median_delta_k))
+}
+```
+
+---
+
+# Module Mapping Between Conditions
+
+**Approach**: Map CTRL modules to Inv4m modules using Jaccard overlap.
+
+```{r module_mapping}
+# Create mapping between CTRL and Inv4m modules
+ctrl_mod_list <- split(ctrl_modules$gene, ctrl_modules$module)
+ctrl_mod_list <- ctrl_mod_list[names(ctrl_mod_list) != "0"]
+
+inv4m_mod_list <- split(inv4m_modules$gene, inv4m_modules$module)
+inv4m_mod_list <- inv4m_mod_list[names(inv4m_mod_list) != "0"]
+
+# Compute Jaccard overlap
+module_mapping <- expand_grid(
+  ctrl_module = names(ctrl_mod_list),
+  inv4m_module = names(inv4m_mod_list)
+) %>%
+  rowwise() %>%
+  mutate(
+    ctrl_genes = list(ctrl_mod_list[[ctrl_module]]),
+    inv4m_genes = list(inv4m_mod_list[[inv4m_module]]),
+    n_overlap = length(intersect(ctrl_genes, inv4m_genes)),
+    n_ctrl = length(ctrl_genes),
+    n_inv4m = length(inv4m_genes),
+    jaccard = n_overlap / length(union(ctrl_genes, inv4m_genes)),
+    overlap_pct_ctrl = n_overlap / n_ctrl * 100
+  ) %>%
+  ungroup() %>%
+  dplyr::select(-ctrl_genes, -inv4m_genes)
+
+# Best match for each CTRL module
+best_matches <- module_mapping %>%
+  group_by(ctrl_module) %>%
+  slice_max(jaccard, n = 1) %>%
+  ungroup() %>%
+  arrange(as.integer(ctrl_module))
+
+write_csv(best_matches, file.path(OUTPUT_DIR, "module_mapping.csv"))
+
+{
+  cat("\n=== MODULE MAPPING (CTRL → INV4M) ===\n")
+  print(best_matches)
+}
+```
+
+---
+
+# Integrate All Metrics
+
+```{r integrate_metrics}
+# Ensure consistent module types (all as integer)
+adjacency_preservation <- adjacency_preservation %>%
+  mutate(module = as.integer(module))
+
+module_delta_k <- module_delta_k %>%
+  mutate(module = as.integer(module))
+
+ctrl_support <- ctrl_support %>%
+  mutate(module = as.integer(module))
+
+best_matches <- best_matches %>%
+  mutate(ctrl_module = as.integer(ctrl_module))
+
+# Combine all preservation metrics (join by module only - n_genes may differ slightly)
+preservation_summary <- adjacency_preservation %>%
+  left_join(
+    module_delta_k %>% dplyr::select(-n_genes),
+    by = c("module", "color")
+  ) %>%
+  left_join(
+    ctrl_support %>% dplyr::select(module, ctrl_lfp = mean_lfp, ctrl_stability = stability),
+    by = "module"
+  ) %>%
+  left_join(
+    best_matches %>%
+      dplyr::select(ctrl_module, best_inv4m_match = inv4m_module, jaccard),
+    by = c("module" = "ctrl_module")
+  ) %>%
+  mutate(
+    # Classification
+    preservation_status = case_when(
+      adjacency_correlation < 0.3 ~ "Disrupted",
+      adjacency_correlation < 0.5 ~ "Weak",
+      adjacency_correlation < 0.7 ~ "Moderate",
+      TRUE ~ "Preserved"
+    ),
+    preservation_status = factor(
+      preservation_status,
+      levels = c("Disrupted", "Weak", "Moderate", "Preserved")
+    )
+  ) %>%
+  arrange(adjacency_correlation)
+
+# Identify disrupted modules
+# Criteria: adjacency correlation < 0.5 OR significant connectivity loss
+disrupted_modules <- preservation_summary %>%
+  filter(
+    adjacency_correlation < 0.5 |
+    (median_delta_k < -0.1 & pct_decreased > 60)
+  )
+
+# Ensure all columns are simple types (no lists)
+preservation_summary <- preservation_summary %>%
+  mutate(
+    across(where(is.list), ~ sapply(.x, function(x) if(length(x) == 0) NA else x[1])),
+    ctrl_stability = as.character(ctrl_stability),
+    preservation_status = as.character(preservation_status)
+  )
+
+# Save results
+write_csv(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.csv"))
+write_csv(disrupted_modules, file.path(OUTPUT_DIR, "disrupted_modules.csv"))
+saveRDS(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.rds"))
+
+{
+  cat("\n=== INTEGRATED PRESERVATION SUMMARY ===\n")
+  cat("Total modules:", nrow(preservation_summary), "\n")
+  cat("\nPreservation status:\n")
+  print(table(preservation_summary$preservation_status))
+  cat("\nDisrupted modules:", nrow(disrupted_modules), "\n")
+
+  if (nrow(disrupted_modules) > 0) {
+    cat("\nDisrupted module details:\n")
+    print(
+      disrupted_modules %>%
+        dplyr::select(module, color, n_genes, adjacency_correlation,
+                      median_delta_k, ctrl_stability, jaccard)
+    )
+  }
+}
+```
+
+---
+
+# Visualization: Adjacency Correlation
+
+```{r adjacency_correlation_plot, fig.width=10, fig.height=6}
+p_adj_cor <- ggplot(
+  preservation_summary,
+  aes(x = n_genes, y = adjacency_correlation, color = preservation_status)
+) +
+  geom_point(size = 4, alpha = 0.8) +
+  geom_hline(yintercept = c(0.3, 0.5, 0.7), linetype = "dashed", color = "gray50") +
+  geom_text_repel(
+    aes(label = color),
+    size = 3,
+    max.overlaps = 15
+  ) +
+  scale_color_manual(
+    values = c(
+      "Disrupted" = "#D55E00",
+      "Weak" = "#E69F00",
+      "Moderate" = "#56B4E9",
+      "Preserved" = "#009E73"
+    )
+  ) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Module Preservation: Adjacency Correlation (CTRL vs Inv4m)",
+    subtitle = "Based on consensus adjacency matrices",
+    x = "Module Size (genes)",
+    y = "Adjacency Correlation",
+    color = "Status"
+  )
+
+print(p_adj_cor)
+
+ggsave(
+  file.path(OUTPUT_DIR, "adjacency_correlation_plot.pdf"),
+  p_adj_cor,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Visualization: Delta kWithin Boxplot
+
+```{r delta_k_boxplot, fig.width=12, fig.height=6}
+# Order modules by median delta kWithin
+module_order <- module_delta_k %>%
+  arrange(median_delta_k) %>%
+  pull(color)
+
+# Join median_delta_k for coloring
+delta_k_plot <- delta_k %>%
+  left_join(
+    module_delta_k %>% dplyr::select(color, median_delta_k),
+    by = "color"
+  ) %>%
+  mutate(color = factor(color, levels = module_order))
+
+p_delta_k <- ggplot(delta_k_plot, aes(x = color, y = delta_kWithin)) +
+  geom_boxplot(aes(fill = median_delta_k < 0), outlier.size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  scale_fill_manual(
+    values = c("TRUE" = "#0072B2", "FALSE" = "#D55E00"),
+    labels = c("TRUE" = "Decreased", "FALSE" = "Increased"),
+    name = "Median Δk"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Change in Intramodular Connectivity (Consensus): CTRL → Inv4m",
+    subtitle = "Negative values indicate connectivity loss in Inv4m",
+    x = "Module",
+    y = "Δ kWithin (Inv4m - CTRL)"
+  )
+
+print(p_delta_k)
+
+ggsave(
+  file.path(OUTPUT_DIR, "delta_kWithin_boxplot.pdf"),
+  p_delta_k,
+  width = 12, height = 6
+)
+```
+
+---
+
+# Visualization: Correlation vs Delta kWithin
+
+```{r correlation_vs_delta, fig.width=10, fig.height=6}
+p_compare <- ggplot(
+  preservation_summary,
+  aes(x = median_delta_k, y = adjacency_correlation, color = preservation_status)
+) +
+  geom_point(aes(size = n_genes), alpha = 0.8) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text_repel(
+    aes(label = color),
+    size = 3,
+    max.overlaps = 15
+  ) +
+  scale_color_manual(
+    values = c(
+      "Disrupted" = "#D55E00",
+      "Weak" = "#E69F00",
+      "Moderate" = "#56B4E9",
+      "Preserved" = "#009E73"
+    )
+  ) +
+  scale_size_continuous(range = c(3, 10)) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Module Perturbation: Adjacency Correlation vs Δ kWithin",
+    subtitle = "Bottom-left quadrant = most disrupted modules",
+    x = "Median Δ kWithin",
+    y = "Adjacency Correlation",
+    color = "Preservation",
+    size = "Module Size"
+  )
+
+print(p_compare)
+
+ggsave(
+  file.path(OUTPUT_DIR, "correlation_vs_delta_k.pdf"),
+  p_compare,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Visualization: Support vs Preservation
+
+```{r support_vs_preservation, fig.width=10, fig.height=6}
+p_support_pres <- ggplot(
+  preservation_summary,
+  aes(x = ctrl_lfp, y = adjacency_correlation, color = preservation_status)
+) +
+  geom_point(aes(size = n_genes), alpha = 0.8) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "gray50") +
+  geom_text_repel(
+    aes(label = color),
+    size = 3,
+    max.overlaps = 15
+  ) +
+  scale_color_manual(
+    values = c(
+      "Disrupted" = "#D55E00",
+      "Weak" = "#E69F00",
+      "Moderate" = "#56B4E9",
+      "Preserved" = "#009E73"
+    )
+  ) +
+  scale_size_continuous(range = c(3, 10)) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Module Bootstrap Support vs Preservation",
+    subtitle = "X: CTRL module stability | Y: Preservation in Inv4m",
+    x = "CTRL Bootstrap Support (LFP)",
+    y = "Adjacency Correlation",
+    color = "Preservation",
+    size = "Module Size"
+  )
+
+print(p_support_pres)
+
+ggsave(
+  file.path(OUTPUT_DIR, "support_vs_preservation.pdf"),
+  p_support_pres,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Save Summary Statistics
+
+```{r save_summary}
+summary_stats <- tibble(
+  metric = c(
+    "Total CTRL modules analyzed",
+    "Disrupted modules (adj_cor < 0.5 or Δk criteria)",
+    "Weak preservation (0.3-0.5)",
+    "Moderate preservation (0.5-0.7)",
+    "Preserved (>= 0.7)",
+    "Mean adjacency correlation",
+    "Median adjacency correlation",
+    "Genes with decreased kWithin",
+    "Genes with increased kWithin",
+    "Mean delta kWithin (gene-level)"
+  ),
+  value = c(
+    nrow(preservation_summary),
+    nrow(disrupted_modules),
+    sum(preservation_summary$preservation_status == "Weak"),
+    sum(preservation_summary$preservation_status == "Moderate"),
+    sum(preservation_summary$preservation_status == "Preserved"),
+    round(mean(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
+    round(median(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
+    sum(delta_k$delta_kWithin < 0, na.rm = TRUE),
+    sum(delta_k$delta_kWithin > 0, na.rm = TRUE),
+    round(mean(delta_k$delta_kWithin, na.rm = TRUE), 4)
+  )
+)
+
+write_csv(summary_stats, file.path(OUTPUT_DIR, "preservation_analysis_summary.csv"))
+
+{
+  cat("\n=== SAVED OUTPUTS ===\n")
+  cat("preservation_summary.csv: integrated module metrics\n")
+  cat("preservation_summary.rds: R object for downstream\n")
+  cat("disrupted_modules.csv: modules meeting disruption criteria\n")
+  cat("delta_kWithin_genes.csv: gene-level connectivity change\n")
+  cat("delta_kWithin_modules.csv: module-level summary\n")
+  cat("module_mapping.csv: CTRL → Inv4m module correspondence\n")
+  cat("adjacency_correlation_plot.pdf\n")
+  cat("delta_kWithin_boxplot.pdf\n")
+  cat("correlation_vs_delta_k.pdf\n")
+  cat("support_vs_preservation.pdf\n")
+  cat("preservation_analysis_summary.csv\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Module coverage (allow some missing due to gene overlap issues)
+  cat("Check 1: Module coverage\n")
+  n_ctrl_mods <- length(unique(ctrl_modules$module[ctrl_modules$module != 0]))
+  n_analyzed <- nrow(preservation_summary)
+  coverage_pct <- round(100 * n_analyzed / n_ctrl_mods, 1)
+  cat("  CTRL modules analyzed:", n_analyzed, "/", n_ctrl_mods,
+      "(", coverage_pct, "%)\n")
+
+  # Warn if coverage is low, fail only if <80%
+
+  if (n_analyzed < n_ctrl_mods) {
+    missing_mods <- setdiff(
+      unique(ctrl_modules$module[ctrl_modules$module != 0]),
+      preservation_summary$module
+    )
+    cat("  WARNING: Missing modules:", paste(missing_mods, collapse = ", "), "\n")
+  }
+  if (coverage_pct < 80) {
+    stop("Module coverage below 80% - check gene overlap between conditions")
+  }
+
+  # Check 2: Delta kWithin calculated
+  cat("\nCheck 2: Delta kWithin coverage\n")
+  n_assigned_genes <- sum(ctrl_modules$module != 0)
+  cat("  Genes with delta_k:", nrow(delta_k), "/", n_assigned_genes, "\n")
+
+  # Check 3: Adjacency correlation valid
+  cat("\nCheck 3: Adjacency correlation valid\n")
+  valid_cors <- preservation_summary$adjacency_correlation[
+    !is.na(preservation_summary$adjacency_correlation)
+  ]
+  if (length(valid_cors) > 0) {
+    cat("  Range: [", round(min(valid_cors), 3), ",",
+        round(max(valid_cors), 3), "]\n")
+    cat("  Modules with NA correlation:", sum(is.na(preservation_summary$adjacency_correlation)),
+        "(likely <3 genes)\n")
+  }
+
+  # Check 4: Module mapping coverage
+  cat("\nCheck 4: Module mapping\n")
+  cat("  Modules mapped:", nrow(best_matches), "/", n_ctrl_mods, "\n")
+
+  cat("\n=== VALIDATION COMPLETE ===\n")
+}
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

@@ -1,0 +1,876 @@
+---
+title: "Field-Only Perturbation Analysis: Consensus Networks"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/perturbation_test"
+  n_consensus_iterations: 1000
+  n_bootstrap_iterations: 1000
+  gene_subsample_rate: 0.80
+  min_module_size_range: "10,15,20,25,30,35"
+  deep_split: 4
+  network_type: "signed"
+  log_frequency: 50
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/04_consensus_networks.Rmd', output_dir='output/perturbation_YYYYMMDD/04_consensus_networks', params=list(run_dir='output/perturbation_YYYYMMDD', n_consensus_iterations=1000))"
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Build consensus networks for CTRL and Inv4m subsets separately using
+the same approach as the field network pipeline (Phases 1-3).
+
+**Approach**:
+1. Subset expression data by genotype (CTRL, Inv4m)
+2. For each condition:
+   - Select optimal soft power threshold
+   - Run N consensus iterations with 80% gene subsampling
+   - Randomize minModuleSize parameter (10-35)
+   - Build indicator matrix (co-sampling counts)
+   - Build co-clustering matrix (co-module counts)
+   - Compute consensus adjacency: A_ij = C_ij / I_ij
+   - Cut dendrogram to identify modules
+   - Calculate module eigengenes
+
+**Expected outcome**: Consensus modules for both CTRL and Inv4m conditions,
+ready for bootstrap support and preservation analysis.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(WGCNA)
+  library(furrr)
+  library(future)
+  library(here)
+})
+
+# Disable WGCNA verbosity
+options(stringsAsFactors = FALSE)
+disableWGCNAThreads()
+
+set.seed(123)
+```
+
+```{r setup_directories}
+# Input/output directories
+INPUT_DIR <- here::here(params$run_dir, "02_gene_filter")
+DATA_PREP_DIR <- here::here(params$run_dir, "01_data_prep")
+REF_NET_DIR <- here::here(params$run_dir, "03_reference_network")
+OUTPUT_DIR <- here::here(params$run_dir, "04_consensus_networks")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_DIR, "ctrl"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_DIR, "inv4m"), recursive = TRUE, showWarnings = FALSE)
+
+# Log directory
+LOGS_DIR <- file.path(params$run_dir, "logs")
+dir.create(LOGS_DIR, recursive = TRUE, showWarnings = FALSE)
+log_file <- file.path(LOGS_DIR, "04_consensus_networks_progress.log")
+
+# Logging function
+log_progress <- function(...) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  msg <- paste0("[", timestamp, "] ", ...)
+  cat(msg, "\n", file = log_file, append = TRUE)
+}
+
+# Initialize log
+cat("", file = log_file)
+log_progress("Starting consensus network construction")
+
+# Parse parameters
+N_ITERATIONS <- as.integer(params$n_consensus_iterations)
+GENE_SUBSAMPLE_RATE <- as.numeric(params$gene_subsample_rate)
+MIN_MODULE_SIZE_RANGE <- as.integer(strsplit(params$min_module_size_range, ",")[[1]])
+DEEP_SPLIT <- as.integer(params$deep_split)
+NETWORK_TYPE <- params$network_type
+CONSENSUS_MIN_MODULE_SIZE <- min(MIN_MODULE_SIZE_RANGE)
+LOG_FREQUENCY <- if (!is.null(params$log_frequency)) params$log_frequency else 50
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n")
+  cat("Consensus iterations:", N_ITERATIONS, "\n")
+  cat("Gene subsample rate:", GENE_SUBSAMPLE_RATE, "\n")
+  cat("minModuleSize range:", paste(MIN_MODULE_SIZE_RANGE, collapse = ", "), "\n")
+  cat("deepSplit:", DEEP_SPLIT, "\n")
+  cat("networkType:", NETWORK_TYPE, "\n\n")
+}
+
+log_progress("Configuration: N_ITERATIONS=", N_ITERATIONS,
+             ", SUBSAMPLE_RATE=", GENE_SUBSAMPLE_RATE)
+```
+
+---
+
+# Load Data
+
+```{r load_data}
+# Load filtered expression
+expr_filtered <- readRDS(file.path(INPUT_DIR, "filtered_expression.rds"))
+
+# Load sample metadata
+sample_meta <- read_csv(
+  file.path(DATA_PREP_DIR, "sample_metadata.csv"),
+  show_col_types = FALSE
+)
+
+{
+  cat("=== INPUT DATA ===\n")
+  cat("Expression matrix:", nrow(expr_filtered), "genes x",
+      ncol(expr_filtered), "samples\n")
+  cat("\nSample breakdown:\n")
+  print(table(sample_meta$Genotype))
+}
+```
+
+```{r split_by_genotype}
+# Split samples by genotype
+ctrl_samples <- sample_meta %>%
+  filter(Genotype == "CTRL") %>%
+  pull(sample_id)
+
+inv4m_samples <- sample_meta %>%
+  filter(Genotype == "Inv4m") %>%
+  pull(sample_id)
+
+# Transpose for WGCNA (samples as rows)
+datExpr_CTRL <- t(expr_filtered[, ctrl_samples])
+datExpr_Inv4m <- t(expr_filtered[, inv4m_samples])
+
+{
+  cat("=== EXPRESSION DATA BY GENOTYPE ===\n")
+  cat("CTRL:", nrow(datExpr_CTRL), "samples x", ncol(datExpr_CTRL), "genes\n")
+  cat("Inv4m:", nrow(datExpr_Inv4m), "samples x", ncol(datExpr_Inv4m), "genes\n")
+}
+
+log_progress("Data loaded: CTRL=", nrow(datExpr_CTRL), " samples, Inv4m=",
+             nrow(datExpr_Inv4m), " samples, genes=", ncol(datExpr_CTRL))
+```
+
+---
+
+# Define Consensus Functions
+
+```{r define_functions}
+#' Run single WGCNA iteration on gene subsample
+#'
+#' @param datExpr Expression matrix (samples x genes)
+#' @param gene_indices Indices of genes to include
+#' @param power Soft power threshold
+#' @param min_module_size Minimum module size
+#' @param deep_split Deep split parameter
+#'
+#' @return Data frame with gene -> module assignments
+run_subsample_wgcna <- function(datExpr, gene_indices, power, min_module_size,
+                                 deep_split = 4, network_type = "signed") {
+  # Subset to sampled genes
+  expr_subset <- datExpr[, gene_indices]
+  gene_names <- colnames(expr_subset)
+
+  # Run WGCNA
+  net <- blockwiseModules(
+    expr_subset,
+    power = power,
+    networkType = network_type,
+    TOMType = network_type,
+    minModuleSize = min_module_size,
+    mergeCutHeight = 0,  # No merging
+    reassignThreshold = 0,
+    maxBlockSize = ncol(expr_subset),
+    numericLabels = TRUE,
+    deepSplit = deep_split,
+    verbose = 0
+  )
+
+  data.frame(
+    gene = gene_names,
+    module = net$colors,
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Build indicator matrix (co-sampling counts)
+#'
+#' @param subsample_configs List of subsample configurations
+#' @param gene_names All gene names
+#'
+#' @return Indicator matrix
+build_indicator_matrix <- function(subsample_configs, gene_names) {
+  n_genes <- length(gene_names)
+  I <- matrix(0, n_genes, n_genes, dimnames = list(gene_names, gene_names))
+
+  for (config in subsample_configs) {
+    genes_in <- gene_names[config$gene_indices]
+    I[genes_in, genes_in] <- I[genes_in, genes_in] + 1
+  }
+
+  return(I)
+}
+
+#' Build co-clustering matrix
+#'
+#' @param module_results List of module assignment data frames
+#' @param gene_names All gene names
+#'
+#' @return Co-clustering matrix
+build_coclustering_matrix <- function(module_results, gene_names) {
+  n_genes <- length(gene_names)
+  C <- matrix(0, n_genes, n_genes, dimnames = list(gene_names, gene_names))
+
+  for (result in module_results) {
+    # Group genes by module (exclude grey/0)
+    assigned <- result[result$module != 0, ]
+    for (mod in unique(assigned$module)) {
+      genes_in_mod <- assigned$gene[assigned$module == mod]
+      if (length(genes_in_mod) > 1) {
+        C[genes_in_mod, genes_in_mod] <- C[genes_in_mod, genes_in_mod] + 1
+      }
+    }
+  }
+
+  return(C)
+}
+
+#' Compute consensus adjacency
+#'
+#' @param C Co-clustering matrix
+#' @param I Indicator matrix
+#'
+#' @return Consensus adjacency matrix
+compute_consensus_adjacency <- function(C, I) {
+  A <- C / I
+  A[is.nan(A)] <- 0
+  A[is.infinite(A)] <- 0
+  return(A)
+}
+
+#' Cut consensus tree to get modules
+#'
+#' @param A Consensus adjacency matrix
+#' @param min_module_size Minimum module size
+#' @param deep_split Deep split parameter
+#'
+#' @return List with tree and module assignments
+cut_consensus_tree <- function(A, min_module_size = 25, deep_split = 4) {
+  # Convert to distance
+  D <- 1 - A
+
+  # Hierarchical clustering
+  tree <- hclust(as.dist(D), method = "average")
+
+  # Dynamic tree cut
+  modules <- cutreeDynamic(
+    dendro = tree,
+    distM = D,
+    minClusterSize = min_module_size,
+    deepSplit = deep_split,
+    verbose = 0
+  )
+
+  names(modules) <- rownames(A)
+
+  list(tree = tree, modules = modules)
+}
+
+cat("Consensus functions defined\n")
+```
+
+```{r progress_functions}
+# File-based atomic counter for accurate progress tracking
+# Each worker increments this file when it completes an iteration
+
+#' Atomically increment counter and return new count
+#' @param counter_file Path to counter file
+#' @param lock_file Path to lock file
+#' @return Integer count after increment
+increment_and_get_count <- function(counter_file, lock_file) {
+  tryCatch({
+    max_retries <- 100
+    for (attempt in seq_len(max_retries)) {
+      if (!file.exists(lock_file)) {
+        tryCatch({
+          writeLines(as.character(Sys.getpid()), lock_file)
+          break
+        }, error = function(e) NULL)
+      }
+      Sys.sleep(0.01 * sample(1:10, 1))  # Random backoff
+    }
+
+    lines <- readLines(counter_file, warn = FALSE)
+    current <- if (length(lines) > 0) as.integer(lines[1]) else 0L
+    if (is.na(current)) current <- 0L
+    new_count <- current + 1L
+    writeLines(as.character(new_count), counter_file)
+    tryCatch(unlink(lock_file), error = function(e) NULL)
+    new_count
+  }, error = function(e) NA_integer_)
+}
+
+#' Log progress with ETA calculation
+#' @param completed Number of completed iterations
+#' @param total Total iterations
+#' @param start_time Start time from Sys.time()
+#' @param log_freq Log frequency
+#' @param condition_label Label for the condition (e.g., "CTRL", "Inv4m")
+log_iteration_progress <- function(completed, total, start_time, log_freq,
+                                   condition_label = "") {
+  if (!is.na(completed) && (completed %% log_freq == 0 || completed == total)) {
+    elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+    pct_complete <- 100 * completed / total
+    avg_time <- if (completed > 0) elapsed / completed else 0
+    eta <- (total - completed) * avg_time
+
+    prefix <- if (nchar(condition_label) > 0) paste0(condition_label, ": ") else ""
+    log_progress(
+      prefix, "Completed ", completed, "/", total,
+      " iterations (", round(pct_complete, 1), "%) | ",
+      "Elapsed: ", round(elapsed/60, 1), " min | ",
+      "ETA: ", round(eta/60, 1), " min"
+    )
+  }
+}
+
+cat("Progress tracking functions defined\n")
+```
+
+---
+
+# Build Consensus Network: CTRL
+
+```{r consensus_ctrl}
+log_progress("=== STARTING CTRL CONSENSUS NETWORK ===")
+
+# 1. Load soft power from reference network
+cat("=== CTRL: LOADING REFERENCE PARAMETERS ===\n")
+power_ctrl <- readRDS(file.path(REF_NET_DIR, "ctrl", "selected_power.rds"))
+ctrl_ref_params <- readRDS(file.path(REF_NET_DIR, "ctrl", "reference_params.rds"))
+
+cat("Soft power (from reference):", power_ctrl, "\n")
+cat("Min module size (from reference):", ctrl_ref_params$minModuleSize, "\n")
+log_progress("CTRL power from reference: ", power_ctrl)
+
+# 2. Generate subsample configurations
+n_genes <- ncol(datExpr_CTRL)
+gene_names <- colnames(datExpr_CTRL)
+subsample_size <- floor(GENE_SUBSAMPLE_RATE * n_genes)
+
+ctrl_configs <- lapply(1:N_ITERATIONS, function(i) {
+  list(
+    iteration = i,
+    gene_indices = sample(1:n_genes, subsample_size, replace = FALSE),
+    min_module_size = sample(MIN_MODULE_SIZE_RANGE, 1)
+  )
+})
+
+saveRDS(ctrl_configs, file.path(OUTPUT_DIR, "ctrl", "subsample_configs.rds"))
+
+cat("\nGenerated", N_ITERATIONS, "subsample configurations\n")
+cat("Subsample size:", subsample_size, "genes (", GENE_SUBSAMPLE_RATE * 100, "%)\n\n")
+
+# 3. Run parallel WGCNA iterations
+n_cores <- max(1, parallel::detectCores() - 1)
+plan(multisession, workers = n_cores)
+
+log_progress("CTRL: Starting ", N_ITERATIONS, " WGCNA iterations on ", n_cores, " cores")
+log_progress("CTRL: Progress updates every ", LOG_FREQUENCY, " iterations")
+
+start_time <- Sys.time()
+
+# Initialize progress counter
+ctrl_counter_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_counter")
+ctrl_lock_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_lock")
+writeLines("0", ctrl_counter_file)
+
+ctrl_modules <- future_map(ctrl_configs, function(config) {
+  result <- run_subsample_wgcna(
+    datExpr_CTRL,
+    config$gene_indices,
+    power_ctrl,
+    config$min_module_size,
+    DEEP_SPLIT,
+    NETWORK_TYPE
+  )
+
+  # Track progress
+  completed <- increment_and_get_count(ctrl_counter_file, ctrl_lock_file)
+  log_iteration_progress(completed, N_ITERATIONS, start_time, LOG_FREQUENCY, "CTRL")
+
+  result
+}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+
+# Clean up counter files
+unlink(ctrl_counter_file)
+unlink(ctrl_lock_file)
+
+plan(sequential)
+
+elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+log_progress("=== CTRL CONSENSUS COMPLETE ===")
+log_progress("CTRL: Total runtime: ", round(elapsed, 2), " minutes")
+log_progress("CTRL: Average per iteration: ", round(elapsed_sec / N_ITERATIONS, 2), " seconds")
+
+cat("CTRL WGCNA complete:", round(elapsed, 2), "minutes\n")
+```
+
+```{r ctrl_matrices}
+# 4. Build indicator matrix
+cat("Building CTRL indicator matrix...\n")
+I_ctrl <- build_indicator_matrix(ctrl_configs, gene_names)
+saveRDS(I_ctrl, file.path(OUTPUT_DIR, "ctrl", "indicator_matrix.rds"))
+
+# 5. Build co-clustering matrix
+cat("Building CTRL co-clustering matrix...\n")
+C_ctrl <- build_coclustering_matrix(ctrl_modules, gene_names)
+saveRDS(C_ctrl, file.path(OUTPUT_DIR, "ctrl", "coclustering_matrix.rds"))
+
+# 6. Compute consensus adjacency
+cat("Computing CTRL consensus adjacency...\n")
+A_ctrl <- compute_consensus_adjacency(C_ctrl, I_ctrl)
+saveRDS(A_ctrl, file.path(OUTPUT_DIR, "ctrl", "consensus_adjacency.rds"))
+
+{
+  cat("\n=== CTRL MATRICES ===\n")
+  cat("Indicator range: [", min(I_ctrl), ",", max(I_ctrl), "]\n")
+  cat("Co-clustering range: [", min(C_ctrl), ",", max(C_ctrl), "]\n")
+  cat("Adjacency range: [", round(min(A_ctrl), 3), ",", round(max(A_ctrl), 3), "]\n")
+}
+```
+
+```{r ctrl_modules}
+# 7. Cut consensus tree
+cat("\nCutting CTRL consensus tree...\n")
+ctrl_tree <- cut_consensus_tree(A_ctrl, CONSENSUS_MIN_MODULE_SIZE, DEEP_SPLIT)
+
+# Create module data frame
+ctrl_module_df <- data.frame(
+  gene = names(ctrl_tree$modules),
+  module = ctrl_tree$modules,
+  color = labels2colors(ctrl_tree$modules),
+  stringsAsFactors = FALSE
+)
+
+write_csv(ctrl_module_df, file.path(OUTPUT_DIR, "ctrl", "consensus_modules.csv"))
+saveRDS(ctrl_tree, file.path(OUTPUT_DIR, "ctrl", "consensus_tree.rds"))
+
+# 8. Calculate eigengenes
+cat("Computing CTRL module eigengenes...\n")
+ctrl_MEs <- moduleEigengenes(datExpr_CTRL, ctrl_tree$modules, excludeGrey = TRUE)
+saveRDS(ctrl_MEs$eigengenes, file.path(OUTPUT_DIR, "ctrl", "consensus_eigengenes.rds"))
+
+{
+  cat("\n=== CTRL CONSENSUS MODULES ===\n")
+  cat("Total modules:", length(unique(ctrl_tree$modules[ctrl_tree$modules != 0])), "\n")
+  cat("Assigned genes:", sum(ctrl_tree$modules != 0), "\n")
+  cat("Unassigned (grey):", sum(ctrl_tree$modules == 0), "\n")
+  cat("\nModule sizes:\n")
+  print(table(ctrl_tree$modules))
+}
+
+log_progress("CTRL consensus complete: ",
+             length(unique(ctrl_tree$modules[ctrl_tree$modules != 0])), " modules")
+```
+
+---
+
+# Build Consensus Network: Inv4m
+
+```{r consensus_inv4m}
+log_progress("=== STARTING INV4M CONSENSUS NETWORK ===")
+
+# 1. Load soft power from reference network
+cat("\n=== INV4M: LOADING REFERENCE PARAMETERS ===\n")
+power_inv4m <- readRDS(file.path(REF_NET_DIR, "inv4m", "selected_power.rds"))
+inv4m_ref_params <- readRDS(file.path(REF_NET_DIR, "inv4m", "reference_params.rds"))
+
+cat("Soft power (from reference):", power_inv4m, "\n")
+cat("Min module size (from reference):", inv4m_ref_params$minModuleSize, "\n")
+log_progress("Inv4m power from reference: ", power_inv4m)
+
+# 2. Generate subsample configurations (same structure, different random samples)
+set.seed(456)  # Different seed for Inv4m
+
+inv4m_configs <- lapply(1:N_ITERATIONS, function(i) {
+  list(
+    iteration = i,
+    gene_indices = sample(1:n_genes, subsample_size, replace = FALSE),
+    min_module_size = sample(MIN_MODULE_SIZE_RANGE, 1)
+  )
+})
+
+saveRDS(inv4m_configs, file.path(OUTPUT_DIR, "inv4m", "subsample_configs.rds"))
+
+# 3. Run parallel WGCNA iterations
+plan(multisession, workers = n_cores)
+
+log_progress("Inv4m: Starting ", N_ITERATIONS, " WGCNA iterations on ", n_cores, " cores")
+log_progress("Inv4m: Progress updates every ", LOG_FREQUENCY, " iterations")
+
+start_time <- Sys.time()
+
+# Initialize progress counter
+inv4m_counter_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_counter")
+inv4m_lock_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_lock")
+writeLines("0", inv4m_counter_file)
+
+inv4m_modules <- future_map(inv4m_configs, function(config) {
+  result <- run_subsample_wgcna(
+    datExpr_Inv4m,
+    config$gene_indices,
+    power_inv4m,
+    config$min_module_size,
+    DEEP_SPLIT,
+    NETWORK_TYPE
+  )
+
+  # Track progress
+  completed <- increment_and_get_count(inv4m_counter_file, inv4m_lock_file)
+  log_iteration_progress(completed, N_ITERATIONS, start_time, LOG_FREQUENCY, "Inv4m")
+
+  result
+}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+
+# Clean up counter files
+unlink(inv4m_counter_file)
+unlink(inv4m_lock_file)
+
+plan(sequential)
+
+elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+log_progress("=== INV4M CONSENSUS COMPLETE ===")
+log_progress("Inv4m: Total runtime: ", round(elapsed, 2), " minutes")
+log_progress("Inv4m: Average per iteration: ", round(elapsed_sec / N_ITERATIONS, 2), " seconds")
+
+cat("Inv4m WGCNA complete:", round(elapsed, 2), "minutes\n")
+```
+
+```{r inv4m_matrices}
+# 4. Build indicator matrix
+cat("Building Inv4m indicator matrix...\n")
+I_inv4m <- build_indicator_matrix(inv4m_configs, gene_names)
+saveRDS(I_inv4m, file.path(OUTPUT_DIR, "inv4m", "indicator_matrix.rds"))
+
+# 5. Build co-clustering matrix
+cat("Building Inv4m co-clustering matrix...\n")
+C_inv4m <- build_coclustering_matrix(inv4m_modules, gene_names)
+saveRDS(C_inv4m, file.path(OUTPUT_DIR, "inv4m", "coclustering_matrix.rds"))
+
+# 6. Compute consensus adjacency
+cat("Computing Inv4m consensus adjacency...\n")
+A_inv4m <- compute_consensus_adjacency(C_inv4m, I_inv4m)
+saveRDS(A_inv4m, file.path(OUTPUT_DIR, "inv4m", "consensus_adjacency.rds"))
+
+{
+  cat("\n=== INV4M MATRICES ===\n")
+  cat("Indicator range: [", min(I_inv4m), ",", max(I_inv4m), "]\n")
+  cat("Co-clustering range: [", min(C_inv4m), ",", max(C_inv4m), "]\n")
+  cat("Adjacency range: [", round(min(A_inv4m), 3), ",", round(max(A_inv4m), 3), "]\n")
+}
+```
+
+```{r inv4m_modules}
+# 7. Cut consensus tree
+cat("\nCutting Inv4m consensus tree...\n")
+inv4m_tree <- cut_consensus_tree(A_inv4m, CONSENSUS_MIN_MODULE_SIZE, DEEP_SPLIT)
+
+# Create module data frame
+inv4m_module_df <- data.frame(
+  gene = names(inv4m_tree$modules),
+  module = inv4m_tree$modules,
+  color = labels2colors(inv4m_tree$modules),
+  stringsAsFactors = FALSE
+)
+
+write_csv(inv4m_module_df, file.path(OUTPUT_DIR, "inv4m", "consensus_modules.csv"))
+saveRDS(inv4m_tree, file.path(OUTPUT_DIR, "inv4m", "consensus_tree.rds"))
+
+# 8. Calculate eigengenes
+cat("Computing Inv4m module eigengenes...\n")
+inv4m_MEs <- moduleEigengenes(datExpr_Inv4m, inv4m_tree$modules, excludeGrey = TRUE)
+saveRDS(inv4m_MEs$eigengenes, file.path(OUTPUT_DIR, "inv4m", "consensus_eigengenes.rds"))
+
+{
+  cat("\n=== INV4M CONSENSUS MODULES ===\n")
+  cat("Total modules:", length(unique(inv4m_tree$modules[inv4m_tree$modules != 0])), "\n")
+  cat("Assigned genes:", sum(inv4m_tree$modules != 0), "\n")
+  cat("Unassigned (grey):", sum(inv4m_tree$modules == 0), "\n")
+  cat("\nModule sizes:\n")
+  print(table(inv4m_tree$modules))
+}
+
+log_progress("Inv4m consensus complete: ",
+             length(unique(inv4m_tree$modules[inv4m_tree$modules != 0])), " modules")
+```
+
+---
+
+# Visualization: CTRL Consensus Network
+
+```{r ctrl_dendrogram, fig.height=8}
+# Plot CTRL dendrogram with module colors
+plotDendroAndColors(
+  ctrl_tree$tree,
+  labels2colors(ctrl_tree$modules),
+  "CTRL Modules",
+  dendroLabels = FALSE,
+  hang = 0.03,
+  addGuide = TRUE,
+  guideHang = 0.05,
+  main = "CTRL Consensus Network Gene Dendrogram"
+)
+```
+
+```{r ctrl_module_sizes, fig.height=5}
+# CTRL module size distribution
+ctrl_sizes <- ctrl_module_df %>%
+  filter(module != 0) %>%
+  count(module, color)
+
+ggplot(ctrl_sizes, aes(x = reorder(color, -n), y = n, fill = color)) +
+  geom_col(color = "black") +
+  scale_fill_identity() +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "CTRL Consensus Module Sizes",
+    x = "Module",
+    y = "Number of Genes"
+  )
+```
+
+---
+
+# Visualization: Inv4m Consensus Network
+
+```{r inv4m_dendrogram, fig.height=8}
+# Plot Inv4m dendrogram with module colors
+plotDendroAndColors(
+  inv4m_tree$tree,
+  labels2colors(inv4m_tree$modules),
+  "Inv4m Modules",
+  dendroLabels = FALSE,
+  hang = 0.03,
+  addGuide = TRUE,
+  guideHang = 0.05,
+  main = "Inv4m Consensus Network Gene Dendrogram"
+)
+```
+
+```{r inv4m_module_sizes, fig.height=5}
+# Inv4m module size distribution
+inv4m_sizes <- inv4m_module_df %>%
+  filter(module != 0) %>%
+  count(module, color)
+
+ggplot(inv4m_sizes, aes(x = reorder(color, -n), y = n, fill = color)) +
+  geom_col(color = "black") +
+  scale_fill_identity() +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Inv4m Consensus Module Sizes",
+    x = "Module",
+    y = "Number of Genes"
+  )
+```
+
+---
+
+# Compare CTRL vs Inv4m Networks
+
+```{r network_comparison, fig.width=12, fig.height=5}
+library(patchwork)
+
+# Module count comparison
+comparison_summary <- tibble(
+  Condition = c("CTRL", "Inv4m"),
+  n_modules = c(
+    length(unique(ctrl_tree$modules[ctrl_tree$modules != 0])),
+    length(unique(inv4m_tree$modules[inv4m_tree$modules != 0]))
+  ),
+  n_assigned = c(
+    sum(ctrl_tree$modules != 0),
+    sum(inv4m_tree$modules != 0)
+  ),
+  n_unassigned = c(
+    sum(ctrl_tree$modules == 0),
+    sum(inv4m_tree$modules == 0)
+  ),
+  mean_adjacency = c(
+    mean(A_ctrl[lower.tri(A_ctrl)]),
+    mean(A_inv4m[lower.tri(A_inv4m)])
+  )
+)
+
+{
+  cat("=== NETWORK COMPARISON ===\n")
+  print(comparison_summary)
+}
+
+# Side-by-side module count plot
+p1 <- ggplot(comparison_summary, aes(x = Condition, y = n_modules, fill = Condition)) +
+  geom_col(color = "black") +
+  scale_fill_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(title = "Number of Modules", y = "Modules") +
+  theme(legend.position = "none")
+
+p2 <- ggplot(comparison_summary, aes(x = Condition, y = n_assigned, fill = Condition)) +
+  geom_col(color = "black") +
+  scale_fill_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(title = "Genes Assigned to Modules", y = "Genes") +
+  theme(legend.position = "none")
+
+p3 <- ggplot(comparison_summary, aes(x = Condition, y = mean_adjacency, fill = Condition)) +
+  geom_col(color = "black") +
+  scale_fill_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(title = "Mean Consensus Adjacency", y = "Adjacency") +
+  theme(legend.position = "none")
+
+p1 + p2 + p3
+
+ggsave(
+  file.path(OUTPUT_DIR, "network_comparison.pdf"),
+  p1 + p2 + p3,
+  width = 12, height = 5
+)
+
+write_csv(comparison_summary, file.path(OUTPUT_DIR, "network_comparison.csv"))
+```
+
+---
+
+# Save Combined Outputs
+
+```{r save_outputs}
+# Save PDF of dendrograms
+pdf(file.path(OUTPUT_DIR, "ctrl", "consensus_dendrogram.pdf"), width = 10, height = 8)
+plotDendroAndColors(
+  ctrl_tree$tree,
+  labels2colors(ctrl_tree$modules),
+  "CTRL Modules",
+  dendroLabels = FALSE,
+  hang = 0.03,
+  main = "CTRL Consensus Network"
+)
+dev.off()
+
+pdf(file.path(OUTPUT_DIR, "inv4m", "consensus_dendrogram.pdf"), width = 10, height = 8)
+plotDendroAndColors(
+  inv4m_tree$tree,
+  labels2colors(inv4m_tree$modules),
+  "Inv4m Modules",
+  dendroLabels = FALSE,
+  hang = 0.03,
+  main = "Inv4m Consensus Network"
+)
+dev.off()
+
+{
+  cat("=== SAVED OUTPUTS ===\n")
+  cat("\nCTRL outputs:\n")
+  cat("  ctrl/soft_power.rds\n")
+  cat("  ctrl/subsample_configs.rds\n")
+  cat("  ctrl/indicator_matrix.rds\n")
+  cat("  ctrl/coclustering_matrix.rds\n")
+  cat("  ctrl/consensus_adjacency.rds\n")
+  cat("  ctrl/consensus_modules.csv\n")
+  cat("  ctrl/consensus_tree.rds\n")
+  cat("  ctrl/consensus_eigengenes.rds\n")
+  cat("  ctrl/consensus_dendrogram.pdf\n")
+  cat("\nInv4m outputs:\n")
+  cat("  inv4m/soft_power.rds\n")
+  cat("  inv4m/subsample_configs.rds\n")
+  cat("  inv4m/indicator_matrix.rds\n")
+  cat("  inv4m/coclustering_matrix.rds\n")
+  cat("  inv4m/consensus_adjacency.rds\n")
+  cat("  inv4m/consensus_modules.csv\n")
+  cat("  inv4m/consensus_tree.rds\n")
+  cat("  inv4m/consensus_eigengenes.rds\n")
+  cat("  inv4m/consensus_dendrogram.pdf\n")
+  cat("\nCombined outputs:\n")
+  cat("  network_comparison.csv\n")
+  cat("  network_comparison.pdf\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Both networks built
+  cat("Check 1: Both networks built\n")
+  cat("  CTRL modules:", length(unique(ctrl_tree$modules[ctrl_tree$modules != 0])), "\n")
+  cat("  Inv4m modules:", length(unique(inv4m_tree$modules[inv4m_tree$modules != 0])), "\n")
+  stopifnot(length(unique(ctrl_tree$modules[ctrl_tree$modules != 0])) > 0)
+  stopifnot(length(unique(inv4m_tree$modules[inv4m_tree$modules != 0])) > 0)
+
+  # Check 2: Adjacency matrices valid
+  cat("\nCheck 2: Adjacency matrices valid\n")
+  cat("  CTRL range: [", round(min(A_ctrl), 3), ",", round(max(A_ctrl), 3), "]\n")
+  cat("  Inv4m range: [", round(min(A_inv4m), 3), ",", round(max(A_inv4m), 3), "]\n")
+  stopifnot(min(A_ctrl) >= 0 && max(A_ctrl) <= 1)
+  stopifnot(min(A_inv4m) >= 0 && max(A_inv4m) <= 1)
+
+  # Check 3: Same genes in both
+  cat("\nCheck 3: Gene alignment\n")
+  cat("  Same genes:", all(rownames(A_ctrl) == rownames(A_inv4m)), "\n")
+  stopifnot(all(rownames(A_ctrl) == rownames(A_inv4m)))
+
+  # Check 4: Eigengenes computed
+  cat("\nCheck 4: Eigengenes computed\n")
+  cat("  CTRL eigengenes:", ncol(ctrl_MEs$eigengenes), "modules\n")
+  cat("  Inv4m eigengenes:", ncol(inv4m_MEs$eigengenes), "modules\n")
+
+  cat("\n=== ALL CHECKS PASSED ===\n")
+}
+
+log_progress("Consensus network construction complete!")
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

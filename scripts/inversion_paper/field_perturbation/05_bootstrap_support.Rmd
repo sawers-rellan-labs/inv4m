@@ -1,0 +1,917 @@
+---
+title: "Field-Only Perturbation Analysis: Bootstrap Support"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/perturbation_test"
+  n_bootstrap_iterations: 1000
+  stability_threshold_stable: 0.70
+  stability_threshold_moderate: 0.50
+  network_type: "signed"
+  log_frequency: 50
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/05_bootstrap_support.Rmd', output_dir='output/perturbation_YYYYMMDD/05_bootstrap_support', params=list(run_dir='output/perturbation_YYYYMMDD', n_bootstrap_iterations=1000))"
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Quantify stability of consensus modules for both CTRL and Inv4m
+conditions via bootstrap resampling of samples.
+
+**Approach**:
+1. For each condition (CTRL, Inv4m):
+   - Resample samples WITH replacement
+   - Rebuild WGCNA network with fixed parameters
+   - Compare bootstrap modules to consensus modules
+   - Compute Largest Fragment Proportion (LFP) per module
+2. Classify module stability: stable (>=0.70), moderate (>=0.50), unstable (<0.50)
+
+**Expected outcome**: Stability metrics for each consensus module in both conditions.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(WGCNA)
+  library(furrr)
+  library(future)
+  library(here)
+})
+
+# Disable WGCNA verbosity
+options(stringsAsFactors = FALSE)
+disableWGCNAThreads()
+
+set.seed(123)
+```
+
+```{r setup_directories}
+# Input/output directories
+REF_NET_DIR <- here::here(params$run_dir, "03_reference_network")
+CONSENSUS_DIR <- here::here(params$run_dir, "04_consensus_networks")
+DATA_PREP_DIR <- here::here(params$run_dir, "01_data_prep")
+FILTER_DIR <- here::here(params$run_dir, "02_gene_filter")
+OUTPUT_DIR <- here::here(params$run_dir, "05_bootstrap_support")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_DIR, "ctrl"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_DIR, "inv4m"), recursive = TRUE, showWarnings = FALSE)
+
+# Log directory
+LOGS_DIR <- file.path(params$run_dir, "logs")
+dir.create(LOGS_DIR, recursive = TRUE, showWarnings = FALSE)
+log_file <- file.path(LOGS_DIR, "05_bootstrap_support_progress.log")
+
+# Logging function
+log_progress <- function(...) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  msg <- paste0("[", timestamp, "] ", ...)
+  cat(msg, "\n", file = log_file, append = TRUE)
+}
+
+# Initialize log
+cat("", file = log_file)
+log_progress("Starting bootstrap support analysis")
+
+# Parameters
+N_BOOTSTRAP <- as.integer(params$n_bootstrap_iterations)
+STABILITY_STABLE <- as.numeric(params$stability_threshold_stable)
+STABILITY_MODERATE <- as.numeric(params$stability_threshold_moderate)
+NETWORK_TYPE <- params$network_type
+LOG_FREQUENCY <- if (!is.null(params$log_frequency)) params$log_frequency else 50
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n")
+  cat("Bootstrap iterations:", N_BOOTSTRAP, "\n")
+  cat("Stability threshold (stable):", STABILITY_STABLE, "\n")
+  cat("Stability threshold (moderate):", STABILITY_MODERATE, "\n")
+  cat("Network type:", NETWORK_TYPE, "\n\n")
+}
+
+log_progress("Configuration: N_BOOTSTRAP=", N_BOOTSTRAP)
+```
+
+---
+
+# Load Data
+
+```{r load_data}
+# Load filtered expression
+expr_filtered <- readRDS(file.path(FILTER_DIR, "filtered_expression.rds"))
+
+# Load sample metadata
+sample_meta <- read_csv(
+  file.path(DATA_PREP_DIR, "sample_metadata.csv"),
+  show_col_types = FALSE
+)
+
+# Load consensus networks
+ctrl_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+inv4m_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "inv4m", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+
+# Load reference network parameters (power + minModuleSize)
+ctrl_ref_params <- readRDS(file.path(REF_NET_DIR, "ctrl", "reference_params.rds"))
+inv4m_ref_params <- readRDS(file.path(REF_NET_DIR, "inv4m", "reference_params.rds"))
+
+power_ctrl <- ctrl_ref_params$power
+power_inv4m <- inv4m_ref_params$power
+min_module_size_ctrl <- ctrl_ref_params$minModuleSize
+min_module_size_inv4m <- inv4m_ref_params$minModuleSize
+deep_split_ctrl <- ctrl_ref_params$deepSplit
+deep_split_inv4m <- inv4m_ref_params$deepSplit
+
+{
+  cat("=== INPUT DATA ===\n")
+  cat("Expression matrix:", nrow(expr_filtered), "genes x",
+      ncol(expr_filtered), "samples\n")
+  cat("CTRL consensus modules:", length(unique(ctrl_modules$module[ctrl_modules$module != 0])), "\n")
+  cat("Inv4m consensus modules:", length(unique(inv4m_modules$module[inv4m_modules$module != 0])), "\n")
+  cat("\nReference network parameters:\n")
+  cat("CTRL - power:", power_ctrl, ", minModuleSize:", min_module_size_ctrl,
+      ", deepSplit:", deep_split_ctrl, "\n")
+  cat("Inv4m - power:", power_inv4m, ", minModuleSize:", min_module_size_inv4m,
+      ", deepSplit:", deep_split_inv4m, "\n")
+}
+```
+
+```{r prepare_expression}
+# Split samples by genotype
+ctrl_samples <- sample_meta %>%
+  filter(Genotype == "CTRL") %>%
+  pull(sample_id)
+
+inv4m_samples <- sample_meta %>%
+  filter(Genotype == "Inv4m") %>%
+  pull(sample_id)
+
+# Transpose for WGCNA (samples as rows)
+datExpr_CTRL <- t(expr_filtered[, ctrl_samples])
+datExpr_Inv4m <- t(expr_filtered[, inv4m_samples])
+
+{
+  cat("\n=== EXPRESSION DATA ===\n")
+  cat("CTRL:", nrow(datExpr_CTRL), "samples x", ncol(datExpr_CTRL), "genes\n")
+  cat("Inv4m:", nrow(datExpr_Inv4m), "samples x", ncol(datExpr_Inv4m), "genes\n")
+}
+```
+
+---
+
+# Define Bootstrap Functions
+
+```{r define_functions}
+#' Run single bootstrap iteration of WGCNA
+#'
+#' @param datExpr Expression matrix (samples x genes)
+#' @param power Soft thresholding power
+#' @param params List of WGCNA parameters
+#' @param iteration_num Iteration number
+#'
+#' @return Data frame with gene -> module assignments
+run_bootstrap_iteration <- function(datExpr, power, min_module_size = 10,
+                                     deep_split = 4, network_type = "signed",
+                                     iteration_num = NULL) {
+  # Resample samples WITH replacement
+  n_samples <- nrow(datExpr)
+  boot_indices <- sample(1:n_samples, n_samples, replace = TRUE)
+  expr_boot <- datExpr[boot_indices, ]
+
+  # Run WGCNA
+  net_boot <- blockwiseModules(
+    expr_boot,
+    power = power,
+    networkType = network_type,
+    TOMType = network_type,
+    minModuleSize = min_module_size,
+    mergeCutHeight = 0,
+    reassignThreshold = 0,
+    maxBlockSize = ncol(expr_boot),
+    numericLabels = TRUE,
+    deepSplit = deep_split,
+    verbose = 0
+  )
+
+  data.frame(
+    gene = colnames(expr_boot),
+    module = net_boot$colors,
+    iteration = iteration_num,
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Compute fragmentation-aware module support
+#'
+#' @param consensus_modules Data frame with consensus module assignments
+#' @param bootstrap_results List of bootstrap iteration results
+#'
+#' @return Data frame with support statistics per module
+compute_module_support <- function(consensus_modules, bootstrap_results) {
+  # Get list of consensus modules (exclude grey/0)
+  modules <- unique(consensus_modules$module[consensus_modules$module != 0])
+
+  support <- map_dfr(modules, function(mod) {
+    # Genes in this consensus module
+    mod_genes <- consensus_modules$gene[consensus_modules$module == mod]
+    mod_color <- consensus_modules$color[consensus_modules$module == mod][1]
+
+    # For each bootstrap iteration, compute fragmentation metrics
+    iter_stats <- map_dfr(bootstrap_results, function(boot) {
+      boot_sub <- boot[boot$gene %in% mod_genes, ]
+      if (nrow(boot_sub) == 0) {
+        return(tibble(largest_prop = 0, entropy = NA_real_, n_fragments = 0L))
+      }
+
+      # Distribution across bootstrap modules (including grey/0 for entropy)
+      counts <- table(boot_sub$module)
+      props <- counts / sum(counts)
+
+      # Largest fragment proportion (exclude grey/0)
+      counts_nonzero <- counts[names(counts) != "0"]
+      if (length(counts_nonzero) == 0) {
+        largest_prop <- 0
+      } else {
+        largest_prop <- max(counts_nonzero) / length(mod_genes)
+      }
+
+      # Shannon entropy (all modules including grey)
+      entropy <- -sum(props * log2(props + 1e-12))
+
+      # Number of fragments (distinct modules genes split into)
+      n_fragments <- length(counts)
+
+      tibble(largest_prop = largest_prop, entropy = entropy, n_fragments = n_fragments)
+    })
+
+    n_iter <- nrow(iter_stats)
+    sd_val <- sd(iter_stats$largest_prop)
+
+    tibble(
+      module = mod,
+      color = mod_color,
+      n_genes = length(mod_genes),
+      mean_lfp = mean(iter_stats$largest_prop),
+      median_lfp = median(iter_stats$largest_prop),
+      sd_lfp = sd_val,
+      se_lfp = sd_val / sqrt(n_iter),  # Standard error of the mean
+      min_lfp = min(iter_stats$largest_prop),
+      max_lfp = max(iter_stats$largest_prop),
+      mean_entropy = mean(iter_stats$entropy, na.rm = TRUE),
+      median_entropy = median(iter_stats$entropy, na.rm = TRUE),
+      mean_fragments = mean(iter_stats$n_fragments)
+    )
+  })
+
+  support
+}
+
+cat("Bootstrap functions defined\n")
+```
+
+```{r progress_functions}
+# File-based atomic counter for accurate progress tracking
+# Each worker increments this file when it completes an iteration
+
+#' Atomically increment counter and return new count
+#' @param counter_file Path to counter file
+#' @param lock_file Path to lock file
+#' @return Integer count after increment
+increment_and_get_count <- function(counter_file, lock_file) {
+  tryCatch({
+    max_retries <- 100
+    for (attempt in seq_len(max_retries)) {
+      if (!file.exists(lock_file)) {
+        tryCatch({
+          writeLines(as.character(Sys.getpid()), lock_file)
+          break
+        }, error = function(e) NULL)
+      }
+      Sys.sleep(0.01 * sample(1:10, 1))  # Random backoff
+    }
+
+    lines <- readLines(counter_file, warn = FALSE)
+    current <- if (length(lines) > 0) as.integer(lines[1]) else 0L
+    if (is.na(current)) current <- 0L
+    new_count <- current + 1L
+    writeLines(as.character(new_count), counter_file)
+    tryCatch(unlink(lock_file), error = function(e) NULL)
+    new_count
+  }, error = function(e) NA_integer_)
+}
+
+#' Log progress with ETA calculation
+#' @param completed Number of completed iterations
+#' @param total Total iterations
+#' @param start_time Start time from Sys.time()
+#' @param log_freq Log frequency
+#' @param condition_label Label for the condition (e.g., "CTRL", "Inv4m")
+log_iteration_progress <- function(completed, total, start_time, log_freq,
+                                   condition_label = "") {
+  if (!is.na(completed) && (completed %% log_freq == 0 || completed == total)) {
+    elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+    pct_complete <- 100 * completed / total
+    avg_time <- if (completed > 0) elapsed / completed else 0
+    eta <- (total - completed) * avg_time
+
+    prefix <- if (nchar(condition_label) > 0) paste0(condition_label, ": ") else ""
+    log_progress(
+      prefix, "Completed ", completed, "/", total,
+      " iterations (", round(pct_complete, 1), "%) | ",
+      "Elapsed: ", round(elapsed/60, 1), " min | ",
+      "ETA: ", round(eta/60, 1), " min"
+    )
+  }
+}
+
+cat("Progress tracking functions defined\n")
+```
+
+---
+
+# Bootstrap Support: CTRL
+
+```{r bootstrap_ctrl}
+log_progress("=== STARTING CTRL BOOTSTRAP SUPPORT ===")
+
+# Configure parallelization
+n_cores <- max(1, parallel::detectCores() - 1)
+plan(multisession, workers = n_cores)
+
+log_progress("CTRL: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
+log_progress("CTRL: Progress updates every ", LOG_FREQUENCY, " iterations")
+
+start_time <- Sys.time()
+
+# Initialize progress counter
+ctrl_counter_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_counter")
+ctrl_lock_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_lock")
+writeLines("0", ctrl_counter_file)
+
+# Run bootstrap iterations using reference network parameters
+ctrl_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
+  result <- run_bootstrap_iteration(
+    datExpr_CTRL,
+    power_ctrl,
+    min_module_size = min_module_size_ctrl,
+    deep_split = deep_split_ctrl,
+    network_type = NETWORK_TYPE,
+    iteration_num = i
+  )
+
+  # Track progress
+  completed <- increment_and_get_count(ctrl_counter_file, ctrl_lock_file)
+  log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "CTRL")
+
+  result
+}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+
+# Clean up counter files
+unlink(ctrl_counter_file)
+unlink(ctrl_lock_file)
+
+plan(sequential)
+
+elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+log_progress("=== CTRL BOOTSTRAP COMPLETE ===")
+log_progress("CTRL: Total runtime: ", round(elapsed, 2), " minutes")
+log_progress("CTRL: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
+
+cat("CTRL bootstrap complete:", round(elapsed, 2), "minutes\n")
+
+# Save raw bootstrap results
+saveRDS(ctrl_bootstrap, file.path(OUTPUT_DIR, "ctrl", "bootstrap_results.rds"))
+```
+
+```{r ctrl_support}
+# Compute support metrics
+cat("Computing CTRL module support...\n")
+ctrl_support <- compute_module_support(ctrl_modules, ctrl_bootstrap)
+
+# Add stability classification
+ctrl_support <- ctrl_support %>%
+  mutate(
+    stability = case_when(
+      mean_lfp >= STABILITY_STABLE ~ "Stable",
+      mean_lfp >= STABILITY_MODERATE ~ "Moderate",
+      TRUE ~ "Unstable"
+    ),
+    stability = factor(stability, levels = c("Stable", "Moderate", "Unstable"))
+  ) %>%
+  arrange(desc(mean_lfp))
+
+# Save support metrics
+write_csv(ctrl_support, file.path(OUTPUT_DIR, "ctrl", "module_support.csv"))
+saveRDS(ctrl_support, file.path(OUTPUT_DIR, "ctrl", "module_support.rds"))
+
+{
+  cat("\n=== CTRL MODULE SUPPORT ===\n")
+  cat("Modules analyzed:", nrow(ctrl_support), "\n")
+  cat("\nStability classification:\n")
+  print(table(ctrl_support$stability))
+  cat("\nSupport summary:\n")
+  print(summary(ctrl_support$mean_lfp))
+
+  cat("\n=== ALL CTRL MODULES BY STABILITY ===\n")
+  for (stab in c("Stable", "Moderate", "Unstable")) {
+    mods <- ctrl_support %>% filter(stability == stab)
+    cat("\n", stab, "(n=", nrow(mods), "):\n", sep = "")
+    if (nrow(mods) > 0) {
+      print(mods %>%
+              dplyr::select(module, color, n_genes, mean_lfp, mean_entropy, mean_fragments) %>%
+              as.data.frame())
+    }
+  }
+}
+
+log_progress("CTRL support complete: ", sum(ctrl_support$stability == "Stable"),
+             " stable modules")
+```
+
+---
+
+# Bootstrap Support: Inv4m
+
+```{r bootstrap_inv4m}
+log_progress("=== STARTING INV4M BOOTSTRAP SUPPORT ===")
+
+set.seed(456)  # Different seed
+
+plan(multisession, workers = n_cores)
+
+log_progress("Inv4m: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
+log_progress("Inv4m: Progress updates every ", LOG_FREQUENCY, " iterations")
+
+start_time <- Sys.time()
+
+# Initialize progress counter
+inv4m_counter_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_counter")
+inv4m_lock_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_lock")
+writeLines("0", inv4m_counter_file)
+
+# Run bootstrap iterations using reference network parameters
+inv4m_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
+  result <- run_bootstrap_iteration(
+    datExpr_Inv4m,
+    power_inv4m,
+    min_module_size = min_module_size_inv4m,
+    deep_split = deep_split_inv4m,
+    network_type = NETWORK_TYPE,
+    iteration_num = i
+  )
+
+  # Track progress
+  completed <- increment_and_get_count(inv4m_counter_file, inv4m_lock_file)
+  log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "Inv4m")
+
+  result
+}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+
+# Clean up counter files
+unlink(inv4m_counter_file)
+unlink(inv4m_lock_file)
+
+plan(sequential)
+
+elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+log_progress("=== INV4M BOOTSTRAP COMPLETE ===")
+log_progress("Inv4m: Total runtime: ", round(elapsed, 2), " minutes")
+log_progress("Inv4m: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
+
+cat("Inv4m bootstrap complete:", round(elapsed, 2), "minutes\n")
+
+# Save raw bootstrap results
+saveRDS(inv4m_bootstrap, file.path(OUTPUT_DIR, "inv4m", "bootstrap_results.rds"))
+```
+
+```{r inv4m_support}
+# Compute support metrics
+cat("Computing Inv4m module support...\n")
+inv4m_support <- compute_module_support(inv4m_modules, inv4m_bootstrap)
+
+# Add stability classification
+inv4m_support <- inv4m_support %>%
+  mutate(
+    stability = case_when(
+      mean_lfp >= STABILITY_STABLE ~ "Stable",
+      mean_lfp >= STABILITY_MODERATE ~ "Moderate",
+      TRUE ~ "Unstable"
+    ),
+    stability = factor(stability, levels = c("Stable", "Moderate", "Unstable"))
+  ) %>%
+  arrange(desc(mean_lfp))
+
+# Save support metrics
+write_csv(inv4m_support, file.path(OUTPUT_DIR, "inv4m", "module_support.csv"))
+saveRDS(inv4m_support, file.path(OUTPUT_DIR, "inv4m", "module_support.rds"))
+
+{
+  cat("\n=== INV4M MODULE SUPPORT ===\n")
+  cat("Modules analyzed:", nrow(inv4m_support), "\n")
+  cat("\nStability classification:\n")
+  print(table(inv4m_support$stability))
+  cat("\nSupport summary:\n")
+  print(summary(inv4m_support$mean_lfp))
+
+  cat("\n=== ALL INV4M MODULES BY STABILITY ===\n")
+  for (stab in c("Stable", "Moderate", "Unstable")) {
+    mods <- inv4m_support %>% filter(stability == stab)
+    cat("\n", stab, "(n=", nrow(mods), "):\n", sep = "")
+    if (nrow(mods) > 0) {
+      print(mods %>%
+              dplyr::select(module, color, n_genes, mean_lfp, mean_entropy, mean_fragments) %>%
+              as.data.frame())
+    }
+  }
+}
+
+log_progress("Inv4m support complete: ", sum(inv4m_support$stability == "Stable"),
+             " stable modules")
+```
+
+---
+
+# Compare Support Between Conditions
+
+```{r compare_support}
+# Create combined summary
+support_comparison <- tibble(
+  Condition = c("CTRL", "Inv4m"),
+  n_modules = c(nrow(ctrl_support), nrow(inv4m_support)),
+  n_stable = c(
+    sum(ctrl_support$stability == "Stable"),
+    sum(inv4m_support$stability == "Stable")
+  ),
+  n_moderate = c(
+    sum(ctrl_support$stability == "Moderate"),
+    sum(inv4m_support$stability == "Moderate")
+  ),
+  n_unstable = c(
+    sum(ctrl_support$stability == "Unstable"),
+    sum(inv4m_support$stability == "Unstable")
+  ),
+  mean_lfp = c(
+    mean(ctrl_support$mean_lfp),
+    mean(inv4m_support$mean_lfp)
+  ),
+  median_lfp = c(
+    median(ctrl_support$mean_lfp),
+    median(inv4m_support$mean_lfp)
+  )
+)
+
+write_csv(support_comparison, file.path(OUTPUT_DIR, "support_comparison.csv"))
+
+{
+  cat("\n=== SUPPORT COMPARISON ===\n")
+  print(support_comparison)
+}
+```
+
+---
+
+# Visualization: CTRL Support
+
+```{r ctrl_support_plot, fig.width=10, fig.height=6}
+p_ctrl <- ggplot(
+  ctrl_support,
+  aes(
+    x = reorder(color, mean_lfp),
+    y = mean_lfp,
+    fill = color
+  )
+) +
+  geom_col(color = "black") +
+  geom_errorbar(
+    aes(
+      ymin = pmax(0, mean_lfp - se_lfp),
+      ymax = pmin(1, mean_lfp + se_lfp)
+    ),
+    width = 0.3
+  ) +
+  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed", color = "darkgreen") +
+  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "CTRL Consensus Module Bootstrap Support",
+    subtitle = sprintf(
+      "n = %d bootstrap iterations | Stable >= %.2f | Moderate >= %.2f | Error bars = SEM",
+      N_BOOTSTRAP, STABILITY_STABLE, STABILITY_MODERATE
+    ),
+    x = "Module",
+    y = "Mean Support (LFP)"
+  )
+
+print(p_ctrl)
+
+ggsave(
+  file.path(OUTPUT_DIR, "ctrl", "module_support_plot.pdf"),
+  p_ctrl,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Visualization: Inv4m Support
+
+```{r inv4m_support_plot, fig.width=10, fig.height=6}
+p_inv4m <- ggplot(
+  inv4m_support,
+  aes(
+    x = reorder(color, mean_lfp),
+    y = mean_lfp,
+    fill = color
+  )
+) +
+  geom_col(color = "black") +
+  geom_errorbar(
+    aes(
+      ymin = pmax(0, mean_lfp - se_lfp),
+      ymax = pmin(1, mean_lfp + se_lfp)
+    ),
+    width = 0.3
+  ) +
+  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed", color = "darkgreen") +
+  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Inv4m Consensus Module Bootstrap Support",
+    subtitle = sprintf(
+      "n = %d bootstrap iterations | Stable >= %.2f | Moderate >= %.2f | Error bars = SEM",
+      N_BOOTSTRAP, STABILITY_STABLE, STABILITY_MODERATE
+    ),
+    x = "Module",
+    y = "Mean Support (LFP)"
+  )
+
+print(p_inv4m)
+
+ggsave(
+  file.path(OUTPUT_DIR, "inv4m", "module_support_plot.pdf"),
+  p_inv4m,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Visualization: Fragmentation Entropy
+
+```{r ctrl_entropy_plot, fig.width=10, fig.height=6}
+# CTRL fragmentation entropy plot
+p_ctrl_entropy <- ggplot(
+  ctrl_support,
+  aes(
+    x = reorder(color, -mean_entropy),
+    y = mean_entropy,
+    fill = color
+  )
+) +
+  geom_col(color = "black") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "CTRL Consensus Module Fragmentation",
+    subtitle = "Higher entropy = more dispersed across bootstrap modules",
+    x = "Module",
+    y = "Mean Fragmentation Entropy (bits)"
+  )
+
+print(p_ctrl_entropy)
+
+ggsave(
+  file.path(OUTPUT_DIR, "ctrl", "fragmentation_entropy_plot.pdf"),
+  p_ctrl_entropy,
+  width = 10, height = 6
+)
+```
+
+```{r inv4m_entropy_plot, fig.width=10, fig.height=6}
+# Inv4m fragmentation entropy plot
+p_inv4m_entropy <- ggplot(
+  inv4m_support,
+  aes(
+    x = reorder(color, -mean_entropy),
+    y = mean_entropy,
+    fill = color
+  )
+) +
+  geom_col(color = "black") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Inv4m Consensus Module Fragmentation",
+    subtitle = "Higher entropy = more dispersed across bootstrap modules",
+    x = "Module",
+    y = "Mean Fragmentation Entropy (bits)"
+  )
+
+print(p_inv4m_entropy)
+
+ggsave(
+  file.path(OUTPUT_DIR, "inv4m", "fragmentation_entropy_plot.pdf"),
+  p_inv4m_entropy,
+  width = 10, height = 6
+)
+```
+
+---
+
+# Visualization: Comparison
+
+```{r comparison_plot, fig.width=12, fig.height=5}
+library(patchwork)
+
+# Stability distribution comparison
+stability_data <- bind_rows(
+  ctrl_support %>% mutate(Condition = "CTRL"),
+  inv4m_support %>% mutate(Condition = "Inv4m")
+)
+
+p_compare_hist <- ggplot(stability_data, aes(x = mean_lfp, fill = Condition)) +
+  geom_histogram(bins = 15, alpha = 0.7, position = "dodge") +
+  geom_vline(xintercept = STABILITY_STABLE, linetype = "dashed", color = "darkgreen") +
+  geom_vline(xintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
+  scale_fill_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Distribution of Module Support",
+    x = "Mean LFP",
+    y = "Number of Modules"
+  )
+
+p_compare_box <- ggplot(stability_data, aes(x = Condition, y = mean_lfp, fill = Condition)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed", color = "darkgreen") +
+  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
+  scale_fill_manual(values = c("CTRL" = "#009E73", "Inv4m" = "#D55E00")) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Module Support Comparison",
+    y = "Mean LFP"
+  ) +
+  theme(legend.position = "none")
+
+p_compare_hist + p_compare_box
+
+ggsave(
+  file.path(OUTPUT_DIR, "support_comparison_plot.pdf"),
+  p_compare_hist + p_compare_box,
+  width = 12, height = 5
+)
+```
+
+---
+
+# Save Summary Statistics
+
+```{r save_summary}
+summary_stats <- tibble(
+  metric = c(
+    "Bootstrap iterations",
+    "CTRL modules analyzed",
+    "CTRL stable modules",
+    "CTRL moderate modules",
+    "CTRL unstable modules",
+    "CTRL mean LFP",
+    "Inv4m modules analyzed",
+    "Inv4m stable modules",
+    "Inv4m moderate modules",
+    "Inv4m unstable modules",
+    "Inv4m mean LFP",
+    "Stability threshold (stable)",
+    "Stability threshold (moderate)"
+  ),
+  value = c(
+    N_BOOTSTRAP,
+    nrow(ctrl_support),
+    sum(ctrl_support$stability == "Stable"),
+    sum(ctrl_support$stability == "Moderate"),
+    sum(ctrl_support$stability == "Unstable"),
+    round(mean(ctrl_support$mean_lfp), 3),
+    nrow(inv4m_support),
+    sum(inv4m_support$stability == "Stable"),
+    sum(inv4m_support$stability == "Moderate"),
+    sum(inv4m_support$stability == "Unstable"),
+    round(mean(inv4m_support$mean_lfp), 3),
+    STABILITY_STABLE,
+    STABILITY_MODERATE
+  )
+)
+
+write_csv(summary_stats, file.path(OUTPUT_DIR, "bootstrap_summary.csv"))
+
+{
+  cat("\n=== SAVED OUTPUTS ===\n")
+  cat("\nCTRL outputs:\n")
+  cat("  ctrl/bootstrap_results.rds\n")
+  cat("  ctrl/module_support.csv\n")
+  cat("  ctrl/module_support.rds\n")
+  cat("  ctrl/module_support_plot.pdf\n")
+  cat("\nInv4m outputs:\n")
+  cat("  inv4m/bootstrap_results.rds\n")
+  cat("  inv4m/module_support.csv\n")
+  cat("  inv4m/module_support.rds\n")
+  cat("  inv4m/module_support_plot.pdf\n")
+  cat("\nCombined outputs:\n")
+  cat("  support_comparison.csv\n")
+  cat("  support_comparison_plot.pdf\n")
+  cat("  bootstrap_summary.csv\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Bootstrap iterations completed
+  cat("Check 1: Bootstrap iterations completed\n")
+  cat("  CTRL:", length(ctrl_bootstrap), "iterations\n")
+  cat("  Inv4m:", length(inv4m_bootstrap), "iterations\n")
+  stopifnot(length(ctrl_bootstrap) == N_BOOTSTRAP)
+  stopifnot(length(inv4m_bootstrap) == N_BOOTSTRAP)
+
+  # Check 2: All modules analyzed
+  cat("\nCheck 2: All modules analyzed\n")
+  n_ctrl_mods <- length(unique(ctrl_modules$module[ctrl_modules$module != 0]))
+  n_inv4m_mods <- length(unique(inv4m_modules$module[inv4m_modules$module != 0]))
+  cat("  CTRL modules:", nrow(ctrl_support), "/", n_ctrl_mods, "\n")
+  cat("  Inv4m modules:", nrow(inv4m_support), "/", n_inv4m_mods, "\n")
+  stopifnot(nrow(ctrl_support) == n_ctrl_mods)
+  stopifnot(nrow(inv4m_support) == n_inv4m_mods)
+
+  # Check 3: LFP values in valid range
+  cat("\nCheck 3: LFP values valid\n")
+  cat("  CTRL LFP range: [", round(min(ctrl_support$mean_lfp), 3), ",",
+      round(max(ctrl_support$mean_lfp), 3), "]\n")
+  cat("  Inv4m LFP range: [", round(min(inv4m_support$mean_lfp), 3), ",",
+      round(max(inv4m_support$mean_lfp), 3), "]\n")
+  stopifnot(all(ctrl_support$mean_lfp >= 0 & ctrl_support$mean_lfp <= 1))
+  stopifnot(all(inv4m_support$mean_lfp >= 0 & inv4m_support$mean_lfp <= 1))
+
+  # Check 4: Stability classification complete
+  cat("\nCheck 4: Stability classification\n")
+  cat("  CTRL classified:", all(!is.na(ctrl_support$stability)), "\n")
+  cat("  Inv4m classified:", all(!is.na(inv4m_support$stability)), "\n")
+
+  cat("\n=== ALL CHECKS PASSED ===\n")
+}
+
+log_progress("Bootstrap support analysis complete!")
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

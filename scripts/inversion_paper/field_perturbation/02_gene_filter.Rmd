@@ -1,0 +1,454 @@
+---
+title: "Field-Only Perturbation Analysis: Gene Filtering"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "output/field_perturbation_test"
+  n_permutations: 200
+  gene_selection: "fdr"
+---
+
+<!--
+To render this document with output in the proper directory, use:
+Rscript -e "rmarkdown::render('scripts/07_field_perturbation/02_gene_filter.Rmd', output_dir='output/field_perturbation_YYYYMMDD/02_gene_filter', params=list(run_dir='output/field_perturbation_YYYYMMDD'))"
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+
+# Load project paths
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Filter the expression matrix to differentially expressed genes.
+
+**Gene Selection Mode**: `r params$gene_selection`
+
+**Modes**:
+- `fdr`: Confirmed DEGs (FDR < 0.05) - ~465 genes
+- `pvalue`: DEG neighborhood (P < 0.005) - ~851 genes
+
+**Approach**: Use the DEG effects from the PSU interaction model to select genes
+based on the specified threshold for the Inv4m predictor.
+
+**Expected outcome**: Filtered expression matrix with differentially expressed genes.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+})
+
+set.seed(123)
+```
+
+```{r setup_directories}
+# Input/output directories
+INPUT_DIR <- here::here(params$run_dir, "01_data_prep")
+OUTPUT_DIR <- here::here(params$run_dir, "02_gene_filter")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+# Gene selection mode
+GENE_SELECTION <- params$gene_selection
+
+{
+  cat("=== CONFIGURATION ===\n")
+  cat("Run directory:", params$run_dir, "\n")
+  cat("Input directory:", INPUT_DIR, "\n")
+  cat("Output directory:", OUTPUT_DIR, "\n")
+  cat("Gene selection:", GENE_SELECTION, "\n")
+  if (GENE_SELECTION == "fdr") {
+    cat("Filtering: FDR < 0.05 (confirmed DEGs only)\n\n")
+  } else {
+    cat("Filtering: P < 0.005 (DEG neighborhood)\n\n")
+  }
+}
+```
+
+---
+
+# Load Data
+
+## Expression Data
+
+```{r load_expression}
+# Load expression from data prep step
+expr_matrix <- readRDS(file.path(INPUT_DIR, "combined_expression.rds"))
+
+# Load metadata
+sample_meta <- read_csv(
+  file.path(INPUT_DIR, "sample_metadata.csv"),
+  show_col_types = FALSE
+)
+
+{
+  cat("=== EXPRESSION DATA ===\n")
+  cat("Genes:", nrow(expr_matrix), "\n")
+  cat("Samples:", ncol(expr_matrix), "\n")
+  cat("Sample breakdown:\n")
+  print(table(sample_meta$Genotype))
+}
+```
+
+## DEG Effects from PSU Analysis
+
+```{r load_deg_effects}
+# Load DEG effects from PSU 2022 interaction model
+effects_df <- read_csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  show_col_types = FALSE
+)
+
+{
+  cat("\n=== DEG EFFECTS FILE ===\n")
+  cat("Total rows:", nrow(effects_df), "\n")
+  cat("Predictors:\n")
+  print(table(effects_df$predictor))
+}
+```
+
+---
+
+# Define DEG Set
+
+Gene selection based on the specified mode (`r GENE_SELECTION`).
+
+```{r define_deg}
+# Thresholds
+FDR_THRESHOLD <- 0.05
+PVALUE_THRESHOLD <- 0.005
+
+# Get both gene sets for comparison
+fdr_degs <- effects_df %>%
+  filter(predictor == "Inv4m", adj.P.Val < FDR_THRESHOLD) %>%
+  pull(gene) %>%
+  unique()
+
+pvalue_degs <- effects_df %>%
+  filter(predictor == "Inv4m", P.Value < PVALUE_THRESHOLD) %>%
+  pull(gene) %>%
+  unique()
+
+# Select genes based on mode
+if (GENE_SELECTION == "fdr") {
+  selected_genes <- fdr_degs
+  threshold_label <- paste0("FDR < ", FDR_THRESHOLD)
+} else {
+  selected_genes <- pvalue_degs
+  threshold_label <- paste0("P < ", PVALUE_THRESHOLD)
+}
+
+{
+  cat("=== GENE SELECTION ===\n")
+  cat("Mode:", GENE_SELECTION, "\n")
+  cat("Threshold:", threshold_label, "\n")
+  cat("Selected genes:", length(selected_genes), "\n\n")
+  cat("Comparison:\n")
+  cat("  FDR < 0.05:", length(fdr_degs), "genes\n")
+  cat("  P < 0.005:", length(pvalue_degs), "genes\n")
+  cat("  Neighborhood-only genes:", length(pvalue_degs) - length(fdr_degs), "\n")
+}
+```
+
+---
+
+# Filter Expression to Selected DEGs
+
+```{r filter_expression}
+# Find genes present in expression data
+genes_in_expr <- intersect(selected_genes, rownames(expr_matrix))
+genes_missing <- setdiff(selected_genes, rownames(expr_matrix))
+
+# Filter expression matrix
+expr_filtered <- expr_matrix[genes_in_expr, ]
+
+{
+  cat("\n=== GENE FILTERING ===\n")
+  cat("Selected genes:", length(selected_genes), "\n")
+  cat("Present in expression data:", length(genes_in_expr), "\n")
+  cat("Missing from expression data:", length(genes_missing), "\n")
+
+  if (length(genes_missing) > 0 && length(genes_missing) <= 20) {
+    cat("Missing genes:", paste(genes_missing, collapse = ", "), "\n")
+  }
+
+  cat("\nFiltered expression matrix:", nrow(expr_filtered), "genes x",
+      ncol(expr_filtered), "samples\n")
+}
+```
+
+---
+
+# Prepare Gene Annotation
+
+```{r annotate_genes}
+# Get annotation info for filtered genes
+gene_info <- effects_df %>%
+  filter(predictor == "Inv4m", gene %in% genes_in_expr) %>%
+  dplyr::select(
+    gene, logFC, P.Value, adj.P.Val,
+    regulation, in_Inv4m, in_cis
+  ) %>%
+  mutate(
+    is_confirmed_DEG = adj.P.Val < FDR_THRESHOLD,
+    is_neighborhood = P.Value < PVALUE_THRESHOLD & !is_confirmed_DEG,
+    selection_mode = GENE_SELECTION
+  ) %>%
+  arrange(adj.P.Val)
+
+{
+  cat("\n=== GENE ANNOTATION ===\n")
+  cat("Genes with annotation:", nrow(gene_info), "\n")
+  cat("Confirmed DEGs (FDR < 0.05):", sum(gene_info$is_confirmed_DEG), "\n")
+  cat("Neighborhood-only genes:", sum(gene_info$is_neighborhood), "\n")
+  cat("\nRegulation breakdown:\n")
+  print(table(gene_info$regulation))
+  cat("\nCis-regulated:", sum(gene_info$in_cis, na.rm = TRUE), "\n")
+  cat("In Inv4m region:", sum(gene_info$in_Inv4m, na.rm = TRUE), "\n")
+}
+```
+
+---
+
+# Visualize Gene Selection
+
+```{r volcano_plot, fig.width=10, fig.height=6}
+# Prepare data for volcano plot
+volcano_df <- effects_df %>%
+  filter(predictor == "Inv4m") %>%
+  mutate(
+    is_confirmed = adj.P.Val < FDR_THRESHOLD,
+    is_neighborhood = P.Value < PVALUE_THRESHOLD & !is_confirmed,
+    category = case_when(
+      GENE_SELECTION == "fdr" & is_confirmed ~ "Selected (FDR < 0.05)",
+      GENE_SELECTION == "pvalue" & (is_confirmed | is_neighborhood) ~ "Selected (P < 0.005)",
+      GENE_SELECTION == "fdr" & is_neighborhood ~ "Neighborhood (excluded)",
+      TRUE ~ "Not selected"
+    )
+  )
+
+# Set color scheme based on mode
+if (GENE_SELECTION == "fdr") {
+  color_values <- c(
+    "Selected (FDR < 0.05)" = "#D55E00",
+    "Neighborhood (excluded)" = "#56B4E9",
+    "Not selected" = "gray70"
+  )
+  title_text <- "Field-Only Analysis: Confirmed DEGs (FDR < 0.05)"
+  subtitle_text <- sprintf(
+    "%d genes selected | %d neighborhood genes EXCLUDED",
+    length(genes_in_expr),
+    sum(volcano_df$is_neighborhood)
+  )
+} else {
+  color_values <- c(
+    "Selected (P < 0.005)" = "#D55E00",
+    "Not selected" = "gray70"
+  )
+  title_text <- "Field-Only Analysis: DEG Neighborhood (P < 0.005)"
+  subtitle_text <- sprintf(
+    "%d genes selected (includes %d confirmed + %d neighborhood)",
+    length(genes_in_expr),
+    sum(gene_info$is_confirmed_DEG),
+    sum(gene_info$is_neighborhood)
+  )
+}
+
+# Volcano plot
+ggplot(volcano_df, aes(x = logFC, y = -log10(P.Value), color = category)) +
+  geom_point(alpha = 0.6, size = 1.5) +
+  geom_hline(
+    yintercept = -log10(PVALUE_THRESHOLD),
+    linetype = "dashed",
+    color = "gray50"
+  ) +
+  scale_color_manual(values = color_values, name = "Gene Category") +
+  annotate(
+    "text",
+    x = max(volcano_df$logFC) * 0.8,
+    y = -log10(PVALUE_THRESHOLD) + 0.3,
+    label = paste("P =", PVALUE_THRESHOLD),
+    color = "gray50",
+    size = 3
+  ) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = title_text,
+    subtitle = subtitle_text,
+    x = "log2 Fold Change (Inv4m vs CTRL)",
+    y = "-log10(P-value)"
+  )
+
+ggsave(
+  file.path(OUTPUT_DIR, "deg_selection_volcano.pdf"),
+  width = 10, height = 6
+)
+```
+
+```{r logfc_distribution, fig.width=10, fig.height=5}
+# Distribution of logFC in selected genes
+ggplot(gene_info, aes(x = logFC, fill = regulation)) +
+  geom_histogram(bins = 50, alpha = 0.7) +
+  scale_fill_manual(
+    values = c(
+      "Upregulated" = "#D55E00",
+      "Downregulated" = "#0072B2",
+      "Unregulated" = "gray50"
+    )
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "log2 Fold Change Distribution in Confirmed DEGs",
+    x = "log2 Fold Change (Inv4m vs CTRL)",
+    y = "Count",
+    fill = "Regulation"
+  )
+
+ggsave(
+  file.path(OUTPUT_DIR, "deg_logfc_distribution.pdf"),
+  width = 10, height = 5
+)
+```
+
+---
+
+# Save Outputs
+
+```{r save_outputs}
+# Save filtered expression
+saveRDS(
+  expr_filtered,
+  file.path(OUTPUT_DIR, "filtered_expression.rds")
+)
+
+# Save gene list
+write_csv(
+  gene_info,
+  file.path(OUTPUT_DIR, "deg_neighborhood_genes.csv")
+)
+
+# Save summary
+summary_stats <- tibble(
+  metric = c(
+    "Gene selection mode",
+    "Threshold",
+    "Selected genes",
+    "Genes in expression data",
+    "Genes missing",
+    "Confirmed DEGs (FDR < 0.05)",
+    "Neighborhood-only genes",
+    "Upregulated",
+    "Downregulated",
+    "Cis-regulated",
+    "In Inv4m region"
+  ),
+  value = c(
+    GENE_SELECTION,
+    threshold_label,
+    length(selected_genes),
+    length(genes_in_expr),
+    length(genes_missing),
+    sum(gene_info$is_confirmed_DEG),
+    sum(gene_info$is_neighborhood),
+    sum(gene_info$regulation == "Upregulated"),
+    sum(gene_info$regulation == "Downregulated"),
+    sum(gene_info$in_cis, na.rm = TRUE),
+    sum(gene_info$in_Inv4m, na.rm = TRUE)
+  )
+)
+
+write_csv(
+  summary_stats,
+  file.path(OUTPUT_DIR, "gene_filter_summary.csv")
+)
+
+{
+  cat("=== SAVED OUTPUTS ===\n")
+  cat("filtered_expression.rds:", nrow(expr_filtered), "genes x",
+      ncol(expr_filtered), "samples\n")
+  cat("deg_neighborhood_genes.csv:", nrow(gene_info), "genes\n")
+  cat("gene_filter_summary.csv: summary statistics\n")
+  cat("deg_selection_volcano.pdf: selection visualization\n")
+  cat("deg_logfc_distribution.pdf: logFC distribution\n")
+}
+```
+
+---
+
+# Validation Checks
+
+```{r validation}
+{
+  cat("=== VALIDATION CHECKS ===\n\n")
+
+  # Check 1: Gene count in expected range (depends on mode)
+  cat("Check 1: Gene count in expected range\n")
+  cat("  Filtered genes:", nrow(expr_filtered), "\n")
+  if (GENE_SELECTION == "fdr") {
+    cat("  Expected (FDR mode): ~400-500\n")
+    stopifnot(nrow(expr_filtered) > 300 && nrow(expr_filtered) < 600)
+  } else {
+    cat("  Expected (pvalue mode): ~800-900\n")
+    stopifnot(nrow(expr_filtered) > 700 && nrow(expr_filtered) < 1000)
+  }
+
+  # Check 2: Sample count preserved
+  cat("\nCheck 2: Sample count preserved\n")
+  cat("  Samples before:", ncol(expr_matrix), "\n")
+  cat("  Samples after:", ncol(expr_filtered), "\n")
+  stopifnot(ncol(expr_filtered) == ncol(expr_matrix))
+
+  # Check 3: All genes have annotation
+  cat("\nCheck 3: All genes annotated\n")
+  cat("  Genes in expression:", nrow(expr_filtered), "\n")
+  cat("  Genes in annotation:", nrow(gene_info), "\n")
+  stopifnot(nrow(gene_info) == nrow(expr_filtered))
+
+  # Check 4: No missing values
+  cat("\nCheck 4: No missing values\n")
+  n_na <- sum(is.na(expr_filtered))
+  cat("  NA values:", n_na, "\n")
+  stopifnot(n_na == 0)
+
+  # Check 5: Gene set composition
+  cat("\nCheck 5: Gene set composition\n")
+  cat("  Mode:", GENE_SELECTION, "\n")
+  cat("  Confirmed DEGs:", sum(gene_info$is_confirmed_DEG), "\n")
+  cat("  Neighborhood-only:", sum(gene_info$is_neighborhood), "\n")
+  if (GENE_SELECTION == "fdr") {
+    stopifnot(sum(gene_info$is_neighborhood) == 0)
+  }
+
+  cat("\n=== ALL CHECKS PASSED ===\n")
+}
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
