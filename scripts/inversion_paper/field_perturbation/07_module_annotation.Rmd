@@ -37,10 +37,10 @@ paths <- setup_project_paths("inversion_paper")
 # Overview
 
 **Purpose**: Functionally characterize ALL CTRL consensus modules using GO
-enrichment (BP only), hub gene analysis, and integration with support metrics.
+enrichment (BP, CC, MF), hub gene analysis, and integration with support metrics.
 
 **Approach**:
-1. Run GO BP enrichment for ALL CTRL modules using full filtered expression as universe
+1. Run GO enrichment (BP, CC, MF) for ALL CTRL modules using full filtered expression as universe
 2. Identify hub genes (top 5 by kWithin) for ALL modules
 3. Check which hubs lost connectivity in Inv4m
 4. Integrate support metrics (LFP) with preservation status
@@ -178,13 +178,14 @@ print(sapply(module_gene_lists, length))
 
 ---
 
-# GO Enrichment Analysis (Biological Process)
+# GO Enrichment Analysis (BP, CC, MF)
 
-**Approach**: Run GO BP enrichment for ALL CTRL consensus modules using
+**Approach**: Run GO enrichment for all three ontologies (Biological Process,
+Cellular Component, Molecular Function) for ALL CTRL consensus modules using
 `compareCluster` for comparative analysis.
 
 ```{r enrichment_function}
-#' Perform GO Enrichment Analysis (BP only)
+#' Perform GO Enrichment Analysis
 #'
 #' @param x Character vector of gene IDs
 #' @param ontology GO ontology (default: "BP")
@@ -236,7 +237,109 @@ write_csv(
 # Save the compareCluster object for later use
 saveRDS(compGO_BP, file.path(OUTPUT_DIR, "compareCluster_GO_BP.rds"))
 
-cat("\nTotal enriched terms:", nrow(go_results), "\n")
+cat("\nTotal enriched BP terms:", nrow(go_results), "\n")
+```
+
+## Cellular Component (CC) Enrichment
+
+```{r run_enrichment_cc}
+# Run comparative GO CC enrichment for all modules
+cat("Running GO CC enrichment for all modules...\n")
+
+# Create CC-specific enrichment function
+ego_cc <- function(x) ego(x, ontology = "CC")
+
+compGO_CC <- compareCluster(
+  geneCluster = module_gene_lists,
+  fun = ego_cc
+)
+
+filtered_result <- compGO_BP@compareClusterResult%>%
+  filter(Count > 1) %>%
+  group_by(Cluster, geneID) %>%
+  arrange(p.adjust, .by_group = TRUE) %>%
+  ungroup()
+
+# Set factor levels to preserve module order
+if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
+  levels(compGO_CC@compareClusterResult$Cluster) <- cluster_order
+}
+
+{
+  cat("\n=== GO CC ENRICHMENT RESULTS ===\n")
+  if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
+    cat("Enriched terms per module:\n")
+    print(table(compGO_CC@compareClusterResult$Cluster))
+  } else {
+    cat("No significant CC enrichment found.\n")
+  }
+}
+
+# Save full results
+if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
+  go_results_cc <- as.data.frame(compGO_CC@compareClusterResult) %>%
+    rename(module_color = Cluster) %>%
+    arrange(module_color, pvalue)
+
+  write_csv(
+    go_results_cc,
+    file.path(OUTPUT_DIR, "all_modules_GO_CC.csv")
+  )
+
+  saveRDS(compGO_CC, file.path(OUTPUT_DIR, "compareCluster_GO_CC.rds"))
+  cat("\nTotal enriched CC terms:", nrow(go_results_cc), "\n")
+} else {
+  go_results_cc <- tibble()
+  cat("\nNo significant CC enrichment found.\n")
+}
+```
+
+## Molecular Function (MF) Enrichment
+
+```{r run_enrichment_mf}
+# Run comparative GO MF enrichment for all modules
+cat("Running GO MF enrichment for all modules...\n")
+
+# Create MF-specific enrichment function
+ego_mf <- function(x) ego(x, ontology = "MF")
+
+compGO_MF <- compareCluster(
+  geneCluster = module_gene_lists,
+  fun = ego_mf
+)
+
+# Set factor levels to preserve module order
+if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
+  levels(compGO_MF@compareClusterResult$Cluster) <- cluster_order
+}
+
+{
+  cat("\n=== GO MF ENRICHMENT RESULTS ===\n")
+  if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
+    cat("Enriched terms per module:\n")
+    print(table(compGO_MF@compareClusterResult$Cluster))
+  } else {
+    cat("No significant MF enrichment found.\n")
+  }
+}
+
+# Save full results
+if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
+  go_results_mf <- as.data.frame(compGO_MF@compareClusterResult) %>%
+    rename(module_color = Cluster) %>%
+    arrange(module_color, pvalue)
+
+  write_csv(
+    go_results_mf,
+    file.path(OUTPUT_DIR, "all_modules_GO_MF.csv")
+  )
+
+  saveRDS(compGO_MF, file.path(OUTPUT_DIR, "compareCluster_GO_MF.rds"))
+  cat("\nTotal enriched MF terms:", nrow(go_results_mf), "\n")
+} else {
+  go_results_mf <- tibble()
+  cat("\nNo significant MF enrichment found.\n")
+}
 ```
 
 ---
@@ -244,28 +347,84 @@ cat("\nTotal enriched terms:", nrow(go_results), "\n")
 # Top GO Terms Summary
 
 ```{r go_summary}
+# BP Summary
 if (nrow(go_results) > 0) {
-  # Top 5 terms per module
-  go_summary <- go_results %>%
+  go_summary_bp <- go_results %>%
     group_by(module_color) %>%
     slice_min(pvalue, n = 5, with_ties = FALSE) %>%
     ungroup() %>%
     dplyr::select(module_color, ID, Description, GeneRatio, pvalue, Count) %>%
-    mutate(pvalue = signif(pvalue, 3))
+    mutate(pvalue = signif(pvalue, 3), ontology = "BP")
 
   write_csv(
-    go_summary,
-    file.path(OUTPUT_DIR, "go_summary_table.csv")
+    go_summary_bp,
+    file.path(OUTPUT_DIR, "go_summary_BP.csv")
   )
 
-  {
-    cat("\n=== TOP GO TERMS PER MODULE ===\n")
-    print(go_summary, n = 50)
-  }
+  cat("\n=== TOP GO BP TERMS PER MODULE ===\n")
+  print(go_summary_bp, n = 30)
 } else {
-  go_summary <- tibble()
-  cat("\nNo significant GO enrichment found.\n")
+  go_summary_bp <- tibble()
+  cat("\nNo significant BP enrichment found.\n")
 }
+
+# CC Summary
+if (nrow(go_results_cc) > 0) {
+  go_summary_cc <- go_results_cc %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(module_color, ID, Description, GeneRatio, pvalue, Count) %>%
+    mutate(pvalue = signif(pvalue, 3), ontology = "CC")
+
+  write_csv(
+    go_summary_cc,
+    file.path(OUTPUT_DIR, "go_summary_CC.csv")
+  )
+
+  cat("\n=== TOP GO CC TERMS PER MODULE ===\n")
+  print(go_summary_cc, n = 30)
+} else {
+  go_summary_cc <- tibble()
+  cat("\nNo significant CC enrichment found.\n")
+}
+
+# MF Summary
+if (nrow(go_results_mf) > 0) {
+  go_summary_mf <- go_results_mf %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(module_color, ID, Description, GeneRatio, pvalue, Count) %>%
+    mutate(pvalue = signif(pvalue, 3), ontology = "MF")
+
+  write_csv(
+    go_summary_mf,
+    file.path(OUTPUT_DIR, "go_summary_MF.csv")
+  )
+
+  cat("\n=== TOP GO MF TERMS PER MODULE ===\n")
+  print(go_summary_mf, n = 30)
+} else {
+  go_summary_mf <- tibble()
+  cat("\nNo significant MF enrichment found.\n")
+}
+
+# Combined summary table (top 3 per ontology per module)
+go_summary_combined <- bind_rows(
+  go_summary_bp %>% group_by(module_color) %>% slice_min(pvalue, n = 3, with_ties = FALSE),
+  go_summary_cc %>% group_by(module_color) %>% slice_min(pvalue, n = 3, with_ties = FALSE),
+  go_summary_mf %>% group_by(module_color) %>% slice_min(pvalue, n = 3, with_ties = FALSE)
+) %>%
+  arrange(module_color, ontology, pvalue)
+
+write_csv(
+  go_summary_combined,
+  file.path(OUTPUT_DIR, "go_summary_all_ontologies.csv")
+)
+
+cat("\n=== COMBINED GO SUMMARY (all ontologies) ===\n")
+cat("Total terms in combined summary:", nrow(go_summary_combined), "\n")
 ```
 
 ---
@@ -377,7 +536,7 @@ module_themes <- preservation_summary %>%
     pct_decreased, ctrl_lfp, ctrl_stability, jaccard, preservation_status
   )
 
-# Add top GO term (BP only - from new structure with module_color)
+# Add top GO terms (BP, CC, MF)
 if (nrow(go_results) > 0) {
   top_bp <- go_results %>%
     group_by(module_color) %>%
@@ -387,6 +546,28 @@ if (nrow(go_results) > 0) {
 
   module_themes <- module_themes %>%
     left_join(top_bp, by = "color")
+}
+
+if (nrow(go_results_cc) > 0) {
+  top_cc <- go_results_cc %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(color = module_color, top_CC = Description, cc_pval = pvalue)
+
+  module_themes <- module_themes %>%
+    left_join(top_cc, by = "color")
+}
+
+if (nrow(go_results_mf) > 0) {
+  top_mf <- go_results_mf %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::select(color = module_color, top_MF = Description, mf_pval = pvalue)
+
+  module_themes <- module_themes %>%
+    left_join(top_mf, by = "color")
 }
 
 # Add top hub gene
@@ -420,12 +601,22 @@ write_csv(
 
 # GO Enrichment Visualization
 
-```{r go_visualization, fig.width=12, fig.height=10}
-if (nrow(go_results) > 0) {
-  n_modules <- length(unique(go_results$module_color))
+```{r go_plot_function}
+#' Create GO enrichment dot plot for a given ontology
+#'
+#' @param go_data Data frame with GO enrichment results
+#' @param ontology_name Name of the ontology for plot title
+#' @param filename Output filename
+create_go_plot <- function(go_data, ontology_name, filename) {
+  if (nrow(go_data) == 0) {
+    cat("No significant", ontology_name, "enrichment to plot.\n")
+    return(NULL)
+  }
+
+  n_modules <- length(unique(go_data$module_color))
 
   # Top 5 terms per module for plotting
-  go_plot_data <- go_results %>%
+  go_plot_data <- go_data %>%
     group_by(module_color) %>%
     slice_min(pvalue, n = 5, with_ties = FALSE) %>%
     ungroup() %>%
@@ -436,64 +627,64 @@ if (nrow(go_results) > 0) {
       })
     )
 
-  if (nrow(go_plot_data) > 0 && n_modules <= 12) {
-    p_go <- ggplot(
-      go_plot_data,
-      aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
-          color = -log10(pvalue), size = Count)
+  if (nrow(go_plot_data) == 0) return(NULL)
+
+  ncol_facet <- if (n_modules <= 12) 3 else 4
+  base_size <- if (n_modules <= 12) 10 else 8
+  text_size <- if (n_modules <= 12) 7 else 6
+
+  p <- ggplot(
+    go_plot_data,
+    aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
+        color = -log10(pvalue), size = Count)
+  ) +
+    geom_point() +
+    facet_wrap(~module_color, scales = "free_y", ncol = ncol_facet) +
+    scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
+    theme_minimal(base_size = base_size) +
+    theme(
+      strip.text = element_text(face = "bold", size = text_size),
+      axis.text.y = element_text(size = text_size)
     ) +
-      geom_point() +
-      facet_wrap(~module_color, scales = "free_y", ncol = 3) +
-      scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
-      theme_minimal(base_size = 10) +
-      theme(
-        strip.text = element_text(face = "bold"),
-        axis.text.y = element_text(size = 7)
-      ) +
-      labs(
-        title = "GO Biological Process Enrichment (All Modules)",
-        x = "Gene Ratio",
-        y = NULL,
-        size = "Gene Count"
-      )
-
-    print(p_go)
-
-    ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_plot.pdf"),
-      p_go,
-      width = 12, height = max(8, n_modules * 0.8)
+    labs(
+      title = paste("GO", ontology_name, "Enrichment (All Modules)"),
+      x = "Gene Ratio",
+      y = NULL,
+      size = "Count"
     )
-  } else if (n_modules > 12) {
-    cat("Many modules (", n_modules, "). Full plot saved to PDF.\n")
-    # Save a larger plot for many modules
-    p_go <- ggplot(
-      go_plot_data,
-      aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
-          color = -log10(pvalue), size = Count)
-    ) +
-      geom_point() +
-      facet_wrap(~module_color, scales = "free_y", ncol = 4) +
-      scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
-      theme_minimal(base_size = 8) +
-      theme(
-        strip.text = element_text(face = "bold", size = 7),
-        axis.text.y = element_text(size = 6)
-      ) +
-      labs(
-        title = "GO Biological Process Enrichment (All Modules)",
-        x = "Gene Ratio",
-        y = NULL,
-        size = "Count"
-      )
 
-    ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_plot.pdf"),
-      p_go,
-      width = 16, height = max(12, n_modules * 0.6)
-    )
-  }
+  width <- if (n_modules <= 12) 12 else 16
+  height <- if (n_modules <= 12) max(8, n_modules * 0.8) else max(12, n_modules * 0.6)
+
+  ggsave(
+    file.path(OUTPUT_DIR, filename),
+    p,
+    width = width, height = height
+  )
+
+  return(p)
 }
+```
+
+## BP Enrichment Plot
+
+```{r go_visualization_bp, fig.width=12, fig.height=10}
+p_bp <- create_go_plot(go_results, "Biological Process", "go_enrichment_BP.pdf")
+if (!is.null(p_bp)) print(p_bp)
+```
+
+## CC Enrichment Plot
+
+```{r go_visualization_cc, fig.width=12, fig.height=10}
+p_cc <- create_go_plot(go_results_cc, "Cellular Component", "go_enrichment_CC.pdf")
+if (!is.null(p_cc)) print(p_cc)
+```
+
+## MF Enrichment Plot
+
+```{r go_visualization_mf, fig.width=12, fig.height=10}
+p_mf <- create_go_plot(go_results_mf, "Molecular Function", "go_enrichment_MF.pdf")
+if (!is.null(p_mf)) print(p_mf)
 ```
 
 ---
@@ -547,18 +738,48 @@ comprehensive_summary <- preservation_summary %>%
     by = "module"
   )
 
-# Add GO term counts (using module_color from new structure)
+# Add GO term counts for all ontologies
 if (nrow(go_results) > 0) {
-  go_counts <- go_results %>%
-    count(module_color, name = "n_go_terms") %>%
+  go_counts_bp <- go_results %>%
+    count(module_color, name = "n_BP_terms") %>%
     rename(color = module_color)
-
   comprehensive_summary <- comprehensive_summary %>%
-    left_join(go_counts, by = "color")
+    left_join(go_counts_bp, by = "color")
 } else {
   comprehensive_summary <- comprehensive_summary %>%
-    mutate(n_go_terms = 0)
+    mutate(n_BP_terms = 0)
 }
+
+if (nrow(go_results_cc) > 0) {
+  go_counts_cc <- go_results_cc %>%
+    count(module_color, name = "n_CC_terms") %>%
+    rename(color = module_color)
+  comprehensive_summary <- comprehensive_summary %>%
+    left_join(go_counts_cc, by = "color")
+} else {
+  comprehensive_summary <- comprehensive_summary %>%
+    mutate(n_CC_terms = 0)
+}
+
+if (nrow(go_results_mf) > 0) {
+  go_counts_mf <- go_results_mf %>%
+    count(module_color, name = "n_MF_terms") %>%
+    rename(color = module_color)
+  comprehensive_summary <- comprehensive_summary %>%
+    left_join(go_counts_mf, by = "color")
+} else {
+  comprehensive_summary <- comprehensive_summary %>%
+    mutate(n_MF_terms = 0)
+}
+
+# Replace NA counts with 0
+comprehensive_summary <- comprehensive_summary %>%
+  mutate(
+    n_BP_terms = replace_na(n_BP_terms, 0),
+    n_CC_terms = replace_na(n_CC_terms, 0),
+    n_MF_terms = replace_na(n_MF_terms, 0),
+    n_GO_total = n_BP_terms + n_CC_terms + n_MF_terms
+  )
 
 # Classify final disruption status
 comprehensive_summary <- comprehensive_summary %>%
@@ -602,13 +823,19 @@ write_csv(
 
 ```{r save_summary}
 n_modules_analyzed <- nrow(all_modules)
-n_modules_with_go <- length(unique(go_results$module_color))
+n_modules_with_bp <- length(unique(go_results$module_color))
+n_modules_with_cc <- length(unique(go_results_cc$module_color))
+n_modules_with_mf <- length(unique(go_results_mf$module_color))
 
 summary_stats <- tibble(
   metric = c(
     "Total CTRL modules analyzed",
     "GO BP terms enriched (total)",
-    "Modules with GO enrichment",
+    "GO CC terms enriched (total)",
+    "GO MF terms enriched (total)",
+    "Modules with BP enrichment",
+    "Modules with CC enrichment",
+    "Modules with MF enrichment",
     "Hub genes identified",
     "Hub genes with connectivity loss",
     "Strong disruption modules",
@@ -618,7 +845,11 @@ summary_stats <- tibble(
   value = c(
     n_modules_analyzed,
     nrow(go_results),
-    n_modules_with_go,
+    nrow(go_results_cc),
+    nrow(go_results_mf),
+    n_modules_with_bp,
+    n_modules_with_cc,
+    n_modules_with_mf,
     nrow(hub_genes),
     sum(hub_genes$hub_disrupted, na.rm = TRUE),
     sum(comprehensive_summary$disrupted_final == "Strong", na.rm = TRUE),
@@ -634,16 +865,28 @@ write_csv(
 
 {
   cat("\n=== SAVED OUTPUTS ===\n")
-  cat("all_modules_GO_BP.csv: GO BP enrichment for all modules\n")
-  cat("compareCluster_GO_BP.rds: compareCluster object for visualization\n")
-  cat("go_summary_table.csv: top GO terms per module\n")
-  cat("hub_genes_all_modules.csv: hub genes with connectivity change\n")
-  cat("module_theme_summary.csv: biological themes with support metrics\n")
-  cat("module_direction_summary.csv: Inv4m direction summary\n")
-  cat("comprehensive_module_summary.csv: all modules with all metrics\n")
-  cat("go_enrichment_plot.pdf: GO enrichment visualization\n")
-  cat("hub_connectivity_plot.pdf: hub gene connectivity\n")
-  cat("functional_analysis_summary.csv: summary statistics\n")
+  cat("GO Enrichment Results:\n")
+  cat("  all_modules_GO_BP.csv: GO BP enrichment for all modules\n")
+  cat("  all_modules_GO_CC.csv: GO CC enrichment for all modules\n")
+  cat("  all_modules_GO_MF.csv: GO MF enrichment for all modules\n")
+  cat("  compareCluster_GO_BP.rds: compareCluster object (BP)\n")
+  cat("  compareCluster_GO_CC.rds: compareCluster object (CC)\n")
+  cat("  compareCluster_GO_MF.rds: compareCluster object (MF)\n")
+  cat("  go_summary_BP.csv: top BP terms per module\n")
+  cat("  go_summary_CC.csv: top CC terms per module\n")
+  cat("  go_summary_MF.csv: top MF terms per module\n")
+  cat("  go_summary_all_ontologies.csv: combined summary\n")
+  cat("\nVisualization:\n")
+  cat("  go_enrichment_BP.pdf: BP enrichment plot\n")
+  cat("  go_enrichment_CC.pdf: CC enrichment plot\n")
+  cat("  go_enrichment_MF.pdf: MF enrichment plot\n")
+  cat("  hub_connectivity_plot.pdf: hub gene connectivity\n")
+  cat("\nSummary Tables:\n")
+  cat("  hub_genes_all_modules.csv: hub genes with connectivity change\n")
+  cat("  module_theme_summary.csv: biological themes with support metrics\n")
+  cat("  module_direction_summary.csv: Inv4m direction summary\n")
+  cat("  comprehensive_module_summary.csv: all modules with all metrics\n")
+  cat("  functional_analysis_summary.csv: summary statistics\n")
 }
 ```
 
@@ -660,9 +903,11 @@ write_csv(
   cat("  Modules:", nrow(all_modules), "\n")
   stopifnot(nrow(all_modules) > 0)
 
-  # Check 2: GO enrichment ran
+  # Check 2: GO enrichment ran (all ontologies)
   cat("\nCheck 2: GO enrichment executed\n")
-  cat("  Terms found:", nrow(go_results), "\n")
+  cat("  BP terms found:", nrow(go_results), "\n")
+  cat("  CC terms found:", nrow(go_results_cc), "\n")
+  cat("  MF terms found:", nrow(go_results_mf), "\n")
 
   # Check 3: Hub genes identified
   cat("\nCheck 3: Hub genes identified\n")
@@ -678,6 +923,9 @@ write_csv(
   cat("\nCheck 5: Output files created\n")
   expected_files <- c(
     "all_modules_GO_BP.csv",
+    "all_modules_GO_CC.csv",
+    "all_modules_GO_MF.csv",
+    "go_summary_all_ontologies.csv",
     "hub_genes_all_modules.csv",
     "functional_analysis_summary.csv",
     "comprehensive_module_summary.csv"

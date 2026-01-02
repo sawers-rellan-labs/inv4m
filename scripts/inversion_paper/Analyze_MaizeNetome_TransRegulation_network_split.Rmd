@@ -670,9 +670,12 @@ cat("Total MaizeNetome edges:", nrow(MaizeNetome), "\n")
 # Convert Gene IDs from v4 to v5
 
 ```{r load_v4_v5_xref}
-v4_v5 <- read.csv(
-  file = file.path(paths$data, "v4_v5_2.csv")
+v4_v5 <- read.table(
+  file = file.path(paths$data, "B73v4_to_B73v5.tsv"), 
+  sep ="\t",
+  header = FALSE,
 ) %>%
+  dplyr::rename(v4 = V1, v5 = V2) %>%
   separate_longer_delim(cols = v5, delim = ",")
 
 cat("v4 to v5 mappings:", nrow(v4_v5), "\n")
