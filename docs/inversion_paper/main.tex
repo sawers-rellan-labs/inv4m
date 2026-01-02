@@ -1,0 +1,1131 @@
+\documentclass[9pt,twocolumn,twoside]{rilabRxiv}
+% Use the documentclass option 'lineno' to view line numbers
+\setlength{\marginparwidth}{2cm}
+\usepackage[textsize=tiny,colorinlistoftodos]{todonotes}
+\definecolor{cornflowerblue}{rgb}{0.39, 0.58, 0.93}
+
+% Custom macros from main_20251203.tex
+\usepackage{xspace}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+% Set supplement numbers to S and start counting newly
+\newcommand{\beginsupplement}{%
+  \setcounter{table}{0}
+  \renewcommand{\thetable}{S\arabic{table}}%
+  \setcounter{figure}{0}
+  \renewcommand{\thefigure}{S\arabic{figure}}%
+}
+
+% Custom commands from source
+\newcommand{\mex}{\textit{mexicana}\xspace}
+\newcommand{\invfour}{\textit{Inv4m}\xspace}
+\newcommand{\fdrgt} {$\textrm{\textit{FDR}} > 0.05$}
+\newcommand{\fdreq} {$\textrm{\textit{FDR}} = 0.05$}
+\newcommand{\fdrls} {$\textrm{\textit{FDR}} < 0.05$}
+\newcommand{\parv}{\textit{parviglumis}\xspace}
+\newcommand{\jmjii}{\textit{jmj2}\xspace}
+\newcommand{\jmjiv}{\textit{jmj4}\xspace}
+\newcommand{\jmjvi}{\textit{jmj6}\xspace}
+\newcommand{\jmjix}{\textit{jmj9}\xspace}
+\newcommand{\arabidopis}{\textit{Arabidopsis}\xspace}
+
+\usepackage{hyperref}
+
+\newcolumntype{b}{X}
+\newcolumntype{s}{>{\hsize=.5\hsize}X}
+
+\title{Introgression of Mexican highland chromosomal inversion \textit{Inv4m} into temperate 
+maize accelerates flowering, promotes growth, and modulates a cell 
+proliferation gene network}
+
+
+\author[$1$,$2$,*]{Fausto Rodríguez-Zapata}
+\author[$1$,$2$]{Nirwan Tandukar}
+\author[$1$]{Hannah Pil}
+\author[$1$]{Carolina Escalona-Weldt}
+\author[$1$]{Zehta Glover}
+\author[$1$]{Lauren Insko}
+\author[$1$, $5$]{Alejandro Aragón-Raygoza}
+\author[$4$]{Melanie Perryman}
+\author[$4$]{Sergio Pérez-Limón}
+% Li, Meng
+\author[$1$,$5$]{Josh Strable}
+\author[$6$]{Daniel Runcie}
+\author[$4$]{Ruairidh Sawers}
+\author[$1$,*]{Rubén Rellán-Álvarez}
+\affil[$1$,*]{Department of Molecular and Structural Biochemistry, N.C. Plant Sciences Initiative, North Carolina State University, Raleigh, NC, USA.}
+\affil[$2$]{Genetics and Genomics Program, North Carolina State University, Raleigh, NC, USA}
+\affil[$3$]{United States Department of Agriculture, Agricultural Research Service, Plant Science Research Unit, Raleigh, NC 27695}
+\affil[$4$]{Department of Plant Science, Pennsylvania State University, University Park, PA, USA}
+\affil[$5$]{Department of Genetics, Development, and Cell Biology, Iowa State University, USA}
+\affil[$6$]{Department of Plant Sciences, University of California, Davis, CA, USA}
+
+
+
+\keywords{ Local Adaptation, Highland Maize, Teosinte Mexicana Introgression, Chromosomal Inversion}
+
+\runningtitle{The Role of \textit{Invm4} in adaptation to low phosphorus availability} % For use in the footer
+
+%% For the footnote.
+%% Give the last name of the first author if only one author;
+\runningauthor{Rodríguez-Zapata}
+%% last names of both authors if there are two authors;
+% \runningauthor{FirstAuthorLastname and SecondAuthorLastname}
+%% last name of the first author followed by et al, if more than two authors.
+\runningauthor{Rodríguez-Zapata \textit{et al.}}
+
+
+%%% Abstract %%%%%%%%%%%%%%%%%%
+\begin{abstract}
+Maize adaptation to temperate zones may have been facilitated by introgression 
+from highland wild relatives. We investigated the effects of \invfour, a 15 Mb 
+chromosomal inversion from \textit{Zea mays ssp. mexicana}, by introgressing 
+it into temperate maize (B73) through eight generations of backcrossing. Field 
+trials under contrasting phosphorus treatments revealed that \invfour 
+significantly accelerates flowering time and increases plant height, 
+independent of phosphorus availability. Transcriptomic analysis identified 
+perturbations in a cell proliferation gene expression network, including 
+downregulation of JUMONJI methyltransferases that show higher copy numbers in 
+modern maize compared to highland teosinte. Phenotypic measurements confirmed 
+that \invfour plants exhibit elongated shoot apical meristems. While classical 
+phosphorus starvation response genes were detected within the inversion, 
+\invfour showed no detectable effect on phosphorus starvation responses. These 
+findings illuminate the genetic mechanisms underlying \invfour's contribution 
+to local adaptation and identify candidate genes driving its phenotypic effects.
+\end{abstract}
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setboolean{displaycopyright}{true}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{firststyle}
+\correspondingauthoraffiliation{
+Dept. of Plant Sciences, University of California, Davis, CA, USA
+E-mail: corresponding@ucdavis.edu}
+\vspace{-11pt}%
+
+\setboolean{displaylineno}{true}
+\ifthenelse{\boolean{displaylineno}}{\linenumbers}{}
+
+\section{Introduction}
+\lettrine[lines=2]{\color{color2}M}{aize} might have preadapted to temperate 
+zones through introgression from its highland wild relative, 
+\textit{Zea mays ssp. mexicana} (shorthand \mex) \cite{yang2023}. Maize was originally domesticated in the tropical lowlands of Mexico. Before its expansion into temperate regions, maize was introduced to the Mexican highlands 
+and the Southwestern United States, where sympatry with highland teosinte 
+likely facilitated the introgression of adaptive alleles from \mex.
+
+However, not all highland-adaptive loci are present in temperate maize. 
+Highland-associated chromosomal inversions, such as \invfour and 
+\textit{Inv9f}, are prevalent in highland teosinte populations 
+\cite{pyhajarvi2013} and traditional Mexican maize varieties (TVs) 
+\cite{crow2020,gonzalez-segovia2019-jy} but are rare in temperate maize. 
+Chromosomal inversions can contribute to local adaptation by preserving locally 
+adapted alleles across multiple loci and reducing recombination within the 
+inversion \cite{kirkpatrick2006b}. Genotyping of teosinte populations using 
+the Maize 50K chip revealed that \invfour spans 13 Mb and is predominantly 
+found in \mex populations \cite{pyhajarvi2013}. In Mexican TVs, variation in 
+\invfour is associated with elevation and flowering time 
+\cite{romero_navarro2017-cn}. Additionally, \invfour shows reduced genetic 
+diversity, a clinal relationship with elevation, and is nearly fixed in 
+locations above 2500 m.a.s.l. \cite{crow2020}. The inversion exhibits 
+suppressed recombination, as confirmed in a biparental cross 
+\cite{gonzalez-segovia2019-jy}.
+
+\invfour demonstrates classic patterns of gene-by-environment interactions 
+indicative of local adaptation. Plants carrying the \invfour-highland allele 
+exhibit delayed flowering at low elevations and earlier flowering at high 
+elevations \cite{crow2020}. The highland haplotype of \invfour was introgressed 
+from \textit{Zea mays ssp. mexicana} 
+\cite{pyhajarvi2013,calfee2021-mr,hufford2013-gs}, a wild maize relative 
+native to the Mexican highlands.
+
+Despite strong evidence linking \invfour to local adaptation, the physiological 
+processes and environmental factors underlying its adaptive role remain unclear. 
+Furthermore, the specific genes within \invfour that drive local adaptation are 
+largely unidentified. Previous research has shown that \invfour-highland 
+upregulates photosynthesis genes in response to cold at the seedling stage 
+\cite{crow2020} and is associated with earlier flowering in the Mexican 
+highlands, which likely enhances fitness in environments with limited 
+growth-degree accumulation throughout the year \cite{romero_navarro2017-cn}. 
+However, cold is not the only limiting factor for plant growth in the highlands.
+
+Volcanic soils (Andosols), which dominate the Mexican highlands, present an 
+additional constraint. Approximately 95\% of natural Andosol profiles in Mexico 
+are found above 2000 m.a.s.l. \cite{paz-pellat2018,inegi2013}. These soils are 
+characterized by high phosphorus retention \cite{krasilnikov2013}, which leads 
+to low phosphorus availability for plant uptake \cite{galvan-tejada2014}. 
+MICH21, one of the Mexican highland maize accessions analyzed by 
+\cite{crow2020}, originates from the Purépecha Plateau, where Andosols and 
+phosphorus-efficient TVs are common 
+\cite{paz-pellat2018,galvan-tejada2014,bayuelo-jimenez2011,bayuelo-jimenez2014}. 
+\invfour may contribute to adaptation in the highlands by carrying alleles that 
+enhance the phosphorus starvation response (PSR). For example, the phosphate 
+transporter gene \textit{ZmPho1;2a}, located within \invfour, is a strong 
+candidate for adaptation to low phosphorus availability 
+\cite{salazar-vidal2016-rl}.
+
+In this study, we aimed to understand the physiological and molecular effects 
+of \invfour and to identify candidate genes within the inversion that could 
+elucidate its adaptive role. Specifically, we tested whether \invfour-highland 
+contributes to adaptation to low phosphorus availability. To achieve this, we 
+backcrossed MICH21, a Mexican highland TV carrying \invfour, into the B73 
+genetic background for eight generations, generating Near Isogenic Lines (NILs) 
+\cite{crow2020}. These NILs were grown under temperate field conditions with 
+two phosphorus treatments to evaluate flowering time, height, and 
+transcriptomic responses.
+
+We observed that \invfour significantly reduces flowering time and increases 
+plant height, independent of phosphorus levels. We identified a cluster of 
+JUMONJI methyltransferases, which have higher copy numbers in modern maize 
+compared to highland teosinte and TVs, as potential contributors to flowering 
+time differences. Additionally, we found a group of cell cycle-related genes 
+that may underlie height differences. While classical PSR genes were identified 
+within the inversion, \invfour had no detectable effect on the phosphorus 
+starvation response. These findings provide insights into the genetic 
+mechanisms underlying \invfour's contribution to local adaptation and highlight 
+potential candidate genes driving its effects.
+
+\section{Results}
+
+\subsection{\invfour is a 15 Mb inversion delimited by breakpoint segments 
+overlapping chromosomal knob repeats}
+
+Complete genome sequences of selected Mexican Highland traditional varieties 
+allowed us to delimit the recombination breakpoints of \invfour by using an 
+Anchorwave \cite{song2022} alignment of chromosome 4. With this aim, we aligned 
+both PT, a close relative to the \invfour donor parent Mi21, as a 
+representative genome for the Mexican highlands, and TIL18 representing the 
+highland teosinte \mex, to B73, the recurrent parent used for \invfour 
+introgression (Fig~\ref{fig::design}A, Supporting Table~\ref{tab:breakpoints}).
+
+In each pairwise comparison, we found that the anchor-defined \invfour 
+alignment is between the reference B73 plus strand and the highland genome 
+minus strand, as expected. This alignment allowed us to narrow down \invfour 
+location between genes \textit{Zm00001eb190470} and \textit{Zm00001eb194800}, 
+spanning 15.2 Mb and 432 annotated genes in the B73 v5 genome. This region 
+corresponded to a 13.4 Mb inversion in the PT genome, bounded by genes 
+\textit{Zm00109aa017629} and \textit{Zm00109aa018009}; and, also a 13.2 Mb 
+inversion in TIL18, extending from genes \textit{Zx00002aa015554} to 
+\textit{Zx00002aa015905}.
+
+However, the \invfour section was bordered by unaligned segments rather than by 
+reference orientation (plus/plus) alignments. These unaligned segments 
+contained no annotated genes, except for \textit{Zm00001eb190490} in the 
+upstream breakpoint segment of B73. To explore the nature of the sequences 
+spanning the \invfour breakpoints, we made a local similarity search using LAST 
+\cite{kielbasa2011} inside these \invfour bounding unaligned segments. We 
+detected typical tandem array patterns in the dotplots (blue and red rectangles 
+in Fig~\ref{fig::design}B) and we took a closer look at the available repeat 
+annotation of B73.
+
+The MaizeGDB annotation of B73 shows that the upstream \invfour breakpoint 
+segment contained 438 \textit{knob180} and 29 \textit{TR-1} repeats making up 
+$69\%$ and $5\%$ of the 636 annotated repeats in this 323 kb section. These 
+chromosomal knob 180 bp and TR-1 repeat annotations matched the observed tandem 
+array patterns observed in the dotplots Fig~\ref{fig::design}B. Then we 
+searched the two classes of knob repeats in TIL18 and PT, which have no public 
+repetitive element annotation to date. For comparison purposes, we did a BLAST+ 
+\cite{camacho2009} similarity search of the three chromosomes 4 using a 
+selected sequence of each repeat class as subjects (see methods).
+
+This allowed us not only to detect both kinds of knob repeats in the breakpoint 
+segments but also inside the inversion and the rest of the chromosome. We found 
+in the long arm of chromosome 4 repeat arrays corresponding to previously 
+reported heterochromatic knobs, the ones interspersed in the \invfour 
+breakpoints, and an internal knob repeat array inside \invfour 
+Fig~\ref{fig::design}A. Chromosomal knob repeats were the most abundant kind of 
+repeats within the \invfour breakpoint sections Table \ref{tab:breakpoints} and 
+the \invfour proper.
+
+There is a notable difference in the heterochromatic knobs between the long 
+arms of the analyzed chromosomes. TIL18 has a 30 Mb region of mixed repeats 
+likely corresponding to the 4L knob reported in \mex 
+\cite{bilinski2018,albert2010}, PT is knobless, and B73 carries a 4L knob 
+consisting of \textit{TR-1} repeats \cite{ghaffari2013,albert2010} 
+(Fig~\ref{fig::design}A).
+
+Although the downstream breakpoint had a lower content of knob repeats with 37 
+\textit{knob180} and no annotated \textit{TR-1}'s, those made up $46\%$ out of 
+the 81 annotated repeats in 80 kb. In each genome, the breakpoint segments on 
+each side of the inversion showed asymmetries in size, knob repeat number, 
+presence of knob inverted repeat arrays, and closeness of the knob repeats to 
+the \invfour anchor gene (Fig~\ref{fig::design}B).
+
+In particular, in B73 the upstream breakpoint segment is larger (323 kb vs 89 
+kb), has a greater number of repeats (352 vs 26), presence of inverted knob 
+repeat arrays (blue and red rectangles in Fig~\ref{fig::design} B Upstream), 
+and some knob repeats close to the inversion, while the downstream breakpoint 
+segment is smaller, has a lower number of repeats, no inverted repeats of knob 
+sequences (just red rectangles in Fig~\ref{fig::design}B, Downstream), and the 
+few knob repeats present are closer to the downstream external anchor gene 
+rather than to \invfour. We can observe these four patterns in the opposite 
+orientation in PT and TIL18 relative to B73.
+\clearpage
+
+\begin{figure*}[ht!]
+% (fausto) remove include graphics before submission
+\centering
+\includegraphics[width=\linewidth]{figs/design.png}
+\caption[\textit{\invfour} Delimitation, Introgression Breeding Design and Population Genotypes.]
+{\textit{\textbf{Chromosomal Inversion \invfour: Delimitation,  Introgression Breeding Design, Field Experimental Setup and Population Genotype.}} }
+\label{fig::design}
+\end{figure*}
+
+\clearpage
+
+\addtocounter{figure}{-1}
+
+% caption of the figure on the next page
+\begin{figure*}[ht!]
+    \caption[]{\textbf{Chromosomal Inversion \invfour: Delimitation, Introgression 
+Breeding Design, Field Experimental Setup and Population Genotype.}
+% \textbf{(A)} Chromosome 4 macrosynteny among highland and lowland \textit{Zea} genomes illustrating \invfour. The highland Mexican traditional variety Palomero Toluqueño (PT) shows the same gene order as the teosinte \mex inbred TIL18. This highland karyotype (purple) has the \invfour inversion relative to the reference genome inbred B73 (\textit{spp. mays}, yellow). Synteny plot created with MCscan\cite{tang2024}, genes from the ortholog groups defining the endpoints of the inversion are depicted below each ideogram.
+\textbf{(A)} \invfour breakpoints overlap clusters of full 180 bp knob repeats with interspersed partial \textit{TR-1}s (normalized match score $<50$). Each point represents a BLAST+ \cite{camacho2009} hit with a selected sequence of 180 bp knob or  \textit{TR-1} repeats. 
+ Around the 230 Mb mark regions corresponding to reported 4L cytogenetic knobs can be observed in \mex and B73 while absent in PT.
+\textbf{(B)} Sequence self-similarity dotplots, using LAST \cite{kielbasa2011}, for the inversion breakpoint segments as defined in Table~\ref{tab:breakpoints}.
+Breakpoints are upstream and downstream of \invfour in each genome coordinate system as depicted in (A).
+Forward matches in red, reverse in blue. 
+Rectangles indicate tandem repeats. 
+\textbf{(C)} PT shows higher (** \textit{t-test} $p=0.0022$) leaf phosphorus content than B73 under phosphorus sufficiency (Puerto Vallarta, 2016). 
+\textbf{(D)} Near Isogenic Line population breeding scheme. The \invfour from Mi21, a highland traditional variety closely related to PT, was introgressed into a temperate lowland genetic background using B73 as recurrent parent.
+\textbf{(E)}  Rock Springs, PA, field station experimental setup at 5 ppm (-P), and  36 ppm (+P) soil phosphorus [mg/kg Mehlich-3].
+\textbf{(F)} NIL genotypes at BC$_6$S$_2  $, of plants used in RNA and lipid extractions, $n=13$, B73 NAM5 coordinates. 
+\textbf{(G)} Zoom into \invfour introgression. Plants are sorted by genotype at the \invfour tagging SNP PZE04175660223 (181.6 Mb, downwards pointing triangle) then by field row number. 
+}
+\end{figure*}
+
+
+
+\subsection{Divergent highland introgression is mostly confined to a 39 Mb 
+segment spanning \invfour}
+
+To study the effects of \invfour we repeatedly backcrossed Mi21, a Mexican 
+highland landrace containing \invfour into B73 using a marker inside the 
+inversion. We then used RNA-Seq data to genotype the resulting 
+$\text{BC}_6\text{S}_2$ lines. The distribution of the 19861 QC-filtered SNPs 
+is heavily biased towards chromosome 4. Almost half of the variants, 8892 
+(44\%), are on chromosome 4, with the other 9 chromosomes having an average of 
+1219 SNPs (6\%) each (Supporting Fig~\ref{fig::SNPdistro}A).
+
+The genotypes in the matrix of 19861 SNPs $\times$ 13 individuals are 63.5\% 
+homozygous for B73, 8.96\% heterozygous, and 27.3\% homozygous for Mi21, with 
+0.16\% missing data. We converted this genotype matrix to identical genotype 
+run \cite{layer2016} length in base pairs to estimate the proportion of the 
+plant genome introgressed from Mi21 (Fig~\ref{fig::design}F and G).
+
+By genotype run length, the plants are, on average, 85.6\% homozygous for B73 
+(1821 Mb), 8.61\% heterozygous (183 Mb), and 5.5\% homozygous for Mi21 (117 
+Mb), with 0.34 \% missing data (7.32 Mb) (Supporting Fig~\ref{fig::SNPdistro}D). 
+As the genotypes come exclusively from variant sites, the matrix has no markers 
+fixed for the reference B73 allele. The NIL genomes are thus represented by a 
+mosaic of 3 types of sections. First, sections with fixed highland 
+introgression, where the alternate Mi21 allele is fixed. Second, sections of 
+divergent highland introgression consisting of markers significantly correlated 
+with the \invfour tagging SNP PZE04175660223. And third, sections with random 
+introgressions uncorrelated with \invfour.
+
+The fixed highland introgression sections are made up of 126 SNPs marking 51 Mb 
+(2.4\% of the genome) in genotype run length (average per plant). By manual 
+inspection we defined a region of divergent highland introgression between 
+positions 157012149 and 195900523 in B73 v5 coordinates, bounding 39 Mb of 
+shared introgression among \invfour carrying lines. With our selection for the 
+highland allele of PZE04175660223 we have produced plants with the introgression 
+of the target \invfour inversion surrounded by 24 Mb of lingering unintended 
+linkage drag (Fig~\ref{fig::design}F and G). Conversely, we have produced 
+inversion-free lines in the CTRL group by selecting for the B73 allele.
+
+In more detail, there are 7683 SNPs significantly correlated with \invfour 
+(Pearson correlation \textit{t-test}, \fdrls) constituting divergent highland 
+introgressions throughout the genome but mostly in \invfour and flanking regions 
+(Supporting Fig~\ref{fig::SNPdistro}A). From these 7683, 7322 SNPs ($95.3\%$) 
+cover 35 Mb and 271 expressed genes inside the 39 Mb shared introgressed region 
+that includes \invfour. The remaining 361 divergently introgressed SNPs in the 
+genomic background were dispersed throughout 10.4 Mb of sequence covering 52 
+expressed genes.
+
+Notably, the majority of these markers, 207 SNPs from 14 expressed genes, are 
+negatively correlated with PZE04175660223 and are located just upstream of the 
+shared introgression near \invfour over a 2.7 Mb stretch, from position 
+154283637 to 15698557 (Fig~\ref{fig::design}G and Supporting 
+Fig~\ref{fig::SNPdistro}C). In this segment, individuals selected for \invfour 
+are homozygous for the B73 allele at all positions, while individuals selected 
+for the standard karyotype are frequently heterozygous.
+
+In summary, each plant has an average of 117 Mb of homozygous Mi21 genome per 
+line, 51 Mb of fixed highland introgression, 35 Mb of divergent highland 
+introgression colocalized and matching the selection of \invfour, and 10 Mb of 
+other dispersed divergent highland introgressions.
+
+
+\begin{figure*}[!ht]
+\includegraphics[width=0.95\linewidth]{figs/effects.png}
+\centering
+\caption{\textbf{Effect of \invfour on PH, DTA, DTS, HI.} BLUEs from spatial 
+mixed models (\texttt{statgenHTP::fitModels}); phosphorus is modeled as a 
+covariate and not interpreted.}
+\label{fig:phenotypes}
+\end{figure*}
+
+\subsection{Inv4m accelerates flowering and promotes growth}
+
+Field trials demonstrated that \invfour significantly affects both flowering 
+time and plant architecture. Plants carrying the highland inversion allele 
+flowered earlier and grew taller than control lines, with these effects 
+consistent across both phosphorus treatments (Fig~\ref{fig:phenotypes}).
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=0.95\linewidth]{figs/RNAseq.png}
+\caption{\textbf{Global and local transcriptomic effects of \invfour across leaf stages.}
+\textbf{(A)} Leaf sampling strategy. Four developmental leaf stages (1 to 4) were sampled across four replicates for both \invfour and CTRL genotypes. 
+\textbf{(B)} Multidimensional Scaling Analysis of the leaf transcriptome. Samples are colored by genotype (CTRL: yellow; \invfour: purple) and shaped by leaf stage, showing clear separation along dimension 3 (8\% variance). 
+\textbf{(C)} Volcano plot of \invfour-associated DEGs. Labeled genes highlight significant perturbations, including the downregulation of multiple JUMONJI methyltransferases within the inversion. 
+\textbf{(D)} Global Manhattan plot showing Differentially Expressed Genes (DEGs) associated with leaf stage across the ten maize chromosomes. The floral integrator \textit{zmm4} is a highly significant DEG. 
+\textbf{(E)} Global Manhattan plot for DEGs associated with the \invfour genotype effect. A prominent peak of differential expression is localized to the introgressed region on chromosome 4, containing the \jmjii, \jmjvi, and \jmjix cluster. 
+\textbf{(F)} Haplotype map of the introgressed region on chromosome 4 for representative NIL lines (4125, 4131, 3131). The blue triangle indicates the tagging SNP PZE04175660223 used for selection. 
+\textbf{(G)} Local Manhattan plot zoomed into the 150-200 Mb region of chromosome 4, highlighting the clustering of \fdrls markers within the \invfour boundaries. 
+\textbf{(H)} Local distribution of $\log_2$(Fold change) across chromosome 4. Moving average lines (green for upregulated, red for downregulated) illustrate the coordinated transcriptomic shift within the \invfour region, specifically the downregulation of the \jmjii cluster.
+}
+\label{fig:transcriptome}
+\end{figure*}
+
+
+\subsection{Despite strong transcriptional effects, \invfour differential 
+expression lacks functional enrichment}
+
+The leaf gene expression and lipid profile reveal distinct molecular and 
+metabolic responses to leaf stage, phosphorus availability, and \invfour 
+genotype (Fig~\ref{fig::volcano}). Increased leaf stage, which correlates with 
+aging and senescence, leads to the downregulation of genes involved in floral 
+meristem determinacy (GO biological process enrichment, Fisher's exact test 
+\textit{FDR} $=1.28\times 10^{-5}$). This set was constituted by the MADS box 
+transcription factors \textit{zmm4}, \textit{mads45}, \textit{zmm15}, 
+\textit{mads67}; \textit{zap1} (a maize \textit{APETALA1} homolog); and the TNF 
+receptor-associated factor, \textit{traf7}.
+
+Conversely, samples from later leaf stages show upregulation in a set of genes 
+enriched in aging (Fisher's exact test, \textit{FDR} $=0.002$) that includes 
+the diaminopimelate aminotransferase \textit{dapat3} and the \textit{SAG12} 
+cysteine protease homolog \textit{ccp16}. The KEGG pathway annotation shows 
+that genes encoding photosynthetic antenna proteins (Fisher's exact test, 
+\textit{FDR} $=0.015$) are significantly downregulated in phosphorus deficiency 
+(\textit{lhcb10}) and increased leaf stage (\textit{lhcb1}, \textit{lhcb10}) 
+Fig~\ref{fig::volcano} B.
+
+Downregulated genes under phosphorus starvation do not show enrichment in 
+specific biological processes. However, the most significant PSR gene was 
+\textit{peamt2}, a phosphoethanolamine N-methyltransferase, which is involved 
+in phospholipid biosynthesis, congruent with the reduction in phospholipid 
+synthesis under phosphorus-limiting conditions. On the other hand, plants 
+growing under phosphorus deficiency showed an evident upregulation of classical 
+phosphorus starvation response genes.
+
+Although not included in the GO annotation of protein-coding genes, the most 
+prominent response is that of \textit{pilncr1}, a long noncoding RNA spanning 
+\textit{mir397}, a known master regulator of PSR. The upregulated protein-coding 
+genes showed enrichment in cellular response to phosphate starvation (Fisher's 
+exact test, \textit{FDR} $=9.07 \times 10^{-11}$), including \textit{SPX} 
+family transcription factors, and phosphate transporters such as \textit{phos1}, 
+which facilitate phosphate uptake and redistribution \textit{pht1} \textit{pht7}, 
+and purple acid phosphatases \textit{pap1} \textit{pap14} that increase 
+phosphorus remobilization.
+
+Over-representation analysis of KEGG metabolic pathways showed that phosphorus 
+starvation upregulates genes involved in glycerophospholipid metabolism 
+(glycerophosphodiester phosphodiesterases \textit{gpx1}, \textit{gpx3}, 
+monogalactosyldiacylglycerol synthase \textit{mgd2}), phenylpropanoid and 
+flavonoid biosynthesis, chitin degradation, ABC transporters, and 
+brassinosteroid biosynthesis (\textit{brc2}). Conversely, genes involved in 
+galactolipid biosynthesis, which are crucial for maintaining photosynthetic 
+membranes are significantly downregulated.
+
+\clearpage
+
+\subsection{\invfour plants show perturbations of a cell proliferation gene 
+expression network in leaves and have elongated shoot apical meristems}
+
+A gene co-expression network analysis (Panel A) was performed to investigate the 
+trans-regulatory effects associated with the Inv4m chromosomal inversion in 
+maize leaves. This network comprised approximately 24 genes and 28 co-expression 
+edges, filtered to represent interactions between genes within the 15 Mb Inv4m 
+inversion on chromosome 4 and genes located elsewhere in the genome. Of these, 
+12 genes were located within the inversion, and 12 genes were located outside 
+the inversion. We observed that 10 genes within the network were upregulated 
+and 5 were downregulated in Inv4m plants.
+
+Gene ontology (GO) enrichment analysis (Panel B) of this Inv4m 
+trans-coexpression network revealed an over-representation of terms related to 
+cell population proliferation and regulation of flower development (Fisher's 
+exact test p-values here). Within the enriched group for cell population 
+proliferation, we observed that the expression of mrlk (meristematic 
+receptor-like kinase), PCNA2 (encoding a proliferative cell nuclear antigen 2 
+protein, part of a clamp complex increasing processivity of DNA polymerase 
+delta), and MCM5 (encoding a minichromosome maintenance 5 protein, a helicase) 
+were all perturbed in Inv4m plants.
+
+We specifically noted the perturbation of zcn26, an FT homolog (a gene known 
+for its role in flowering time) located outside the inversion. Furthermore, we 
+identified disruptions in genes involved in protein methylation, specifically 
+\textit{jmj2} and \textit{jmj21} (JMJ domain-containing proteins, shown in the 
+network), suggesting a potential role for epigenetic regulation.
+
+To determine whether these observed gene expression changes had phenotypic 
+consequences, we measured the shape and height of the vegetative meristems in 
+control and Inv4m individuals. We found that Inv4m plants have shoots with a 
+significant ($p<0.05$, one-tailed \textit{t-test}, 
+$H_a: \mu_{\textit{Inv4}} > \mu_{\textit{CTRL}}$) 9\% increase in SAM height 
+(9.65 $\mu$m, 0.37 $\mu$m lower bound with 95\% confidence), a 9\% increase in 
+shape coefficient (2.49 $\text{nm}^{-1}$, 0.59 $\text{nm}^{-1}$), indicating an 
+elongated meristem (Panel C).
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
+\caption{\textbf{Trans coexpression network of \invfour DEGs.} \textbf{(A)} 
+Edge polarity reflects causal precedence of the genetic perturbation by 
+\invfour introgression. \textbf{(B)} GO enrichment results.}
+\label{fig::DEGnetwork}
+\end{figure*}
+
+\begin{table*}[!ht]
+\caption{\textbf{Effect of \invfour on Flowering Time and Plant Height Gene 
+Candidates}}
+\label{tab:FT_PH_candidates}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllllllll}
+\hline
+\rowcolor[HTML]{FFFFFF} 
+\textbf{Phenotype} &
+  \textbf{Gene} &
+  \textbf{Label} &
+  \textbf{Description} &
+  \textbf{\begin{tabular}[c]{@{}l@{}}$\bf{log_2}$\\(FC)\end{tabular}} &
+  \textbf{\begin{tabular}[c]{@{}l@{}}$\bf{-log_{10}}$\\ 
+(\textit{FDR})\end{tabular}} &
+  \textbf{Location} &
+  \textbf{\begin{tabular}[c]{@{}l@{}} GWAS \\ 
+\textit{p-value}\end{tabular}} &
+  \textbf{ref} \\ \midrule
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb191790} &
+  \textit{jmj2} &
+  Lysine-specific demethylase &
+  -3.49 &
+  21.93 &
+  \textbf{\invfour} &
+  1.34E-07 &
+  \cite{tibbs-cortes2024} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb191790} &
+  \textit{jmj6} &
+  Lysine-specific demethylase &
+  -3.49 &
+  21.93 &
+  \textbf{\invfour} &
+  1.34E-07 &
+  \cite{tibbs-cortes2024} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb191790} &
+  \textit{jmj9} &
+  Lysine-specific demethylase &
+  -3.49 &
+  21.93 &
+  \textbf{\invfour} &
+  1.34E-07 &
+  \cite{tibbs-cortes2024} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb191820} &
+  \textit{jmj4} &
+  Lysine-specific demethylase &
+  -2.84 &
+  19.72 &
+  \textbf{\invfour} &
+   &
+  \cite{wang2021} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb060540} &
+  \textit{actin-1} &
+  Actin-1 &
+  2.23 &
+  9.93 &
+  outside &
+   &
+  \cite{wang2021} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb070810} &
+  \textit{} &
+  \begin{tabular}[c]{@{}l@{}}YchF C-terminal domain\\ containing
+protein\end{tabular} &
+  4.19 &
+  9.70 &
+  outside &
+   &
+  \cite{wang2021, li2016, liu2023} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb190090} &
+  \textit{} &
+  Aspartic proteinase &
+  7.18 &
+  7.00 &
+  flanking &
+  1.14E-11 &
+  \cite{peiffer2014} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb157030} &
+  \textit{} &
+  \begin{tabular}[c]{@{}l@{}}Electron transfer flavoprotein\\ subunit
+alpha\end{tabular} &
+  5.68 &
+  4.84 &
+  outside &
+   &
+  \cite{wang2021, li2016, liu2023} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb428740} &
+  \textit{ocl2} &
+  Homeobox-leucine zipper &
+  -2.66 &
+  5.46 &
+  outside &
+   &
+  \cite{wang2021} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb197370} &
+  \textit{abi40} &
+  \begin{tabular}[c]{@{}l@{}}ABI3VP1-type\\ transcription
+factor\end{tabular} &
+  -2.25 &
+  5.77 &
+  outside &
+   &
+  \cite{wang2021} \\
+\rowcolor[HTML]{EFEFEF}
+\cellcolor[HTML]{EFEFEF} &
+  \textit{Zm00001eb186670} &
+  \textit{} &
+  Uncharacterized protein &
+  -2.83 &
+  5.41 &
+  flanking &
+   &
+  \cite{wang2021, li2016, liu2023} \\
+\rowcolor[HTML]{EFEFEF}
+\multirow{-11}{*}{\cellcolor[HTML]{EFEFEF}\begin{tabular}[c]{@{}l@{}}Flowering\\
+Time\end{tabular}} &
+  \textit{Zm00001eb191000} &
+  \textit{} &
+  4-coumarate--CoA ligase-like 5 &
+  -3.35 &
+  2.76 &
+  \textbf{\invfour} &
+   &
+  \cite{wang2021} \\ \hline
+ &
+  \textit{Zm00001eb196600} &
+  \textit{} &
+  \begin{tabular}[c]{@{}l@{}}R3H-assoc domain\\ containing
+protein\end{tabular} &
+  -2.25 &
+  12.49 &
+  flanking &
+  8.80E-11 &
+  \cite{peiffer2014, liu2023} \\
+ &
+  \textit{Zm00001eb194380} &
+  \textit{sec6} &
+  Exocyst complex component &
+  2.87 &
+  16.53 &
+  \textbf{\invfour} &
+  1.42E-04 &
+  \cite{peiffer2014, liu2023} \\
+ &
+  \textit{Zm00001eb196920} &
+  \textit{} &
+  Uncharacterized protein &
+  -2.81 &
+  7.37 &
+  flanking &
+  8.36E-08 &
+  \cite{peiffer2014, liu2023} \\
+ &
+  \textit{Zm00001eb195080} &
+  \textit{imk3} &
+  \begin{tabular}[c]{@{}l@{}}Leucine-rich repeat receptor-like\\ protein
+kinase IMK3\end{tabular} &
+  -4.68 &
+  5.34 &
+  flanking &
+  1.19E-09 &
+  \cite{peiffer2014, liu2023} \\
+ &
+  \textit{Zm00001eb186670} &
+  \textit{} &
+  Uncharacterized protein &
+  -2.83 &
+  5.41 &
+  flanking &
+  7.18E-11 &
+  \cite{peiffer2014, liu2023} \\
+ &
+  \textit{Zm00001eb194020} &
+  \textit{exo} &
+  \begin{tabular}[c]{@{}l@{}}Exordium / Phi-1-like \\ phosphate-induced
+protein\end{tabular} &
+  -2.39 &
+  1.86 &
+  \textbf{\invfour} &
+  3.32E-12 &
+  \cite{peiffer2014, liu2023} \\
+\multirow{-7}{*}{\begin{tabular}[c]{@{}l@{}}Plant\\ Height\end{tabular}} &
+  \textit{Zm00001eb197300} &
+  \textit{} &
+  \begin{tabular}[c]{@{}l@{}}Cysteine-rich RLK\\ (receptor-like protein
+kinase)\end{tabular} &
+  -2.62 &
+  2.00 &
+  flanking &
+  3.04E-08 &
+  \cite{peiffer2014, liu2023} \\ \hline
+\end{tabular}%
+}
+\end{table*}
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/model.png}
+\caption{\textbf{B73 phenotypic and gene expression response to \invfour 
+introgression}}
+\label{fig::model}
+\end{figure*}
+
+However, the variation at \invfour seems to have no major effect in the gene 
+response to phosphorus. The \invfour x P interaction t-test (\textit{FDR} 
+$<0.005$) shows only one gene with differential response to phosphorus depending 
+on the \invfour karyotype. This gene is found in near \invfour, but outside 
+previously reported limits (Fig~\ref{fig::RNAseq} C). A single gene 
+\textit{aldh2}, 3 Mb upstream of the reported \invfour limit, shows a different 
+response to phosphorus depending on the \invfour genotype. In phosphorus 
+deficiency \textit{aldh2} overexpresses in the CTRL plants, but it is not 
+responsive in the \invfour plant (Fig~\ref{fig::RNAseq} D).
+
+\section{Materials and Methods}
+\label{sec:materials:methods}
+
+\subsection{\invfour Near Introgressed Lines, growth conditions, experimental 
+design, and phenotype measurements}
+
+To measure the effects of the \invfour in plant field phenotypes and their 
+phosphorus starvation response transcriptome, we used a highland traditional 
+variety carrying the Highland haplotype of \invfour corresponding to the 
+inverted karyotype. The accession Michoacán 21 (referred to as Mi21), from the 
+Mexican Cónico group, was obtained from the International Maize and Wheat 
+Improvement Center (CIMMYT). In contrast, the reference genome of the temperate 
+inbred B73, the recurrent parent for introgression, carries the lowland 
+haplotype corresponding to the standard non-inverted karyotype at \invfour.
+
+From the cross of Mi21 with B73 one F1 individual was backcrossed to B73 for 
+six generations. We selected lines carrying \invfour with a diagnostic SNP 
+during each cycle using a cleaved amplified polymorphic sequence (CAPS) marker. 
+The marker SNP is PZE04175660223 located at position 4:181637780 in the NAM 
+B73v5 \textit{Zea mays} genome assembly. Amplification of the polymorphic site 
+was done with the following primer pair: 
+\textit{CTGAGCAGGAGATGATGGCCACTC} and 
+\textit{GGAAAGGACATAAAAGAAAGGTGCA}, and subsequently cleaved by \textit{HinfI}. 
+Plants were genotyped using the CASP marker for selecting heterozygous plants 
+at BC6S2 after selfing seeds of \invfour and CTRL homozygous individuals were 
+selected for the field trial.
+
+Plants were planted on May 26 2022 at the Russell E. Larson Agricultural 
+Research Farm in Rock Springs, Pennsylvania (40°42'36" N 77°57'0" W, 366 
+m.a.s.l.) in soil classified as a Hagerstown silt loam (fine, mixed, semiactive, 
+mesic Typic Hapludalf). Experimental conditions were similar to previously 
+described \cite{strock2018}. The experiment had a complete block design with 
+two phosphorus (P) levels. Low-P fields (5 ppm Melich-3 Phosphorus) and high-P 
+fields (36 ppm Melich-3 Phosphorus) were divided into smaller blocks. Three 
+rows per block were planted with a mean stand count of 8 plants per plot, and 
+the plants from the center row were selected for measurements to avoid border 
+effects. Fields received fertilization based on treatment requirements. Drip 
+irrigation was provided during dry periods. Each genotype was replicated four 
+times within its P treatment.
+
+\subsection{Phenotype analysis}
+
+For stover mass growth curves, a different plant at each time point 40, 50, 60,
+and harvest, 121 days after planting (DAP), was collected, dried, and weighed
+for the same row. Stover dry mass data was fitted to a logistic growth model
+using the R package \textit{Growthcurver} \cite{sprouffske2016}. Maximum stover
+dry weight was estimated as the maximum over the four time points rather than
+dry weight at harvest. Ear measurements were taken for one ear per row at
+harvest.
+
+We used a two-stage approach to estimate \invfour effects on field phenotypes
+while accounting for spatial heterogeneity. In the first stage, we applied
+P-spline analysis of spatial trends (SpATS) \cite{rodriguez-alvarez2018}
+implemented via the \texttt{statgenHTP::fitModels()} function
+\cite{perez-valencia2022}. For each phenotype $y$, SpATS fits a mixed model
+that decomposes spatial variation into smooth bivariate surfaces using
+two-dimensional P-splines over field row and column coordinates:
+
+\begin{eqnarray}
+\label{eq:pheno_model}
+y_{ijr} = \mu + \text{Rep}_i + \text{P}_j + f(\text{row}, \text{col}) + \varepsilon_{ijr}
+\end{eqnarray}
+
+where $\mu$ is the overall mean, $\text{Rep}_i$ is the replicate effect,
+$\text{P}_j$ is the phosphorus treatment effect, and
+$f(\text{row}, \text{col})$ is a smooth bivariate spatial surface estimated
+via penalized spline ANOVA (PSANOVA). Notably, genotype was not included in
+this model, so genotypic effects are preserved in the spatially-corrected
+values extracted using the \texttt{getCorrected()} function.
+
+In the second stage, we tested for \invfour effects on these spatially-corrected
+values. For each phenotype, we performed two-sample \textit{t}-tests comparing
+\invfour and control genotypes, with data pooled across phosphorus treatments.
+This approach tests whether \invfour affects phenotypes independent of
+phosphorus availability. P-values were adjusted for multiple comparisons using
+the Benjamini-Hochberg false discovery rate (FDR) method \cite{benjamini1995}.
+Phenotypes with adjusted $p < 0.05$ were considered significantly affected by
+\invfour.
+
+Days to anthesis (DTA) and days to silking (DTS) were converted to growing
+degree days (GDDA and GDDS, respectively) using daily temperature records from
+the Rock Springs weather station with a base temperature of 10°C and an upper
+threshold of 30°C.
+
+\subsection{Tissue sampling, RNA extraction, and sequencing}
+
+We sampled the plants at 63 DAP when we estimated them to be between v10 to v12 
+developmental stages. We took tissue from he first leaf with a fully developed 
+collar, or first leaf before the flag leaf, and every other leaf below for a 
+total of four sampled leaves per plant. These leaves were numbered sequentially 
+from 1 (most apical) to 4 (most basal). We used four replicate plants per 
+combination of P treatment and \invfour genotype for a total of 64 tissue 
+samples.
+
+We took ten disc samples from the leaf tips with a tissue puncher and 
+immediately froze the tissue in 1.5 mL tubes with two steel beads precooled 
+with liquid nitrogen and kept in dry ice until stored at -80°C. We extracted 
+total RNA with the QIAGEN RNAeasy Plant Mini Kit RNA extraction kit following 
+manufacturer procedures (QIAGEN 74904), and RNA samples were quantified in 
+nanodrop and sent to the NCSU Core Genomics Laboratory for sequencing. 
+Following QC in Bioanalyzer, Illumina libraries were prepared and sequenced in 
+a lane of Novaseq according to manufacturer recommendations.
+
+\subsection{Plant genotyping}
+
+We followed \cite{brouard2022} for GATK-based RNAseq genotyping of 15 plant 
+samples represented by 60 leaf libraries. Briefly, Illumina short reads were 
+mapped to the NAM5 Zea mays B73 genome \cite{hufford2021} using \textit{STAR} 
+\cite{dobin2013}, then we marked duplicates in the resulting BAM alignments, 
+split reads at intron-exon junctions and recalibrated sequence quality per leaf 
+library.
+
+At this point, we used HaploytypeCallerfor for generating gvcfs per plant 
+identified by field row id ($\sim 4$ libraries per plant). We did joint sample 
+genotyping afterward with \textit{genotypeGVCFs}. Then we filtered for variant 
+quality (\textit{window 35, cluster, QD < 2.0, FS > 30.0, SOR > 3.0, MQ < 
+40.0}) for the genotypes and $50\%$ marker completion for individuals. This 
+resulted in 200000 markers with $85\%$ complete data for 13 plants. Finally, we 
+used TASSEL5 K Nearest Neighbour imputing, producing a matrix of 19668 markers 
+at $99.84\%$ completion. Shell scripts are available at the 
+\href{https://github.com/sawers-rellan-labs/\invfourRNA}{\textit{\invfourRNA} 
+github repository}
+
+\subsection{Differential gene expression analysis}
+
+We aligned reads to the maize Zm-B73-REFERENCE-NAM-5.0 genome using
+\textit{kallisto} \cite{bray2016}. The alternative transcript alignment was
+turned into counts per gene. We used \textit{voom} to calculate variance
+weights according to gene expression levels and counts were converted to
+$\log_2(\text{CPM})$ \cite{ritchie2015}.
+
+We made a multivariate multiple regression for gene expression using
+\textit{limma}. For the log-transformed expression $Y_{ijrs}$, from leaf
+stage $s$, in plant $r$, under phosphorus treatment $i$, with genotype $j$,
+we have:
+
+\begin{eqnarray}
+\begin{aligned}
+Y_{ijrs} = {}& \beta_0 + \beta_1 \text{Leaf}_s + \beta_2 \text{P}_i +
+\beta_3 \textit{\invfour}_j \\
+& + \beta_4 [\text{Leaf} \times \text{P}]_{si} +
+\beta_5 [\text{P} \times \textit{\invfour}]_{ij} \\
+& + \beta_6 [\text{Leaf} \times \textit{\invfour}]_{sj} +
+u_r + \varepsilon_{ijrs}
+\end{aligned}
+\end{eqnarray}
+
+with plant-level random effect and residuals:
+\begin{eqnarray}
+u_r \sim \mathcal{N}(0, \sigma^2_u), \quad
+\varepsilon_{ijrs} \sim \mathcal{N}(0, \phi_{ijrs}\sigma^2)
+\end{eqnarray}
+
+The term $u_r$ represents a plant-level random effect that accounts for
+non-independence among leaves sampled from the same individual. This
+approach correctly treats plants (n=4 per treatment $\times$ genotype) as
+biological replicates, with leaves as correlated sub-samples within each
+plant. The consensus within-plant correlation was estimated using
+\textit{duplicateCorrelation} in \textit{limma} and incorporated into
+model fitting.
+
+The leaf stage ($\text{Leaf}_s$) was modeled as a centered numerical
+variable ($s \in \{1,2,3,4\}$), so the intercept represents expression
+at the average leaf stage. The precision weights $\phi_{ijrs}$ from the
+voom transformation capture heteroskedastic measurement error across
+samples.
+
+We adjusted the p-values for the t-tests of the linear model coefficients
+as false discovery rates (FDR). Genes whose effect had FDR $< 0.05$ were
+deemed differentially expressed. For phosphorus treatment ($\beta_2$) and
+\invfour genotype ($\beta_3$), genes with
+$|\log_2(\text{FC})| > 1.5$ were considered high-confidence DEGs. For the
+leaf stage effect ($\beta_1$) and interaction terms, a threshold of
+$|\log_2(\text{FC})| > 0.5$ was applied, corresponding to $>2.1$-fold
+total change across the leaf gradient. R scripts and expression data are
+available at the
+\href{https://github.com/sawers-rellan-labs/\invfourRNA}{\textit{\invfourRNA}
+github repository}.
+
+\subsection{Gene Ontology and KEGG overrepresenattion analysis}
+
+Once we had sets of differentially expressed genes for the three predictors 
+(leaf, -P, \invfour) and two types of gene expression response (upregulated and 
+downregulated), we proceeded to annotate them with gene ontology terms and KEGG 
+pathways using \textit{ClusterProfiler} \cite{yu2012, zicola2024}. We started 
+with the B73 NAM v5 gene ontology annotation from \cite{fattel2024} and added 
+GO terms for each intermediate node in the gene ontology tree using the 
+\textit{ClusterProfiler} function \textit{buildGOmap}.
+
+Then we conducted gene over-representation analysis with the function 
+\textit{compareCluster}, using as universe/background the set of 24011 genes 
+detected in at least one good quality leaf RNAseq library. This function 
+calculates the hypergeometric test for overrepresented ontology terms in the 
+specified gene set and returns raw, and FDR-adjusted p-values. We then manually 
+reviewed the combined 1700 significant (\textit{FDR} $<0.05$) overrepresented 
+GO term associations for the 6 predictor/regulation combinations, and we 
+selected for illustration an \textit{ad hoc} subset with low semantic 
+redundancy.
+
+Similarly, We tested for KEGG pathways over representation using the 
+\textit{enrichKEGG} function from \textit{compareCluster}, which makes the same 
+hypothesis tests on the NCBI REFseq annotation of the B73 NAM assembly. Both 
+types of overrepresentation analysis were plotted with the package \textit{DOSE} 
+\cite{yu2015}.
+
+\subsection{Filtering of \invfour DEGs by phenotype association}
+
+As our data showed evidence of \invfour accelerating flowering time and 
+increasing plant height, we put together a list of candidate genes associated 
+with these two phenotypes to tease out which DEGs were likely contributors to 
+the observed \invfour effect in these traits. For flowering time, we started 
+with the list of 991 genes compiled by \cite{wang2021} and 62 genes from 
+\cite{li2023a}.
+
+Then we downloaded the maize data from the GWAS atlas \cite{liu2023} 
+(\textit{gwas\_association\_result\_for\_maize.txt.gz}) and selected genes that 
+overlapped association SNPs for the 
+\href{https://ngdc.cncb.ac.cn/gwas/browse/ontology}{Plant Phenotype and Trait 
+Ontology} term ``days to flowering trait" \textit{PPTO:0000155}. For this and 
+the following candidate gene list, we considered that a gene overlapped an 
+association SNP if the SNP was located within the 5 kb extended range of the 
+gene model, i.e. as described in the gff gene annotation $\pm 5$ kb.
+
+The final source of associations for flowering time was the phenotypic 
+plasticity study in \cite{tibbs-cortes2024} from which we used 281 genes with 
+significant GWAS SNPs in the columns \textit{DTS\_slope}, \textit{DTS\_intcp}, 
+\textit{DTA\_slope}, \textit{DTA\_intcp}. For plant height, 27 genes from 
+\cite{liu2023}, 1210 genes with GWAS Atlas associations for the term ``plant 
+height" \textit{PPTO:0000126}; and 39 genes overlapping phenotypic plasticity 
+association SNPs for \textit{PH\_slope} and \textit{PH\_intcp} 
+\cite{tibbs-cortes2024}. The final nonredundant list consisted of a total of 
+2224 candidate genes for flowering time and 1272 candidates for plant height.
+
+\subsection{Meristem clearing and size quantification}
+
+For vegetative meristem size quantification, maize seedlings were grown at the 
+North Carolina State University Phytotron in a Percival Model LT-105 growth 
+chamber (conditions: 29.4°C day/23.9°C night, relative humidity 50\%, 16 hours 
+light/8 hours dark, light intensity of 412 $\mu$ mol at plant height; soil 
+type: 1:1 Sun Gro Propagation Growing Mix [Canadian Sphagnum peat moss 50-65\%, 
+vermiculite, dolomitic lime, 0.0001\% silicon dioxide] : cement sand) in 
+24-well trays. Seedlings were watered daily in the morning daily and fertilized 
+three times per week.
+
+Two-weeks after planting, seedlings were cut at soil level and again 1cm above 
+the soil cut. This 1cm tissue cassette of the shoot apex was cut longitudinally 
+in the medial plane, in a midrib to margin orientation, by hand with a razor 
+blade. Tissue was fixed in ice cold and fresh FAA [50\% EtOH, 35\% milliQ 
+water, 10\% formaldehyde (35\%), 5\% glacial acetic acid (v/v)] with a vacuum 
+for 15 min. FAA was replaced, and tissues were place overnight at 4°C on a 
+rocker.
+
+For clearing, tissues were then removed from FAA and dehydrated through a 
+graded ethanol series at room temperature for an hour each with gentle shaking: 
+50\%, 70\%, 85\%, 95\% EtOH (v/v)], followed by 1:1 95\% EtOH and Methyl 
+Salicylate, and finally, 100\% Methyl Salicylate. Once in 100\% Methyl 
+Salicylate, samples were left to shake at room temperature overnight. Each 
+shoot apex tissue cassette was placed on a microscope slide and covered with a 
+coverslip.
+
+Cleared shoot apices were imaged with differential internal contrast using a 
+Leica DM4B microscope equipped with a DMC6200 digital camera. Each shoot apex 
+image was measured using ImageJ v2.14.0. The scale was properly set for each 
+image. Width was measured as a straight line at 0° anchored from the edge of 
+P0. Height was measured from the highest point of the meristem tip to the width 
+line at 90°. Surface area was measured using the polygon selection tool by 
+taking into consideration the width line and marking the edge of the meristem 
+dome.
+
+Data were analyzed using ANOVA and plots were generated in R v.4.3.2 with the 
+packages rstatix v.0.7.2, readxl v.1.4.3, ggplot2 v.3.5.1 and ggpubr v.0.6.0.
+
+\section{Discussion}
+
+Our study demonstrates that introgression of the \invfour chromosomal inversion 
+from Mexican highland maize into temperate germplasm produces significant 
+phenotypic effects on flowering time and plant height, independent of phosphorus 
+availability. These findings illuminate potential mechanisms underlying local 
+adaptation in maize and identify candidate genes for future functional studies.
+
+The accelerated flowering time in \invfour-carrying plants represents a 
+counterintuitive result given the inversion's highland origin, where delayed 
+flowering at low elevations is adaptive. However, this pattern is consistent 
+with gene-by-environment interactions previously observed for \invfour 
+\cite{crow2020}. In temperate environments with extended growing seasons, the 
+earlier flowering conferred by \invfour may not be adaptive, explaining its 
+rarity in modern temperate cultivars despite potential introgression 
+opportunities during maize's northward expansion.
+
+The identification of JUMONJI methyltransferases as strong candidates for 
+flowering time regulation provides a mechanistic hypothesis for \invfour's 
+effects. These genes show differential copy number between modern maize and 
+highland teosinte, suggesting structural variation beyond the inversion itself 
+may contribute to phenotypic differences. The perturbation of a cell 
+proliferation gene network and the observed elongation of shoot apical 
+meristems offer a plausible cellular mechanism linking \invfour genotype to 
+increased plant height.
+
+Contrary to our initial hypothesis, \invfour showed no detectable effect on 
+phosphorus starvation responses despite containing classical PSR genes. This 
+suggests that phosphorus availability may not be the primary selective pressure 
+maintaining \invfour in highland populations, or that any phosphorus-related 
+effects are masked in our experimental conditions. Alternative adaptive 
+functions related to temperature, growing season length, or other edaphic 
+factors warrant further investigation.
+
+The presence of substantial linkage drag flanking \invfour (24 Mb across eight 
+generations of backcrossing) highlights the challenges of dissecting inversion 
+effects through introgression. Future work employing larger populations or 
+additional recombinant lines could help separate effects of genes within the 
+inversion proper from those in flanking regions.
+
+Inv4m
+\section{Acknowledgments}
+
+We acknowledge support from [funding agencies]. We thank [collaborators] for 
+assistance with field work and laboratory analyses.
+
+\bibliography{Inv4m}
+
+\pagebreak
+\onecolumn
+\section*{Supplement}
+
+\beginsupplement
+
+\begin{table}[!ht]
+\caption{\textbf{\invfour delimitation, breakpoints and knob repeats.}}
+\label{tab:breakpoints}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llrrrrrrl@{}}
+\multicolumn{9}{l}{\textbf{\invfour Limits}} \\ \midrule
+ &
+   &
+  \multicolumn{1}{l}{\textbf{Start}} &
+  \multicolumn{1}{l}{\textbf{End}} &
+  \multicolumn{1}{l}{\textbf{Length}} &
+  \multicolumn{2}{l}{\textbf{Start gene}} &
+  \multicolumn{2}{l}{\textbf{End gene}} \\ \cmidrule(l){3-9} 
+\multicolumn{1}{r}{B73} &
+   &
+  172883881 &
+  188131462 &
+  15247580 &
+  \multicolumn{2}{r}{\textit{Zm00001eb190470}} &
+  \multicolumn{2}{r}{\textit{Zm00001eb194800}} \\
+\multicolumn{1}{r}{PT} &
+   &
+  186925484 &
+  173486186 &
+  13439298 &
+  \multicolumn{2}{r}{\textit{Zm00109aa017629}} &
+  \multicolumn{2}{r}{\textit{Zm00109aa018009}} \\
+\multicolumn{1}{r}{TIL18} &
+   &
+  180365316 &
+  193570652 &
+  13205336 &
+  \multicolumn{2}{r}{\textit{Zx00002aa015554}} &
+  \multicolumn{2}{r}{\textit{Zx00002aa015905}} \\ \bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{figure}[!ht]
+\includegraphics[width=\linewidth]{figs/SNP_distribution.png}
+\caption{\textbf{Chromosome Distribution of the SNPs in the RNAseq samples, 
+their correlation with \invfour, and genotype run length as percentage of the 
+genome.} \textbf{(A)} Chromosome 4 contains 44\% of all genotyped SNPs and 98\% 
+of \invfour correlated SNPs (n=13). \textbf{(B)} Manhattan plot for the 
+significance (\textit{t-test}) of the Pearson correlation of 19861 genotyped 
+SNPs with PZE04175660223. Red line: \textit{FDR} $=0.05$ threshold. 
+\textbf{(C)} Pearson correlation ($r$) of the each SNP with the \invfour 
+tagging SNP PZE04175660223, open circles: non-significant SNPs. SNPs with 
+significant correlation with \invfour (full circles) are divergent highland 
+introgressions. \textbf{(D)} NIL genotype run length as percentage of the 
+genome. Each point represents a NIL, \invfour plants are tagged by the highland 
+allele of PZE04175660223, CTRL plants by the reference (B73) allele, dashed 
+line is the overall mean for the 13 NILs.}
+\label{fig::SNPdistro}
+\end{figure}
+
+
+\begin{table}[!ht]
+\caption{\textbf{Effect of experimental conditions on expression of 
+characterized maize genes.}}
+\label{tab:gene_effects}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+\textbf{Predictor} & \textbf{Regulation} & \textbf{Locus} & 
+\textbf{-log10(\textit{FDR})} & \textbf{logFC} & \textbf{Name} \\ \midrule
+Leaf & Down & zmm4 & 9.3 & -3.51 & Zea mays MADS4 \\
+Leaf & Down & sm2 & 7.3 & -2.12 & salmon silk2 \\
+-P & Up & pap19 & 9.7 & 5.99 & purple acid phosphatase19 \\
+-P & Up & pilncr1 & 9.6 & 7.34 & pi-deficiency-induced long non-coding RNA1 \\
+\invfour & Down & jmj2 & 13.7 & -3.03 & JUMONJI-transcription factor 2 \\
+\invfour & Down & jmj6 & 13.7 & -3.03 & JUMONJI-transcription factor 6 \\
+\invfour & Down & jmj9 & 13.7 & -3.03 & JUMONJI-transcription factor 9 \\
+\invfour & Down & jmj4 & 13.1 & -2.94 & JUMONJI-transcription factor 4 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\end{document}

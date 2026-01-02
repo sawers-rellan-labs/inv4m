@@ -12,11 +12,29 @@ results/
 *.RData
 *.csv
 *.tex
-*.log
 *.aln
 
 # Allow HTML files in docs/ directory for GitHub Pages
 !docs/**/*.html
+
+# Allow LaTeX source files in docs/ directory
+!docs/**/*.tex
+
+# LaTeX intermediary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
 
 # System files
 .DS_Store
