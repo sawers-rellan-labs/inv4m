@@ -472,13 +472,6 @@ transcript_MDS_12 <- d %>%
 
 saveRDS(transcript_MDS_12, file.path(paths$intermediate, "transcript_MDS_12.rds"))
 
-# Save as Panel B for Figure 3
-ggsave(
-  file.path(paths$figures, "panels", "panel_B_MDS.png"),
-  plot = transcript_MDS_12,
-  width = 6, height = 5, dpi = 300, bg = "white"
-)
-
 transcript_MDS_12
 ```
 
@@ -491,7 +484,7 @@ The third dimension separates by genotype.
 labels <- c("CTRL", "*Inv4m*")
 names(labels) <- c("CTRL", "INV4")
 
-d %>%
+transcript_MDS_34 <- d %>%
   ggplot(aes(x = dim3, y = dim4, fill = Genotype, shape = Treatment)) +
   xlab(paste0("dim3 (", round(100 * mds$var.explained[3]), "%)")) +
   ylab(paste0("dim4 (", round(100 * mds$var.explained[4]), "%)")) +
@@ -513,6 +506,15 @@ d %>%
     legend.spacing = unit(0, "line"),
     legend.box.spacing = unit(0, "line")
   )
+
+# Save as Panel B for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_B_MDS.png"),
+  plot = transcript_MDS_34,
+  width = 6, height = 5, dpi = 300, bg = "white"
+)
+
+transcript_MDS_34
 ```
 
 ## MDS Dimension Correlations
