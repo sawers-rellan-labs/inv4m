@@ -220,6 +220,9 @@ volcano_inv4m <- effects_df %>%
     legend.direction = "vertical"
   )
 
+# Save as RDS for assembly
+saveRDS(volcano_inv4m, file.path(paths$intermediate, "volcano_inv4m.rds"))
+
 # Save as Panel C for Figure 3
 ggsave(
   file.path(paths$figures, "panels", "panel_C_volcano.png"),

@@ -504,8 +504,15 @@ transcript_MDS_34 <- d %>%
     legend.position = c(0.89, 0.9),
     legend.text = element_markdown(),
     legend.spacing = unit(0, "line"),
-    legend.box.spacing = unit(0, "line")
+    legend.box.spacing = unit(0, "line"),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
   )
+
+# Save as RDS for assembly
+saveRDS(transcript_MDS_34, file.path(paths$intermediate, "transcript_MDS_34.rds"))
 
 # Save as Panel B for Figure 3
 ggsave(
