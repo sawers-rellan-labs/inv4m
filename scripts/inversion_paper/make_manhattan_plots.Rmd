@@ -372,8 +372,8 @@ plot_manhattan_gg <- function(m,
 ```{r manhattan-leaf-tissue}
 r <- effects %>% filter(predictor == "Leaf")
 
-# Manually set significant count (note from user)
-n.significant <- 14330
+# Calculate DEG count from data
+n.significant <- sum(r$is_DEG)
 
 # Prepare data
 to_plot <- get_plot_data(
@@ -401,8 +401,8 @@ leaf.plot
 ```{r manhattan-p-treatment}
 r <- effects %>% filter(predictor == "-P")
 
-# Manually set significant count (note from user)
-n.significant <- 10606
+# Calculate DEG count from data
+n.significant <- sum(r$is_DEG)
 
 # Prepare data
 to_plot <- get_plot_data(r)
@@ -419,6 +419,9 @@ lowP.plot
 
 ```{r manhattan-inv4m-genotype}
 r <- effects %>% filter(predictor == "Inv4m")
+
+# Calculate DEG count from data
+n.significant <- sum(r$is_DEG)
 
 uninformative <- c("cl19799_1", "cl19648_2a", "cl35478_1d", "IDP4515",
                    "pco086874", "GRMZM2G162007")
@@ -461,8 +464,8 @@ inv4m.plot
 ```{r manhattan-inv4m-p-interaction}
 r <- effects %>% filter(predictor == "Inv4m:-P")
 
-# Manually set significant count (note from user)
-n.significant <- 970
+# Calculate DEG count from data
+n.significant <- sum(r$is_DEG)
 
 uninformative <- c("cl19799_1", "cl19648_2a", "cl35478_1d", "IDP4515",
                    "pco086874", "GRMZM2G162007")
