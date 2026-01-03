@@ -394,6 +394,7 @@ ggsave(
   plot = leaf.plot,
   width = 8, height = 4, dpi = 300, bg = "white"
 )
+saveRDS(leaf.plot, file.path(paths$intermediate, "panel_D_manhattan_leaf.rds"))
 
 leaf.plot
 ```
@@ -457,6 +458,7 @@ ggsave(
   plot = inv4m.plot,
   width = 8, height = 4, dpi = 300, bg = "white"
 )
+saveRDS(inv4m.plot, file.path(paths$intermediate, "panel_E_manhattan_inv4m.rds"))
 
 inv4m.plot
 ```
@@ -539,6 +541,7 @@ ggsave(
   plot = p1,
   width = 6, height = 4, dpi = 300, bg = "white"
 )
+saveRDS(p1, file.path(paths$intermediate, "panel_G_local_manhattan.rds"))
 
 p1
 ```
@@ -574,6 +577,7 @@ ggsave(
   plot = p_logfc,
   width = 6, height = 4, dpi = 300, bg = "white"
 )
+saveRDS(p_logfc, file.path(paths$intermediate, "panel_H_local_logfc.rds"))
 
 p_logfc
 ```

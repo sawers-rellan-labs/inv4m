@@ -36,8 +36,8 @@ paths <- setup_project_paths("inversion_paper")
 # Overview
 
 This notebook assembles individual panels into the final Figure 3 composite.
-Panels B (MDS) and C (Volcano) are loaded from RDS files for proper ggplot assembly.
-Other panels are loaded from PNG files.
+All panels (except A which is a user-provided PNG) are loaded from RDS files
+for font size control and proper ggplot assembly.
 
 **Panel layout (8 panels, A-H):**
 
@@ -82,8 +82,9 @@ library(ggplot2)
 panel_dir <- file.path(paths$figures, "panels")
 
 # Final figure dimensions (2-column width for journal)
-fig_width_mm <- 180
-fig_height_mm <- 200
+# Note: height increased to accommodate 8 panels with ggrepel labels
+fig_width_mm <- 280
+fig_height_mm <- 370
 dpi <- 300
 
 # Convert mm to inches for ggsave
@@ -95,14 +96,31 @@ fig_height_in <- fig_height_mm / 25.4
 
 # Load Panels
 
-## Panels B and C from RDS (ggplot objects)
+## Load RDS Panels (B, C, D, E, F, G, H)
 
 ```{r load_rds_panels}
-# Load MDS plot (Panel B)
+# Helper to load RDS panel with fallback
+load_rds_panel <- function(filepath, label, script_hint = "") {
+  if (file.exists(filepath)) {
+    p <- readRDS(filepath)
+    cat(sprintf("Loaded Panel %s from RDS\n", label))
+    return(p)
+  } else {
+    warning(sprintf("Panel %s RDS not found. %s", label, script_hint))
+    return(ggplot() +
+      annotate("text", x = 0.5, y = 0.5,
+               label = paste("Panel", label, "\n(missing)"),
+               size = 8, color = "gray50") +
+      theme_void())
+  }
+}
+
+# Panel B: MDS plot
 mds_file <- file.path(paths$intermediate, "transcript_MDS_34.rds")
+panel_B <- load_rds_panel(mds_file, "B",
+  "Run differential_expression_leaf_treatment_model.Rmd first.")
+# Remove axis text/ticks for figure assembly
 if (file.exists(mds_file)) {
-  panel_B <- readRDS(mds_file)
-  # Remove axis text and ticks for figure assembly
   panel_B <- panel_B +
     theme(
       axis.text.x = element_blank(),
@@ -110,28 +128,40 @@ if (file.exists(mds_file)) {
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank()
     )
-  cat("Loaded MDS plot from RDS\n")
-} else {
-  warning("MDS RDS not found. Run differential_expression_leaf_treatment_model.Rmd first.")
-  panel_B <- ggplot() +
-    annotate("text", x = 0.5, y = 0.5, label = "Panel B\n(missing)", size = 8, color = "gray50") +
-    theme_void()
 }
 
-# Load Volcano plot (Panel C)
+# Panel C: Volcano plot
 volcano_file <- file.path(paths$intermediate, "volcano_inv4m.rds")
-if (file.exists(volcano_file)) {
-  panel_C <- readRDS(volcano_file)
-  cat("Loaded Volcano plot from RDS\n")
-} else {
-  warning("Volcano RDS not found. Run volcano_plot_analysis.Rmd first.")
-  panel_C <- ggplot() +
-    annotate("text", x = 0.5, y = 0.5, label = "Panel C\n(missing)", size = 8, color = "gray50") +
-    theme_void()
-}
+panel_C <- load_rds_panel(volcano_file, "C",
+  "Run volcano_plot_analysis.Rmd first.")
+
+# Panel D: Manhattan Leaf
+panel_D_file <- file.path(paths$intermediate, "panel_D_manhattan_leaf.rds")
+panel_D <- load_rds_panel(panel_D_file, "D",
+  "Run make_manhattan_plots.Rmd first.")
+
+# Panel E: Manhattan Inv4m
+panel_E_file <- file.path(paths$intermediate, "panel_E_manhattan_inv4m.rds")
+panel_E <- load_rds_panel(panel_E_file, "E",
+  "Run make_manhattan_plots.Rmd first.")
+
+# Panel F: Haplotype
+panel_F_file <- file.path(paths$intermediate, "panel_F_haplotype.rds")
+panel_F <- load_rds_panel(panel_F_file, "F",
+  "Run plot_genotype_get_correlated_loci.Rmd first.")
+
+# Panel G: Local Manhattan
+panel_G_file <- file.path(paths$intermediate, "panel_G_local_manhattan.rds")
+panel_G <- load_rds_panel(panel_G_file, "G",
+  "Run make_manhattan_plots.Rmd first.")
+
+# Panel H: Local logFC
+panel_H_file <- file.path(paths$intermediate, "panel_H_local_logfc.rds")
+panel_H <- load_rds_panel(panel_H_file, "H",
+  "Run make_manhattan_plots.Rmd first.")
 ```
 
-## Other Panels from PNG
+## Panel A from PNG (user-provided schematic)
 
 ```{r load_png_panels}
 # Helper function to load PNG as ggplot
@@ -150,40 +180,89 @@ load_png_panel <- function(filepath, label) {
   return(p)
 }
 
-# Load PNG panels
-panel_A <- load_png_panel(file.path(panel_dir, "panel_A_leaf_sampling.png"), "A")
-panel_D <- load_png_panel(file.path(panel_dir, "panel_D_manhattan_leaf.png"), "D")
-panel_E <- load_png_panel(file.path(panel_dir, "panel_E_manhattan_inv4m.png"), "E")
-panel_F <- load_png_panel(file.path(panel_dir, "panel_F_haplotype.png"), "F")
-panel_G <- load_png_panel(file.path(panel_dir, "panel_G_local_manhattan.png"), "G")
-panel_H <- load_png_panel(file.path(panel_dir, "panel_H_local_logfc.png"), "H")
+# Load Panel A (leaf sampling schematic - user-provided PNG)
+panel_A_file <- file.path(panel_dir, "panel_A_leaf_sampling.png")
+panel_A <- load_png_panel(panel_A_file, "A")
+```
 
-# Check status
-png_files <- c(
-  A = file.path(panel_dir, "panel_A_leaf_sampling.png"),
-  D = file.path(panel_dir, "panel_D_manhattan_leaf.png"),
-  E = file.path(panel_dir, "panel_E_manhattan_inv4m.png"),
-  F = file.path(panel_dir, "panel_F_haplotype.png"),
-  G = file.path(panel_dir, "panel_G_local_manhattan.png"),
-  H = file.path(panel_dir, "panel_H_local_logfc.png")
-)
+## Panel Status
 
+```{r panel_status}
+# Check status of all panels
 status_df <- data.frame(
   Panel = c("A", "B", "C", "D", "E", "F", "G", "H"),
-  Source = c("PNG", "RDS", "RDS", "PNG", "PNG", "PNG", "PNG", "PNG"),
+  Source = c("PNG", "RDS", "RDS", "RDS", "RDS", "RDS", "RDS", "RDS"),
   Status = c(
-    ifelse(file.exists(png_files["A"]), "OK", "MISSING"),
+    ifelse(file.exists(panel_A_file), "OK", "MISSING"),
     ifelse(file.exists(mds_file), "OK", "MISSING"),
     ifelse(file.exists(volcano_file), "OK", "MISSING"),
-    ifelse(file.exists(png_files["D"]), "OK", "MISSING"),
-    ifelse(file.exists(png_files["E"]), "OK", "MISSING"),
-    ifelse(file.exists(png_files["F"]), "OK", "MISSING"),
-    ifelse(file.exists(png_files["G"]), "OK", "MISSING"),
-    ifelse(file.exists(png_files["H"]), "OK", "MISSING")
+    ifelse(file.exists(panel_D_file), "OK", "MISSING"),
+    ifelse(file.exists(panel_E_file), "OK", "MISSING"),
+    ifelse(file.exists(panel_F_file), "OK", "MISSING"),
+    ifelse(file.exists(panel_G_file), "OK", "MISSING"),
+    ifelse(file.exists(panel_H_file), "OK", "MISSING")
   )
 )
 
 knitr::kable(status_df, caption = "Panel Availability")
+```
+
+---
+
+# Adjust Panel Fonts
+
+Balance font sizes across all panels for consistent appearance.
+
+```{r adjust_fonts}
+# Target base size for readable axes
+base_size <- 15
+
+# Panel B (MDS): Keep axes readable, shrink legend (legend.text uses element_markdown)
+panel_B <- panel_B +
+  theme(
+    axis.title = element_text(size = base_size),
+    legend.title = element_markdown(size = 15),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    legend.position = "top"
+  )
+
+# Panel C (Volcano): Readable axes, smaller legend
+panel_C <- panel_C +
+
+  theme(
+    axis.title = element_text(size = base_size),
+    axis.text = element_text(size = base_size - 2),
+    legend.key.size = unit(0.12, "cm"),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key = element_rect(fill = "transparent", colour = NA)
+  )
+
+# Panels D, E (Manhattan): Readable axes, smaller title and legend
+manhattan_theme <- theme(
+  plot.title = element_markdown(size = base_size, face = "bold", hjust = 1),
+  axis.title = element_text(size = base_size),
+  axis.text = element_text(size = base_size - 2),
+  axis.text.x = element_text(size = base_size - 3)
+)
+panel_D <- panel_D + manhattan_theme
+panel_E <- panel_E + manhattan_theme
+
+# Panels G, H (Local Manhattan/logFC): Readable axes
+local_theme <- theme(
+  axis.title = element_text(size = base_size),
+  axis.text.x = element_text(size = base_size - 3),
+  plot.margin = unit(c(5.5, 5.5, 5.5, 20), "pt")
+)
+
+# Panel F: Haplotype
+panel_F <- panel_F + local_theme +
+  theme(
+    legend.title = element_markdown(size = 15)
+  )
+
+panel_G <- panel_G + local_theme
+panel_H <- panel_H + local_theme
 ```
 
 ---
@@ -224,6 +303,7 @@ col1 <- plot_grid(
 )
 
 # Column 2: D, E, F, G, H
+# Panel F needs much more height for the 3 haplotype lines to be clearly visible
 col2 <- plot_grid(
   panel_D_labeled,
   panel_E_labeled,
@@ -231,7 +311,7 @@ col2 <- plot_grid(
   panel_G_labeled,
   panel_H_labeled,
   ncol = 1,
-  rel_heights = c(0.8, 0.8, 1.2, 1.2, 1.2),
+  rel_heights = c(0.6, 0.6, 0.6, 0.9, 0.9),
   align = "v",
   axis = "lr"
 )
@@ -276,14 +356,20 @@ cat(sprintf("Dimensions: %.0f x %.0f mm at %d DPI\n", fig_width_mm, fig_height_m
 ```{r summary}
 cat("=== Assembly Complete ===\n\n")
 cat("Panel sources:\n")
+cat("  A (Leaf sampling): PNG (user-provided schematic)\n")
 cat("  B (MDS): RDS -> axis removed for assembly\n")
 cat("  C (Volcano): RDS\n")
-cat("  A, D, E, F, G, H: PNG\n")
-cat("\nTo update panels, run:\n")
+cat("  D (Manhattan Leaf): RDS\n")
+cat("  E (Manhattan Inv4m): RDS\n")
+cat("  F (Haplotype): RDS\n")
+cat("  G (Local Manhattan): RDS\n")
+cat("  H (Local logFC): RDS\n")
+cat("\nTo regenerate panels, run:\n")
 cat("  - differential_expression_leaf_treatment_model.Rmd -> Panel B (MDS)\n")
 cat("  - volcano_plot_analysis.Rmd -> Panel C (Volcano)\n")
 cat("  - make_manhattan_plots.Rmd -> Panels D, E, G, H\n")
 cat("  - plot_genotype_get_correlated_loci.Rmd -> Panel F\n")
+cat("\nAll RDS panels can have fonts adjusted in this assembly script.\n")
 ```
 
 ---

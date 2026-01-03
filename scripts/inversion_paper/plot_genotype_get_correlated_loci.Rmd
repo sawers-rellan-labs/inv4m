@@ -393,13 +393,6 @@ inlay <- gt_runs %>%
     plot.background = element_rect(fill = "transparent", color = NA)
   )
 
-# Save as Panel F for Figure 3
-ggsave(
-  file.path(paths$figures, "panels", "panel_F_haplotype.png"),
-  plot = inlay,
-  width = 6, height = 4, dpi = 300, bg = "white"
-)
-
 # Combine plots
 plot_with_inset <- ggdraw() +
   draw_plot(gt_plot) +
@@ -412,6 +405,78 @@ plot_with_inset <- ggdraw() +
 plot_with_inset
 ```
 
+## Panel F: Selected NIL Haplotypes
+
+**Purpose**: Create Panel F for Figure 3 showing haplotype map for 3 representative NIL lines.
+
+```{r panel_f_haplotype, fig.height=3, fig.width=8}
+# Selected samples for Panel F (representative NILs)
+selected3 <- c("3131", "4125", "4131")
+
+# Create Panel F plot
+gt3_plot <- gt_runs %>%
+  filter(chr == "S4", ind %in% selected3) %>%
+  droplevels() %>%
+  ungroup() %>%
+  mutate(
+    ind = factor(ind, levels = selected3),
+    chr = gsub("S", "", chr)
+  ) %>%
+  ggplot(aes(x = span, y = ind, fill = gt)) +
+  ylab("Line") +
+  geom_col(width = 1) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_fill_viridis_b(
+    breaks = breaks,
+    limits = c(-0.5, 2.5),
+    show.limits = TRUE,
+    na.value = "gray85",
+    direction = -1
+  ) +
+  guides(fill = guide_legend(title = "Genotype", ncol = 3)) +
+  coord_cartesian(xlim = c(150, 200)) +
+  annotate("point",
+    x = 181.6, y = 4,
+    shape = 25, size = 7, color = "#0D0887FF", fill = "#0D0887FF"
+  ) +
+  annotate("text",
+    x = c(inversion_limit, introgression_limit), y = 4,
+    label = rep("|", 4), size = 7
+  ) +
+  annotate("text",
+    x = c(inversion_limit, introgression_limit), y = 0,
+    label = rep("|", 4), size = 7
+  ) +
+  ggpubr::theme_classic2(base_size = 25) +
+  theme(
+    legend.position = "top",
+    legend.byrow = TRUE,
+    legend.text = element_text(size = 20),
+    legend.box.spacing = unit(0, "pt"),
+    plot.margin = unit(c(0, 0, 0, 0), "cm"),
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    plot.title = element_text(color = "white"),
+    axis.title.y = element_text(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line.x = element_blank(),
+    plot.background = element_rect(fill = "transparent", color = NA)
+  )
+
+# Save as Panel F for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_F_haplotype.png"),
+  plot = gt3_plot,
+  width = 8, height = 3, dpi = 300, bg = "white"
+)
+saveRDS(gt3_plot, file.path(paths$intermediate, "panel_F_haplotype.rds"))
+
+gt3_plot
+```
 
 ```{r genotype_summary, fig.height=4}
 # Background means
