@@ -1,0 +1,738 @@
+---
+title: "Expression Manhattan Plots using fastman_gg (ggplot2)"
+author: "Fausto Rodríguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r overview, include=FALSE}
+# This document creates Manhattan plots for differential expression analysis across 
+# multiple predictors (-P treatment, Inv4m genotype, leaf stage) in maize using 
+# the fastman_gg function with ggplot2.
+#
+# Key differences from base graphics version:
+# - Uses fastman_gg() which returns ggplot objects
+# - Easier to customize with standard ggplot2 functions
+# - No need for ggplotify conversion
+# - Can use ggrepel for better label placement
+```
+
+```{r load-libraries}
+library(here)
+library(dplyr)
+library(scales)
+library(ggplot2)
+library(rtracklayer)
+library(GenomicRanges)
+library(fastman)
+library(RAINBOWR)
+library(cowplot)
+library(ggpubr)
+library(ggtext)
+library(ggrepel)
+
+# Setup project paths
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+```{r define-genomic-regions}
+# Load Maize Reference Genome
+myGFF <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
+B73 <- rtracklayer::import(myGFF) %>%
+  subset(type == "gene" & seqnames %in% 1:10)
+
+genes <- as.data.frame(B73)
+genes$ID <- gsub("gene:", "", genes$ID)
+
+# Inv4m boundaries based on gene coordinates
+inv4m_start <- genes[genes$ID == "Zm00001eb190470", "start"]
+inv4m_end <- genes[genes$ID == "Zm00001eb194780", "end"]
+
+# Create GRanges objects
+inv4m <- GRanges(
+  seqnames = "4",
+  ranges = IRanges(start = inv4m_start, end = inv4m_end),
+  strand = "+"
+)
+
+shared_introgression <- GRanges(
+  seqnames = "4",
+  ranges = IRanges(start = 157012149, end = 195900523),
+  strand = "+"
+)
+
+# Calculate limits in Mb
+introgression_limit <- round(c(157012149, 195900523) / 1000000, 2)
+inversion_limit <- round(c(inv4m_start, inv4m_end) / 1000000, 2)
+```
+
+```{r identify-genes-in-regions}
+# Find genes overlapping inv4m
+olap <- findOverlaps(inv4m, B73)
+inv4m_gene_ids <- genes$ID[subjectHits(olap)]
+
+# Find genes in shared introgression
+olap2 <- findOverlaps(shared_introgression, B73)
+shared_introgression_gene_ids <- genes$ID[subjectHits(olap2)]
+
+# Find flanking region genes (in introgression but not in inv4m)
+flanking_introgression_gene_ids <- 
+  shared_introgression_gene_ids[!(shared_introgression_gene_ids %in% inv4m_gene_ids)]
+
+cat("Genes in inv4m:", length(inv4m_gene_ids), "\n")
+cat("Genes in shared introgression:", length(shared_introgression_gene_ids), "\n")
+cat("Genes in flanking regions:", length(flanking_introgression_gene_ids), "\n")
+cat("Inversion size (Mb):", round(inversion_limit[2] - inversion_limit[1], 1), "\n")
+cat("Introgression size (Mb):", round(introgression_limit[2] - introgression_limit[1], 1), "\n")
+```
+
+```{r load-expression-effects-data}
+effects <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"))
+
+# Set Bonferroni threshold for multiple testing
+bonferroni_threshold <- -log10(0.05 / nrow(effects))
+```
+
+```{r data-preparation-function}
+#' Prepare Data for Manhattan Plot
+#'
+#' Extracts and formats the required columns for fastman_gg plotting
+#'
+#' @param stats Data frame containing gene-level statistics
+#' @param point_label Character, name of column containing locus labels
+#' @param uninfomative_labels Character vector, labels to exclude from annotation
+#'
+#' @return Data frame with columns: gene, SNP, CHR, BP, P, and point_label
+get_plot_data <- function(stats,
+                          point_label = "locus_symbol",
+                          uninfomative_labels = NA) {
+  stats <- stats %>%
+    mutate(
+      SNP = paste0("S", CHR, "_", BP),
+      P = P.Value  # Rename for fastman compatibility
+    ) %>%
+    dplyr::select(gene, SNP, CHR, BP, P, all_of(point_label)) %>%
+    distinct() %>%
+    arrange(CHR, BP)
+  
+  # Check if uninfomative_labels has any non-NA values
+  if (length(uninfomative_labels) > 0 && any(!is.na(uninfomative_labels))) {
+    # Set to empty string so points are plotted but not labeled
+    stats[[point_label]][stats[[point_label]] %in% uninfomative_labels] <- ""
+  }
+  
+  stats
+}
+```
+
+```{r coordinate-transformer-function}
+#' Create Coordinate Transformer for Manhattan Plots
+#'
+#' Generates a function that transforms chromosome and base pair coordinates
+#' to the scaled x-axis coordinates used by fastman_gg. This exactly replicates
+#' the internal coordinate transformation of fastman_gg.
+#'
+#' @param m Data frame with CHR and BP columns
+#'
+#' @return A function that takes CHR and BP (vectors or scalars) and returns BPn
+#'
+#' @details The transformation follows these steps:
+#'   1. Calculate per-chromosome statistics (min, max, width, median gap)
+#'   2. Find maximum gap across all chromosomes
+#'   3. Calculate cumulative base positions with gaps between chromosomes
+#'   4. Scale so the final midpoint equals the number of chromosomes
+#'   5. For each point: BPn = scaled_BP + scaled_base_for_chromosome
+#'
+#' @examples
+#' transform_coords <- get_transformer(to_plot)
+#' # Transform specific coordinates on chromosome 4 at 172.88 Mb
+#' x_coord <- transform_coords(chr = 4, bp = 172.88e6)
+get_transformer <- function(m) {
+  
+  # Calculate per-chromosome statistics (matching fastman_gg exactly)
+  cmat <- m %>%
+    arrange(CHR, BP) %>%
+    group_by(CHR) %>%
+    summarise(
+      min_bp = min(BP),
+      max_bp = max(BP),
+      width = max_bp - min_bp,
+      medgap = median(diff(sort(BP))),
+      .groups = "drop"
+    ) %>%
+    arrange(CHR)
+  
+  # Find max gap across all chromosomes
+  maxgap <- max(cmat$medgap, na.rm = TRUE)
+  
+  # Calculate cumulative bases and midpoints
+  numc <- nrow(cmat)
+  cmat$base <- 0
+  cmat$midp <- 0
+  
+  cmat$base[1] <- 0
+  cmat$midp[1] <- cmat$width[1] / 2
+  
+  if (numc > 1) {
+    for (i in 2:numc) {
+      cmat$base[i] <- cmat$base[i - 1] + cmat$width[i - 1] + maxgap
+      cmat$midp[i] <- cmat$base[i] + cmat$width[i] / 2
+    }
+  }
+  
+  # Calculate scaling factor
+  fac <- numc / cmat$midp[numc]
+  
+  # Scale bases
+  cmat$basef <- fac * cmat$base
+  
+  # Create lookup table
+  lookup <- cmat %>%
+    select(CHR, min_bp, basef)
+  
+  # Return transformer function (closure)
+  transform_coordinates <- function(chr, bp) {
+    # Convert to data frame for joining
+    coords <- data.frame(
+      CHR = chr,
+      BP = bp
+    )
+    
+    # Join with lookup table and calculate BPn
+    result <- coords %>%
+      left_join(lookup, by = "CHR") %>%
+      mutate(
+        BP_offset = BP - min_bp,
+        BP_scaled = fac * BP_offset,
+        BPn = BP_scaled + basef
+      ) %>%
+      pull(BPn)
+    
+    result
+  }
+  
+  transform_coordinates
+}
+```
+
+```{r locus-label-annotation-function}
+#' Add Locus Labels to Manhattan Plot
+#'
+#' Adds ggrepel text annotations for top SNPs to an existing Manhattan plot
+#'
+#' @param p ggplot object (Manhattan plot)
+#' @param m Data frame with CHR, BP, P, and label column
+#' @param transform_coordinates Function that transforms CHR, BP to BPn
+#' @param top_n Integer, number of top loci to annotate
+#' @param maxnegLogP Maximum -log10(P) value for y-axis positioning
+#' @param label_column Character, name of column to use for labels
+#' @param text_size Numeric, size of annotation text
+#' @param segment_color Character, color of connecting segments
+#'
+#' @return ggplot object with added annotations
+add_locus_labels <- function(p,
+                             m,
+                             transform_coordinates,
+                             top_n,
+                             maxnegLogP,
+                             label_column = "locus_symbol",
+                             text_size = 5,
+                             segment_color = "black") {
+  
+  if (is.null(top_n) || top_n <= 0) {
+    return(p)
+  }
+  
+  # Calculate BPn for all points using transformer
+  m_with_coords <- m %>%
+    mutate(
+      BPn = transform_coordinates(CHR, BP),
+      logP = -log10(P)
+    )
+  
+  # Get top N SNPs with non-empty labels
+  top_snps <- m_with_coords %>%
+    filter(!is.na(.data[[label_column]]) & trimws(.data[[label_column]]) != "") %>%
+    arrange(P) %>%
+    head(top_n)
+  
+  if (nrow(top_snps) > 0) {
+    p <- p +
+      ggrepel::geom_text_repel(
+        data = top_snps,
+        aes(x = BPn, y = logP, label = .data[[label_column]]),
+        inherit.aes = FALSE,
+        ylim = c(maxnegLogP, NA),
+        segment.color = segment_color,
+        segment.size = 0.3,
+        min.segment.length = 0,
+        size = text_size,
+        box.padding = 0.5,
+        point.padding = 0.3,
+        force = 1.5,
+        max.overlaps = Inf,
+        fontface = "italic"
+      )
+  }
+  
+  p
+}
+```
+
+```{r main-manhattan-plot-function}
+#' Create Manhattan Plot using fastman_gg
+#'
+#' Creates a Manhattan plot with optional ggrepel annotations for top loci
+#'
+#' @param m Data frame formatted by get_plot_data(), must contain:
+#'   - CHR: chromosome number
+#'   - BP: base pair position  
+#'   - P: p-value
+#'   - SNP: SNP identifier
+#'   - locus_symbol: gene/locus labels for annotation (optional)
+#' @param title Character string for plot title (supports markdown)
+#' @param top_n Integer, number of top SNPs to annotate with ggrepel.
+#'   Only SNPs with non-empty label values are considered.
+#'   If NULL or 0, no annotation is added
+#' @param label_column Character, name of column to use for labels
+#' @param ... Additional arguments passed to fastman_gg()
+#'
+#' @return ggplot object with optional annotations
+#'
+#' @examples
+#' # Basic plot
+#' plot_manhattan_gg(m = to_plot, title = "My Analysis")
+#' 
+#' # With annotations
+#' plot_manhattan_gg(m = to_plot, title = "My Analysis", top_n = 5)
+#' 
+#' # Add vertical lines
+#' p <- plot_manhattan_gg(m = to_plot, title = "My Analysis", top_n = 3)
+#' transform <- get_transformer(to_plot)
+#' p + geom_vline(xintercept = transform(4, 172e6), linetype = "dashed")
+plot_manhattan_gg <- function(m, 
+                              title, 
+                              top_n = NULL,
+                              label_column = "locus_symbol",
+                              ...) {
+  
+  neglogFDR <- expression(-log[10](italic(FDR)))
+  FDR_thresh <- -log10(0.05) 
+  maxnegLogP <- -log10(min(m$P[m$P > 0]))
+  
+  # Get coordinate transformer
+  transform_coordinates <- get_transformer(m)
+  
+  # Create base Manhattan plot
+  p <- fastman_gg(
+    m = m,
+    snp = "SNP",
+    maxP = maxnegLogP,
+    genomewideline = FDR_thresh,
+    suggestiveline = NULL,
+    ylab = neglogFDR,
+    xlab = "", 
+    ...
+  ) +
+    ggtitle(title) +
+    theme_classic(base_size = 20) +
+    scale_y_continuous(expand = expansion(mult = c(0.01, 0.25))) +
+    theme(
+      plot.title = element_markdown(hjust = 1, size = 25, face = "bold"),
+      axis.text.x = element_text(angle = 0, hjust = 0.5),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.2),
+      legend.position = "none"
+    )
+  
+  # Add locus labels if requested
+  p <- add_locus_labels(
+    p = p,
+    m = m,
+    transform_coordinates = transform_coordinates,
+    top_n = top_n,
+    maxnegLogP = maxnegLogP,
+    label_column = label_column
+  )
+  
+  p
+}
+```
+
+```{r manhattan-leaf-tissue}
+r <- effects %>% filter(predictor == "Leaf")
+
+# Manually set significant count (note from user)
+n.significant <- 14330
+
+# Prepare data
+to_plot <- get_plot_data(
+  r,
+  uninfomative_labels = c("umc1690", "umc1286")
+)
+
+# Create plot with top 5 SNP annotations
+leaf.plot <- plot_manhattan_gg(
+  m = to_plot,
+  title = paste("Leaf:", n.significant, "DEGs"),
+  top_n = 5
+)
+
+# Save as Panel D for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_D_manhattan_leaf.png"),
+  plot = leaf.plot,
+  width = 8, height = 4, dpi = 300, bg = "white"
+)
+
+leaf.plot
+```
+
+```{r manhattan-p-treatment}
+r <- effects %>% filter(predictor == "-P")
+
+# Manually set significant count (note from user)
+n.significant <- 10606
+
+# Prepare data
+to_plot <- get_plot_data(r)
+
+# Create plot with top 5 SNP annotations
+lowP.plot <- plot_manhattan_gg(
+  m = to_plot, 
+  title = paste("-P:", n.significant, "DEGs"),
+  top_n = 5
+)
+
+lowP.plot
+```
+
+```{r manhattan-inv4m-genotype}
+r <- effects %>% filter(predictor == "Inv4m")
+
+uninformative <- c("cl19799_1", "cl19648_2a", "cl35478_1d", "IDP4515",
+                   "pco086874", "GRMZM2G162007")
+
+to_plot <- get_plot_data(
+  r,
+  uninfomative_labels = uninformative 
+)
+
+# Get transformer for adding vertical lines
+convert_coordinates <- get_transformer(to_plot)
+
+inv4m_x_coord <- convert_coordinates(
+  c(4, 4),
+  c(inv4m_start, inv4m_end)
+)
+
+# Create plot with top 5 SNP annotations
+inv4m.plot <- plot_manhattan_gg(
+  m = to_plot,
+  title = paste("<i>Inv4m</i>:", n.significant, "DEGs"),
+  top_n = 5
+) +
+  geom_vline(
+    xintercept = inv4m_x_coord,
+    linetype = "dashed",
+    color = "grey"
+  )
+
+# Save as Panel E for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_E_manhattan_inv4m.png"),
+  plot = inv4m.plot,
+  width = 8, height = 4, dpi = 300, bg = "white"
+)
+
+inv4m.plot
+```
+
+```{r manhattan-inv4m-p-interaction}
+r <- effects %>% filter(predictor == "Inv4m:-P")
+
+# Manually set significant count (note from user)
+n.significant <- 970
+
+uninformative <- c("cl19799_1", "cl19648_2a", "cl35478_1d", "IDP4515",
+                   "pco086874", "GRMZM2G162007")
+
+to_plot <- get_plot_data(
+  r,
+  uninfomative_labels = uninformative 
+)
+
+# Create plot with top 3 SNP annotations
+inv4mxP.plot <- plot_manhattan_gg(
+  m = to_plot, 
+  title = paste("<i>Inv4m</i> x -P:", n.significant, "DEGs"),
+  top_n = 3
+) +
+  geom_vline(
+    xintercept = inv4m_x_coord,
+    linetype = "dashed",
+    color = "grey"
+  )
+
+inv4mxP.plot
+```
+
+```{r chr4-detail-plot}
+# Define color palette
+pal <- c("#C84B79", "#0F1D87", "#F1FA41")
+names(pal) <- c("inv4m", "flanking", "outside")
+FDR_thresh <- -log10(0.05)
+
+# Filter to Inv4m predictor and create region column
+effect_inv4m <- effects %>%
+  filter(predictor == "Inv4m") %>%
+  mutate(
+    region = case_when(
+      in_Inv4m ~ "inv4m",
+      in_flank ~ "flanking",
+      TRUE ~ "outside"
+    ),
+    region = factor(region, levels = c("inv4m", "flanking", "outside"))
+  )
+
+# Create chromosome 4 detail plot
+p1 <- effect_inv4m %>%
+  filter(CHR == 4) %>%
+  mutate(x = BP / 1e6) %>%
+  ggplot(aes(x = x, y = -log10(adj.P.Val), group = region, color = region)) +
+  ylab(expression(-log[10](italic(FDR)))) +
+  annotate(
+    "text",
+    x = c(inversion_limit, introgression_limit),
+    y = -0.5,
+    label = rep("|", 4),
+    size = 10
+  ) +
+  geom_point(size = 2, alpha = 0.7) +
+  scale_color_manual(values = pal) +
+  scale_y_continuous(expand = c(0, 0.5)) +
+  geom_hline(yintercept = FDR_thresh, col = "red", linetype = "dashed") +
+  coord_cartesian(xlim = c(150, 200)) +
+  xlab("Chromosome 4 Position [Mb]") +
+  ggpubr::theme_classic2(base_size = 25) +
+  theme(
+    legend.position = "none",
+    plot.margin = unit(c(0.5, 0, 0.5, 0), "cm")
+  )
+
+# Save as Panel G for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_G_local_manhattan.png"),
+  plot = p1,
+  width = 6, height = 4, dpi = 300, bg = "white"
+)
+
+p1
+```
+
+```{r chr4-logfc-distribution}
+# Panel H: Local logFC distribution for chr4 150-200Mb region
+p_logfc <- effect_inv4m %>%
+  filter(CHR == 4, BP >= 150e6, BP <= 200e6) %>%
+  mutate(x = BP / 1e6) %>%
+  ggplot(aes(x = x, y = logFC, color = region)) +
+  ylab(expression(log[2]("Fold Change"))) +
+  xlab("Chromosome 4 Position [Mb]") +
+  annotate(
+    "text",
+    x = c(inversion_limit, introgression_limit),
+    y = min(effect_inv4m$logFC[effect_inv4m$CHR == 4], na.rm = TRUE) - 0.3,
+    label = rep("|", 4),
+    size = 8
+  ) +
+  geom_point(size = 2, alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = pal) +
+  coord_cartesian(xlim = c(150, 200)) +
+  ggpubr::theme_classic2(base_size = 20) +
+  theme(
+    legend.position = "none",
+    plot.margin = unit(c(0.5, 0, 0.5, 0), "cm")
+  )
+
+# Save as Panel H for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_H_local_logfc.png"),
+  plot = p_logfc,
+  width = 6, height = 4, dpi = 300, bg = "white"
+)
+
+p_logfc
+```
+
+```{r contingency-table-analysis}
+# Test enrichment of significant genes in regions
+contingency <- with(
+  effect_inv4m %>% mutate(is_significant = adj.P.Val < 0.05),
+  table(region, is_significant)
+)
+
+print(contingency)
+
+chisq.test(contingency)
+
+# Test inv4m vs flanking
+contingency_subset <- with(
+  effect_inv4m %>% 
+    filter(region != "outside") %>%
+    mutate(is_significant = adj.P.Val < 0.05),
+  table(region, is_significant)
+)
+
+print(contingency_subset)
+
+chisq.test(contingency_subset)
+```
+
+```{r kolmogorov-smirnov-tests}
+# Test if p-value distributions differ between regions
+ks_inv4m_flanking <- ks.test(
+  effect_inv4m$P.Value[effect_inv4m$in_Inv4m],
+  effect_inv4m$P.Value[effect_inv4m$in_flank],
+  alternative = "greater"
+)
+
+ks_flanking_outside <- ks.test(
+  effect_inv4m$P.Value[effect_inv4m$in_flank],
+  effect_inv4m$P.Value[effect_inv4m$region == "outside"],
+  alternative = "greater"
+)
+
+# in_shared = in_Inv4m OR in_flank
+in_shared <- effect_inv4m$in_Inv4m | effect_inv4m$in_flank
+ks_shared_outside <- ks.test(
+  effect_inv4m$P.Value[in_shared],
+  effect_inv4m$P.Value[effect_inv4m$region == "outside"],
+  alternative = "greater"
+)
+
+print(ks_inv4m_flanking)
+print(ks_flanking_outside)
+print(ks_shared_outside)
+```
+
+```{r qq-plot-analysis}
+# Define in_shared for convenience
+in_shared <- effect_inv4m$in_Inv4m | effect_inv4m$in_flank
+
+# Prepare QQ plot data for each region
+inv4m_dens <- qqplot(
+  runif(n = 10000),
+  effect_inv4m$P.Value[effect_inv4m$in_Inv4m],
+  plot.it = FALSE
+)
+
+flanking_dens <- qqplot(
+  runif(n = 10000),
+  effect_inv4m$P.Value[effect_inv4m$in_flank],
+  plot.it = FALSE
+)
+
+outside_dens <- qqplot(
+  runif(n = 10000),
+  effect_inv4m$P.Value[!in_shared],
+  plot.it = FALSE
+)
+
+# Combine data
+qq_data <- rbind(
+  inv4m_dens %>%
+    as.data.frame() %>%
+    mutate(
+      region = "inv4m",
+      expected = -log10(x),
+      observed = -log10(y)
+    ),
+  flanking_dens %>%
+    as.data.frame() %>%
+    mutate(
+      region = "flanking",
+      expected = -log10(x),
+      observed = -log10(y)
+    ),
+  outside_dens %>%
+    as.data.frame() %>%
+    mutate(
+      region = "outside",
+      expected = -log10(x),
+      observed = -log10(y)
+    )
+)
+
+qq_data$region <- factor(qq_data$region, levels = c("inv4m", "flanking", "outside"))
+levels(qq_data$region) <- c("*Inv4m*", "flanking", "outside")
+
+# Create QQ plot
+pal2 <- viridis_pal(option = "plasma")(3)
+key_order <- c("*Inv4m*", "flanking", "outside")
+names(pal2) <- key_order
+
+qqplot <- qq_data %>%
+  ggplot(aes(y = observed, x = expected, color = region)) +
+  ylab(expression("Observed " - log[10](italic(P)))) +
+  xlab(expression("Expected " - log[10](italic(P)))) +
+  geom_abline(slope = 1, color = "black") +
+  geom_point(size = 3, alpha = 0.7) +
+  annotate(
+    "text",
+    x = 2.3,
+    y = c(25, 15),
+    hjust = 0,
+    label = c(expression(italic(p) == "0.29"), expression(italic(p) == "2.2e-16")),
+    size = 5
+  ) +
+  scale_color_manual(values = pal2) +
+  ggpubr::theme_classic2(base_size = 25) +
+  theme(
+    legend.position = c(0.17, 0.83),
+    legend.margin = margin(0, 0, 0, 0),
+    legend.box.spacing = unit(0, "pt"),
+    legend.text = ggtext::element_markdown()
+  )
+
+qqplot
+```
+
+```{r combined-detail-figure}
+# Create combined detail plot
+detail <- cowplot::plot_grid(
+  qqplot,
+  p1,
+  ncol = 1,
+  nrow = 2,
+  rel_heights = c(1.5, 1),
+  align = "v",
+  axis = "lr"
+)
+
+detail
+
+# Save to file
+ggsave(
+  filename = file.path(paths$figures, "chr04_expression_detail.png"),
+  plot = detail,
+  width = 8,
+  height = 12,
+  units = "in",
+  dpi = 300
+)
+```
+
+```{r session-info}
+sessionInfo()
+```

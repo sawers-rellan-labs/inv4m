@@ -393,6 +393,13 @@ inlay <- gt_runs %>%
     plot.background = element_rect(fill = "transparent", color = NA)
   )
 
+# Save as Panel F for Figure 3
+ggsave(
+  file.path(paths$figures, "panels", "panel_F_haplotype.png"),
+  plot = inlay,
+  width = 6, height = 4, dpi = 300, bg = "white"
+)
+
 # Combine plots
 plot_with_inset <- ggdraw() +
   draw_plot(gt_plot) +
