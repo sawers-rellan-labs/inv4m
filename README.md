@@ -58,8 +58,8 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | **Main Figures** | | | |
 | Figure 1 | Inv4m delimitation, breakpoints, breeding design | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI | [`Corrected_phenotype_analysis_PSU2022.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2022.html) | ✅ |
-| Figure 3 | Global and local transcriptomic effects | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
-| Figure 4 | Volcano plots for DEGs | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
+| Figure 3 | Global and local transcriptomic effects (8 panels) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + panel scripts | ⚠️ |
+| Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation.html) | ✅ |
 | Figure 6 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Main Tables** | | | |
@@ -74,12 +74,24 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | WGCNA modules | Co-expression network analysis | [`get_WGCNA_modules.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/get_WGCNA_modules.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
 | Crow 2020 reanalysis | Reference dataset reanalysis | [`Crow2020_reanalysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Crow2020_reanalysis.html) | ✅ |
+| Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
+| Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
+| Figure 3 assembly | 8-panel composite figure | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) | ⚠️ |
 
 **Status Legend:** ✅ Ready | ⚠️ Needs work | ❌ Missing
 
 ---
 
 ## Recent Updates
+
+**2026-01-02:** Figure 3 panel generation infrastructure for inversion paper revision:
+- ✅ Created `assemble_figure3_RNAseq.Rmd` - Assembly notebook for 8-panel composite figure
+- ✅ Created `volcano_plot_analysis.Rmd` - Dedicated volcano plot script (Panel C)
+- ✅ Updated `make_manhattan_plots.Rmd` - Dynamic DEG counts in titles (Panels D, E, G, H)
+- ✅ Updated `differential_expression_leaf_treatment_model.Rmd` - MDS saved as RDS (Panel B)
+- ✅ Panel infrastructure: RDS for ggplot panels (B, C), PNG for raster panels (A, D-H)
+- ⚠️ Panel F (haplotype) needs ggsave update in genotype script
+- ⚠️ Figure composition needs final refinement
 
 **2025-12-23:** All inversion paper analysis scripts (8/8) are now fully operational and path-standardized:
 - ✅ Fixed `Crow2020_reanalysis.Rmd` - Removed hard-coded server paths
@@ -110,12 +122,12 @@ Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_A
 inv4m/
 ├── scripts/
 │   ├── phosphorus_paper/    # Paper 2 analysis notebooks (12 Rmd files) ✅
-│   ├── inversion_paper/     # Paper 1 analysis notebooks (8 Rmd files) ✅
+│   ├── inversion_paper/     # Paper 1 analysis notebooks (12 Rmd files) ✅
 │   └── utils/               # Shared utilities (setup_paths.R, render_notebook.R)
 ├── data/                    # Input data (symlink, not tracked)
 ├── docs/                    # Published HTML reports (GitHub Pages)
 │   ├── phosphorus_paper/    # Paper 2 reports (12 HTML files)
-│   └── inversion_paper/     # Paper 1 reports (8 HTML files)
+│   └── inversion_paper/     # Paper 1 reports
 └── results/                 # Generated outputs (not tracked)
     ├── phosphorus_paper/
     └── inversion_paper/

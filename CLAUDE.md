@@ -1,8 +1,28 @@
 # inv4m Project Guide
 
-**Last Updated:** 2025-12-23
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Complete ✅
-**Version:** v1.1.0
+**Last Updated:** 2026-01-02
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Revision In Progress ⚠️
+**Version:** v1.2.0
+
+---
+
+## START HERE: Inversion Paper Revision
+
+**Active Work:** The inversion paper is undergoing revision after a statistical model change. Before starting any work, read these files to understand current state:
+
+```
+scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
+scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
+README.md  # Figure/table coverage
+```
+
+**Quick command for user:** Ask the agent to read handover docs:
+> "Read the handover document and master plan, then suggest where to start"
+
+**Current Priority (as of 2026-01-02):**
+1. Figure 3 composition refinement (7/8 panels ready)
+2. Panel F (haplotype) - needs ggsave in genotype script
+3. Figure 5 (trans network) restructuring
 
 ---
 
@@ -77,9 +97,9 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
-## Inversion Paper - Complete ✅
+## Inversion Paper - Revision In Progress ⚠️
 
-### Scripts (7 Rmd files in `scripts/inversion_paper/`)
+### Scripts (12 Rmd files in `scripts/inversion_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -90,6 +110,11 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `get_WGCNA_modules.Rmd` | WGCNA network analysis | ✅ |
 | `GO_Enrichment_Trans_Network.Rmd` | Network GO analysis | ✅ |
 | `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis | ✅ |
+| `make_manhattan_plots.Rmd` | Manhattan plots (Fig 3 D,E,G,H) | ✅ |
+| `volcano_plot_analysis.Rmd` | Volcano plot (Fig 3 C / Fig 4) | ⚠️ |
+| `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ⚠️ |
+| `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
+| `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
 
 ### Generated Outputs
 
@@ -322,7 +347,7 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper ✅ Complete
+### Inversion Paper ⚠️ Revision In Progress
 - [x] Read `docs/inversion_paper/main.tex` and extract figures/tables
 - [x] Create `scripts/inversion_paper/` directory structure
 - [x] Recover needed scripts from git history (`b2dd1488`)
@@ -331,11 +356,27 @@ git push origin main
 - [x] Update all paths to use `setup_paths.R`
 - [x] Test rendering all notebooks
 - [x] Add coverage table to README.md
-- [x] Move `Annotation_assembly.Rmd` to phosphorus paper (now handles GO/KEGG/LION enrichment panels for phosphorus paper)
+- [x] Move `Annotation_assembly.Rmd` to phosphorus paper
+- [x] Update limma model (spatial → plant blocking)
+- [x] Verify DEG outputs from new model
+- [~] Figure 3 panel generation (7/8 panels ready)
+- [ ] Figure 3 composition refinement
+- [ ] Figure 5 restructuring (reference vs novel network)
+- [ ] Table S2 update
+
+**See:** `scripts/00_agent_work/HANDOVER_inversion_paper_revision.md` for detailed status
 
 ---
 
 ## Notes for AI Assistants
+
+### Session Start Protocol
+
+When starting a new session on this project, **proactively read**:
+1. `scripts/00_agent_work/HANDOVER_inversion_paper_revision.md` - Current state and next actions
+2. `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` - Full revision roadmap
+
+Then suggest next actions based on the handover document.
 
 ### Key Conventions
 
@@ -354,3 +395,5 @@ git push origin main
 - ❌ Don't put CSV files in `tables/` (LaTeX only)
 - ❌ Don't create subdirectories in `data/` (it's a symlink)
 - ❌ Don't modify analysis logic without explicit request
+- ❌ Don't add formatting changes (axis removal, etc.) to analysis scripts - do it in assembly scripts
+- ❌ Don't hardcode values that can be calculated from data (e.g., DEG counts)
