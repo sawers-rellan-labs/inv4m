@@ -394,43 +394,43 @@ consistent across both phosphorus treatments (Fig~\ref{fig:phenotypes}).
   \multicolumn{1}{c}{} &
   \multicolumn{1}{c}{\textbf{}} &
   \multicolumn{1}{c}{\textbf{DEGs}} &
-  \multicolumn{1}{l}{\textbf{Top DEGs}} \\
+  \multicolumn{1}{l}{\textbf{High-conf DEGs}} \\
 \textbf{Location of genes} &
   \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total \\ Annotated\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total\\  Expressed\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fraction \\ Expressed\end{tabular}}} &
   \multicolumn{1}{c}{$\textit{FDR} < 0.05$} &
-  \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}$\textit{FDR} < 0.05$ \\ $|log_2 FC| > 2$\end{tabular}} \\ \midrule
+  \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}$\textit{FDR} < 0.05$ \\ $|log_2 FC| > 1.5$\end{tabular}} \\ \midrule
 Chromosomes 1-10 &
   \multicolumn{2}{r}{43459} &
   24011 &
   0.55 &
-  970 &
-  139 \\
+  465 &
+  155 \\
 Outside Introgression &
   \multicolumn{2}{r}{42360} &
   23403 &
   0.55 &
-  646 &
-  43 \\
+  193 &
+  39 \\
 Shared Introgression &
   \multicolumn{2}{r}{1099} &
   608 &
   0.55 &
-  324 &
-  96 \\
+  272 &
+  116 \\
 \hspace*{2em}\invfour &
   \multicolumn{2}{r}{432} &
-  252 &
-  0.58 &
-  141 &
-  35 \\
+  253 &
+  0.59 &
+  114 &
+  40 \\
 \hspace*{2em}Flanking Introgression &
   \multicolumn{2}{r}{667} &
-  356 &
+  355 &
   0.53 &
-  183 &
-  61 \\ \midrule
+  158 &
+  76 \\ \midrule
  &
   \multicolumn{1}{l}{} &
   \multicolumn{1}{l}{} &
@@ -440,7 +440,7 @@ Shared Introgression &
   \multicolumn{1}{l}{} \\
  &
   \multicolumn{3}{c}{\textbf{DEGs Enrichment}} &
-  \multicolumn{3}{c}{\textbf{Top DEGs Enrichment}} \\ \cline{2-7}
+  \multicolumn{3}{c}{\textbf{High-conf DEGs Enrichment}} \\ \cline{2-7}
 \textbf{Comparison} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Odds\\ Ratio\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fisher's \\ Exact test\\ \textit{p-value}\end{tabular}}} &
@@ -448,34 +448,34 @@ Shared Introgression &
   \textbf{\begin{tabular}[c]{@{}r@{}}Odds\\ Ratio\end{tabular}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fisher's\\ Exact test\\ \textit{p-value}\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Confidence\\ Interval\end{tabular}}} \\ \midrule
-Inside introgression vs Outside &
-  40 &
-  2.38E-300 &
-  {[}33,48{]} &
-  102 &
-  1.51E-121 &
-  {[}70,151{]} \\
+Shared introgression vs Outside &
+  97.1 &
+  $<10^{-200}$ &
+  {[}70,135{]} &
+  141 &
+  $<10^{-100}$ &
+  {[}95,215{]} \\
 Flanking vs Outside &
-  37 &
-  6.70E-173 &
-  {[}30,27{]} &
-  112 &
-  4.69E-85 &
-  {[}73,173{]} \\
+  96.5 &
+  $<10^{-150}$ &
+  {[}68,135{]} &
+  163 &
+  $<10^{-80}$ &
+  {[}100,275{]} \\
 \textbf{\invfour vs Outside} &
-  \textbf{45} &
-  2.73E-142 &
-  {[}34,59{]} &
-  \textbf{87} &
-  9.72E-49 &
-  {[}53,143{]} \\
+  \textbf{98.7} &
+  $<10^{-100}$ &
+  {[}65,150{]} &
+  \textbf{112} &
+  $<10^{-45}$ &
+  {[}65,200{]} \\
 \invfour vs Flanking &
-  1.2 &
-  0.28 &
-  {[}0.85,1.68{]} &
-  0.78 &
-  0.31 &
-  {[}0.48,1.25{]} \\ \bottomrule
+  1.02 &
+  0.95 &
+  {[}0.7,1.5{]} &
+  0.69 &
+  0.25 &
+  {[}0.4,1.2{]} \\ \bottomrule
 \end{tabular}%
 }
 \end{table*}
@@ -570,14 +570,16 @@ $H_a: \mu_{\textit{Inv4}} > \mu_{\textit{CTRL}}$) 9\% increase in SAM height
 shape coefficient (2.49 $\text{nm}^{-1}$, 0.59 $\text{nm}^{-1}$), indicating an 
 elongated meristem (Panel C).
 
-\begin{figure*}[!ht]
-\centering
-\includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
-\caption{\textbf{Trans coexpression network of \invfour DEGs.} \textbf{(A)} 
-Edge polarity reflects causal precedence of the genetic perturbation by 
-\invfour introgression. \textbf{(B)} GO enrichment results.}
-\label{fig::DEGnetwork}
-\end{figure*}
+  \begin{figure*}[!ht]
+  \centering
+  \includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
+  \caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
+  \textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow). Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants. Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
+  \textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships. The network includes key cell cycle genes (\textit{pcna2}, \textit{map4k8}), transcription factors (\textit{ocl2}), and the \jmjii cluster.
+  \textit{Right:} Novel edges specific to the \invfour network, showing the \jmjiv neighborhood subgraph. This includes upregulated genes involved in cell proliferation (\textit{sec6}, \textit{kan1}) and downregulated JUMONJI methyltransferases.
+  \textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). Gene labels identify representative members of enriched terms. Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes, consistent with the observed meristem phenotype.}
+  \label{fig::DEGnetwork}
+  \end{figure*}
 
 \begin{table*}[!ht]
 \caption{\textbf{Effect of \invfour on Flowering Time and Plant Height Gene 
@@ -1420,40 +1422,52 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 
 
 \begin{table}[!ht]
-\caption{\textbf{Effect of \invfour on expression of characterized maize genes.}}
+\caption{\textbf{Effect of \invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|log_2 FC| > 1.5$). Bottom row shows the only significant Leaf$\times$\invfour interaction.}
 \label{tab:gene_effects}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}rrrrrr@{}}
 \toprule
 \textbf{Predictor} & \textbf{Regulation} & \textbf{Locus} & \textbf{-log10(\textit{FDR})} & \textbf{logFC} & \textbf{Name}                                   \\ \midrule
-\invfour & Down & jmj2     & 13.7 & -3.03 & JUMONJI-transcription factor 2             \\
-\invfour & Down & jmj6     & 13.7 & -3.03 & JUMONJI-transcription factor 6             \\
-\invfour & Down & jmj9     & 13.7 & -3.03 & JUMONJI-transcription factor 9             \\
-\invfour & Down & jmj4     & 13.1 & -2.94 & JUMONJI-transcription factor 4             \\
-\invfour           & Down                & mfsd2          & 7.8                  & -2.40          & major facilitator superfamily defense2          \\
-\invfour & Down & hb115    & 7.5  & -2.38 & Homeobox-transcription factor 115          \\
-\invfour & Down & fad1     & 6.6  & -2.30 & fatty acid desaturase1                     \\
-\invfour & Down & his2b5   & 4.5  & -5.61 & histone 2B5                                \\
-\invfour & Down & abi40    & 3.5  & -2.99 & ABI3-VP1-transcription factor 40           \\
-\invfour & Down & his402   & 2.4  & -5.55 & histone H4 family2                         \\
+\invfour & Down & jmj2      & 21.9 & -3.49 & JUMONJI-transcription factor 2              \\
+\invfour & Down & jmj4      & 19.7 & -2.84 & JUMONJI-transcription factor 4              \\
+\invfour & Down & metrs1    & 17.5 & -2.86 & Methionyl-tRNA synthetase                   \\
+\invfour & Down & uba2      & 17.5 & -1.98 & SUMO-activating enzyme subunit              \\
+\invfour & Down & ccta      & 15.8 & -1.69 & CCT-alpha                                   \\
+\invfour & Down & arf1      & 15.8 & -2.78 & ADP-ribosylation factor                     \\
+\invfour & Down & hsp70-17  & 14.2 & -6.48 & Heat shock 70 kDa protein 17                \\
+\invfour & Down & Zm..0240  & 14.2 & -9.16 & ---                                         \\
+\invfour & Down & ropgef14  & 13.6 & -2.98 & Rop guanine nucleotide exchange factor 14   \\
+\invfour & Down & trxl2     & 13.2 & -6.10 & Thioredoxin-like 3-1, chloroplastic         \\
+\invfour & Down & ank       & 13.0 & -1.83 & Ankyrin repeat-containing protein           \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & kan1     & 9.8  & 2.15  & KANADI1                                    \\
+\invfour & Up   & ychf      & 16.9 & 6.50  & ---                                         \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & aldh2    & 7.7  & 2.92  & aldehyde dehydrogenase2                    \\
+\invfour & Up   & sec6      & 16.5 & 2.87  & Exocyst complex component Sec6              \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & jmj21    & 7.7  & 2.74  & JUMONJI-transcription factor 21            \\
+\invfour & Up   & zfrvt     & 15.6 & 1.97  & ---                                         \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & abf2     & 6.9  & 2.09  & alpha-L-arabinofuranosidase2               \\
+\invfour & Up   & pig3      & 15.0 & 1.97  & Quinone oxidoreductase PIG3                 \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & flz22    & 5.8  & 3.24  & FCS-like zinc finger22                     \\
+\invfour & Up   & etfa      & 14.0 & 4.46  & Electron transfer flavoprotein alpha        \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & mybr58   & 1.9  & 2.81  & MYB-related-transcription factor 58        \\
+\invfour & Up   & gbp1      & 13.7 & 8.96  & GTP-binding protein-related                 \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & hmg3     & 1.6  & 2.23  & high mobility group protein3               \\
+\invfour & Up   & Zm..5370  & 13.6 & 1.63  & ---                                         \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & cdj4     & 1.6  & 2.52  & chaperone DNA J4                           \\
+\invfour & Up   & kan1      & 13.6 & 1.68  & KANADI1                                     \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & zap1     & 1.4  & 3.32  & zea apetala homolog1                       \\ \bottomrule
+\invfour & Up   & aldh2     & 13.6 & 2.70  & aldehyde dehydrogenase2                     \\
+\rowcolor[HTML]{EFEFEF}
+\invfour & Up   & jmj21     & 13.5 & 2.28  & JUMONJI-transcription factor 21             \\
+\rowcolor[HTML]{EFEFEF}
+\invfour & Up   & Zm..9580  & 13.2 & 7.38  & ---                                         \\
+\rowcolor[HTML]{EFEFEF}
+\invfour & Up   & mybsant   & 12.4 & 6.96  & ---                                         \\
+\rowcolor[HTML]{EFEFEF}
+\invfour & Up   & engd2     & 12.3 & 6.14  & ---                                         \\
+\rowcolor[HTML]{EFEFEF}
+\invfour & Up   & gpm458    & 11.2 & 10.47 & Oil body-associated protein like            \\ \midrule
+Leaf$\times$\invfour & Down & sec6 & 3.1 & -0.55 & Exocyst complex component Sec6              \\ \bottomrule
 \end{tabular}%
 }
 \end{table}
