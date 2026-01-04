@@ -35,21 +35,26 @@ paths <- setup_project_paths("inversion_paper")
 
 # Overview
 
-**Purpose**: Perform Gene Ontology enrichment analysis on the validated 
-trans-regulatory network to identify biological processes associated with genes 
-in trans-regulatory networks controlled by different genomic regions.
+**Purpose**: Perform Gene Ontology enrichment analysis on the validated
+trans-regulatory network to identify biological processes associated with genes
+regulated by Inv4m versus flanking regions.
 
-**Approach**:
-1. Load trans network node lists from MaizeNetome analysis
-2. Define gene sets by network sub-structure (flanking-regulated vs Inv4m-regulated)
-3. Perform GO enrichment separately for each network subset
-4. Compare enrichment across network regions
-5. Validate with Top DEGs subset (|log2FC| > 2)
+**Approach**: We partition network genes based on the **strongest regulator criterion**:
+
+1. **Flanking network**: All genes connected by edges where the regulator is in the
+   flanking region (gets priority - any connection to flanking counts)
+2. **Inv4m network**: Genes from Inv4m-regulated edges where the target's strongest
+   correlated regulator is NOT in the flanking region
+
+This approach recovers trans targets that would otherwise be excluded due to
+any connection to flanking regulators, while ensuring genes are assigned to the
+network of their dominant regulatory influence.
 
 **Expected outcomes**:
+
 - Identification of enriched biological processes in trans-regulatory networks
 - Comparison of functional categories between flanking and Inv4m networks
-- Visualization of GO terms with representative gene examples
+- Visualization of GO terms with representative gene examples (e.g., JMJ cluster)
 
 ---
 
@@ -63,17 +68,19 @@ library(stringr)
 library(clusterProfiler)
 library(forcats)
 library(DOSE)
+library(AnnotationHub)
+library(rrvgo)
 ```
 
 ---
 
 # Load Data
 
-## Trans Co-expression Network Node Lists
+## Trans Co-expression Network
 
-**Purpose**: Load gene lists defining trans-regulatory network substructures.
+**Purpose**: Load gene lists and edges defining trans-regulatory network structure.
 
-```{r load_network_nodes}
+```{r load_network}
 trans_regulators <- read.csv(
   file.path(paths$intermediate, "trans_network_regulators.csv")
 )
@@ -94,9 +101,9 @@ cat("  Total genes:", nrow(trans_network_all), "\n")
 cat("  Edges:", nrow(trans_edges), "\n")
 ```
 
-## Load Effects Table for Background
+## Load Effects Table
 
-**Purpose**: Define universe of analyzed genes as background for enrichment.
+**Purpose**: Define universe of analyzed genes and get expression direction.
 
 ```{r load_effects}
 effects_df <- read.csv(
@@ -115,63 +122,46 @@ background <- effects_df %>%
 
 cat("Background genes:", length(background), "\n")
 cat("DEGs:", sum(effects_df$is_DEG), "\n")
-cat("High confidence DEGs:", sum(effects_df$is_hiconf_DEG), "\n")
 ```
 
 ## Load GO Annotation
 
-**Purpose**: Load maize B73 NAM5 GO annotations from GOMAP.
+**Purpose**: Load maize B73 NAM5 GO annotations from PANNZER.
 
 ```{r load_go_annotation}
 TERM2NAME <- readRDS(file.path(paths$data, "TERM2NAME.rds"))
 TERM2GENE <- readRDS(file.path(paths$data, "TERM2GENE_PANNZER_full.rds"))
 
 cat("GO annotation loaded:\n")
-cat("  Biological Process terms:", 
+cat("  Biological Process terms:",
     length(unique(TERM2NAME$BP$go_id)), "\n")
 cat("  Gene-term associations:", nrow(TERM2GENE), "\n")
 ```
 
 ---
 
-# Define Gene Sets for Enrichment
+# Define Network Subsets
 
-## Extract Network Substructure Node Lists
+## Partition by Strongest Regulator
 
-**Purpose**: Identify nodes in flanking-regulated vs Inv4m-regulated 
-sub-networks from edge structure.
+**Purpose**: Assign genes to flanking or Inv4m networks based on the strongest
+regulatory connection.
+
+**Logic**:
+
+1. Flanking network gets priority: all genes in flanking-regulated edges
+2. Inv4m network: genes from Inv4m edges where target's strongest regulator
+   is non-flanking
 
 ```{r define_network_subsets}
+# Flanking network: all genes connected by flanking-regulated edges
 flanking_network_genes <- trans_edges %>%
   filter(regulator_region == "flanking") %>%
   {union(.$from, .$to)} %>%
   sort() %>%
   unique()
 
-inv4m_network_genes <- trans_edges %>%
-  filter(regulator_region == "inv4m") %>%
-  {union(.$from, .$to)} %>%
-  setdiff(flanking_network_genes) %>%
-  sort() %>%
-  unique()
-
-cat("Network subsets (Method 1 - Location setdiff):\n")
-cat("  Flanking-regulated network:", length(flanking_network_genes), "genes\n")
-cat("  Inv4m-regulated network:", length(inv4m_network_genes), "genes\n")
-cat("  Overlap:",
-    length(intersect(flanking_network_genes, inv4m_network_genes)), "\n")
-```
-
-## Method 2: Strongest Non-Flanking Regulator
-
-**Purpose**: Alternative gene set definition that keeps trans targets where Inv4m
-is the strongest regulator, even if they also connect to flanking regulators.
-
-This recovers trans targets that Method 1 excludes due to any connection to
-flanking network.
-
-```{r define_method2_subsets}
-# Define regulators by region
+# Identify regulators by region
 inv4m_regulators <- trans_edges %>%
   filter(regulator_region == "inv4m") %>%
   pull(from) %>%
@@ -189,74 +179,48 @@ strongest_edge_per_target <- trans_edges %>%
   slice_max(abs_r, n = 1, with_ties = FALSE) %>%
   ungroup()
 
-# Targets whose strongest regulator is NOT in flanking
+# Targets whose strongest regulator is NOT in flanking region
 targets_strongest_nonflanking <- strongest_edge_per_target %>%
   filter(regulator_region != "flanking") %>%
   pull(to)
 
 # Inv4m edges to these targets
-edges_strongest_nonflanking_inv4m <- trans_edges %>%
+edges_inv4m_dominant <- trans_edges %>%
   filter(
     to %in% targets_strongest_nonflanking,
     regulator_region == "inv4m"
   )
 
-# Method 2 gene set
-inv4m_network_genes_method2 <- union(
-  edges_strongest_nonflanking_inv4m$from,
-  edges_strongest_nonflanking_inv4m$to
+# Inv4m network: genes from edges where Inv4m is dominant regulator
+inv4m_network_genes <- union(
+  edges_inv4m_dominant$from,
+  edges_inv4m_dominant$to
 ) %>%
   sort() %>%
   unique()
 
-cat("\nNetwork subsets (Method 2 - Strongest non-flanking regulator):\n")
-cat("  Inv4m regulators:", length(inv4m_regulators), "\n")
+cat("Network partitioning (strongest regulator criterion):\n")
 cat("  Flanking regulators:", length(flanking_regulators), "\n")
+cat("  Inv4m regulators:", length(inv4m_regulators), "\n")
+cat("  Flanking network:", length(flanking_network_genes), "genes\n")
+cat("  Inv4m network:", length(inv4m_network_genes), "genes\n")
 cat("  Targets with Inv4m as strongest:", length(targets_strongest_nonflanking), "\n")
-cat("  Inv4m network (Method 2):", length(inv4m_network_genes_method2), "genes\n")
-
-# Compare methods
-cat("\nMethod comparison:\n")
-cat("  Method 1 (setdiff):", length(inv4m_network_genes), "genes\n")
-cat("  Method 2 (strongest):", length(inv4m_network_genes_method2), "genes\n")
-cat("  Overlap:", length(intersect(inv4m_network_genes, inv4m_network_genes_method2)), "\n")
-cat("  Only in Method 2:", length(setdiff(inv4m_network_genes_method2, inv4m_network_genes)),
-    "(trans targets recovered)\n")
 ```
 
 ## Create Directional Gene Sets
 
-**Purpose**: Split network genes by direction of regulation for enrichment.
+**Purpose**: Split network genes by direction of Inv4m effect for enrichment.
 
 ```{r define_gene_sets}
-# Method 1 gene sets (location-based setdiff)
-network_gene_sets_m1 <- list(
-  `flank.Up` = trans_network_all %>%
-    filter(gene %in% flanking_network_genes, logFC > 0) %>%
-    pull(gene),
-
-  `flank.Down` = trans_network_all %>%
-    filter(gene %in% flanking_network_genes, logFC < 0) %>%
-    pull(gene),
-
-  `Inv4m.Up` = trans_network_all %>%
-    filter(gene %in% inv4m_network_genes, logFC > 0) %>%
-    pull(gene),
-
-  `Inv4m.Down` = trans_network_all %>%
-    filter(gene %in% inv4m_network_genes, logFC < 0) %>%
-    pull(gene)
-)
-
-# Method 2 gene sets (strongest non-flanking regulator)
-# For Method 2, we need logFC info - join with effects_df
-method2_genes_with_logfc <- effects_df %>%
-  filter(gene %in% inv4m_network_genes_method2) %>%
+# Get logFC for Inv4m network genes
+inv4m_genes_with_logfc <- effects_df %>%
+  filter(gene %in% inv4m_network_genes) %>%
   group_by(gene) %>%
   slice(1) %>%
   ungroup()
 
-network_gene_sets_m2 <- list(
+# Define gene sets by network and direction
+network_gene_sets <- list(
   `flank.Up` = trans_network_all %>%
     filter(gene %in% flanking_network_genes, logFC > 0) %>%
     pull(gene),
@@ -265,35 +229,21 @@ network_gene_sets_m2 <- list(
     filter(gene %in% flanking_network_genes, logFC < 0) %>%
     pull(gene),
 
-  `Inv4m.Up.M2` = method2_genes_with_logfc %>%
+  `Inv4m.Up` = inv4m_genes_with_logfc %>%
     filter(logFC > 0) %>%
     pull(gene),
 
-  `Inv4m.Down.M2` = method2_genes_with_logfc %>%
+  `Inv4m.Down` = inv4m_genes_with_logfc %>%
     filter(logFC < 0) %>%
     pull(gene)
 )
 
-# Use Method 1 for main analysis (backward compatible)
-network_gene_sets <- network_gene_sets_m1
+n_genes <- sapply(network_gene_sets, length)
 
-n_genes_m1 <- sapply(network_gene_sets_m1, length)
-n_genes_m2 <- sapply(network_gene_sets_m2, length)
-
-cat("=== Method 1 (Location setdiff) ===\n")
-cat("Gene set sizes:\n")
-print(n_genes_m1)
-cat("  Inv4m total:", n_genes_m1["Inv4m.Up"] + n_genes_m1["Inv4m.Down"], "\n")
-
-cat("\n=== Method 2 (Strongest non-flanking) ===\n")
-cat("Gene set sizes:\n")
-print(n_genes_m2)
-cat("  Inv4m total:", n_genes_m2["Inv4m.Up.M2"] + n_genes_m2["Inv4m.Down.M2"], "\n")
-
-cat("\nDifference: Method 2 adds",
-    (n_genes_m2["Inv4m.Up.M2"] + n_genes_m2["Inv4m.Down.M2"]) -
-    (n_genes_m1["Inv4m.Up"] + n_genes_m1["Inv4m.Down"]),
-    "trans targets\n")
+cat("\nGene set sizes:\n")
+print(n_genes)
+cat("\nFlanking total:", n_genes["flank.Up"] + n_genes["flank.Down"], "\n")
+cat("Inv4m total:", n_genes["Inv4m.Up"] + n_genes["Inv4m.Down"], "\n")
 ```
 
 ---
@@ -307,13 +257,9 @@ cat("\nDifference: Method 2 adds",
 ```{r enrichment_function}
 #' Perform GO enrichment analysis
 #'
-#' Wrapper around clusterProfiler::enricher with standardized parameters
-#' for maize GO annotation.
-#'
 #' @param x Character vector of gene IDs
 #' @param ontology GO ontology: "BP", "MF", or "CC"
 #' @param universe Character vector of background genes
-#'
 #' @return enrichResult object from clusterProfiler
 ego <- function(x, ontology = "BP", universe = NULL) {
   enricher(
@@ -330,12 +276,11 @@ ego <- function(x, ontology = "BP", universe = NULL) {
 }
 ```
 
-## Compare Networks: Biological Process
+## Run GO Enrichment
 
-**Purpose**: Identify enriched GO Biological Process terms across network 
-subsets.
+**Purpose**: Identify enriched GO Biological Process terms across network subsets.
 
-```{r compare_networks_bp}
+```{r run_enrichment}
 compGO_BP <- compareCluster(
   geneCluster = network_gene_sets,
   fun = function(x) {
@@ -343,76 +288,66 @@ compGO_BP <- compareCluster(
   }
 )
 
-filtered_result <- compGO_BP@compareClusterResult %>%
-  filter(Count > 1) %>%
-  group_by(Cluster, geneID) %>%
-  arrange(p.adjust, .by_group = TRUE) %>%
-  ungroup()
-
-{
-cat("\nEnrichment results by network:\n")
+cat("RAW enrichment results by cluster:\n")
 print(table(compGO_BP@compareClusterResult$Cluster))
-print(table(filtered_result$Cluster))
-}
 ```
 
 ---
 
 # Filter and Process Results
 
-## Remove Redundant and Low-Count Terms
+## Remove Redundant Terms
 
-**Purpose**: Filter GO results to reduce semantic redundancy and focus on 
-well-supported terms.
+**Purpose**: Use rrvgo semantic similarity to reduce redundant GO terms.
 
 ```{r filter_results}
-library(AnnotationHub)
-
+# Load maize annotation for semantic similarity
 ah <- AnnotationHub()
 org.Zm.eg.db <- ah[["AH119718"]]
 
-library(rrvgo)
+# Filter low-count terms
+filtered_result <- compGO_BP@compareClusterResult %>%
+  filter(Count > 1) %>%
+  group_by(Cluster, geneID) %>%
+  arrange(p.adjust, .by_group = TRUE) %>%
+  ungroup()
 
-
-# Calculate similarity matrix
+# Calculate semantic similarity matrix
 go_terms <- unique(compGO_BP@compareClusterResult$ID)
-simMatrix <- calculateSimMatrix(go_terms,
-  orgdb = org.Zm.eg.db,  # Maize annotation
-  ont = "BP",
-  method = "Rel"
-)
 
-# Reduce to representative terms
-scores <- setNames(-log10(compGO_BP@compareClusterResult$p.adjust),
-                   compGO_BP@compareClusterResult$ID)
-reducedTerms <- reduceSimMatrix(simMatrix,
-  scores,
-  threshold = 0.7,
-  orgdb = org.Zm.eg.db
-)
-
-# Keep only parent (representative) terms
-compGO_BP@compareClusterResult  <- 
-  filtered_result  %>%
-  filter(
-    ID %in% c(reducedTerms$parent,
-              "GO:0040007")
+if (length(go_terms) > 1) {
+  simMatrix <- calculateSimMatrix(go_terms,
+    orgdb = org.Zm.eg.db,
+    ont = "BP",
+    method = "Rel"
   )
 
-{
-cat("\nEnrichment results by network:\n")
-table(compGO_BP@compareClusterResult$Cluster)
+  # Reduce to representative terms
+  scores <- setNames(-log10(compGO_BP@compareClusterResult$p.adjust),
+                     compGO_BP@compareClusterResult$ID)
+  reducedTerms <- reduceSimMatrix(simMatrix,
+    scores,
+    threshold = 0.7,
+    orgdb = org.Zm.eg.db
+  )
+
+  # Keep parent terms + growth (GO:0040007) which includes JMJ genes
+  compGO_BP@compareClusterResult <- filtered_result %>%
+    filter(ID %in% c(reducedTerms$parent, "GO:0040007"))
 }
+
+cat("\nFILTERED enrichment results by cluster:\n")
+print(table(compGO_BP@compareClusterResult$Cluster))
 ```
 
 ## Identify Terms with Known Genes
 
-**Purpose**: Focus on GO terms that include genes with characterized symbols.
+**Purpose**: Focus on GO terms containing genes with characterized symbols.
 
 ```{r identify_known_genes}
 effects_symbol <- effects_df %>%
   filter(is_DEG) %>%
-  dplyr::select(gene, SYMBOL = locus_symbol, locus_label, locus_name, 
+  dplyr::select(gene, SYMBOL = locus_symbol, locus_label, locus_name,
          logFC, adj.P.Val) %>%
   filter(!is.na(SYMBOL) & !is.na(locus_name)) %>%
   mutate(neglogP = -log10(adj.P.Val))
@@ -421,7 +356,7 @@ with_known_gene <- compGO_BP@compareClusterResult %>%
   separate_longer_delim(geneID, delim = "/") %>%
   dplyr::rename(gene = geneID) %>%
   inner_join(
-    effects_symbol %>% 
+    effects_symbol %>%
       dplyr::select(gene, SYMBOL, locus_name),
     relationship = "many-to-many"
   ) %>%
@@ -429,268 +364,25 @@ with_known_gene <- compGO_BP@compareClusterResult %>%
   sort() %>%
   unique()
 
-cat("GO terms with known genes:", length(with_known_gene), "\n")
+cat("GO terms with characterized genes:", length(with_known_gene), "\n")
 ```
 
 ---
 
 # Visualize Enrichment Results
 
-## Dotplot: All Networks
+## Prepare Plot Data
 
-**Purpose**: Overview of enriched GO terms across network subsets.
-
-```{r dotplot_all, fig.height=10, fig.width=12}
-cluster_order <- names(network_gene_sets)
-levels(compGO_BP@compareClusterResult$Cluster) <- cluster_order
-
-dotplot(compGO_BP, size = "Count", showCategory = 10) +
-  ggtitle("GO Biological Process Annotation\nInv4m Trans Co-expression Network") +
-  scale_size(range = c(4, 8), breaks = 1:4) +
-  scale_x_discrete(drop = FALSE) +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
-```
-
-## Prepare Data for Annotated Plot
-
-**Purpose**: Select top terms per cluster and identify representative genes.
+**Purpose**: Select top 5 terms per cluster and identify representative genes.
 
 ```{r prepare_plot_data}
-sorted_by_p <- compGO_BP@compareClusterResult %>%
-  filter(ID %in% with_known_gene) %>%
+cluster_order <- c("flank.Up", "flank.Down", "Inv4m.Up", "Inv4m.Down")
+
+to_plot <- compGO_BP@compareClusterResult %>%
+  filter(p.adjust < 0.05) %>%
   mutate(
     neglogP = -log10(p.adjust),
     Cluster = factor(Cluster, levels = cluster_order)
-  ) %>%
-  group_by(Cluster) %>%
-  arrange(Cluster, p.adjust) %>%
-  dplyr::slice(1:5) %>%
-  mutate(label_order = 1:n()) %>%
-  mutate(Description = fct_reorder(Description, label_order))
-
-top_terms <- levels(sorted_by_p$Description)
-
-to_plot <- compGO_BP@compareClusterResult %>%
-  filter(ID %in% with_known_gene) %>%
-  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
-  filter(Description %in% top_terms) %>%
-  mutate(
-    neglogP = -log10(p.adjust),
-    Description = factor(Description, levels = top_terms)
-  ) %>%
-  group_by(Cluster) %>%
-  arrange(Cluster, p.adjust) %>%
-  mutate(
-    label_order = 1:n(),
-    Description = fct_reorder(Description, label_order)
-  )
-
-term2symbol <- to_plot %>%
-  separate_longer_delim(geneID, delim = "/") %>%
-  dplyr::rename(gene = geneID) %>%
-  inner_join(effects_symbol, relationship = "many-to-many", by="gene") %>%
-  dplyr::select(Cluster, gene, SYMBOL, locus_label, ID, Description, 
-         p.adjust, Count, logFC, adj.P.Val) %>%
-  distinct() %>%
-  group_by(Cluster, ID) %>%
-  arrange(Cluster, ID, adj.P.Val) %>%
-  dplyr::slice(1) %>%
-  ungroup() %>%
-  mutate(gene_label = ifelse(
-    !is.na(locus_label) & locus_label != "", 
-    locus_label, 
-    SYMBOL
-  ))
-
-cat("\nTerms with gene labels:", nrow(term2symbol), "\n")
-```
-
-## Bubble Plot with Gene Annotations
-
-**Purpose**: Detailed visualization showing enriched GO terms with 
-representative gene symbols.
-
-```{r bubble_plot_annotated, fig.height=5, fig.width=14}
-labels <- paste0(
-  gsub(".", " ", cluster_order, fixed = TRUE),
-  "\n(", n_genes_m1, ")"
-)
-names(labels) <- names(n_genes_m1)
-
-bg <- to_plot %>%
-  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
-  ggtitle("GO Biological Process Annotation\nInv4m Trans Co-expression Network") +
-  scale_fill_gradient(
-    low = "dodgerblue", 
-    high = "tomato", 
-    name = "-log10(FDR)",
-    limits = c(1, max(to_plot$neglogP, na.rm = TRUE)),
-    guide = guide_colorbar()
-  ) +
-  scale_y_discrete(
-    labels = scales::wrap_format(60),
-    limits = rev(levels(to_plot$Description))
-  ) +
-  scale_x_discrete(
-    labels = labels, 
-    drop = FALSE,
-    expand = expansion(add = c(0.5, 1))
-  ) +
-  geom_point(shape = 21) +
-  scale_size(range =c(6,8),breaks = 2:4) +
-  ylab(NULL) +
-  xlab(NULL) +
-  DOSE::theme_dose(font.size = 16) +
-  theme(
-    plot.title = element_text(face = "bold", size = 20),
-    legend.position = "right",
-    axis.text.x = element_text(vjust = 0.5, angle = 0, hjust = 0.5)
-  )
-
-annotation_plot <- bg +
-  geom_text(
-    data = term2symbol,
-    position = position_nudge(0.15),
-    hjust = 0,
-    vjust = 0.5,
-    fontface = "italic",
-    size = 5,
-    mapping = aes(x = Cluster, y = Description, label = gene_label),
-    inherit.aes = FALSE
-  )
-
-print(annotation_plot)
-```
-
----
-
-# Method 2: GO Enrichment Comparison
-
-**Purpose**: Compare GO enrichment between Method 1 (location setdiff) and
-Method 2 (strongest non-flanking regulator) to assess impact of including
-trans targets.
-
-## Run Method 2 Enrichment
-
-```{r method2_enrichment}
-# Run GO enrichment on Method 2 gene sets (Inv4m only, since flanking is same)
-compGO_BP_M2 <- compareCluster(
-  geneCluster = network_gene_sets_m2,
-  fun = function(x) {
-    ego(x, ontology = "BP", universe = background)
-  }
-)
-
-cat("Method 2 RAW enrichment results by cluster:\n")
-print(table(compGO_BP_M2@compareClusterResult$Cluster))
-
-# Apply same filtering as Method 1: Count > 1, then rrvgo semantic reduction
-filtered_result_m2 <- compGO_BP_M2@compareClusterResult %>%
-  filter(Count > 1) %>%
-  group_by(Cluster, geneID) %>%
-  arrange(p.adjust, .by_group = TRUE) %>%
-  ungroup()
-
-# Calculate similarity matrix for Method 2 terms
-go_terms_m2 <- unique(compGO_BP_M2@compareClusterResult$ID)
-
-# Only run rrvgo if there are terms to process
-if (length(go_terms_m2) > 1) {
-  simMatrix_m2 <- calculateSimMatrix(go_terms_m2,
-    orgdb = org.Zm.eg.db,
-    ont = "BP",
-    method = "Rel"
-  )
-
-  # Reduce to representative terms
-  scores_m2 <- setNames(-log10(compGO_BP_M2@compareClusterResult$p.adjust),
-                        compGO_BP_M2@compareClusterResult$ID)
-  reducedTerms_m2 <- reduceSimMatrix(simMatrix_m2,
-    scores_m2,
-    threshold = 0.7,
-    orgdb = org.Zm.eg.db
-  )
-
-  # Keep only parent (representative) terms + manually add growth (GO:0040007)
-  # Growth is significant (p.adjust < 0.05) and biologically relevant:
-  # - Plant height differs significantly in field
-  # - Annotated genes include jmj cluster
-  compGO_BP_M2@compareClusterResult <- filtered_result_m2 %>%
-    filter(ID %in% c(reducedTerms_m2$parent, "GO:0040007"))
-}
-
-cat("\nMethod 2 FILTERED enrichment results by cluster:\n")
-print(table(compGO_BP_M2@compareClusterResult$Cluster))
-```
-
-## Compare Methods
-
-```{r compare_methods}
-# Extract Inv4m results from both methods
-m1_inv4m <- compGO_BP@compareClusterResult %>%
-  filter(grepl("Inv4m", Cluster))
-
-m2_inv4m <- compGO_BP_M2@compareClusterResult %>%
-  filter(grepl("Inv4m", Cluster))
-
-cat("\n=== GO ENRICHMENT COMPARISON ===\n")
-cat("\nMethod 1 (Location setdiff):\n")
-cat("  Inv4m gene sets:", n_genes_m1["Inv4m.Up"] + n_genes_m1["Inv4m.Down"], "genes\n")
-cat("  Significant GO terms:", nrow(m1_inv4m %>% filter(p.adjust < 0.05)), "\n")
-
-cat("\nMethod 2 (Strongest non-flanking):\n")
-cat("  Inv4m gene sets:", n_genes_m2["Inv4m.Up.M2"] + n_genes_m2["Inv4m.Down.M2"], "genes\n")
-cat("  Significant GO terms:", nrow(m2_inv4m %>% filter(p.adjust < 0.05)), "\n")
-
-# Search for growth-related terms
-growth_keywords <- c("growth", "cell cycle", "division", "meristem",
-                     "proliferat", "development", "morphogenesis")
-
-m1_growth <- m1_inv4m %>%
-  filter(p.adjust < 0.05) %>%
-  filter(str_detect(tolower(Description), paste(growth_keywords, collapse = "|")))
-
-m2_growth <- m2_inv4m %>%
-  filter(p.adjust < 0.05) %>%
-  filter(str_detect(tolower(Description), paste(growth_keywords, collapse = "|")))
-
-cat("\n=== GROWTH-RELATED TERMS ===\n")
-cat("\nMethod 1 growth terms:", nrow(m1_growth), "\n")
-if (nrow(m1_growth) > 0) {
-  print(m1_growth %>% dplyr::select(Cluster, Description, Count, p.adjust))
-}
-
-cat("\nMethod 2 growth terms:", nrow(m2_growth), "\n")
-if (nrow(m2_growth) > 0) {
-  print(m2_growth %>% dplyr::select(Cluster, Description, Count, p.adjust))
-}
-```
-
-## Method 2 Top Terms
-
-```{r method2_top_terms}
-cat("\n=== Method 2: Top GO Terms by Cluster ===\n")
-
-m2_inv4m %>%
-  filter(p.adjust < 0.05) %>%
-  group_by(Cluster) %>%
-  arrange(p.adjust) %>%
-  slice_head(n = 10) %>%
-  dplyr::select(Cluster, Description, Count, p.adjust) %>%
-  print(n = 30)
-```
-
-## Method 2 Visualization
-
-```{r method2_bubble_plot, fig.height=5, fig.width=14}
-# Prepare data: top 5 terms per group by p.adjust
-cluster_order_m2 <- c("flank.Up", "flank.Down", "Inv4m.Up.M2", "Inv4m.Down.M2")
-
-to_plot_m2 <- compGO_BP_M2@compareClusterResult %>%
-  filter(p.adjust < 0.05) %>%
-  mutate(
-    neglogP = -log10(p.adjust),
-    Cluster = factor(Cluster, levels = cluster_order_m2)
   ) %>%
   group_by(Cluster) %>%
   arrange(p.adjust) %>%
@@ -701,8 +393,8 @@ to_plot_m2 <- compGO_BP_M2@compareClusterResult %>%
   ) %>%
   ungroup()
 
-# Get gene labels for each term (most significant gene per term)
-term2symbol_m2 <- to_plot_m2 %>%
+# Get gene labels for each term (most significant DEG per term)
+term2symbol <- to_plot %>%
   separate_longer_delim(geneID, delim = "/") %>%
   dplyr::rename(gene = geneID) %>%
   inner_join(effects_symbol, relationship = "many-to-many", by = "gene") %>%
@@ -719,34 +411,40 @@ term2symbol_m2 <- to_plot_m2 %>%
     SYMBOL
   ))
 
-cat("\nMethod 2 bubble plot:\n")
-cat("  Terms to plot:", nrow(to_plot_m2), "\n")
-cat("  Terms with gene labels:", nrow(term2symbol_m2), "\n")
+cat("\nPlot summary:\n")
+cat("  GO terms to plot:", nrow(to_plot), "\n")
+cat("  Terms with gene labels:", nrow(term2symbol), "\n")
+```
 
+## Bubble Plot with Gene Annotations
+
+**Purpose**: Visualize enriched GO terms with representative gene symbols.
+
+```{r bubble_plot, fig.height=5, fig.width=14}
 # Create facet labels with gene counts
-labels_m2 <- paste0(
-  gsub(".", " ", cluster_order_m2, fixed = TRUE),
-  "\n(", n_genes_m2, ")"
+labels <- paste0(
+  gsub(".", " ", cluster_order, fixed = TRUE),
+  "\n(", n_genes[cluster_order], ")"
 )
-names(labels_m2) <- names(n_genes_m2)
+names(labels) <- cluster_order
 
 # Build bubble plot
-bg_m2 <- to_plot_m2 %>%
+bg <- to_plot %>%
   ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
-  ggtitle("GO Biological Process Annotation\nMethod 2: Strongest Non-Flanking Regulator") +
+  ggtitle("GO Biological Process Enrichment\nInv4m Trans Co-expression Network") +
   scale_fill_gradient(
     low = "dodgerblue",
     high = "tomato",
-    name = "-log10(FDR)",
-    limits = c(1, max(to_plot_m2$neglogP, na.rm = TRUE)),
+    name = "-log10(p)",
+    limits = c(1, max(to_plot$neglogP, na.rm = TRUE)),
     guide = guide_colorbar()
   ) +
   scale_y_discrete(
     labels = scales::wrap_format(60),
-    limits = rev(levels(to_plot_m2$Description))
+    limits = rev(levels(to_plot$Description))
   ) +
   scale_x_discrete(
-    labels = labels_m2,
+    labels = labels,
     drop = FALSE,
     expand = expansion(add = c(0.5, 1))
   ) +
@@ -762,9 +460,9 @@ bg_m2 <- to_plot_m2 %>%
   )
 
 # Add gene annotations
-annotation_plot_m2 <- bg_m2 +
+annotation_plot <- bg +
   geom_text(
-    data = term2symbol_m2,
+    data = term2symbol,
     position = position_nudge(0.15),
     hjust = 0,
     vjust = 0.5,
@@ -774,7 +472,24 @@ annotation_plot_m2 <- bg_m2 +
     inherit.aes = FALSE
   )
 
-print(annotation_plot_m2)
+print(annotation_plot)
+```
+
+## Top Terms Summary
+
+**Purpose**: Tabular summary of top enriched terms per network.
+
+```{r top_terms_table}
+cat("\n=== Top GO Terms by Network ===\n")
+
+compGO_BP@compareClusterResult %>%
+  filter(p.adjust < 0.05) %>%
+  mutate(Cluster = factor(Cluster, levels = cluster_order)) %>%
+  group_by(Cluster) %>%
+  arrange(p.adjust) %>%
+  slice_head(n = 5) %>%
+  dplyr::select(Cluster, Description, Count, p.adjust) %>%
+  print(n = 25)
 ```
 
 ---
@@ -784,17 +499,19 @@ print(annotation_plot_m2)
 **Purpose**: Save enrichment results and visualizations.
 
 ```{r export_results}
+# Export full enrichment results
 write.csv(
   compGO_BP@compareClusterResult,
-  file = file.path(paths$intermediate, "GO_enrichment_trans_network_all.csv"),
+  file = file.path(paths$intermediate, "GO_enrichment_trans_network.csv"),
   row.names = FALSE
 )
 
+# Export gene-term associations with symbols
 gene_term_associations <- to_plot %>%
   separate_longer_delim(geneID, delim = "/") %>%
   dplyr::rename(gene = geneID) %>%
   left_join(effects_symbol, relationship = "many-to-many") %>%
-  dplyr::select(Cluster, gene, SYMBOL, locus_name, ID, Description, 
+  dplyr::select(Cluster, gene, SYMBOL, locus_name, ID, Description,
          p.adjust, Count, logFC, adj.P.Val)
 
 write.csv(
@@ -803,30 +520,26 @@ write.csv(
   row.names = FALSE
 )
 
+# Save figures
 ggsave(
   annotation_plot,
   file = file.path(paths$figures, "GO_trans_network_annotated.svg"),
-  height = 10,
+  height = 5,
   width = 14
 )
 
 ggsave(
   annotation_plot,
   file = file.path(paths$figures, "GO_trans_network_annotated.pdf"),
-  height = 10,
+  height = 5,
   width = 14
 )
 
-# Export Method 2 results
-write.csv(
-  compGO_BP_M2@compareClusterResult,
-  file = file.path(paths$intermediate, "GO_enrichment_trans_network_method2.csv"),
-  row.names = FALSE
-)
-
-cat("\nFiles exported to paths$intermediate and paths$figures\n")
-cat("  - GO_enrichment_trans_network_all.csv (Method 1)\n")
-cat("  - GO_enrichment_trans_network_method2.csv (Method 2)\n")
+cat("\nFiles exported:\n")
+cat("  - GO_enrichment_trans_network.csv\n")
+cat("  - GO_gene_term_associations.csv\n")
+cat("  - GO_trans_network_annotated.svg\n")
+cat("  - GO_trans_network_annotated.pdf\n")
 ```
 
 ---
