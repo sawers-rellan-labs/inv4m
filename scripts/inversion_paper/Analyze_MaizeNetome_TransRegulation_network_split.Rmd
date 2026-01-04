@@ -1047,6 +1047,100 @@ visualize_trans_network(
 
 ---
 
+# Export Files for GO Enrichment Analysis
+
+```{r export_go_enrichment_files}
+# Generate trans_network_edges_annotated.csv with regulator_region column
+# This file is required by GO_Enrichment_Trans_Network.Rmd
+
+trans_network_edges_annotated <- bipartite_edges %>%
+  mutate(
+    regulator_region = case_when(
+      from %in% inv4m_regulators ~ "inv4m",
+      from %in% flanking_regulators ~ "flanking",
+      TRUE ~ "other"
+    )
+  ) %>%
+  dplyr::select(from, to, r, in_maizenetome, network_module, regulator_region)
+
+write.csv(
+  trans_network_edges_annotated,
+  file.path(paths$intermediate, "trans_network_edges_annotated.csv"),
+  row.names = FALSE
+)
+
+cat("=== trans_network_edges_annotated.csv ===\n")
+cat("Total edges:", nrow(trans_network_edges_annotated), "\n")
+cat("By regulator_region:\n")
+print(table(trans_network_edges_annotated$regulator_region))
+
+# Generate trans_network_regulators.csv
+trans_network_regulators <- effects_df %>%
+  filter(gene %in% unique(bipartite_edges$from)) %>%
+  group_by(gene) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::select(gene, locus_label, locus_symbol, desc_merged, logFC, adj.P.Val) %>%
+  mutate(
+    node_type = "regulator",
+    region = case_when(
+      gene %in% inv4m_regulators ~ "inv4m",
+      gene %in% flanking_regulators ~ "flanking",
+      TRUE ~ "other"
+    )
+  )
+
+write.csv(
+  trans_network_regulators,
+  file.path(paths$intermediate, "trans_network_regulators.csv"),
+  row.names = FALSE
+)
+
+cat("\n=== trans_network_regulators.csv ===\n")
+cat("Total regulators:", nrow(trans_network_regulators), "\n")
+cat("By region:\n")
+print(table(trans_network_regulators$region))
+
+# Generate trans_network_targets.csv
+trans_network_targets <- effects_df %>%
+  filter(gene %in% unique(bipartite_edges$to)) %>%
+  group_by(gene) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::select(gene, locus_label, locus_symbol, desc_merged, logFC, adj.P.Val) %>%
+  mutate(
+    node_type = "target",
+    region = "trans"
+  )
+
+write.csv(
+  trans_network_targets,
+  file.path(paths$intermediate, "trans_network_targets.csv"),
+  row.names = FALSE
+)
+
+cat("\n=== trans_network_targets.csv ===\n")
+cat("Total targets:", nrow(trans_network_targets), "\n")
+
+# Generate trans_network_all_genes.csv
+trans_network_all_genes <- bind_rows(
+  trans_network_regulators,
+  trans_network_targets
+) %>%
+  distinct(gene, .keep_all = TRUE)
+
+write.csv(
+  trans_network_all_genes,
+  file.path(paths$intermediate, "trans_network_all_genes.csv"),
+  row.names = FALSE
+)
+
+cat("\n=== trans_network_all_genes.csv ===\n")
+cat("Total unique genes:", nrow(trans_network_all_genes), "\n")
+```
+
+---
+
 # Export Network Modules
 
 ```{r export_modules}
