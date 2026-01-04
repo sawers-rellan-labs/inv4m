@@ -570,16 +570,16 @@ $H_a: \mu_{\textit{Inv4}} > \mu_{\textit{CTRL}}$) 9\% increase in SAM height
 shape coefficient (2.49 $\text{nm}^{-1}$, 0.59 $\text{nm}^{-1}$), indicating an 
 elongated meristem (Panel C).
 
-  \begin{figure*}[!ht]
-  \centering
-  \includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
-  \caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
-  \textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow). Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants. Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
-  \textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships. The network includes key cell cycle genes (\textit{pcna2}, \textit{map4k8}), transcription factors (\textit{ocl2}), and the \jmjii cluster.
-  \textit{Right:} Novel edges specific to the \invfour network, showing the \jmjiv neighborhood subgraph. This includes upregulated genes involved in cell proliferation (\textit{sec6}, \textit{kan1}) and downregulated JUMONJI methyltransferases.
-  \textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). Gene labels identify representative members of enriched terms. Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes, consistent with the observed meristem phenotype.}
-  \label{fig::DEGnetwork}
-  \end{figure*}
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
+\caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
+\textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow). Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants. Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
+\textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships. The network includes   \textit{proliferating cell nuclear antigen2} (\textit{pcna2}, \textit{outer cell layer2} (\textit{ocl2}), and  \jmjii .
+\textit{Right:} Novel edges specific to the \invfour network, showing the \jmjiv neighborhood subgraph that includes \textit{Exocyst complex component SEC6} (\textit{sec6}) .
+\textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). Gene labels identify representative members of enriched terms. Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.}
+\label{fig::DEGnetwork}
+\end{figure*}
 
 \begin{table*}[!ht]
 \caption{\textbf{Effect of \invfour on Flowering Time and Plant Height Gene 
@@ -985,31 +985,40 @@ available at the
 github repository}.
 
 
-\subsection{Gene Ontology and KEGG overrepresenattion analysis}
+\subsection{Trans coexpression network analysis}
 
-Once we had sets of differentially expressed genes for the three predictors 
-(leaf, -P, \invfour) and two types of gene expression response (upregulated and 
-downregulated), we proceeded to annotate them with gene ontology terms and KEGG 
-pathways using \textit{ClusterProfiler} \cite{yu2012, zicola2024}. We started 
-with the B73 NAM v5 gene ontology annotation from \cite{fattel2024} and added 
-GO terms for each intermediate node in the gene ontology tree using the 
-\textit{ClusterProfiler} function \textit{buildGOmap}.
+To identify genes regulated in \textit{trans} by \invfour, we constructed a
+bipartite co-expression network linking DEGs within the introgressed region
+(\textit{cis} regulators) to DEGs located elsewhere in the genome (\textit{trans}
+targets). Pearson correlation coefficients were calculated between all
+\textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized
+expression values. Edges were retained if $|r| > 0.5$ and the correlation was
+significant (\textit{p} $< 0.005$).
 
-Then we conducted gene over-representation analysis with the function 
-\textit{compareCluster}, using as universe/background the set of 24011 genes 
-detected in at least one good quality leaf RNAseq library. This function 
-calculates the hypergeometric test for overrepresented ontology terms in the 
-specified gene set and returns raw, and FDR-adjusted p-values. We then manually 
-reviewed the combined 1700 significant (\textit{FDR} $<0.05$) overrepresented 
-GO term associations for the 6 predictor/regulation combinations, and we 
-selected for illustration an \textit{ad hoc} subset with low semantic 
-redundancy.
+To distinguish \invfour-specific effects from flanking introgression effects, we
+applied a strongest-regulator criterion: for each \textit{trans} target, we
+identified the \textit{cis} regulator with the highest absolute correlation.
+Targets were assigned to the \invfour network only if their strongest regulator
+was located within the 15 Mb inversion proper, not in the flanking introgressed
+regions. This approach recovered 50 genes in the \invfour trans-regulatory
+network (22 upregulated, 28 downregulated).
 
-Similarly, We tested for KEGG pathways over representation using the 
-\textit{enrichKEGG} function from \textit{compareCluster}, which makes the same 
-hypothesis tests on the NCBI REFseq annotation of the B73 NAM assembly. Both 
-types of overrepresentation analysis were plotted with the package \textit{DOSE} 
-\cite{yu2015}.
+We compared our co-expression edges against the MaizeNetome database
+\cite{obata2022} to classify edges as ``Reference'' (previously reported) or
+``Novel'' (\invfour-specific). Gene identifiers were converted from B73 NAM v4
+to v5 using published correspondence tables \cite{hufford2021}. Networks were
+visualized as minimum spanning trees (MST) constructed on standardized Euclidean
+distance derived from mutual information: $MI = 0.5 \times \log_2(1/(1-r^2))$.
+Edge polarity (concordant vs. discordant expression) was indicated by arrow or
+bar symbols.
+
+Gene Ontology enrichment analysis was performed on the trans network using
+\textit{clusterProfiler} \cite{yu2012} with the B73 NAM v5 GO annotation from
+\cite{fattel2024}. Gene sets were stratified by regulator location (flanking vs.
+\invfour) and direction of differential expression (up vs. down). Semantic
+redundancy among enriched terms was reduced using \textit{rrvgo} \cite{sayols2023}
+with a similarity threshold of 0.7. Enrichment results were visualized as bubble
+plots showing the top five terms per gene set ranked by adjusted \textit{p}-value.
 
 \subsection{Filtering of \invfour DEGs by phenotype association}
 
