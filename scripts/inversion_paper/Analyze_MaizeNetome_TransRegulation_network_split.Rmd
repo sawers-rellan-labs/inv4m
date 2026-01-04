@@ -733,6 +733,91 @@ if (nrow(novel_edges) > 0) {
 
 ---
 
+# Visualize jmj4 Neighborhood (Novel MST Subgraph)
+
+**Purpose**: Extract the jmj4-centered subgraph from the novel network MST.
+This preserves the MST structure while focusing on jmj4, engd2, and their
+targets (kan1, sec6, nii2, roc4-2, etc.).
+
+```{r jmj4_neighborhood}
+# Define the jmj4 neighborhood genes (from manual selection of novel MST)
+jmj4_neighborhood_labels <- c(
+  "jmj4", "engd2", "roc4-2", "kan1", "sec6", "nii2", "tet2", "flz22", "pza01976"
+)
+
+# Get gene IDs matching these labels
+jmj4_genes_by_label <- effects_df %>%
+  filter(locus_label %in% jmj4_neighborhood_labels) %>%
+  pull(gene) %>%
+  unique()
+
+cat("jmj4 neighborhood genes:", length(jmj4_genes_by_label), "\n")
+
+if (nrow(novel_edges_prep) > 0 && length(jmj4_genes_by_label) > 0) {
+  # Build the full novel MST first
+  g_novel <- graph_from_data_frame(
+    d = novel_edges_prep %>% dplyr::select(from, to, r, corr_std, std_dist, mi),
+    directed = TRUE,
+    vertices = novel_nodes
+  )
+  g_novel_mst <- mst(g_novel, weights = E(g_novel)$std_dist)
+
+  # Extract subgraph containing jmj4 neighborhood nodes
+  jmj4_nodes_in_mst <- V(g_novel_mst)$name[V(g_novel_mst)$name %in% jmj4_genes_by_label]
+
+  if (length(jmj4_nodes_in_mst) > 0) {
+    g_jmj4_subgraph <- induced_subgraph(g_novel_mst, jmj4_nodes_in_mst)
+
+    # Get edges and nodes from subgraph
+    jmj4_mst_edges <- igraph::as_data_frame(g_jmj4_subgraph, what = "edges")
+    jmj4_node_ids <- V(g_jmj4_subgraph)$name
+
+    jmj4_nodes <- format_network_nodes(
+      jmj4_node_ids, effects_df,
+      inv4m_regulators, flanking_regulators
+    )
+
+    cat("\n=== jmj4 Neighborhood (Novel MST Subgraph) ===\n")
+    cat("MST Edges:", nrow(jmj4_mst_edges), "\n")
+    cat("Nodes:", length(jmj4_node_ids), "\n")
+
+    # Prepare edges for visualization
+    jmj4_vis_edges <- jmj4_mst_edges %>%
+      left_join(
+        effects_df %>% group_by(gene) %>% dplyr::slice(1) %>% ungroup() %>%
+          dplyr::select(gene, logFC_from = logFC),
+        by = c("from" = "gene")
+      ) %>%
+      left_join(
+        effects_df %>% group_by(gene) %>% dplyr::slice(1) %>% ungroup() %>%
+          dplyr::select(gene, logFC_to = logFC),
+        by = c("to" = "gene")
+      ) %>%
+      mutate(
+        is_concordant = sign(logFC_from) == sign(logFC_to),
+        arrows.to.type = ifelse(is_concordant, "arrow", "bar"),
+        color = "DarkGray",
+        width = mi
+      ) %>%
+      dplyr::select(from, to, width, arrows.to.type, color)
+
+    visNetwork(jmj4_nodes, jmj4_vis_edges) %>%
+      visNodes(font = list(size = 24, multi = "html")) %>%
+      visEdges(arrows = "to") %>%
+      visOptions(
+        highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
+        nodesIdSelection = TRUE
+      )
+  } else {
+    cat("No jmj4 neighborhood genes found in novel MST\n")
+  }
+} else {
+  cat("No novel edges or jmj4 genes to process\n")
+}
+```
+
+---
+
 # Export Files for GO Enrichment Analysis
 
 ```{r export_go_files}
