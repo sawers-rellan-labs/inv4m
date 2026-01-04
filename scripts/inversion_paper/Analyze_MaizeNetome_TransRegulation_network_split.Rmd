@@ -745,15 +745,26 @@ jmj4_neighborhood_labels <- c(
   "jmj4", "engd2", "roc4-2", "kan1", "sec6", "nii2", "tet2", "flz22", "pza01976"
 )
 
-# Get gene IDs matching these labels
+# Genes with only assembly IDs (no locus labels)
+jmj4_neighborhood_ids <- c(
+  "Zm00001eb132370",
+  "Zm00001eb193130",
+
+  "Zm00001eb192970"
+)
+
+# Get gene IDs matching labels
 jmj4_genes_by_label <- effects_df %>%
   filter(locus_label %in% jmj4_neighborhood_labels) %>%
   pull(gene) %>%
   unique()
 
-cat("jmj4 neighborhood genes:", length(jmj4_genes_by_label), "\n")
+# Combine both sources
+jmj4_all_genes <- unique(c(jmj4_genes_by_label, jmj4_neighborhood_ids))
 
-if (nrow(novel_edges_prep) > 0 && length(jmj4_genes_by_label) > 0) {
+cat("jmj4 neighborhood genes:", length(jmj4_all_genes), "\n")
+
+if (nrow(novel_edges_prep) > 0 && length(jmj4_all_genes) > 0) {
   # Build the full novel MST first
   g_novel <- graph_from_data_frame(
     d = novel_edges_prep %>% dplyr::select(from, to, r, corr_std, std_dist, mi),
@@ -763,7 +774,7 @@ if (nrow(novel_edges_prep) > 0 && length(jmj4_genes_by_label) > 0) {
   g_novel_mst <- mst(g_novel, weights = E(g_novel)$std_dist)
 
   # Extract subgraph containing jmj4 neighborhood nodes
-  jmj4_nodes_in_mst <- V(g_novel_mst)$name[V(g_novel_mst)$name %in% jmj4_genes_by_label]
+  jmj4_nodes_in_mst <- V(g_novel_mst)$name[V(g_novel_mst)$name %in% jmj4_all_genes]
 
   if (length(jmj4_nodes_in_mst) > 0) {
     g_jmj4_subgraph <- induced_subgraph(g_novel_mst, jmj4_nodes_in_mst)
