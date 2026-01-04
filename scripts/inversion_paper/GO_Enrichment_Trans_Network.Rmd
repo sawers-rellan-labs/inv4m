@@ -682,15 +682,99 @@ m2_inv4m %>%
 
 ## Method 2 Visualization
 
-```{r method2_dotplot, fig.height=10, fig.width=12}
-if (nrow(m2_inv4m %>% filter(p.adjust < 0.05)) > 0) {
-  dotplot(compGO_BP_M2, size = "Count", showCategory = 10) +
-    ggtitle("GO Biological Process: Method 2 (Strongest Non-Flanking Regulator)") +
-    scale_size(range = c(4, 8), breaks = 1:4) +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1))
-} else {
-  cat("No significant GO terms for Method 2 Inv4m sets\n")
-}
+```{r method2_bubble_plot, fig.height=5, fig.width=14}
+# Prepare data: top 5 terms per group by p.adjust
+cluster_order_m2 <- c("flank.Up", "flank.Down", "Inv4m.Up.M2", "Inv4m.Down.M2")
+
+to_plot_m2 <- compGO_BP_M2@compareClusterResult %>%
+  filter(p.adjust < 0.05) %>%
+  mutate(
+    neglogP = -log10(p.adjust),
+    Cluster = factor(Cluster, levels = cluster_order_m2)
+  ) %>%
+  group_by(Cluster) %>%
+  arrange(p.adjust) %>%
+  slice_head(n = 5) %>%
+  mutate(
+    label_order = 1:n(),
+    Description = fct_reorder(Description, label_order)
+  ) %>%
+  ungroup()
+
+# Get gene labels for each term (most significant gene per term)
+term2symbol_m2 <- to_plot_m2 %>%
+  separate_longer_delim(geneID, delim = "/") %>%
+  dplyr::rename(gene = geneID) %>%
+  inner_join(effects_symbol, relationship = "many-to-many", by = "gene") %>%
+  dplyr::select(Cluster, gene, SYMBOL, locus_label, ID, Description,
+         p.adjust, Count, logFC, adj.P.Val) %>%
+  distinct() %>%
+  group_by(Cluster, ID) %>%
+  arrange(Cluster, ID, adj.P.Val) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  mutate(gene_label = ifelse(
+    !is.na(locus_label) & locus_label != "",
+    locus_label,
+    SYMBOL
+  ))
+
+cat("\nMethod 2 bubble plot:\n")
+cat("  Terms to plot:", nrow(to_plot_m2), "\n")
+cat("  Terms with gene labels:", nrow(term2symbol_m2), "\n")
+
+# Create facet labels with gene counts
+labels_m2 <- paste0(
+  gsub(".", " ", cluster_order_m2, fixed = TRUE),
+  "\n(", n_genes_m2, ")"
+)
+names(labels_m2) <- names(n_genes_m2)
+
+# Build bubble plot
+bg_m2 <- to_plot_m2 %>%
+  ggplot(aes(x = Cluster, y = Description, size = Count, fill = neglogP)) +
+  ggtitle("GO Biological Process Annotation\nMethod 2: Strongest Non-Flanking Regulator") +
+  scale_fill_gradient(
+    low = "dodgerblue",
+    high = "tomato",
+    name = "-log10(FDR)",
+    limits = c(1, max(to_plot_m2$neglogP, na.rm = TRUE)),
+    guide = guide_colorbar()
+  ) +
+  scale_y_discrete(
+    labels = scales::wrap_format(60),
+    limits = rev(levels(to_plot_m2$Description))
+  ) +
+  scale_x_discrete(
+    labels = labels_m2,
+    drop = FALSE,
+    expand = expansion(add = c(0.5, 1))
+  ) +
+  geom_point(shape = 21) +
+  scale_size(range = c(6, 8), breaks = 2:4) +
+  ylab(NULL) +
+  xlab(NULL) +
+  DOSE::theme_dose(font.size = 16) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    legend.position = "right",
+    axis.text.x = element_text(vjust = 0.5, angle = 0, hjust = 0.5)
+  )
+
+# Add gene annotations
+annotation_plot_m2 <- bg_m2 +
+  geom_text(
+    data = term2symbol_m2,
+    position = position_nudge(0.15),
+    hjust = 0,
+    vjust = 0.5,
+    fontface = "italic",
+    size = 5,
+    mapping = aes(x = Cluster, y = Description, label = gene_label),
+    inherit.aes = FALSE
+  )
+
+print(annotation_plot_m2)
 ```
 
 ---
