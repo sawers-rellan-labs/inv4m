@@ -1076,6 +1076,23 @@ dome.
 Data were analyzed using ANOVA and plots were generated in R v.4.3.2 with the 
 packages rstatix v.0.7.2, readxl v.1.4.3, ggplot2 v.3.5.1 and ggpubr v.0.6.0.
 
+\begin{figure*}[!ht]
+\includegraphics[width=0.95\linewidth]{figs/jmj_cluster.png}
+\centering
+\caption{\textbf{The \jmjii cluster within \invfour shows lineage-specific expansion in B73.}
+\textbf{(A)} Microsynteny of the JUMONJI gene cluster across three \textit{Zea} genomes.
+The teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}) and the highland landrace Palomero Toluque\~{n}o (PT) each contain a single \textit{jmj6} ortholog, while B73 has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6},
+\textit{jmj2}, \textit{jmj4}). 
+Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes. Coordinates in Mb.
+\textbf{(B)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
+The NAM v5 annotation consolidates \textit{jmj2}, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while
+\textit{jmj4} is annotated separately (\textit{Zm00001eb191820}). 
+The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
+Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
+\label{fig:jmj_cluster}
+\end{figure*}
+
+
 \section{Discussion}
 
 Our study demonstrates that introgression of the \invfour chromosomal inversion 
@@ -1099,8 +1116,9 @@ effects. These genes show differential copy number between modern maize and
 highland teosinte, suggesting structural variation beyond the inversion itself 
 may contribute to phenotypic differences. The perturbation of a cell 
 proliferation gene network and the observed elongation of shoot apical 
-meristems offer a plausible cellular mechanism linking \invfour genotype to 
+meristems offer a plausible cellular mechanism linking \invfour genotype to
 increased plant height.
+
 
 Contrary to our initial hypothesis, \invfour showed no detectable effect on 
 phosphorus starvation responses despite containing classical PSR genes. This 
@@ -1390,17 +1408,13 @@ assistance with field work and laboratory analyses.
 \includegraphics[width=\linewidth]{figs/SNP_distribution.png}
 \caption{\textbf{Chromosome Distribution of the SNPs in the RNAseq samples, 
 their correlation with \invfour, and genotype run length as percentage of the 
-genome.} \textbf{(A)} Chromosome 4 contains 44\% of all genotyped SNPs and 98\% 
-of \invfour correlated SNPs (n=13). \textbf{(B)} Manhattan plot for the 
-significance (\textit{t-test}) of the Pearson correlation of 19861 genotyped 
-SNPs with PZE04175660223. Red line: \textit{FDR} $=0.05$ threshold. 
-\textbf{(C)} Pearson correlation ($r$) of the each SNP with the \invfour 
-tagging SNP PZE04175660223, open circles: non-significant SNPs. SNPs with 
-significant correlation with \invfour (full circles) are divergent highland 
-introgressions. \textbf{(D)} NIL genotype run length as percentage of the 
-genome. Each point represents a NIL, \invfour plants are tagged by the highland 
-allele of PZE04175660223, CTRL plants by the reference (B73) allele, dashed 
-line is the overall mean for the 13 NILs.}
+genome.} 
+\textbf{(A)} Chromosome 4 contains 44\% of all genotyped SNPs and 98\% 
+of \invfour correlated SNPs (n=13).
+\textbf{(B)} Manhattan plot for the significance (\textit{t-test}) of the Pearson correlation of 19861 genotyped SNPs with PZE04175660223. Red line: \textit{FDR} $=0.05$ threshold. 
+\textbf{(C)} Pearson correlation ($r$) of the each SNP with the \invfour tagging SNP PZE04175660223, open circles: non-significant SNPs.
+SNPs with significant correlation with \invfour (full circles) are divergent highland introgressions.
+\textbf{(D)} NIL genotype run length as percentage of the genome. Each point represents a NIL, \invfour plants are tagged by the highland allele of PZE04175660223, CTRL plants by the reference (B73) allele, dashed line is the overall mean for the 13 NILs.}
 \label{fig::SNPdistro}
 \end{figure}
 

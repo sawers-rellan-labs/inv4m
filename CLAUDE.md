@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-02
+**Last Updated:** 2026-01-03
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Revision In Progress ⚠️
-**Version:** v1.2.0
+**Version:** v1.2.1
 
 ---
 
@@ -11,6 +11,7 @@
 **Active Work:** The inversion paper is undergoing revision after a statistical model change. Before starting any work, read these files to understand current state:
 
 ```
+scripts/00_agent_work/HANDOVER_tables_revision.md           # CRITICAL - Table values need updating
 scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
 scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
@@ -19,10 +20,13 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-02):**
-1. Figure 3 composition refinement (7/8 panels ready)
-2. Panel F (haplotype) - needs ggsave in genotype script
-3. Figure 5 (trans network) restructuring
+**Current Priority (as of 2026-01-03):**
+1. **UPDATE TABLE VALUES** - Tables have old model statistics, need values from:
+   - `docs/inversion_paper/differential_expression_leaf_treatment_model.html`
+   - `results/inversion_paper/intermediate/inv4m_selected_DEGs_leaf_interaction_model.csv`
+2. Figure 5 (trans network) restructuring
+
+**Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
 ---
 
