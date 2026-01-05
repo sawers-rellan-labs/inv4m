@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-03
+**Last Updated:** 2026-01-04
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Revision In Progress ⚠️
-**Version:** v1.2.1
+**Version:** v1.2.2
 
 ---
 
@@ -20,11 +20,11 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-03):**
-1. **UPDATE TABLE VALUES** - Tables have old model statistics, need values from:
-   - `docs/inversion_paper/differential_expression_leaf_treatment_model.html`
-   - `results/inversion_paper/intermediate/inv4m_selected_DEGs_leaf_interaction_model.csv`
-2. Figure 5 (trans network) restructuring
+**Current Priority (as of 2026-01-04):**
+1. **WGCNA Figure Implementation** - Next figure to generate (Figure 6)
+   - See: `scripts/00_agent_work/HANDOVER_WGCNA_figure_implementation.md`
+   - Data ready: `results/inversion_paper/field_perturbation/run_20251231_201332/`
+   - Needs: Boxplot colors by module, locus_label in scatter plot, RDS saves
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
@@ -119,6 +119,8 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ⚠️ |
 | `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
+| `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ⚠️ |
+| `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
 
 ### Generated Outputs
 

@@ -534,6 +534,10 @@ membranes are significantly downregulated.
 \subsection{\invfour plants show perturbations of a cell proliferation gene 
 expression network in leaves and have elongated shoot apical meristems}
 
+\subsection{\invfour coexpression network perturbation analysis }
+
+
+
 A gene co-expression network analysis (Panel A) was performed to investigate the 
 trans-regulatory effects associated with the Inv4m chromosomal inversion in 
 maize leaves. This network comprised approximately 24 genes and 28 co-expression 
@@ -567,6 +571,19 @@ $H_a: \mu_{\textit{Inv4}} > \mu_{\textit{CTRL}}$) 9\% increase in SAM height
 (9.65 $\mu$m, 0.37 $\mu$m lower bound with 95\% confidence), a 9\% increase in 
 shape coefficient (2.49 $\text{nm}^{-1}$, 0.59 $\text{nm}^{-1}$), indicating an 
 elongated meristem (Panel C).
+
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=0.8\linewidth]{figs/WGCNA_module_perturbation.png}
+\caption{\textbf{WGCNA module perturbation analysis reveals widespread network disruption in \invfour plants.}
+\textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10--35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
+\textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes. Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Most modules show substantial connectivity decrease, with blue, yellow, and brown modules exhibiting the strongest disruption.
+\textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis). Points represent top 5 hub genes per module, colored by module assignment. Point size indicates $|\log_2 FC|$. Points below the diagonal indicate hub genes that lost connectivity in \invfour. Labels show gene symbols where available.}
+\label{fig:wgcna}
+\end{figure*}
+
+\clearpage
 
 \begin{figure*}[!ht]
 \centering
@@ -1032,6 +1049,8 @@ total change across the leaf gradient. R scripts and expression data are
 available at the
 \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour
 github repository}.
+
+
 
 \subsection{Trans coexpression network analysis}
 

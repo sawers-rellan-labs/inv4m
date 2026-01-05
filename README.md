@@ -61,7 +61,8 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 3 | Global and local transcriptomic effects (8 panels) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + panel scripts | ⚠️ |
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation.html) | ✅ |
-| Figure 6 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
+| Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ⚠️ |
+| Figure 7 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
@@ -71,7 +72,9 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Table S1 | Inv4m breakpoints and knob repeats | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table S2 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
 | **Supporting Scripts** | | | |
-| WGCNA modules | Co-expression network analysis | [`get_WGCNA_modules.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/get_WGCNA_modules.html) | ✅ |
+| Field perturbation pipeline | WGCNA consensus + preservation | `scripts/inversion_paper/field_perturbation/` (7 scripts) | ✅ |
+| WGCNA figure assembly | Figure 6 composition | `assemble_WGCNA_figure.Rmd` | ⚠️ |
+| WGCNA modules (legacy) | Co-expression network analysis | [`get_WGCNA_modules.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/get_WGCNA_modules.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
 | Crow 2020 reanalysis | Reference dataset reanalysis | [`Crow2020_reanalysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Crow2020_reanalysis.html) | ✅ |
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
@@ -83,6 +86,12 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 ---
 
 ## Recent Updates
+
+**2026-01-04:** WGCNA module perturbation figure planning:
+- ✅ Created handover document for WGCNA figure implementation
+- ⚠️ Figure 6: Needs boxplot colors by module, locus_label in scatter plot
+- ⚠️ Assembly notebook `assemble_WGCNA_figure.Rmd` to be created
+- Pipeline data available: `results/inversion_paper/field_perturbation/run_20251231_201332/`
 
 **2026-01-02:** Figure 3 panel generation infrastructure for inversion paper revision:
 - ✅ Created `assemble_figure3_RNAseq.Rmd` - Assembly notebook for 8-panel composite figure
