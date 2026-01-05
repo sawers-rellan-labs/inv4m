@@ -531,8 +531,6 @@ brassinosteroid biosynthesis (\textit{brc2}). Conversely, genes involved in
 galactolipid biosynthesis, which are crucial for maintaining photosynthetic 
 membranes are significantly downregulated.
 
-\clearpage
-
 \subsection{\invfour plants show perturbations of a cell proliferation gene 
 expression network in leaves and have elongated shoot apical meristems}
 
@@ -805,6 +803,57 @@ response to phosphorus depending on the \invfour genotype. In phosphorus
 deficiency \textit{aldh2} overexpresses in the CTRL plants, but it is not 
 responsive in the \invfour plant (Fig~\ref{fig::RNAseq} D).
 
+\section{Discussion}
+
+Our study demonstrates that introgression of the \invfour chromosomal inversion 
+from Mexican highland maize into temperate germplasm produces significant 
+phenotypic effects on flowering time and plant height, independent of phosphorus 
+availability. These findings illuminate potential mechanisms underlying local 
+adaptation in maize and identify candidate genes for future functional studies.
+
+The accelerated flowering time in \invfour-carrying plants represents a 
+counterintuitive result given the inversion's highland origin, where delayed 
+flowering at low elevations is adaptive. However, this pattern is consistent 
+with gene-by-environment interactions previously observed for \invfour 
+\cite{crow2020}. In temperate environments with extended growing seasons, the 
+earlier flowering conferred by \invfour may not be adaptive, explaining its 
+rarity in modern temperate cultivars despite potential introgression 
+opportunities during maize's northward expansion.
+
+The identification of JUMONJI methyltransferases as strong candidates for 
+flowering time regulation provides a mechanistic hypothesis for \invfour's 
+effects. These genes show differential copy number between modern maize and 
+highland teosinte, suggesting structural variation beyond the inversion itself 
+may contribute to phenotypic differences. The perturbation of a cell 
+proliferation gene network and the observed elongation of shoot apical 
+meristems offer a plausible cellular mechanism linking \invfour genotype to
+increased plant height.
+
+
+
+\begin{figure*}[!ht]
+\includegraphics[width=0.95\linewidth]{figs/jmj_cluster.png}
+\centering
+\caption{\textbf{The \jmjii cluster within \invfour shows lineage-specific expansion in B73.}
+\textbf{(A)} Microsynteny of the JUMONJI gene cluster across three \textit{Zea} genomes.
+The teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}) and the highland landrace Palomero Toluque\~{n}o (PT) each contain a single \textit{jmj6} ortholog, while B73 has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6},
+\textit{jmj2}, \textit{jmj4}). 
+Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes. Coordinates in Mb.
+\textbf{(B)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
+The NAM v5 annotation consolidates \textit{jmj2}, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while
+\textit{jmj4} is annotated separately (\textit{Zm00001eb191820}). 
+The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
+Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
+\label{fig:jmj_cluster}
+\end{figure*}
+
+
+The presence of substantial linkage drag flanking \invfour (24 Mb across eight 
+generations of backcrossing) highlights the challenges of dissecting inversion 
+effects through introgression. Future work employing larger populations or 
+additional recombinant lines could help separate effects of genes within the 
+inversion proper from those in flanking regions.
+
 \section{Materials and Methods}
 \label{sec:materials:methods}
 
@@ -984,7 +1033,6 @@ available at the
 \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour
 github repository}.
 
-
 \subsection{Trans coexpression network analysis}
 
 To identify genes regulated in \textit{trans} by \invfour, we constructed a
@@ -1004,7 +1052,7 @@ regions. This approach recovered 50 genes in the \invfour trans-regulatory
 network (22 upregulated, 28 downregulated).
 
 We compared our co-expression edges against the MaizeNetome database
-\cite{obata2022} to classify edges as ``Reference'' (previously reported) or
+\cite{feng2023} to classify edges as ``Reference'' (previously reported) or
 ``Novel'' (\invfour-specific). Gene identifiers were converted from B73 NAM v4
 to v5 using published correspondence tables \cite{hufford2021}. Networks were
 visualized as minimum spanning trees (MST) constructed on standardized Euclidean
@@ -1019,6 +1067,7 @@ Gene Ontology enrichment analysis was performed on the trans network using
 redundancy among enriched terms was reduced using \textit{rrvgo} \cite{sayols2023}
 with a similarity threshold of 0.7. Enrichment results were visualized as bubble
 plots showing the top five terms per gene set ranked by adjusted \textit{p}-value.
+
 
 \subsection{Filtering of \invfour DEGs by phenotype association}
 
@@ -1087,65 +1136,8 @@ dome.
 Data were analyzed using ANOVA and plots were generated in R v.4.3.2 with the 
 packages rstatix v.0.7.2, readxl v.1.4.3, ggplot2 v.3.5.1 and ggpubr v.0.6.0.
 
-\begin{figure*}[!ht]
-\includegraphics[width=0.95\linewidth]{figs/jmj_cluster.png}
-\centering
-\caption{\textbf{The \jmjii cluster within \invfour shows lineage-specific expansion in B73.}
-\textbf{(A)} Microsynteny of the JUMONJI gene cluster across three \textit{Zea} genomes.
-The teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}) and the highland landrace Palomero Toluque\~{n}o (PT) each contain a single \textit{jmj6} ortholog, while B73 has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6},
-\textit{jmj2}, \textit{jmj4}). 
-Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes. Coordinates in Mb.
-\textbf{(B)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
-The NAM v5 annotation consolidates \textit{jmj2}, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while
-\textit{jmj4} is annotated separately (\textit{Zm00001eb191820}). 
-The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
-Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
-\label{fig:jmj_cluster}
-\end{figure*}
 
 
-\section{Discussion}
-
-Our study demonstrates that introgression of the \invfour chromosomal inversion 
-from Mexican highland maize into temperate germplasm produces significant 
-phenotypic effects on flowering time and plant height, independent of phosphorus 
-availability. These findings illuminate potential mechanisms underlying local 
-adaptation in maize and identify candidate genes for future functional studies.
-
-The accelerated flowering time in \invfour-carrying plants represents a 
-counterintuitive result given the inversion's highland origin, where delayed 
-flowering at low elevations is adaptive. However, this pattern is consistent 
-with gene-by-environment interactions previously observed for \invfour 
-\cite{crow2020}. In temperate environments with extended growing seasons, the 
-earlier flowering conferred by \invfour may not be adaptive, explaining its 
-rarity in modern temperate cultivars despite potential introgression 
-opportunities during maize's northward expansion.
-
-The identification of JUMONJI methyltransferases as strong candidates for 
-flowering time regulation provides a mechanistic hypothesis for \invfour's 
-effects. These genes show differential copy number between modern maize and 
-highland teosinte, suggesting structural variation beyond the inversion itself 
-may contribute to phenotypic differences. The perturbation of a cell 
-proliferation gene network and the observed elongation of shoot apical 
-meristems offer a plausible cellular mechanism linking \invfour genotype to
-increased plant height.
-
-
-Contrary to our initial hypothesis, \invfour showed no detectable effect on 
-phosphorus starvation responses despite containing classical PSR genes. This 
-suggests that phosphorus availability may not be the primary selective pressure 
-maintaining \invfour in highland populations, or that any phosphorus-related 
-effects are masked in our experimental conditions. Alternative adaptive 
-functions related to temperature, growing season length, or other edaphic 
-factors warrant further investigation.
-
-The presence of substantial linkage drag flanking \invfour (24 Mb across eight 
-generations of backcrossing) highlights the challenges of dissecting inversion 
-effects through introgression. Future work employing larger populations or 
-additional recombinant lines could help separate effects of genes within the 
-inversion proper from those in flanking regions.
-
-Inv4m
 \section{Acknowledgments}
 
 We acknowledge support from [funding agencies]. We thank [collaborators] for 
