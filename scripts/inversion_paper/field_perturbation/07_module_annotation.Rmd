@@ -840,13 +840,13 @@ hub_genes <- hub_genes %>%
       delta_kWithin > 0.02 ~ "Gain",
       TRUE ~ "Stable"
     ),
-    # Use locus_label if available, else filtered locus_symbol, else truncated gene ID
+    # Use locus_label if available, else filtered locus_symbol, else no label
     # Filter out marker names (umc, pco, etc.) from display
     display_label = case_when(
       !is.na(locus_label) & locus_label != "" ~ locus_label,
       !is.na(locus_symbol) & locus_symbol != "" &
         !grepl("^(umc|pco|bnlg|pza|gpm|csu|php|IDP|TIDP)[0-9]+|^cl[0-9]+_", locus_symbol) ~ locus_symbol,
-      TRUE ~ str_sub(gene, -8, -1)  # Last 8 chars of gene ID (e.g., eb192050)
+      TRUE ~ NA_character_
     )
   ) %>%
   arrange(module, desc(kWithin_ctrl))
