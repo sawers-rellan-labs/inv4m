@@ -391,6 +391,58 @@ if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
 }
 ```
 
+## rrvgo Reduction for CC
+
+```{r rrvgo_cc}
+# Apply rrvgo semantic reduction to CC results
+if (nrow(go_results_cc) > 0) {
+  cat("\n=== APPLYING RRVGO TO CC ===\n")
+
+  filtered_cc_result <- go_results_cc %>%
+    filter(Count > 1) %>%
+    group_by(module_color) %>%
+    arrange(pvalue, .by_group = TRUE) %>%
+    ungroup()
+
+  go_terms_cc <- unique(go_results_cc$ID)
+
+  if (length(go_terms_cc) > 1) {
+    cat("Calculating semantic similarity for", length(go_terms_cc), "CC terms...\n")
+
+    simMatrix_cc <- calculateSimMatrix(
+      go_terms_cc,
+      orgdb = org.Zm.eg.db,
+      ont = "CC",
+      method = "Rel"
+    )
+
+    scores_cc <- setNames(-log10(go_results_cc$pvalue), go_results_cc$ID)
+
+    reducedTerms_cc <- reduceSimMatrix(
+      simMatrix_cc,
+      scores_cc,
+      threshold = 0.7,
+      orgdb = org.Zm.eg.db
+    )
+
+    go_results_cc_rrvgo <- filtered_cc_result %>%
+      filter(ID %in% reducedTerms_cc$parent)
+
+    cat("CC terms after rrvgo:", nrow(go_results_cc_rrvgo),
+        "(from", nrow(go_results_cc), ")\n")
+  } else {
+    go_results_cc_rrvgo <- filtered_cc_result
+  }
+
+  write_csv(
+    go_results_cc_rrvgo,
+    file.path(OUTPUT_DIR, "all_modules_GO_CC_rrvgo.csv")
+  )
+} else {
+  go_results_cc_rrvgo <- tibble()
+}
+```
+
 ## Molecular Function (MF) Enrichment
 
 ```{r run_enrichment_mf}
@@ -436,6 +488,58 @@ if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
 } else {
   go_results_mf <- tibble()
   cat("\nNo significant MF enrichment found.\n")
+}
+```
+
+## rrvgo Reduction for MF
+
+```{r rrvgo_mf}
+# Apply rrvgo semantic reduction to MF results
+if (nrow(go_results_mf) > 0) {
+  cat("\n=== APPLYING RRVGO TO MF ===\n")
+
+  filtered_mf_result <- go_results_mf %>%
+    filter(Count > 1) %>%
+    group_by(module_color) %>%
+    arrange(pvalue, .by_group = TRUE) %>%
+    ungroup()
+
+  go_terms_mf <- unique(go_results_mf$ID)
+
+  if (length(go_terms_mf) > 1) {
+    cat("Calculating semantic similarity for", length(go_terms_mf), "MF terms...\n")
+
+    simMatrix_mf <- calculateSimMatrix(
+      go_terms_mf,
+      orgdb = org.Zm.eg.db,
+      ont = "MF",
+      method = "Rel"
+    )
+
+    scores_mf <- setNames(-log10(go_results_mf$pvalue), go_results_mf$ID)
+
+    reducedTerms_mf <- reduceSimMatrix(
+      simMatrix_mf,
+      scores_mf,
+      threshold = 0.7,
+      orgdb = org.Zm.eg.db
+    )
+
+    go_results_mf_rrvgo <- filtered_mf_result %>%
+      filter(ID %in% reducedTerms_mf$parent)
+
+    cat("MF terms after rrvgo:", nrow(go_results_mf_rrvgo),
+        "(from", nrow(go_results_mf), ")\n")
+  } else {
+    go_results_mf_rrvgo <- filtered_mf_result
+  }
+
+  write_csv(
+    go_results_mf_rrvgo,
+    file.path(OUTPUT_DIR, "all_modules_GO_MF_rrvgo.csv")
+  )
+} else {
+  go_results_mf_rrvgo <- tibble()
 }
 ```
 
@@ -635,63 +739,63 @@ if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
 ```
 
 ```{r go_supplementary_figure_cc, fig.width=14, fig.height=10}
-# Create CC bubble plot
-if (exists("go_results_cc") && nrow(go_results_cc) > 0) {
+# Create CC bubble plot (rrvgo-reduced)
+if (exists("go_results_cc_rrvgo") && nrow(go_results_cc_rrvgo) > 0) {
 
-  p_go_cc <- create_bubble_plot(go_results_cc, "Cellular Component", module_sizes)
+  p_go_cc <- create_bubble_plot(go_results_cc_rrvgo, "Cellular Component", module_sizes)
 
   if (!is.null(p_go_cc)) {
     print(p_go_cc)
 
     ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_CC.pdf"),
+      file.path(OUTPUT_DIR, "go_enrichment_CC_rrvgo.pdf"),
       p_go_cc,
       width = 14, height = 10
     )
 
     ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_CC.png"),
+      file.path(OUTPUT_DIR, "go_enrichment_CC_rrvgo.png"),
       p_go_cc,
       width = 14, height = 10, dpi = 300
     )
 
-    saveRDS(p_go_cc, file.path(OUTPUT_DIR, "go_enrichment_CC.rds"))
+    saveRDS(p_go_cc, file.path(OUTPUT_DIR, "go_enrichment_CC_rrvgo.rds"))
 
-    cat("\nCC supplementary figure saved:\n")
-    cat("  - go_enrichment_CC.pdf\n")
-    cat("  - go_enrichment_CC.png\n")
-    cat("  - go_enrichment_CC.rds\n")
+    cat("\nCC supplementary figure saved (rrvgo-reduced):\n")
+    cat("  - go_enrichment_CC_rrvgo.pdf\n")
+    cat("  - go_enrichment_CC_rrvgo.png\n")
+    cat("  - go_enrichment_CC_rrvgo.rds\n")
   }
 }
 ```
 
 ```{r go_supplementary_figure_mf, fig.width=14, fig.height=10}
-# Create MF bubble plot
-if (exists("go_results_mf") && nrow(go_results_mf) > 0) {
+# Create MF bubble plot (rrvgo-reduced)
+if (exists("go_results_mf_rrvgo") && nrow(go_results_mf_rrvgo) > 0) {
 
-  p_go_mf <- create_bubble_plot(go_results_mf, "Molecular Function", module_sizes)
+  p_go_mf <- create_bubble_plot(go_results_mf_rrvgo, "Molecular Function", module_sizes)
 
   if (!is.null(p_go_mf)) {
     print(p_go_mf)
 
     ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_MF.pdf"),
+      file.path(OUTPUT_DIR, "go_enrichment_MF_rrvgo.pdf"),
       p_go_mf,
       width = 14, height = 10
     )
 
     ggsave(
-      file.path(OUTPUT_DIR, "go_enrichment_MF.png"),
+      file.path(OUTPUT_DIR, "go_enrichment_MF_rrvgo.png"),
       p_go_mf,
       width = 14, height = 10, dpi = 300
     )
 
-    saveRDS(p_go_mf, file.path(OUTPUT_DIR, "go_enrichment_MF.rds"))
+    saveRDS(p_go_mf, file.path(OUTPUT_DIR, "go_enrichment_MF_rrvgo.rds"))
 
-    cat("\nMF supplementary figure saved:\n")
-    cat("  - go_enrichment_MF.pdf\n")
-    cat("  - go_enrichment_MF.png\n")
-    cat("  - go_enrichment_MF.rds\n")
+    cat("\nMF supplementary figure saved (rrvgo-reduced):\n")
+    cat("  - go_enrichment_MF_rrvgo.pdf\n")
+    cat("  - go_enrichment_MF_rrvgo.png\n")
+    cat("  - go_enrichment_MF_rrvgo.rds\n")
   }
 }
 ```
@@ -1076,14 +1180,16 @@ write_csv(
   cat("  all_modules_GO_BP_rrvgo.csv: rrvgo-reduced BP terms\n")
   cat("  top_BP_per_module_rrvgo.csv: top BP term per module (for boxplot)\n")
   cat("  all_modules_GO_CC.csv: GO CC enrichment for all modules\n")
+  cat("  all_modules_GO_CC_rrvgo.csv: rrvgo-reduced CC terms\n")
   cat("  all_modules_GO_MF.csv: GO MF enrichment for all modules\n")
+  cat("  all_modules_GO_MF_rrvgo.csv: rrvgo-reduced MF terms\n")
   cat("  compareCluster_GO_BP/CC/MF.rds: compareCluster objects\n")
   cat("  go_summary_BP/CC/MF.csv: top terms per module\n")
   cat("  go_summary_all_ontologies.csv: combined summary\n")
-  cat("\nVisualization (Trans Network style bubble plots):\n")
-  cat("  go_enrichment_BP_rrvgo.pdf/png/rds: BP enrichment (rrvgo-reduced)\n")
-  cat("  go_enrichment_CC.pdf/png/rds: CC enrichment\n")
-  cat("  go_enrichment_MF.pdf/png/rds: MF enrichment\n")
+  cat("\nVisualization (Trans Network style bubble plots, all rrvgo-reduced):\n")
+  cat("  go_enrichment_BP_rrvgo.pdf/png/rds: BP enrichment\n")
+  cat("  go_enrichment_CC_rrvgo.pdf/png/rds: CC enrichment\n")
+  cat("  go_enrichment_MF_rrvgo.pdf/png/rds: MF enrichment\n")
   cat("  hub_connectivity_plot.pdf/png/rds: hub gene connectivity (ggrepel labels)\n")
   cat("\nSummary Tables:\n")
   cat("  hub_genes_all_modules.csv: hub genes with connectivity change\n")
@@ -1130,10 +1236,15 @@ write_csv(
     "all_modules_GO_BP_rrvgo.csv",
     "top_BP_per_module_rrvgo.csv",
     "all_modules_GO_CC.csv",
+    "all_modules_GO_CC_rrvgo.csv",
     "all_modules_GO_MF.csv",
+    "all_modules_GO_MF_rrvgo.csv",
     "go_summary_all_ontologies.csv",
     "hub_genes_all_modules.csv",
     "hub_connectivity_plot.rds",
+    "go_enrichment_BP_rrvgo.rds",
+    "go_enrichment_CC_rrvgo.rds",
+    "go_enrichment_MF_rrvgo.rds",
     "functional_analysis_summary.csv",
     "comprehensive_module_summary.csv"
   )
