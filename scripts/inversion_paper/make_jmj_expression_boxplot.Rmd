@@ -233,9 +233,9 @@ jmj_combined <- jmj_combined %>%
 
 
 
-# Create Expression Boxplot
+# Create Expression Boxplot (All 3 genes)
 
-```{r boxplot, fig.width=14, fig.height=10}
+```{r boxplot_all, fig.width=14, fig.height=10}
 # Define colors (matching ionome style: gold for B73, purple for Inv4m)
 genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
 
@@ -266,8 +266,8 @@ p_jmj_expr <- ggplot(
     ),
     axis.text.y = element_text(color = "black", face = "bold"),
     axis.title = element_text(face = "bold", size = 13),
-    strip.text = element_text(face = "bold", size = 12),
-    strip.text.y = element_text(face = "bold.italic"),
+    strip.text.x = element_text(face = "bold", size = 16),
+    strip.text.y = element_text(face = "bold.italic", size = 16),
     strip.background = element_rect(fill = "grey95", color = NA),
     legend.position = "bottom",
     legend.text = element_text(face = "bold"),
@@ -280,6 +280,57 @@ p_jmj_expr <- ggplot(
   )
 
 print(p_jmj_expr)
+```
+
+# Create Expression Boxplot (jmj2 and jmj4 only)
+
+```{r boxplot_jmj2_jmj4, fig.width=14, fig.height=7}
+# Filter for jmj2 and jmj4 only
+jmj_cluster <- jmj_combined %>%
+  filter(symbol %in% c("jmj2", "jmj4")) %>%
+  mutate(symbol = factor(symbol, levels = c("jmj2", "jmj4")))
+
+p_jmj_cluster <- ggplot(
+  jmj_cluster,
+  aes(x = tissue, y = logCPM, color = genotype)
+) +
+  geom_boxplot(
+    width = 0.5,
+    linewidth = 1,
+    outlier.shape = NA,
+    position = position_dodge(width = 0.7)
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(
+    size = 1.5,
+    dodge.width = 0.7,
+    alpha = 0.7
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  facet_grid(symbol ~ experiment, scales = "free_x", space = "free_x") +
+  scale_color_manual(values = genotype_colors, name = "Genotype") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text.x = element_text(
+      angle = 45, hjust = 1,
+      color = "black", face = "bold", size = 12
+    ),
+    axis.text.y = element_text(color = "black", face = "bold", size = 12),
+    axis.title = element_text(face = "bold", size = 14),
+    strip.text.x = element_text(face = "bold", size = 18),
+    strip.text.y = element_text(face = "bold.italic", size = 18),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    legend.position = "bottom",
+    legend.text = element_text(face = "bold", size = 12),
+    legend.title = element_text(face = "bold", size = 12),
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
+  ) +
+  labs(
+    x = NULL,
+    y = expression(bold(log[2]*"(CPM)"))
+  )
+
+print(p_jmj_cluster)
 ```
 
 
@@ -321,35 +372,46 @@ jmj_summary <- jmj_combined %>%
 # Save Outputs
 
 ```{r save_outputs}
-# Save plot as RDS for composition
+# Save all 3 genes plot
 saveRDS(p_jmj_expr, file.path(paths$figures, "jmj_expression_boxplot.rds"))
-
-# Save as PDF
 ggsave(
- file.path(paths$figures, "jmj_expression_boxplot.pdf"),
- p_jmj_expr,
- width = 12, height = 8
+  file.path(paths$figures, "jmj_expression_boxplot.pdf"),
+  p_jmj_expr,
+  width = 14, height = 10
+)
+ggsave(
+  file.path(paths$figures, "jmj_expression_boxplot.png"),
+  p_jmj_expr,
+  width = 14, height = 10, dpi = 300
 )
 
-# Save as PNG
+# Save jmj2/jmj4 cluster plot
+saveRDS(p_jmj_cluster, file.path(paths$figures, "jmj2_jmj4_expression_boxplot.rds"))
 ggsave(
- file.path(paths$figures, "jmj_expression_boxplot.png"),
- p_jmj_expr,
- width = 12, height = 8, dpi = 300
+  file.path(paths$figures, "jmj2_jmj4_expression_boxplot.pdf"),
+  p_jmj_cluster,
+  width = 14, height = 7
+)
+ggsave(
+  file.path(paths$figures, "jmj2_jmj4_expression_boxplot.png"),
+  p_jmj_cluster,
+  width = 14, height = 7, dpi = 300
 )
 
 # Save summary table
 write_csv(
- jmj_summary,
- file.path(paths$intermediate, "jmj_expression_summary.csv")
+  jmj_summary,
+  file.path(paths$intermediate, "jmj_expression_summary.csv")
 )
 
 {
- cat("=== SAVED OUTPUTS ===\n")
- cat("jmj_expression_boxplot.rds (for composition)\n")
- cat("jmj_expression_boxplot.pdf\n")
- cat("jmj_expression_boxplot.png\n")
- cat("jmj_expression_summary.csv\n")
+  cat("=== SAVED OUTPUTS ===\n")
+  cat("All 3 genes:\n")
+  cat("  jmj_expression_boxplot.rds/pdf/png\n")
+  cat("\njmj2/jmj4 cluster only:\n")
+  cat("  jmj2_jmj4_expression_boxplot.rds/pdf/png\n")
+  cat("\nSummary table:\n")
+  cat("  jmj_expression_summary.csv\n")
 }
 ```
 
