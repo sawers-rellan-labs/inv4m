@@ -1032,25 +1032,40 @@ effects_df <- effects_df %>%
 
 # Make locus_symbol the default locus_label
 # Remove symbols corresponding to DNA markers in the consensus map
+# Marker types (from data/maizegdb_consensus_map/):
+#   umc  - University of Missouri, Columbia SSR markers
+#   pco  - Pioneer Company markers
+#   bnlg - Brookhaven National Laboratory (SSR)
+#   pza  - Pioneer SNP markers
+#   gpm  - Gene primer markers
+#   csu  - Colorado State University markers
+#   php  - Pioneer hybrid markers
+#   IDP  - Insertion-Deletion Polymorphism markers
+#   TIDP - Tagged IDP markers
+#   cl   - Clone numbers (cDNA libraries)
+#   si   - Sequence identifiers
+#   LOC  - NCBI gene identifiers
+#   AY   - GenBank accessions
+# Key insight: Markers have locus_symbol but NO locus_name
+marker_pattern <- paste0(
+  "^(umc|pco|bnlg|pza|gpm|csu|php|IDP|TIDP)[0-9]+",
+  "|^cl[0-9]+_",
+  "|^si[0-9]{5,}",
+  "|^LOC[0-9]+",
+  "|^AY[0-9]+",
+  "|^Zm00001[de]?b?[0-9]+",
+  "|^GRMZM"
+)
+
 effects_df <- effects_df %>%
   mutate(
     locus_label = case_when(
       is.na(locus_symbol) ~ NA_character_,
-      grepl("^si\\d*[a-h]", locus_symbol) ~ NA_character_,
-      grepl("^umc", locus_symbol) ~ NA_character_,
-      grepl("^csu", locus_symbol) ~ NA_character_,
-      grepl("^bnlg", locus_symbol) ~ NA_character_,
-      grepl("^php\\d\\d", locus_symbol) ~ NA_character_,
-      grepl("^csu\\d+\a", locus_symbol) ~ NA_character_,
-      grepl("^pco", locus_symbol) ~ NA_character_,
-      grepl("^IDP", locus_symbol) ~ NA_character_,
-      grepl("^TIDP\\d{4}", locus_symbol) ~ NA_character_,
-      grepl("^cl\\d*_\\d", locus_symbol) ~ NA_character_,
-      grepl("^cl\\d*_-", locus_symbol) ~ NA_character_,
-      grepl("^Zm00001eb", locus_symbol) ~ NA_character_,
-      grepl("^Zm00001d", locus_symbol) ~ NA_character_,
-      grepl("^GRM", locus_symbol) ~ NA_character_,
-      grepl("LOC\\d{4}", locus_symbol) ~ NA_character_,
+      # If locus_name exists, the symbol is a real gene name
+      !is.na(locus_name) & locus_name != "" ~ locus_symbol,
+      # If no locus_name and matches marker pattern, filter it
+      grepl(marker_pattern, locus_symbol) ~ NA_character_,
+      # Otherwise keep the symbol
       TRUE ~ locus_symbol
     )
   )
