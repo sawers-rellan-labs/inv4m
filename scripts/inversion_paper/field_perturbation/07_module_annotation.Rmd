@@ -61,6 +61,8 @@ suppressPackageStartupMessages({
   library(patchwork)
   library(rrvgo)
   library(AnnotationHub)
+  library(ggrepel)
+  library(DOSE)
 })
 
 set.seed(123)
@@ -123,6 +125,17 @@ gene_info <- read_csv(
 # Load GO annotations
 TERM2GENE <- readRDS(here("data", "TERM2GENE.rds"))
 TERM2NAME <- readRDS(here("data", "TERM2NAME.rds"))
+
+# Load effects from differential expression (for locus labels in hub gene plot)
+effects_df <- read_csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  show_col_types = FALSE
+) %>%
+  filter(predictor == "Inv4m") %>%
+  group_by(gene) %>%
+  arrange(adj.P.Val) %>%
+  dplyr::slice(1) %>%
+  ungroup()
 
 {
   cat("=== INPUT DATA ===\n")
@@ -515,72 +528,171 @@ cat("Total terms in combined summary:", nrow(go_summary_combined), "\n")
 
 # Supplementary Figure: GO Enrichment (rrvgo-reduced)
 
-**Purpose**: Generate a comprehensive GO enrichment figure for supplementary
-material showing the top 5 semantically-reduced BP terms per module.
+**Purpose**: Generate comprehensive GO enrichment bubble plots in Trans Network style
+for supplementary material. Uses DOSE::theme_dose for visual consistency.
 
-```{r go_supplementary_figure, fig.width=14, fig.height=10}
-# Create comprehensive GO enrichment plot for supplementary
-if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
-  n_modules <- length(unique(go_results_rrvgo$module_color))
+```{r bubble_plot_function}
+#' Create bubble plot for GO enrichment (Trans Network style)
+#'
+#' @param go_data Data frame with GO enrichment results
+#' @param ontology_name Name of the ontology for plot title
+#' @param module_sizes Named vector of module sizes
+#' @return ggplot object
+create_bubble_plot <- function(go_data, ontology_name, module_sizes) {
 
-  go_plot_data_rrvgo <- go_results_rrvgo %>%
+  if (is.null(go_data) || nrow(go_data) == 0) {
+    cat("No significant", ontology_name, "enrichment to plot.\n")
+    return(NULL)
+  }
+
+  # Prepare data - top 5 per module
+  to_plot <- go_data %>%
+    filter(pvalue < 0.05) %>%
+    mutate(neglogP = -log10(pvalue)) %>%
     group_by(module_color) %>%
-    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
-    ungroup() %>%
+    arrange(pvalue) %>%
+    slice_head(n = 5) %>%
     mutate(
-      Description = str_trunc(Description, 45),
-      GeneRatio_num = sapply(strsplit(GeneRatio, "/"), function(x) {
-        as.numeric(x[1]) / as.numeric(x[2])
-      })
-    )
+      label_order = 1:n(),
+      Description = forcats::fct_reorder(Description, label_order)
+    ) %>%
+    ungroup()
 
-  ncol_facet <- if (n_modules <= 12) 3 else 4
+  if (nrow(to_plot) == 0) {
+    cat("No terms with p < 0.05 for", ontology_name, "\n")
+    return(NULL)
+  }
 
-  p_go_supp <- ggplot(
-    go_plot_data_rrvgo,
-    aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
-        color = -log10(pvalue), size = Count)
-  ) +
-    geom_point() +
-    facet_wrap(~module_color, scales = "free_y", ncol = ncol_facet) +
-    scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
-    theme_minimal(base_size = 10) +
-    theme(
-      strip.text = element_text(face = "bold"),
-      strip.background = element_rect(fill = "grey90", color = NA)
+  # Module labels with gene counts
+  module_order <- unique(to_plot$module_color)
+  labels <- paste0(module_order, "\n(", module_sizes[module_order], ")")
+  names(labels) <- module_order
+
+  p <- to_plot %>%
+    ggplot(aes(x = module_color, y = Description, size = Count, fill = neglogP)) +
+    ggtitle(paste("GO", ontology_name, "Enrichment by WGCNA Module")) +
+    scale_fill_gradient(
+      low = "dodgerblue",
+      high = "tomato",
+      name = "-log10(p)",
+      limits = c(1, max(to_plot$neglogP, na.rm = TRUE))
     ) +
-    labs(
-      title = "GO Biological Process Enrichment by WGCNA Module",
-      subtitle = "Semantically reduced terms (rrvgo, threshold = 0.7)",
-      x = "Gene Ratio",
-      y = NULL,
-      size = "Count"
+    scale_y_discrete(
+      labels = scales::wrap_format(50),
+      limits = rev(levels(to_plot$Description))
+    ) +
+    scale_x_discrete(labels = labels, drop = FALSE) +
+    geom_point(shape = 21) +
+    scale_size(range = c(4, 8), name = "Count") +
+    ylab(NULL) +
+    xlab(NULL) +
+    DOSE::theme_dose(font.size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
     )
 
-  print(p_go_supp)
+  return(p)
+}
 
-  # Save supplementary figure
-  ggsave(
-    file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.pdf"),
-    p_go_supp,
-    width = 14, height = 10
-  )
+# Get module sizes for labels
+module_sizes <- sapply(module_gene_lists, length)
+```
 
-  ggsave(
-    file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.png"),
-    p_go_supp,
-    width = 14, height = 10, dpi = 300
-  )
+```{r go_supplementary_figure_bp, fig.width=14, fig.height=10}
+# Create BP bubble plot (Trans Network style)
+if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
 
-  # Save RDS for composition
-  saveRDS(p_go_supp, file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.rds"))
+  p_go_bp <- create_bubble_plot(go_results_rrvgo, "Biological Process", module_sizes)
 
-  cat("\nSupplementary figure saved:\n")
-  cat("  - go_enrichment_BP_rrvgo.pdf\n")
-  cat("  - go_enrichment_BP_rrvgo.png\n")
-  cat("  - go_enrichment_BP_rrvgo.rds\n")
+  if (!is.null(p_go_bp)) {
+    print(p_go_bp)
+
+    # Save supplementary figure
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.pdf"),
+      p_go_bp,
+      width = 14, height = 10
+    )
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.png"),
+      p_go_bp,
+      width = 14, height = 10, dpi = 300
+    )
+
+    # Save RDS for composition
+    saveRDS(p_go_bp, file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.rds"))
+
+    cat("\nBP supplementary figure saved:\n")
+    cat("  - go_enrichment_BP_rrvgo.pdf\n")
+    cat("  - go_enrichment_BP_rrvgo.png\n")
+    cat("  - go_enrichment_BP_rrvgo.rds\n")
+  }
 } else {
   cat("\nNo rrvgo-reduced GO results available for supplementary figure.\n")
+}
+```
+
+```{r go_supplementary_figure_cc, fig.width=14, fig.height=10}
+# Create CC bubble plot
+if (exists("go_results_cc") && nrow(go_results_cc) > 0) {
+
+  p_go_cc <- create_bubble_plot(go_results_cc, "Cellular Component", module_sizes)
+
+  if (!is.null(p_go_cc)) {
+    print(p_go_cc)
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_CC.pdf"),
+      p_go_cc,
+      width = 14, height = 10
+    )
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_CC.png"),
+      p_go_cc,
+      width = 14, height = 10, dpi = 300
+    )
+
+    saveRDS(p_go_cc, file.path(OUTPUT_DIR, "go_enrichment_CC.rds"))
+
+    cat("\nCC supplementary figure saved:\n")
+    cat("  - go_enrichment_CC.pdf\n")
+    cat("  - go_enrichment_CC.png\n")
+    cat("  - go_enrichment_CC.rds\n")
+  }
+}
+```
+
+```{r go_supplementary_figure_mf, fig.width=14, fig.height=10}
+# Create MF bubble plot
+if (exists("go_results_mf") && nrow(go_results_mf) > 0) {
+
+  p_go_mf <- create_bubble_plot(go_results_mf, "Molecular Function", module_sizes)
+
+  if (!is.null(p_go_mf)) {
+    print(p_go_mf)
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_MF.pdf"),
+      p_go_mf,
+      width = 14, height = 10
+    )
+
+    ggsave(
+      file.path(OUTPUT_DIR, "go_enrichment_MF.png"),
+      p_go_mf,
+      width = 14, height = 10, dpi = 300
+    )
+
+    saveRDS(p_go_mf, file.path(OUTPUT_DIR, "go_enrichment_MF.rds"))
+
+    cat("\nMF supplementary figure saved:\n")
+    cat("  - go_enrichment_MF.pdf\n")
+    cat("  - go_enrichment_MF.png\n")
+    cat("  - go_enrichment_MF.rds\n")
+  }
 }
 ```
 
@@ -592,17 +704,6 @@ if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
 connectivity change in Inv4m. Analyze ALL modules (excluding grey/0).
 
 ```{r hub_analysis}
-# Load effects_df from differential expression analysis (contains locus_label)
-effects_df <- read_csv(
-  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
-  show_col_types = FALSE
-) %>%
-  filter(predictor == "Inv4m") %>%
-  group_by(gene) %>%
-  arrange(adj.P.Val) %>%
-  dplyr::slice(1) %>%
-  ungroup()
-
 # Merge module assignments with delta kWithin (all modules except grey)
 hub_data <- ctrl_modules %>%
   filter(module != 0) %>%
@@ -667,7 +768,7 @@ write_csv(
 
 # Hub Gene Connectivity Plot
 
-```{r hub_connectivity, fig.width=10, fig.height=6}
+```{r hub_connectivity, fig.width=10, fig.height=8}
 if (nrow(hub_genes) > 0) {
   p_hub <- ggplot(
     hub_genes,
@@ -675,12 +776,15 @@ if (nrow(hub_genes) > 0) {
   ) +
     geom_point(aes(size = abs(logFC)), alpha = 0.7) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
-    geom_text(
+    geom_text_repel(
       aes(label = display_label),
-      size = 2.5,
-      hjust = -0.1,
-      vjust = 0.5,
-      check_overlap = TRUE
+      size = 3,
+      color = "black",
+      max.overlaps = 25,
+      box.padding = 0.35,
+      point.padding = 0.3,
+      segment.color = "gray70",
+      na.rm = TRUE
     ) +
     scale_color_identity() +
     theme_minimal(base_size = 12) +
@@ -697,7 +801,13 @@ if (nrow(hub_genes) > 0) {
   ggsave(
     file.path(OUTPUT_DIR, "hub_connectivity_plot.pdf"),
     p_hub,
-    width = 10, height = 6
+    width = 10, height = 8
+  )
+
+  ggsave(
+    file.path(OUTPUT_DIR, "hub_connectivity_plot.png"),
+    p_hub,
+    width = 10, height = 8, dpi = 300
   )
 
   # Save as RDS for figure composition
@@ -705,6 +815,7 @@ if (nrow(hub_genes) > 0) {
 
   cat("\nHub connectivity plot saved:\n")
   cat("  - hub_connectivity_plot.pdf\n")
+  cat("  - hub_connectivity_plot.png\n")
   cat("  - hub_connectivity_plot.rds\n")
 }
 ```
@@ -780,96 +891,6 @@ write_csv(
           dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
                         adjacency_correlation, preservation_status, top_BP))
 }
-```
-
----
-
-# GO Enrichment Visualization
-
-```{r go_plot_function}
-#' Create GO enrichment dot plot for a given ontology
-#'
-#' @param go_data Data frame with GO enrichment results
-#' @param ontology_name Name of the ontology for plot title
-#' @param filename Output filename
-create_go_plot <- function(go_data, ontology_name, filename) {
-  if (nrow(go_data) == 0) {
-    cat("No significant", ontology_name, "enrichment to plot.\n")
-    return(NULL)
-  }
-
-  n_modules <- length(unique(go_data$module_color))
-
-  # Top 5 terms per module for plotting
-  go_plot_data <- go_data %>%
-    group_by(module_color) %>%
-    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
-    ungroup() %>%
-    mutate(
-      Description = str_trunc(Description, 40),
-      GeneRatio_num = sapply(strsplit(GeneRatio, "/"), function(x) {
-        as.numeric(x[1]) / as.numeric(x[2])
-      })
-    )
-
-  if (nrow(go_plot_data) == 0) return(NULL)
-
-  ncol_facet <- if (n_modules <= 12) 3 else 4
-  base_size <- if (n_modules <= 12) 10 else 8
-  text_size <- if (n_modules <= 12) 7 else 6
-
-  p <- ggplot(
-    go_plot_data,
-    aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
-        color = -log10(pvalue), size = Count)
-  ) +
-    geom_point() +
-    facet_wrap(~module_color, scales = "free_y", ncol = ncol_facet) +
-    scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
-    theme_minimal(base_size = base_size) +
-    theme(
-      strip.text = element_text(face = "bold", size = text_size),
-      axis.text.y = element_text(size = text_size)
-    ) +
-    labs(
-      title = paste("GO", ontology_name, "Enrichment (All Modules)"),
-      x = "Gene Ratio",
-      y = NULL,
-      size = "Count"
-    )
-
-  width <- if (n_modules <= 12) 12 else 16
-  height <- if (n_modules <= 12) max(8, n_modules * 0.8) else max(12, n_modules * 0.6)
-
-  ggsave(
-    file.path(OUTPUT_DIR, filename),
-    p,
-    width = width, height = height
-  )
-
-  return(p)
-}
-```
-
-## BP Enrichment Plot
-
-```{r go_visualization_bp, fig.width=12, fig.height=10}
-p_bp <- create_go_plot(go_results, "Biological Process", "go_enrichment_BP.pdf")
-if (!is.null(p_bp)) print(p_bp)
-```
-
-## CC Enrichment Plot
-
-```{r go_visualization_cc, fig.width=12, fig.height=10}
-p_cc <- create_go_plot(go_results_cc, "Cellular Component", "go_enrichment_CC.pdf")
-if (!is.null(p_cc)) print(p_cc)
-```
-
-## MF Enrichment Plot
-
-```{r go_visualization_mf, fig.width=12, fig.height=10}
-p_mf <- create_go_plot(go_results_mf, "Molecular Function", "go_enrichment_MF.pdf")
-if (!is.null(p_mf)) print(p_mf)
 ```
 
 ---
@@ -1052,20 +1073,18 @@ write_csv(
   cat("\n=== SAVED OUTPUTS ===\n")
   cat("GO Enrichment Results:\n")
   cat("  all_modules_GO_BP.csv: GO BP enrichment for all modules\n")
+  cat("  all_modules_GO_BP_rrvgo.csv: rrvgo-reduced BP terms\n")
+  cat("  top_BP_per_module_rrvgo.csv: top BP term per module (for boxplot)\n")
   cat("  all_modules_GO_CC.csv: GO CC enrichment for all modules\n")
   cat("  all_modules_GO_MF.csv: GO MF enrichment for all modules\n")
-  cat("  compareCluster_GO_BP.rds: compareCluster object (BP)\n")
-  cat("  compareCluster_GO_CC.rds: compareCluster object (CC)\n")
-  cat("  compareCluster_GO_MF.rds: compareCluster object (MF)\n")
-  cat("  go_summary_BP.csv: top BP terms per module\n")
-  cat("  go_summary_CC.csv: top CC terms per module\n")
-  cat("  go_summary_MF.csv: top MF terms per module\n")
+  cat("  compareCluster_GO_BP/CC/MF.rds: compareCluster objects\n")
+  cat("  go_summary_BP/CC/MF.csv: top terms per module\n")
   cat("  go_summary_all_ontologies.csv: combined summary\n")
-  cat("\nVisualization:\n")
-  cat("  go_enrichment_BP.pdf: BP enrichment plot\n")
-  cat("  go_enrichment_CC.pdf: CC enrichment plot\n")
-  cat("  go_enrichment_MF.pdf: MF enrichment plot\n")
-  cat("  hub_connectivity_plot.pdf: hub gene connectivity\n")
+  cat("\nVisualization (Trans Network style bubble plots):\n")
+  cat("  go_enrichment_BP_rrvgo.pdf/png/rds: BP enrichment (rrvgo-reduced)\n")
+  cat("  go_enrichment_CC.pdf/png/rds: CC enrichment\n")
+  cat("  go_enrichment_MF.pdf/png/rds: MF enrichment\n")
+  cat("  hub_connectivity_plot.pdf/png/rds: hub gene connectivity (ggrepel labels)\n")
   cat("\nSummary Tables:\n")
   cat("  hub_genes_all_modules.csv: hub genes with connectivity change\n")
   cat("  module_theme_summary.csv: biological themes with support metrics\n")
@@ -1108,10 +1127,13 @@ write_csv(
   cat("\nCheck 5: Output files created\n")
   expected_files <- c(
     "all_modules_GO_BP.csv",
+    "all_modules_GO_BP_rrvgo.csv",
+    "top_BP_per_module_rrvgo.csv",
     "all_modules_GO_CC.csv",
     "all_modules_GO_MF.csv",
     "go_summary_all_ontologies.csv",
     "hub_genes_all_modules.csv",
+    "hub_connectivity_plot.rds",
     "functional_analysis_summary.csv",
     "comprehensive_module_summary.csv"
   )
