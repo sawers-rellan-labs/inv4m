@@ -259,6 +259,44 @@ After sourcing `setup_paths.R`, use:
 
 Note: HTML reports are routed to `docs/{paper}/` via the `knit:` field in YAML headers.
 
+### Running WGCNA Field Perturbation Pipeline
+
+The WGCNA consensus network pipeline (`scripts/inversion_paper/field_perturbation/`) uses a shell script with checkpoint support:
+
+```bash
+# Full pipeline (steps 1-7, ~2-3 hours for production)
+./scripts/inversion_paper/run_field_perturbation.sh --yes
+
+# Resume from existing run directory (use cached results)
+./scripts/inversion_paper/run_field_perturbation.sh \
+  --resume results/inversion_paper/field_perturbation/run_20251231_201332 \
+  --start 7 --end 7 --yes
+
+# Run specific steps from checkpoint
+./scripts/inversion_paper/run_field_perturbation.sh \
+  --resume results/inversion_paper/field_perturbation/run_YYYYMMDD_HHMMSS \
+  --start N --end M --yes
+```
+
+**Pipeline Steps:**
+| Step | Script | Purpose | Typical Runtime |
+|------|--------|---------|-----------------|
+| 1 | `01_data_prep.Rmd` | Data preparation | ~1 min |
+| 2 | `02_gene_filter.Rmd` | Gene filtering (FDR < 0.05) | ~1 min |
+| 3 | `03_reference_network.Rmd` | Reference network (power fit) | ~5 min |
+| 4 | `04_consensus_networks.Rmd` | Consensus WGCNA (1000 iter) | ~1-2 hours |
+| 5 | `05_bootstrap_support.Rmd` | Bootstrap support (1000 iter) | ~30 min |
+| 6 | `06_preservation.Rmd` | Preservation analysis | ~10 min |
+| 7 | `07_module_annotation.Rmd` | GO enrichment & hub genes | ~5 min |
+
+**Key options:**
+- `--mode test` - Quick test run (50 iterations instead of 1000)
+- `--resume DIR` - Use existing run directory
+- `--start N --end M` - Run only steps N through M
+- `--yes` - Skip confirmation prompt
+
+**Current production run:** `results/inversion_paper/field_perturbation/run_20251231_201332/`
+
 ---
 
 ## Execution Dependencies
