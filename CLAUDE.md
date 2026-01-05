@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-04
+**Last Updated:** 2026-01-05
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Revision In Progress ⚠️
-**Version:** v1.2.2
+**Version:** v1.2.3
 
 ---
 
@@ -20,11 +20,13 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-04):**
+**Current Priority (as of 2026-01-05):**
 1. **WGCNA Figure Implementation** - Next figure to generate (Figure 6)
    - See: `scripts/00_agent_work/HANDOVER_WGCNA_figure_implementation.md`
    - Data ready: `results/inversion_paper/field_perturbation/run_20251231_201332/`
    - Needs: Boxplot colors by module, locus_label in scatter plot, RDS saves
+
+**Recent completion:** JMJ cluster figure with expression boxplot (Panel A) + microsynteny (Panel B/C)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 

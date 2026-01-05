@@ -62,6 +62,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ⚠️ |
+| Figure (jmj) | JMJ cluster expression + microsynteny | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + Manual | ✅ |
 | Figure 7 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -86,6 +87,12 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 ---
 
 ## Recent Updates
+
+**2026-01-05:** JMJ cluster figure with expression boxplot:
+- ✅ Created `make_jmj_expression_boxplot.Rmd` - jmj2/jmj4 expression across tissues
+- ✅ Figure shows consistent downregulation in Inv4m across PSU2022 and Crow2020
+- ✅ Ionome-style boxplots with gold (B73) and purple (Inv4m) color scheme
+- ✅ Caption updated in main.tex with 3 panels (A: expression, B: microsynteny, C: transcripts)
 
 **2026-01-04:** WGCNA module perturbation figure planning:
 - ✅ Created handover document for WGCNA figure implementation
