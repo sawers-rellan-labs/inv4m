@@ -1,0 +1,347 @@
+---
+title: "JMJ Cluster Expression Boxplot"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+ echo = TRUE,
+ warning = FALSE,
+ message = FALSE,
+ fig.width = 10,
+ fig.height = 6
+)
+
+# Load project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+This script creates an expression boxplot for the JMJ cluster genes (jmj2, jmj4, jmj21)
+comparing Inv4m vs CTRL across all tissues in:
+
+1. **PSU2022**: Field experiment with 4 leaf positions
+2. **Crow2020**: Growth chamber experiment with 5 tissues (V1_Leaf, V1_Root, V3_Leaf, V3_Root, V3_SAM)
+
+The output is saved as an RDS file for composition with the JMJ microsynteny figure.
+
+## Libraries
+
+```{r libraries}
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(here)
+```
+
+## Define JMJ Genes
+
+```{r jmj_genes}
+jmj_genes <- tibble(
+ gene = c("Zm00001eb191790", "Zm00001eb191820", "Zm00001eb190750"),
+ symbol = c("jmj2", "jmj4", "jmj21"),
+ description = c(
+   "JUMONJI-transcription factor 2",
+   "JUMONJI-transcription factor 4",
+   "JUMONJI-transcription factor 21"
+ )
+)
+
+cat("JMJ cluster genes:\n")
+print(jmj_genes)
+```
+
+
+
+# Load PSU2022 Data
+
+```{r load_psu2022}
+# Load expression matrix (logCPM)
+expr_psu <- readRDS(file.path(paths$intermediate, "normalized_expression_logCPM_leaf_trt.rds"))
+
+# Load metadata
+meta_psu <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
+
+{
+ cat("=== PSU2022 DATA ===\n")
+ cat("Expression matrix:", nrow(expr_psu), "genes x", ncol(expr_psu), "samples\n")
+ cat("Metadata samples:", nrow(meta_psu), "\n")
+ cat("\nGenotypes:\n")
+ print(table(meta_psu$Genotype))
+ cat("\nLeaf positions:\n")
+ print(table(meta_psu$leaf_tissue))
+}
+```
+
+```{r extract_psu2022}
+# Extract JMJ expression
+jmj_in_psu <- jmj_genes$gene[jmj_genes$gene %in% rownames(expr_psu)]
+cat("JMJ genes found in PSU2022:", length(jmj_in_psu), "\n")
+
+if (length(jmj_in_psu) > 0) {
+ # Extract expression for JMJ genes
+ jmj_expr_psu <- expr_psu[jmj_in_psu, , drop = FALSE] %>%
+   as.data.frame() %>%
+   rownames_to_column("gene") %>%
+   pivot_longer(
+     cols = -gene,
+     names_to = "sample",
+     values_to = "logCPM"
+   )
+
+ # Match samples to metadata
+ # Sample IDs in expression matrix should match library column in metadata
+ jmj_expr_psu <- jmj_expr_psu %>%
+   left_join(
+     meta_psu %>%
+       dplyr::select(library, Genotype, leaf_tissue, Treatment) %>%
+       mutate(sample = library),
+     by = "sample"
+   ) %>%
+   filter(!is.na(Genotype)) %>%
+   left_join(jmj_genes, by = "gene") %>%
+   mutate(
+     experiment = "PSU2022 (Field)",
+     tissue = paste0("Leaf ", leaf_tissue),
+     genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m")
+   )
+
+ cat("PSU2022 expression records:", nrow(jmj_expr_psu), "\n")
+}
+```
+
+
+
+# Load Crow2020 Data
+
+```{r load_crow2020}
+# Load expression matrix (logCPM)
+expr_crow <- readRDS(file.path(paths$intermediate, "normalized_expression_logCPM_crow2020.rds"))
+
+# Load metadata
+meta_crow <- read.csv(file.path(paths$data, "SraRunTable.csv"), check.names = FALSE)
+
+# Standardize column names - use Run (SRR ID) as sample ID
+meta_crow <- meta_crow %>%
+ dplyr::rename(
+   sample = Run,
+   genotype_raw = genotype,
+   tissue_raw = tissue
+ ) %>%
+ mutate(
+   genotype = ifelse(genotype_raw == "B73", "B73", "Inv4m"),
+   tissue = tissue_raw
+ )
+
+{
+ cat("=== CROW2020 DATA ===\n")
+ cat("Expression matrix:", nrow(expr_crow), "genes x", ncol(expr_crow), "samples\n")
+ cat("Metadata samples:", nrow(meta_crow), "\n")
+ cat("\nGenotypes:\n")
+ print(table(meta_crow$genotype))
+ cat("\nTissues:\n")
+ print(table(meta_crow$tissue))
+ cat("\nTemperatures:\n")
+ print(table(meta_crow$temp))
+}
+```
+
+```{r extract_crow2020}
+# Extract JMJ expression
+jmj_in_crow <- jmj_genes$gene[jmj_genes$gene %in% rownames(expr_crow)]
+cat("JMJ genes found in Crow2020:", length(jmj_in_crow), "\n")
+
+if (length(jmj_in_crow) > 0) {
+ # Extract expression for JMJ genes
+ jmj_expr_crow <- expr_crow[jmj_in_crow, , drop = FALSE] %>%
+   as.data.frame() %>%
+   rownames_to_column("gene") %>%
+   pivot_longer(
+     cols = -gene,
+     names_to = "sample",
+     values_to = "logCPM"
+   )
+
+ # Match samples to metadata
+ jmj_expr_crow <- jmj_expr_crow %>%
+   left_join(
+     meta_crow %>%
+       dplyr::select(sample, genotype, tissue, temp),
+     by = "sample"
+   ) %>%
+   filter(!is.na(genotype)) %>%
+   left_join(jmj_genes, by = "gene") %>%
+   mutate(
+     experiment = "Crow2020 (Growth Chamber)",
+     # Clean up tissue names
+     tissue = str_replace(tissue, "_tissue$", "") %>%
+       str_replace("_", " ") %>%
+       str_replace("Primary root", "Root")
+   )
+
+ cat("Crow2020 expression records:", nrow(jmj_expr_crow), "\n")
+}
+```
+
+
+# Combine Data
+
+```{r combine_data}
+# Combine both experiments
+jmj_combined <- bind_rows(
+ jmj_expr_psu %>%
+   dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment),
+ jmj_expr_crow %>%
+   dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment)
+)
+
+# Order factors
+jmj_combined <- jmj_combined %>%
+ mutate(
+   symbol = factor(symbol, levels = c("jmj2", "jmj4", "jmj21")),
+   genotype = factor(genotype, levels = c("B73", "Inv4m")),
+   experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+ )
+
+{
+ cat("=== COMBINED DATA ===\n")
+ cat("Total records:", nrow(jmj_combined), "\n")
+ cat("\nBy experiment:\n")
+ print(table(jmj_combined$experiment))
+ cat("\nBy gene:\n")
+ print(table(jmj_combined$symbol))
+}
+```
+
+
+
+# Create Expression Boxplot
+
+```{r boxplot, fig.width=12, fig.height=8}
+# Define colors
+genotype_colors <- c("B73" = "#009E73", "Inv4m" = "#D55E00")
+
+p_jmj_expr <- ggplot(
+ jmj_combined,
+ aes(x = tissue, y = logCPM, fill = genotype)
+) +
+ geom_boxplot(
+   position = position_dodge(width = 0.8),
+   outlier.size = 1,
+   alpha = 0.8
+ ) +
+ facet_grid(symbol ~ experiment, scales = "free_x", space = "free_x") +
+ scale_fill_manual(values = genotype_colors, name = "Genotype") +
+ theme_minimal(base_size = 11) +
+ theme(
+   axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+   strip.text = element_text(face = "bold", size = 10),
+   strip.text.y = element_text(face = "italic"),
+   legend.position = "bottom",
+   panel.grid.minor = element_blank(),
+   panel.border = element_rect(color = "grey80", fill = NA)
+ ) +
+ labs(
+   x = "Tissue",
+   y = expression(log[2]*"(CPM)"),
+   title = "JMJ Cluster Expression: Inv4m vs B73",
+   subtitle = "Consistent downregulation of jmj2/jmj4 across tissues and experiments"
+ )
+
+print(p_jmj_expr)
+```
+
+
+
+# Statistical Summary
+
+```{r stats_summary}
+# Calculate means and fold changes
+jmj_summary <- jmj_combined %>%
+ group_by(experiment, tissue, symbol, genotype) %>%
+ summarise(
+   mean_logCPM = mean(logCPM, na.rm = TRUE),
+   sd_logCPM = sd(logCPM, na.rm = TRUE),
+   n = n(),
+   .groups = "drop"
+ ) %>%
+ pivot_wider(
+   names_from = genotype,
+   values_from = c(mean_logCPM, sd_logCPM, n),
+   names_sep = "_"
+ ) %>%
+ mutate(
+   log2FC = mean_logCPM_Inv4m - mean_logCPM_B73,
+   direction = ifelse(log2FC < 0, "Down", "Up")
+ )
+
+{
+ cat("=== EXPRESSION SUMMARY ===\n")
+ print(
+   jmj_summary %>%
+     dplyr::select(experiment, tissue, symbol, log2FC, direction) %>%
+     arrange(symbol, experiment, tissue)
+ )
+}
+```
+
+
+
+# Save Outputs
+
+```{r save_outputs}
+# Save plot as RDS for composition
+saveRDS(p_jmj_expr, file.path(paths$figures, "jmj_expression_boxplot.rds"))
+
+# Save as PDF
+ggsave(
+ file.path(paths$figures, "jmj_expression_boxplot.pdf"),
+ p_jmj_expr,
+ width = 12, height = 8
+)
+
+# Save as PNG
+ggsave(
+ file.path(paths$figures, "jmj_expression_boxplot.png"),
+ p_jmj_expr,
+ width = 12, height = 8, dpi = 300
+)
+
+# Save summary table
+write_csv(
+ jmj_summary,
+ file.path(paths$intermediate, "jmj_expression_summary.csv")
+)
+
+{
+ cat("=== SAVED OUTPUTS ===\n")
+ cat("jmj_expression_boxplot.rds (for composition)\n")
+ cat("jmj_expression_boxplot.pdf\n")
+ cat("jmj_expression_boxplot.png\n")
+ cat("jmj_expression_summary.csv\n")
+}
+```
+
+
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
