@@ -59,6 +59,8 @@ suppressPackageStartupMessages({
   library(clusterProfiler)
   library(here)
   library(patchwork)
+  library(rrvgo)
+  library(AnnotationHub)
 })
 
 set.seed(123)
@@ -226,7 +228,7 @@ levels(compGO_BP@compareClusterResult$Cluster) <- cluster_order
 
 # Save full results
 go_results <- as.data.frame(compGO_BP@compareClusterResult) %>%
-  rename(module_color = Cluster) %>%
+  dplyr::rename(module_color = Cluster) %>%
   arrange(module_color, pvalue)
 
 write_csv(
@@ -239,6 +241,94 @@ saveRDS(compGO_BP, file.path(OUTPUT_DIR, "compareCluster_GO_BP.rds"))
 
 cat("\nTotal enriched BP terms:", nrow(go_results), "\n")
 ```
+
+## rrvgo Semantic Redundancy Reduction
+
+**Purpose**: Reduce redundant GO terms using semantic similarity to identify
+representative parent terms for each module. This provides cleaner annotations
+for the boxplot visualization.
+
+```{r rrvgo_reduction}
+cat("\n=== APPLYING RRVGO SEMANTIC REDUCTION ===\n")
+
+# Load maize annotation for semantic similarity
+ah <- AnnotationHub()
+org.Zm.eg.db <- ah[["AH119718"]]
+
+# Filter low-count terms first
+filtered_bp_result <- go_results %>%
+  filter(Count > 1) %>%
+  group_by(module_color) %>%
+  arrange(pvalue, .by_group = TRUE) %>%
+  ungroup()
+
+# Calculate semantic similarity matrix across all GO terms
+go_terms_all <- unique(go_results$ID)
+
+if (length(go_terms_all) > 1) {
+  cat("Calculating semantic similarity for", length(go_terms_all), "GO terms...\n")
+
+  simMatrix <- calculateSimMatrix(
+    go_terms_all,
+    orgdb = org.Zm.eg.db,
+    ont = "BP",
+    method = "Rel"
+  )
+
+  # Reduce to representative (parent) terms
+  # Use -log10(pvalue) as scores to prioritize significant terms
+  scores <- setNames(
+    -log10(go_results$pvalue),
+    go_results$ID
+  )
+
+  reducedTerms <- reduceSimMatrix(
+    simMatrix,
+    scores,
+    threshold = 0.7,
+    orgdb = org.Zm.eg.db
+  )
+
+  # Filter to keep only parent terms
+  go_results_rrvgo <- filtered_bp_result %>%
+    filter(ID %in% reducedTerms$parent)
+
+  cat("Terms after rrvgo reduction:", nrow(go_results_rrvgo),
+      "(from", nrow(go_results), ")\n")
+
+} else {
+  go_results_rrvgo <- filtered_bp_result
+  cat("Skipping rrvgo: only", length(go_terms_all), "GO terms\n")
+}
+
+# Extract top 1 BP term per module for boxplot annotation
+top_BP_per_module <- go_results_rrvgo %>%
+  group_by(module_color) %>%
+  slice_min(pvalue, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  dplyr::select(module_color, ID, Description, pvalue, Count)
+
+# Save for use in 06_preservation.Rmd boxplot
+write_csv(
+  top_BP_per_module,
+  file.path(OUTPUT_DIR, "top_BP_per_module_rrvgo.csv")
+)
+
+cat("\nTop BP term per module (for boxplot annotation):\n")
+print(top_BP_per_module)
+
+# Save full rrvgo-reduced results
+write_csv(
+  go_results_rrvgo,
+  file.path(OUTPUT_DIR, "all_modules_GO_BP_rrvgo.csv")
+)
+
+cat("\nFiles saved:\n")
+cat("  - top_BP_per_module_rrvgo.csv (for boxplot annotation)\n")
+cat("  - all_modules_GO_BP_rrvgo.csv (full rrvgo-reduced results)\n")
+```
+
+---
 
 ## Cellular Component (CC) Enrichment
 
@@ -253,12 +343,6 @@ compGO_CC <- compareCluster(
   geneCluster = module_gene_lists,
   fun = ego_cc
 )
-
-filtered_result <- compGO_BP@compareClusterResult%>%
-  filter(Count > 1) %>%
-  group_by(Cluster, geneID) %>%
-  arrange(p.adjust, .by_group = TRUE) %>%
-  ungroup()
 
 # Set factor levels to preserve module order
 if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
@@ -278,7 +362,7 @@ if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
 # Save full results
 if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
   go_results_cc <- as.data.frame(compGO_CC@compareClusterResult) %>%
-    rename(module_color = Cluster) %>%
+    dplyr::rename(module_color = Cluster) %>%
     arrange(module_color, pvalue)
 
   write_csv(
@@ -326,7 +410,7 @@ if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
 # Save full results
 if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
   go_results_mf <- as.data.frame(compGO_MF@compareClusterResult) %>%
-    rename(module_color = Cluster) %>%
+    dplyr::rename(module_color = Cluster) %>%
     arrange(module_color, pvalue)
 
   write_csv(
@@ -429,12 +513,96 @@ cat("Total terms in combined summary:", nrow(go_summary_combined), "\n")
 
 ---
 
+# Supplementary Figure: GO Enrichment (rrvgo-reduced)
+
+**Purpose**: Generate a comprehensive GO enrichment figure for supplementary
+material showing the top 5 semantically-reduced BP terms per module.
+
+```{r go_supplementary_figure, fig.width=14, fig.height=10}
+# Create comprehensive GO enrichment plot for supplementary
+if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
+  n_modules <- length(unique(go_results_rrvgo$module_color))
+
+  go_plot_data_rrvgo <- go_results_rrvgo %>%
+    group_by(module_color) %>%
+    slice_min(pvalue, n = 5, with_ties = FALSE) %>%
+    ungroup() %>%
+    mutate(
+      Description = str_trunc(Description, 45),
+      GeneRatio_num = sapply(strsplit(GeneRatio, "/"), function(x) {
+        as.numeric(x[1]) / as.numeric(x[2])
+      })
+    )
+
+  ncol_facet <- if (n_modules <= 12) 3 else 4
+
+  p_go_supp <- ggplot(
+    go_plot_data_rrvgo,
+    aes(x = GeneRatio_num, y = reorder(Description, GeneRatio_num),
+        color = -log10(pvalue), size = Count)
+  ) +
+    geom_point() +
+    facet_wrap(~module_color, scales = "free_y", ncol = ncol_facet) +
+    scale_color_viridis_c(option = "plasma", name = "-log10(p)") +
+    theme_minimal(base_size = 10) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      strip.background = element_rect(fill = "grey90", color = NA)
+    ) +
+    labs(
+      title = "GO Biological Process Enrichment by WGCNA Module",
+      subtitle = "Semantically reduced terms (rrvgo, threshold = 0.7)",
+      x = "Gene Ratio",
+      y = NULL,
+      size = "Count"
+    )
+
+  print(p_go_supp)
+
+  # Save supplementary figure
+  ggsave(
+    file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.pdf"),
+    p_go_supp,
+    width = 14, height = 10
+  )
+
+  ggsave(
+    file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.png"),
+    p_go_supp,
+    width = 14, height = 10, dpi = 300
+  )
+
+  # Save RDS for composition
+  saveRDS(p_go_supp, file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.rds"))
+
+  cat("\nSupplementary figure saved:\n")
+  cat("  - go_enrichment_BP_rrvgo.pdf\n")
+  cat("  - go_enrichment_BP_rrvgo.png\n")
+  cat("  - go_enrichment_BP_rrvgo.rds\n")
+} else {
+  cat("\nNo rrvgo-reduced GO results available for supplementary figure.\n")
+}
+```
+
+---
+
 # Hub Gene Analysis
 
 **Approach**: Identify hub genes using CTRL consensus kWithin, then check
 connectivity change in Inv4m. Analyze ALL modules (excluding grey/0).
 
 ```{r hub_analysis}
+# Load effects_df from differential expression analysis (contains locus_label)
+effects_df <- read_csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  show_col_types = FALSE
+) %>%
+  filter(predictor == "Inv4m") %>%
+  group_by(gene) %>%
+  arrange(adj.P.Val) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
 # Merge module assignments with delta kWithin (all modules except grey)
 hub_data <- ctrl_modules %>%
   filter(module != 0) %>%
@@ -449,10 +617,14 @@ hub_genes <- hub_data %>%
   slice_max(kWithin_ctrl, n = 5) %>%
   ungroup()
 
-# Add gene annotations
+# Add gene annotations (including locus_label for plotting)
 hub_genes <- hub_genes %>%
   left_join(
     gene_info %>% dplyr::select(gene, logFC, regulation, in_cis, in_Inv4m),
+    by = "gene"
+  ) %>%
+  left_join(
+    effects_df %>% dplyr::select(gene, locus_label, locus_symbol),
     by = "gene"
   ) %>%
   mutate(
@@ -462,6 +634,12 @@ hub_genes <- hub_genes %>%
       delta_kWithin < -0.02 ~ "Moderate loss",
       delta_kWithin > 0.02 ~ "Gain",
       TRUE ~ "Stable"
+    ),
+    # Use locus_label if available, else locus_symbol, else truncated gene ID
+    display_label = case_when(
+      !is.na(locus_label) & locus_label != "" ~ locus_label,
+      !is.na(locus_symbol) & locus_symbol != "" ~ locus_symbol,
+      TRUE ~ str_sub(gene, -8, -1)  # Last 8 chars of gene ID
     )
   ) %>%
   arrange(module, desc(kWithin_ctrl))
@@ -498,7 +676,7 @@ if (nrow(hub_genes) > 0) {
     geom_point(aes(size = abs(logFC)), alpha = 0.7) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
     geom_text(
-      aes(label = gene),
+      aes(label = display_label),
       size = 2.5,
       hjust = -0.1,
       vjust = 0.5,
@@ -521,6 +699,13 @@ if (nrow(hub_genes) > 0) {
     p_hub,
     width = 10, height = 6
   )
+
+  # Save as RDS for figure composition
+  saveRDS(p_hub, file.path(OUTPUT_DIR, "hub_connectivity_plot.rds"))
+
+  cat("\nHub connectivity plot saved:\n")
+  cat("  - hub_connectivity_plot.pdf\n")
+  cat("  - hub_connectivity_plot.rds\n")
 }
 ```
 
@@ -742,7 +927,7 @@ comprehensive_summary <- preservation_summary %>%
 if (nrow(go_results) > 0) {
   go_counts_bp <- go_results %>%
     count(module_color, name = "n_BP_terms") %>%
-    rename(color = module_color)
+    dplyr::rename(color = module_color)
   comprehensive_summary <- comprehensive_summary %>%
     left_join(go_counts_bp, by = "color")
 } else {
@@ -753,7 +938,7 @@ if (nrow(go_results) > 0) {
 if (nrow(go_results_cc) > 0) {
   go_counts_cc <- go_results_cc %>%
     count(module_color, name = "n_CC_terms") %>%
-    rename(color = module_color)
+    dplyr::rename(color = module_color)
   comprehensive_summary <- comprehensive_summary %>%
     left_join(go_counts_cc, by = "color")
 } else {
@@ -764,7 +949,7 @@ if (nrow(go_results_cc) > 0) {
 if (nrow(go_results_mf) > 0) {
   go_counts_mf <- go_results_mf %>%
     count(module_color, name = "n_MF_terms") %>%
-    rename(color = module_color)
+    dplyr::rename(color = module_color)
   comprehensive_summary <- comprehensive_summary %>%
     left_join(go_counts_mf, by = "color")
 } else {
