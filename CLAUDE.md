@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-05
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Revision In Progress ⚠️
-**Version:** v1.2.3
+**Last Updated:** 2026-01-06
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 (Methods/Results) ⚠️
+**Version:** v1.3.0
 
 ---
 
@@ -20,13 +20,16 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-05):**
-1. **WGCNA Figure Implementation** - Next figure to generate (Figure 6)
-   - See: `scripts/00_agent_work/HANDOVER_WGCNA_figure_implementation.md`
-   - Data ready: `results/inversion_paper/field_perturbation/run_20251231_201332/`
-   - Needs: Boxplot colors by module, locus_label in scatter plot, RDS saves
+**Current Priority (as of 2026-01-06):**
+1. **Phase 4: Methods & Results Writing**
+   - MaizeNetome validation methods section
+   - Results section review for consistency with new figures
+   - Add `shahan2018` to bibliography (WGCNA consensus citation)
 
-**Recent completion:** JMJ cluster figure with expression boxplot (Panel A) + microsynteny (Panel B/C)
+**Recent completions:**
+- ✅ WGCNA Figure 6 (dendrogram + GO-annotated boxplot + hub scatter)
+- ✅ WGCNA methods section in main.tex (Shahan et al. 2018)
+- ✅ JMJ cluster figure with expression boxplot (Panel A) + microsynteny (Panel B/C)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
@@ -121,7 +124,8 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ⚠️ |
 | `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
-| `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ⚠️ |
+| `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
+| `make_jmj_expression_boxplot.Rmd` | JMJ cluster expression | ✅ |
 | `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
 
 ### Generated Outputs
@@ -393,24 +397,26 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper ⚠️ Revision In Progress
-- [x] Read `docs/inversion_paper/main.tex` and extract figures/tables
-- [x] Create `scripts/inversion_paper/` directory structure
-- [x] Recover needed scripts from git history (`b2dd1488`)
-- [x] Map figures/tables to scripts (coverage checklist)
-- [x] Copy differential expression script for independent refinement
-- [x] Update all paths to use `setup_paths.R`
-- [x] Test rendering all notebooks
-- [x] Add coverage table to README.md
-- [x] Move `Annotation_assembly.Rmd` to phosphorus paper
-- [x] Update limma model (spatial → plant blocking)
-- [x] Verify DEG outputs from new model
-- [~] Figure 3 panel generation (7/8 panels ready)
-- [ ] Figure 3 composition refinement
-- [ ] Figure 5 restructuring (reference vs novel network)
-- [ ] Table S2 update
+### Inversion Paper ⚠️ Phase 4 In Progress
 
-**See:** `scripts/00_agent_work/HANDOVER_inversion_paper_revision.md` for detailed status
+**Completed Phases:**
+- [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-4)
+- [x] Phase 2: Network Analysis (Figure 5, Figure 6 WGCNA, GO enrichment)
+- [x] Phase 3: Phenotype Integration (SAM data in Figure 2)
+
+**Current Phase 4: Methods & Results**
+- [x] Limma methods updated
+- [x] WGCNA methods section (Shahan et al. 2018)
+- [ ] MaizeNetome validation methods
+- [ ] Results section review
+
+**Phase 5: Review & Polish (not started)**
+- [ ] Internal consistency check
+- [ ] Figure quality review
+- [ ] Caption review
+- [ ] References update (add shahan2018 to Inv4m.bib)
+
+**See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` for detailed roadmap
 
 ---
 
