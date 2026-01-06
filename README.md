@@ -86,7 +86,78 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 ---
 
+## Gene Label Consolidation Method
+
+Short-hand gene labels (e.g., `jmj4`, `pip1d`, `acsn1`) were consolidated for figure annotation using a hierarchical approach:
+
+### Label Sources (Priority Order)
+
+1. **Curated labels** (28 genes) - Manual curation from phosphorus paper (`selected_DEGs_curated_locus_label_2.csv`)
+2. **MaizeGDB symbols** (94 genes) - Official locus symbols from `gene_symbol.tab`, filtered to exclude uninformative markers
+3. **LLM-proposed labels** (269 genes) - Generated from PANNZER functional descriptions using consistent naming conventions
+
+### Marker Pattern Filtering
+
+MaizeGDB symbols include genetic markers that are uninformative for figure labels. These were identified by analyzing the consensus map (`data/maizegdb_consensus_map/`) and filtered using regex:
+
+```r
+MARKER_PATTERN <- paste0(
+  "^(umc|pco|bnlg|pza|gpm|csu|php|IDP|TIDP)[0-9]+",  # SSR/SNP markers
+  "|^cl[0-9]+_",                                       # Clone markers
+  "|^si[0-9]{5,}",                                     # Sequence identifiers
+  "|^LOC[0-9]+",                                       # NCBI locus tags
+  "|^AY[0-9]+",                                        # GenBank accessions
+  "|^Zm00001[de]?b?[0-9]+",                            # Assembly gene IDs
+  "|^GRMZM"                                            # B73 RefGen_v3 IDs
+)
+```
+
+Key insight: Markers have `locus_symbol` but NO `locus_name`; real genes have both.
+
+### LLM-Proposed Label Conventions
+
+For genes with PANNZER descriptions but no symbol, short labels (≤7 characters) were generated following these conventions:
+
+| Category | Convention | Example |
+|----------|------------|---------|
+| Domain-based | Domain abbreviation + number | `ppr3` (PPR domain), `ring1` (RING finger) |
+| Function-based | Function abbreviation | `tars` (threonyl-tRNA synthetase) |
+| Protein family | Family name lowercase | `dnaj1` (DnaJ chaperone) |
+| Existing nomenclature | Match Arabidopsis/rice orthologs | `abh1`, `gata12` |
+
+### Final Coverage
+
+| Source | Count | % |
+|--------|-------|---|
+| curated | 28 | 6% |
+| symbol | 94 | 20% |
+| llm_proposed | 269 | 58% |
+| **Total labeled** | **391** | **84%** |
+| Unlabeled (no annotation) | 74 | 16% |
+
+Hub gene coverage: 55/65 (85%)
+
+### Scripts
+
+- `scripts/utils/consolidate_locus_labels.R` - Main consolidation workflow
+- `scripts/utils/merge_proposed_labels.R` - Merge LLM-proposed labels into master
+
+### Data Files
+
+- `data/locus_labels_master.csv` - Master label file (391 genes)
+- `data/locus_labels_proposed_top50.csv` - First 50 LLM-proposed with rationale
+- `data/locus_labels_proposed_remaining.csv` - Remaining 219 LLM-proposed
+
+---
+
 ## Recent Updates
+
+**2026-01-05:** Gene label consolidation for WGCNA hub gene plots:
+- ✅ Created `consolidate_locus_labels.R` - Hierarchical label consolidation
+- ✅ Filtered MaizeGDB markers (umc, pco, bnlg, pza, gpm, etc.) using consensus map analysis
+- ✅ Generated 269 LLM-proposed labels from PANNZER descriptions
+- ✅ Final coverage: 391/465 genes (84%), hub genes 55/65 (85%)
+- ✅ Hub connectivity plot updated with base_size=25, ggrepel labels size=5
 
 **2026-01-05:** JMJ cluster figure with expression boxplot:
 - ✅ Created `make_jmj_expression_boxplot.Rmd` - jmj2/jmj4 expression across tissues
