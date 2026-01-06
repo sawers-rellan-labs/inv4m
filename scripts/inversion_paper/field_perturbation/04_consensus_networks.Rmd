@@ -71,6 +71,7 @@ suppressPackageStartupMessages({
   library(furrr)
   library(future)
   library(here)
+  library(ggplotify)
 })
 
 # Disable WGCNA verbosity
@@ -801,6 +802,35 @@ plotDendroAndColors(
 )
 dev.off()
 
+# Save as ggplot objects for figure composition
+p_dendro_ctrl <- as.ggplot(~{
+  plotDendroAndColors(
+    ctrl_tree$tree,
+    labels2colors(ctrl_tree$modules),
+    "CTRL Modules",
+    dendroLabels = FALSE,
+    hang = 0.03,
+    addGuide = TRUE,
+    guideHang = 0.05,
+    main = ""
+  )
+})
+saveRDS(p_dendro_ctrl, file.path(OUTPUT_DIR, "ctrl", "dendrogram_plot.rds"))
+
+p_dendro_inv4m <- as.ggplot(~{
+  plotDendroAndColors(
+    inv4m_tree$tree,
+    labels2colors(inv4m_tree$modules),
+    "Inv4m Modules",
+    dendroLabels = FALSE,
+    hang = 0.03,
+    addGuide = TRUE,
+    guideHang = 0.05,
+    main = ""
+  )
+})
+saveRDS(p_dendro_inv4m, file.path(OUTPUT_DIR, "inv4m", "dendrogram_plot.rds"))
+
 {
   cat("=== SAVED OUTPUTS ===\n")
   cat("\nCTRL outputs:\n")
@@ -813,6 +843,7 @@ dev.off()
   cat("  ctrl/consensus_tree.rds\n")
   cat("  ctrl/consensus_eigengenes.rds\n")
   cat("  ctrl/consensus_dendrogram.pdf\n")
+  cat("  ctrl/dendrogram_plot.rds\n")
   cat("\nInv4m outputs:\n")
   cat("  inv4m/soft_power.rds\n")
   cat("  inv4m/subsample_configs.rds\n")
@@ -823,6 +854,7 @@ dev.off()
   cat("  inv4m/consensus_tree.rds\n")
   cat("  inv4m/consensus_eigengenes.rds\n")
   cat("  inv4m/consensus_dendrogram.pdf\n")
+  cat("  inv4m/dendrogram_plot.rds\n")
   cat("\nCombined outputs:\n")
   cat("  network_comparison.csv\n")
   cat("  network_comparison.pdf\n")

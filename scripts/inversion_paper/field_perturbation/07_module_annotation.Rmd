@@ -899,8 +899,6 @@ if (nrow(hub_genes) > 0) {
     scale_color_identity() +
     theme_minimal(base_size = 25) +
     labs(
-      title = "Hub Gene Connectivity Change (Consensus Adjacency)",
-      subtitle = "Points below diagonal = connectivity loss in Inv4m",
       x = "kWithin (CTRL)",
       y = "kWithin (Inv4m)",
       size = "|logFC|"

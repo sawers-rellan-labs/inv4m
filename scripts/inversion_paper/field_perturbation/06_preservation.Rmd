@@ -134,6 +134,22 @@ inv4m_support <- read_csv(
 }
 ```
 
+```{r load_go_annotations}
+# Load top GO BP terms from 07_module_annotation (for boxplot annotation)
+ANNOTATION_DIR <- here::here(params$run_dir, "07_module_annotation")
+top_bp_file <- file.path(ANNOTATION_DIR, "top_BP_per_module_rrvgo.csv")
+
+if (file.exists(top_bp_file)) {
+  top_bp_terms <- read_csv(top_bp_file, show_col_types = FALSE)
+  cat("\n=== GO BP ANNOTATIONS ===\n")
+  cat("Modules with GO BP annotation:", nrow(top_bp_terms), "\n")
+} else {
+  top_bp_terms <- NULL
+  cat("\n=== GO BP ANNOTATIONS ===\n")
+  cat("Note: No GO annotations found (run 07_module_annotation.Rmd first)\n")
+}
+```
+
 ---
 
 # Validate Gene Alignment
@@ -519,7 +535,7 @@ ggsave(
 
 # Visualization: Delta kWithin Boxplot
 
-```{r delta_k_boxplot, fig.width=12, fig.height=6}
+```{r delta_k_boxplot, fig.width=12, fig.height=8}
 # Order modules by median delta kWithin
 module_order <- module_delta_k %>%
   arrange(median_delta_k) %>%
@@ -533,30 +549,88 @@ delta_k_plot <- delta_k %>%
   ) %>%
   mutate(color = factor(color, levels = module_order))
 
-p_delta_k <- ggplot(delta_k_plot, aes(x = color, y = delta_kWithin)) +
-  geom_boxplot(aes(fill = median_delta_k < 0), outlier.size = 0.5) +
+# Prepare GO term annotation data (if available)
+if (!is.null(top_bp_terms) && nrow(top_bp_terms) > 0) {
+  go_annotation <- top_bp_terms %>%
+    filter(module_color %in% module_order) %>%
+    mutate(
+      color = factor(module_color, levels = module_order),
+      # Truncate long descriptions for display
+      short_desc = str_trunc(Description, 30)
+    )
+  has_go_annotation <- TRUE
+} else {
+  has_go_annotation <- FALSE
+}
+
+# Create boxplot with module colors
+p_delta_k <- ggplot(delta_k_plot, aes(x = color, y = delta_kWithin, fill = color)) +
+  geom_boxplot(outlier.size = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-  scale_fill_manual(
-    values = c("TRUE" = "#0072B2", "FALSE" = "#D55E00"),
-    labels = c("TRUE" = "Decreased", "FALSE" = "Increased"),
-    name = "Median Δk"
+  scale_fill_identity() +
+  theme_minimal(base_size = 25) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10),
+    plot.title = element_blank(),
+    plot.subtitle = element_blank()
   ) +
-  theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(
-    title = "Change in Intramodular Connectivity (Consensus): CTRL → Inv4m",
-    subtitle = "Negative values indicate connectivity loss in Inv4m",
     x = "Module",
     y = "Δ kWithin (Inv4m - CTRL)"
   )
 
-print(p_delta_k)
+# Add GO term annotation if available
+if (has_go_annotation) {
+  # Fixed y position for annotation - add as column to data
+  go_annotation <- go_annotation %>%
+    mutate(y_pos = 0.5)
 
+  p_delta_k_annotated <- p_delta_k +
+    geom_text(
+      data = go_annotation,
+      aes(x = color, y = y_pos, label = short_desc),
+      vjust = 0,
+      hjust = 0,
+      size = 5,
+      angle = 45,
+      inherit.aes = FALSE
+    ) +
+    coord_cartesian(clip = "off", ylim = c(NA, 1.1)) +
+    theme(plot.margin = margin(t = 120, r = 10, b = 10, l = 10))
+
+  print(p_delta_k_annotated)
+
+  # Save annotated version
+  ggsave(
+    file.path(OUTPUT_DIR, "delta_kWithin_boxplot_annotated.pdf"),
+    p_delta_k_annotated,
+    width = 12, height = 10
+  )
+  ggsave(
+    file.path(OUTPUT_DIR, "delta_kWithin_boxplot_annotated.png"),
+    p_delta_k_annotated,
+    width = 12, height = 10, dpi = 300
+  )
+  saveRDS(p_delta_k_annotated, file.path(OUTPUT_DIR, "delta_kWithin_boxplot_annotated.rds"))
+  cat("Saved: delta_kWithin_boxplot_annotated.pdf/png/rds\n")
+} else {
+  print(p_delta_k)
+}
+
+# Also save simple version (without GO annotation)
 ggsave(
   file.path(OUTPUT_DIR, "delta_kWithin_boxplot.pdf"),
   p_delta_k,
   width = 12, height = 6
 )
+ggsave(
+  file.path(OUTPUT_DIR, "delta_kWithin_boxplot.png"),
+  p_delta_k,
+  width = 12, height = 6, dpi = 300
+)
+saveRDS(p_delta_k, file.path(OUTPUT_DIR, "delta_kWithin_boxplot.rds"))
+cat("Saved: delta_kWithin_boxplot.pdf/png/rds\n")
 ```
 
 ---
