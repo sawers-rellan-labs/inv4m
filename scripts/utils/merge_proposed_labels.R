@@ -19,10 +19,17 @@ master <- read_csv(here("data/locus_labels_master.csv"), show_col_types = FALSE)
 cat("Master file:", nrow(master), "genes\n")
 cat("  With labels:", sum(!is.na(master$locus_label)), "\n")
 
-# Load proposed labels
-proposed <- read_csv(here("data/locus_labels_proposed_top50.csv"), show_col_types = FALSE) %>%
+# Load proposed labels from both files (top50 and remaining)
+proposed_top50 <- read_csv(here("data/locus_labels_proposed_top50.csv"), show_col_types = FALSE) %>%
   dplyr::select(gene, proposed_label)
-cat("Proposed labels:", nrow(proposed), "genes\n\n")
+proposed_remaining <- read_csv(here("data/locus_labels_proposed_remaining.csv"), show_col_types = FALSE) %>%
+  dplyr::select(gene, proposed_label)
+
+proposed <- bind_rows(proposed_top50, proposed_remaining) %>%
+  distinct(gene, .keep_all = TRUE)
+cat("Proposed labels:", nrow(proposed), "genes\n")
+cat("  From top50:", nrow(proposed_top50), "\n")
+cat("  From remaining:", nrow(proposed_remaining), "\n\n")
 
 # Merge: add proposed_label where locus_label is NA
 master <- master %>%
