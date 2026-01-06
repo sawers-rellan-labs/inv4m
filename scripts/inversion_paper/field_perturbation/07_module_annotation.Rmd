@@ -888,7 +888,7 @@ if (nrow(hub_genes) > 0) {
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
     geom_text_repel(
       aes(label = display_label),
-      size = 3,
+      size = 5,
       color = "black",
       max.overlaps = 25,
       box.padding = 0.35,
@@ -897,7 +897,7 @@ if (nrow(hub_genes) > 0) {
       na.rm = TRUE
     ) +
     scale_color_identity() +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 25) +
     labs(
       title = "Hub Gene Connectivity Change (Consensus Adjacency)",
       subtitle = "Points below diagonal = connectivity loss in Inv4m",
