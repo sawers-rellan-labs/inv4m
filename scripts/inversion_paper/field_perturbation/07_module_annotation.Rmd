@@ -823,15 +823,19 @@ hub_genes <- hub_data %>%
   ungroup()
 
 # Add gene annotations (including locus_label for plotting)
+# Load consolidated labels from master file (includes curated + symbol + LLM-proposed)
+master_labels <- read_csv(
+  file.path(paths$data, "locus_labels_master.csv"),
+  show_col_types = FALSE
+) %>%
+  dplyr::select(gene, locus_label, locus_symbol)
+
 hub_genes <- hub_genes %>%
   left_join(
     gene_info %>% dplyr::select(gene, logFC, regulation, in_cis, in_Inv4m),
     by = "gene"
   ) %>%
-  left_join(
-    effects_df %>% dplyr::select(gene, locus_label, locus_symbol),
-    by = "gene"
-  ) %>%
+  left_join(master_labels, by = "gene") %>%
   mutate(
     hub_disrupted = delta_kWithin < -0.05,
     connectivity_change = case_when(
