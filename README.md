@@ -152,6 +152,13 @@ Hub gene coverage: 55/65 (85%)
 
 ## Recent Updates
 
+**2026-01-06:** WGCNA Figure 6 implementation complete:
+- ✅ Created `assemble_WGCNA_figure.Rmd` - 3-panel composition (A: dendrogram, B: boxplot, C: hub scatter)
+- ✅ Added GO term annotations to delta kWithin boxplot (rrvgo-reduced, y=0.5)
+- ✅ Boxplots colored by module with `scale_fill_identity()`
+- ✅ Added WGCNA consensus methods to main.tex (Shahan et al. 2018 citation)
+- ✅ Figure output: `WGCNA_module_perturbation.pdf/png` (12x12 inch, heights 0.5:1:1)
+
 **2026-01-05:** Gene label consolidation for WGCNA hub gene plots:
 - ✅ Created `consolidate_locus_labels.R` - Hierarchical label consolidation
 - ✅ Filtered MaizeGDB markers (umc, pco, bnlg, pza, gpm, etc.) using consensus map analysis
@@ -167,9 +174,9 @@ Hub gene coverage: 55/65 (85%)
 
 **2026-01-04:** WGCNA module perturbation figure planning:
 - ✅ Created handover document for WGCNA figure implementation
-- ⚠️ Figure 6: Needs boxplot colors by module, locus_label in scatter plot
-- ⚠️ Assembly notebook `assemble_WGCNA_figure.Rmd` to be created
-- Pipeline data available: `results/inversion_paper/field_perturbation/run_20251231_201332/`
+- ✅ Figure 6: Boxplot colors by module, GO annotations, hub connectivity
+- ✅ Assembly notebook `assemble_WGCNA_figure.Rmd` created (see 2026-01-06)
+- ✅ Pipeline data: `results/inversion_paper/field_perturbation/run_20251231_201332/`
 
 **2026-01-02:** Figure 3 panel generation infrastructure for inversion paper revision:
 - ✅ Created `assemble_figure3_RNAseq.Rmd` - Assembly notebook for 8-panel composite figure
