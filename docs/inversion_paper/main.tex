@@ -1087,6 +1087,40 @@ redundancy among enriched terms was reduced using \textit{rrvgo} \cite{sayols202
 with a similarity threshold of 0.7. Enrichment results were visualized as bubble
 plots showing the top five terms per gene set ranked by adjusted \textit{p}-value.
 
+\subsection{WGCNA module perturbation analysis}
+
+To assess how \invfour disrupts gene coexpression structure, we performed weighted
+gene co-expression network analysis (WGCNA) \cite{langfelder2008} on the 465 DEGs
+(FDR $< 0.05$) separately for CTRL and \invfour genotypes using field expression
+data only. Networks were constructed using a signed adjacency with soft-thresholding
+power selected to achieve approximate scale-free topology ($R^2 > 0.8$).
+
+To obtain robust module assignments, we employed a consensus network approach with
+1000 iterations. In each iteration, 80\% of genes were randomly sampled and
+hierarchical clustering was performed on the topological overlap matrix (TOM) with
+\textit{minModuleSize} uniformly sampled from 10--35 to avoid parameterization bias.
+A co-clustering matrix was constructed by counting how often gene pairs were assigned
+to the same module across iterations. The final consensus adjacency was computed as
+the ratio of co-clustering counts to co-sampling counts, and modules were identified
+by cutting the resulting dendrogram (\textit{deepSplit} = 4).
+
+Module stability was assessed using 1000 bootstrap iterations, calculating the
+proportion of iterations in which each module was recovered with $\geq 80\%$ gene
+overlap (Jaccard index $\geq 0.8$). Module eigengenes were computed as the first
+principal component of each module's expression matrix.
+
+Network perturbation was quantified by comparing intramodular connectivity
+($k_{Within}$) between CTRL and \invfour networks for genes assigned to CTRL
+consensus modules. Connectivity change was calculated as $\Delta k_{Within} =
+k_{Within}^{Inv4m} - k_{Within}^{CTRL}$, where negative values indicate connectivity
+loss in \invfour. Hub genes were identified as the top 5 genes per module ranked by
+$k_{Within}$ in the CTRL network.
+
+Gene Ontology enrichment analysis was performed for each module using
+\textit{clusterProfiler} \cite{yu2012}. Semantic redundancy was reduced using
+\textit{rrvgo} \cite{sayols2023} with a similarity threshold of 0.7, and the top
+Biological Process term per module was used to annotate the connectivity change
+boxplot.
 
 \subsection{Filtering of \invfour DEGs by phenotype association}
 
