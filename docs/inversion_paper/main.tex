@@ -1095,14 +1095,22 @@ gene co-expression network analysis (WGCNA) \cite{langfelder2008} on the 465 DEG
 data only. Networks were constructed using a signed adjacency with soft-thresholding
 power selected to achieve approximate scale-free topology ($R^2 > 0.8$).
 
-To obtain robust module assignments, we employed a consensus network approach with
-1000 iterations. In each iteration, 80\% of genes were randomly sampled and
-hierarchical clustering was performed on the topological overlap matrix (TOM) with
-\textit{minModuleSize} uniformly sampled from 10--35 to avoid parameterization bias.
-A co-clustering matrix was constructed by counting how often gene pairs were assigned
-to the same module across iterations. The final consensus adjacency was computed as
-the ratio of co-clustering counts to co-sampling counts, and modules were identified
-by cutting the resulting dendrogram (\textit{deepSplit} = 4).
+To obtain robust module assignments, we adapted the consensus network approach of
+\cite{shahan2018}, which uses gene subsampling rather than sample bootstrapping to
+identify relationships that are stable across parameter choices. In each of 1000
+iterations, 80\% of genes were randomly subsampled without replacement and WGCNA
+clustering was performed with \textit{minModuleSize} uniformly sampled from 10--35
+to avoid parameterization bias. Following \cite{shahan2018}, the consensus adjacency
+matrix $A$ was computed as:
+\begin{equation}
+A_{ij} = \frac{\text{number of times gene } i \text{ clusters with gene } j}{\text{number of times gene } i \text{ is subsampled with gene } j}
+\end{equation}
+where $A_{ij} \in [0,1]$ represents the proportion of opportunities in which genes
+$i$ and $j$ were assigned to the same module. Unlike \cite{shahan2018} who randomized
+power transformation across iterations, we fixed soft power at the value fitted to
+our data's scale-free topology and varied only \textit{minModuleSize} given our
+smaller gene set. Final modules were identified by hierarchical clustering on the
+consensus adjacency matrix (\textit{deepSplit} = 4).
 
 Module stability was assessed using 1000 bootstrap iterations, calculating the
 proportion of iterations in which each module was recovered with $\geq 80\%$ gene
