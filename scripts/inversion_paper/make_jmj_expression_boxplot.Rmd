@@ -417,35 +417,41 @@ write_csv(
 
 ---
 
-# SMO4 Expression (Supplementary Figure)
+# Cell Proliferation Genes Expression (Supplementary Figure)
 
-SMO4 (Zm00001eb192850) encodes a ribosome biogenesis protein NOP53. The Arabidopsis
-ortholog *SMO4* regulates cell proliferation and organ size (Zhang et al. 2015 JIPB).
-Downregulation in Inv4m (logFC = -1.98) provides an independent link to cell
-proliferation control beyond MCM5/PCNA2.
+This section plots expression of two cell proliferation-related genes across tissues:
 
-## Define SMO4 Gene
+- **pcna2** (Zm00001eb192050): Proliferating cell nuclear antigen 2, a DNA replication
+  processivity factor. Upregulated in Inv4m (log2FC = 2.96, p < 0.001).
+- **smo4** (Zm00001eb192850): Ribosome biogenesis protein NOP53 (SMO4 ortholog).
+  The Arabidopsis ortholog regulates cell proliferation and organ size (Zhang et al.
+  2015 JIPB). Downregulated in Inv4m (log2FC = -1.98).
 
-```{r smo4_gene}
-smo4_gene <- tibble(
-  gene = "Zm00001eb192850",
-  symbol = "smo4",
-  description = "Ribosome biogenesis protein NOP53 (SMO4 ortholog)"
+## Define Cell Proliferation Genes
+
+```{r cellprolif_genes}
+cellprolif_genes <- tibble(
+  gene = c("Zm00001eb192050", "Zm00001eb192850"),
+  symbol = c("pcna2", "smo4"),
+  description = c(
+    "Proliferating cell nuclear antigen 2",
+    "Ribosome biogenesis protein NOP53 (SMO4 ortholog)"
+  )
 )
 
-cat("SMO4 gene info:\n")
-print(smo4_gene)
+cat("Cell proliferation genes:\n")
+print(cellprolif_genes)
 ```
 
-## Extract SMO4 Expression
+## Extract Cell Proliferation Gene Expression
 
-```{r extract_smo4_psu2022}
-# Extract SMO4 from PSU2022
-smo4_in_psu <- smo4_gene$gene[smo4_gene$gene %in% rownames(expr_psu)]
-cat("SMO4 found in PSU2022:", length(smo4_in_psu) > 0, "\n")
+```{r extract_cellprolif_psu2022}
+# Extract from PSU2022
+cellprolif_in_psu <- cellprolif_genes$gene[cellprolif_genes$gene %in% rownames(expr_psu)]
+cat("Cell proliferation genes found in PSU2022:", length(cellprolif_in_psu), "\n")
 
-if (length(smo4_in_psu) > 0) {
-  smo4_expr_psu <- expr_psu[smo4_in_psu, , drop = FALSE] %>%
+if (length(cellprolif_in_psu) > 0) {
+  cellprolif_expr_psu <- expr_psu[cellprolif_in_psu, , drop = FALSE] %>%
     as.data.frame() %>%
     rownames_to_column("gene") %>%
     pivot_longer(
@@ -460,24 +466,24 @@ if (length(smo4_in_psu) > 0) {
       by = "sample"
     ) %>%
     filter(!is.na(Genotype)) %>%
-    left_join(smo4_gene, by = "gene") %>%
+    left_join(cellprolif_genes, by = "gene") %>%
     mutate(
       experiment = "PSU2022 (Field)",
       tissue = paste0("Leaf ", leaf_tissue),
       genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m")
     )
 
-  cat("PSU2022 SMO4 expression records:", nrow(smo4_expr_psu), "\n")
+  cat("PSU2022 expression records:", nrow(cellprolif_expr_psu), "\n")
 }
 ```
 
-```{r extract_smo4_crow2020}
-# Extract SMO4 from Crow2020
-smo4_in_crow <- smo4_gene$gene[smo4_gene$gene %in% rownames(expr_crow)]
-cat("SMO4 found in Crow2020:", length(smo4_in_crow) > 0, "\n")
+```{r extract_cellprolif_crow2020}
+# Extract from Crow2020
+cellprolif_in_crow <- cellprolif_genes$gene[cellprolif_genes$gene %in% rownames(expr_crow)]
+cat("Cell proliferation genes found in Crow2020:", length(cellprolif_in_crow), "\n")
 
-if (length(smo4_in_crow) > 0) {
-  smo4_expr_crow <- expr_crow[smo4_in_crow, , drop = FALSE] %>%
+if (length(cellprolif_in_crow) > 0) {
+  cellprolif_expr_crow <- expr_crow[cellprolif_in_crow, , drop = FALSE] %>%
     as.data.frame() %>%
     rownames_to_column("gene") %>%
     pivot_longer(
@@ -491,7 +497,7 @@ if (length(smo4_in_crow) > 0) {
       by = "sample"
     ) %>%
     filter(!is.na(genotype)) %>%
-    left_join(smo4_gene, by = "gene") %>%
+    left_join(cellprolif_genes, by = "gene") %>%
     mutate(
       experiment = "Crow2020 (Growth Chamber)",
       tissue = str_replace(tissue, "_tissue$", "") %>%
@@ -499,39 +505,42 @@ if (length(smo4_in_crow) > 0) {
         str_replace("Primary root", "Root")
     )
 
-  cat("Crow2020 SMO4 expression records:", nrow(smo4_expr_crow), "\n")
+  cat("Crow2020 expression records:", nrow(cellprolif_expr_crow), "\n")
 }
 ```
 
-```{r combine_smo4}
+```{r combine_cellprolif}
 # Combine both experiments
-smo4_combined <- bind_rows(
-  smo4_expr_psu %>%
+cellprolif_combined <- bind_rows(
+  cellprolif_expr_psu %>%
     dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment),
-  smo4_expr_crow %>%
+  cellprolif_expr_crow %>%
     dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment)
 )
 
-# Order factors
-smo4_combined <- smo4_combined %>%
+# Order factors (pcna2 first, then smo4)
+cellprolif_combined <- cellprolif_combined %>%
   mutate(
+    symbol = factor(symbol, levels = c("pcna2", "smo4")),
     genotype = factor(genotype, levels = c("B73", "Inv4m")),
     experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
   )
 
 {
-  cat("=== SMO4 COMBINED DATA ===\n")
-  cat("Total records:", nrow(smo4_combined), "\n")
+  cat("=== CELL PROLIFERATION GENES COMBINED DATA ===\n")
+  cat("Total records:", nrow(cellprolif_combined), "\n")
+  cat("\nBy gene:\n")
+  print(table(cellprolif_combined$symbol))
   cat("\nBy experiment:\n")
-  print(table(smo4_combined$experiment))
+  print(table(cellprolif_combined$experiment))
 }
 ```
 
-## SMO4 Boxplot
+## Cell Proliferation Genes Boxplot
 
-```{r smo4_boxplot, fig.width=14, fig.height=5}
-p_smo4_expr <- ggplot(
-  smo4_combined,
+```{r cellprolif_boxplot, fig.width=14, fig.height=7}
+p_cellprolif_expr <- ggplot(
+  cellprolif_combined,
   aes(x = tissue, y = logCPM, color = genotype)
 ) +
   geom_boxplot(
@@ -570,13 +579,13 @@ p_smo4_expr <- ggplot(
     y = expression(bold(log[2]*"(CPM)"))
   )
 
-print(p_smo4_expr)
+print(p_cellprolif_expr)
 ```
 
-## SMO4 Statistics
+## Cell Proliferation Genes Statistics
 
-```{r smo4_stats}
-smo4_summary <- smo4_combined %>%
+```{r cellprolif_stats}
+cellprolif_summary <- cellprolif_combined %>%
   group_by(experiment, tissue, symbol, genotype) %>%
   summarise(
     mean_logCPM = mean(logCPM, na.rm = TRUE),
@@ -595,41 +604,41 @@ smo4_summary <- smo4_combined %>%
   )
 
 {
-  cat("=== SMO4 EXPRESSION SUMMARY ===\n")
+  cat("=== CELL PROLIFERATION GENES EXPRESSION SUMMARY ===\n")
   print(
-    smo4_summary %>%
+    cellprolif_summary %>%
       dplyr::select(experiment, tissue, symbol, log2FC, direction) %>%
-      arrange(experiment, tissue)
+      arrange(symbol, experiment, tissue)
   )
 }
 ```
 
-## Save SMO4 Outputs
+## Save Cell Proliferation Outputs
 
-```{r save_smo4}
-# Save SMO4 plot
-saveRDS(p_smo4_expr, file.path(paths$figures, "smo4_expression_boxplot.rds"))
+```{r save_cellprolif}
+# Save cell proliferation plot (pcna2 + smo4)
+saveRDS(p_cellprolif_expr, file.path(paths$figures, "cellprolif_pcna2_smo4_expression_boxplot.rds"))
 ggsave(
-  file.path(paths$figures, "smo4_expression_boxplot.pdf"),
-  p_smo4_expr,
-  width = 14, height = 5
+  file.path(paths$figures, "cellprolif_pcna2_smo4_expression_boxplot.pdf"),
+  p_cellprolif_expr,
+  width = 14, height = 7
 )
 ggsave(
-  file.path(paths$figures, "smo4_expression_boxplot.png"),
-  p_smo4_expr,
-  width = 14, height = 5, dpi = 300
+  file.path(paths$figures, "cellprolif_pcna2_smo4_expression_boxplot.png"),
+  p_cellprolif_expr,
+  width = 14, height = 7, dpi = 300
 )
 
 # Save summary table
 write_csv(
-  smo4_summary,
-  file.path(paths$intermediate, "smo4_expression_summary.csv")
+  cellprolif_summary,
+  file.path(paths$intermediate, "cellprolif_pcna2_smo4_expression_summary.csv")
 )
 
 {
-  cat("=== SMO4 SAVED OUTPUTS ===\n")
-  cat("  smo4_expression_boxplot.rds/pdf/png\n")
-  cat("  smo4_expression_summary.csv\n")
+  cat("=== CELL PROLIFERATION SAVED OUTPUTS ===\n")
+  cat("  cellprolif_pcna2_smo4_expression_boxplot.rds/pdf/png\n")
+  cat("  cellprolif_pcna2_smo4_expression_summary.csv\n")
 }
 ```
 
