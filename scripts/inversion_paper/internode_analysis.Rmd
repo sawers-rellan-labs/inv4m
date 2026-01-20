@@ -1,0 +1,463 @@
+---
+title: "Internode Length Analysis: CLY2025 Field Experiment"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 12, fig.height = 8)
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+## Overview
+
+This analysis examines **internode length measurements** from the CLY2025 field experiment to characterize the effect of the Inv4m introgression on plant architecture.
+
+**Research Questions:**
+1. Does Inv4m affect internode length patterns along the stem?
+2. Does Inv4m affect the total number of nodes?
+3. How do internode profiles relate to overall plant height?
+
+## 1. Load Libraries and Data
+
+```{r load-libraries}
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+library(ggtext)
+library(ggbeeswarm)
+library(broom)
+library(patchwork)
+```
+```{r load-data}
+# Load field metadata
+field_data <- read_csv(file.path(paths$data, "CLY25_Inv4m.csv"),
+                       na = c("", "NA", NA))
+
+# Extract metadata columns
+metadata <- field_data %>%
+  select(plant:group, X_pos, Y_pos)
+
+# Load internode measurements
+phytomere <- read_csv(file.path(paths$data, "CLY25_Inv4m_Internode.csv"),
+                      na = c("", "na", "NA", NA))
+
+# Load dissection validation data
+dissection <- read_csv(file.path(paths$data, "CLY25_Inv4m_dissection.csv"))
+
+cat("Field data dimensions:", dim(field_data), "\n")
+cat("Internode measurements:", nrow(phytomere), "records\n")
+cat("Dissection records:", nrow(dissection), "records\n")
+```
+
+## 2. Data Processing
+
+```{r data-processing}
+# Join metadata with internode measurements
+phytomere_processed <- metadata %>%
+  inner_join(phytomere, by = "plant") %>%
+  rename(genotype = "inv4m_gt") %>%
+  filter(!is.na(length)) %>%
+  filter(!(grepl("no tassel", notes))) %>%
+  group_by(plant) %>%
+  arrange(-internode) %>%
+  mutate(from_top = row_number()) %>%
+  ungroup()
+
+# Filter by donor (focus on MI21 and TMEX with ≤10 internodes from top)
+phytomere_processed <- phytomere_processed %>%
+  filter(donor == "MI21" | (donor == "TMEX" & from_top <= 10))
+
+# Create genotype labels for plotting
+phytomere_processed <- phytomere_processed %>%
+  mutate(
+    Genotype_label = case_when(
+      genotype == "CTRL" ~ "CTRL",
+      genotype == "INV4M" ~ "<i>Inv4m</i>",
+      TRUE ~ genotype
+    )
+  )
+
+cat("\nProcessed data dimensions:", dim(phytomere_processed), "\n")
+cat("Plants:", n_distinct(phytomere_processed$plant), "\n")
+cat("Genotypes:", paste(unique(phytomere_processed$genotype), collapse = ", "), "\n")
+cat("Donors:", paste(unique(phytomere_processed$donor), collapse = ", "), "\n")
+```
+
+## 3. Summary Statistics
+
+```{r summary-stats}
+# Summary by genotype and donor
+summary_by_genotype <- phytomere_processed %>%
+  group_by(donor, genotype) %>%
+  summarise(
+    n_plants = n_distinct(plant),
+    n_internodes = n(),
+    mean_length = mean(length, na.rm = TRUE),
+    sd_length = sd(length, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cat("Summary by genotype and donor:\n")
+print(summary_by_genotype)
+
+# Node count per plant
+node_count <- phytomere_processed %>%
+  group_by(donor, genotype, plant) %>%
+  summarise(n_nodes = n(), .groups = "drop")
+
+cat("\nNode count summary:\n")
+node_count %>%
+  group_by(donor, genotype) %>%
+  summarise(
+    n_plants = n(),
+    mean_nodes = mean(n_nodes),
+    sd_nodes = sd(n_nodes),
+    .groups = "drop"
+  ) %>%
+  print()
+```
+
+## 4. Internode Length Profiles
+
+### 4.1 Theme and Color Palette
+
+```{r plot-theme}
+# Color palette (gold for CTRL, purple for Inv4m)
+pal <- c("CTRL" = "gold", "<i>Inv4m</i>" = "purple4", "INV4M" = "purple4")
+
+# Phenotype theme (matching ionome style)
+pheno_theme <- theme_classic(base_size = 16) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = element_markdown(),
+    axis.title.x = element_markdown(),
+    axis.text.x = element_text(face = "bold", color = "black"),
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 14),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+```
+
+### 4.2 Line Plot by Position from Top
+
+```{r internode-lines, fig.width=12, fig.height=10}
+plot_from_top_lines <- phytomere_processed %>%
+  mutate(Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))) %>%
+  arrange(Genotype_label, length) %>%
+  ggplot(aes(x = factor(from_top), y = length, color = Genotype_label, group = plant)) +
+  geom_line(alpha = 0.6) +
+  geom_point(data = phytomere_processed %>%
+               filter(has_ear == 1) %>%
+               mutate(Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))),
+             aes(x = factor(from_top), y = length, fill = Genotype_label),
+             size = 3,
+             shape = 21,
+             color = "white",
+             stroke = 1) +
+  xlab("Internode position from top") +
+  ylab("Internode length (cm)") +
+  scale_x_discrete(limits = rev) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  facet_wrap(~ donor, nrow = 2) +
+  labs(title = "**Internode Length Profiles by Position from Top**",
+       subtitle = "Filled points indicate ear node position") +
+  pheno_theme +
+  theme(strip.background = element_blank())
+
+print(plot_from_top_lines)
+
+# Save figure
+ggsave(file.path(paths$figures, "internode_profiles_from_top.pdf"),
+       plot_from_top_lines, width = 12, height = 10)
+ggsave(file.path(paths$figures, "internode_profiles_from_top.png"),
+       plot_from_top_lines, width = 12, height = 10, dpi = 300)
+```
+
+### 4.3 Boxplot by Position from Top
+
+```{r internode-boxplot, fig.width=12, fig.height=10}
+plot_from_top_boxplot <- phytomere_processed %>%
+  mutate(Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))) %>%
+  ggplot(aes(x = factor(from_top), y = length, color = Genotype_label)) +
+  geom_boxplot(width = 0.6, position = position_dodge(width = 0.7)) +
+  xlab("Internode position from top") +
+  ylab("Internode length (cm)") +
+  scale_color_manual(values = pal) +
+  scale_x_discrete(limits = rev) +
+  facet_wrap(~ donor, nrow = 2) +
+  labs(title = "**Internode Length Distribution by Position**") +
+  pheno_theme +
+  theme(strip.background = element_blank())
+
+print(plot_from_top_boxplot)
+
+ggsave(file.path(paths$figures, "internode_boxplot_by_position.pdf"),
+       plot_from_top_boxplot, width = 12, height = 10)
+ggsave(file.path(paths$figures, "internode_boxplot_by_position.png"),
+       plot_from_top_boxplot, width = 12, height = 10, dpi = 300)
+```
+
+## 5. Node Count Analysis
+
+```{r node-count-analysis, fig.width=10, fig.height=8}
+# Statistical tests: comparing genotypes WITHIN each donor
+stat_test <- node_count %>%
+  group_by(donor) %>%
+  t_test(n_nodes ~ genotype) %>%
+  add_significance("p") %>%
+  add_xy_position(x = "genotype")
+
+cat("Statistical test results by donor:\n")
+print(stat_test)
+
+# Summary statistics for reporting
+node_summary_stats <- node_count %>%
+  group_by(donor, genotype) %>%
+  get_summary_stats(n_nodes, type = "mean_sd")
+cat("\nSummary statistics:\n")
+print(node_summary_stats)
+
+# Create plot with significance brackets
+node_count_plot <- node_count %>%
+  mutate(
+    Genotype_label = case_when(
+      genotype == "CTRL" ~ "CTRL",
+      genotype == "INV4M" ~ "<i>Inv4m</i>",
+      TRUE ~ genotype
+    ),
+    Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))
+  ) %>%
+  ggplot(aes(x = Genotype_label, y = n_nodes, color = Genotype_label)) +
+  geom_boxplot(width = 0.4, linewidth = 1, outlier.shape = NA) +
+  geom_beeswarm(size = 2.5, alpha = 0.7) +
+  scale_color_manual(values = pal) +
+  facet_wrap(~ donor, nrow = 1) +
+  labs(
+    title = "**Node Count by Genotype**",
+    x = NULL,
+    y = "Number of nodes"
+  ) +
+  pheno_theme +
+  theme(
+    strip.background = element_blank(),
+    axis.text.x = element_markdown()
+  )
+
+print(node_count_plot)
+
+ggsave(file.path(paths$figures, "node_count_boxplot.pdf"),
+       node_count_plot, width = 10, height = 8)
+ggsave(file.path(paths$figures, "node_count_boxplot.png"),
+       node_count_plot, width = 10, height = 8, dpi = 300)
+```
+
+## 6. Height Validation: Sum of Internodes vs Direct Measurement
+
+```{r height-comparison, fig.width=10, fig.height=8}
+# Calculate sum of internodes per plant
+sum_internodes <- phytomere_processed %>%
+  group_by(plant, donor, genotype) %>%
+  summarise(
+    sum_nodes = sum(length, na.rm = TRUE),
+    n_nodes = n(),
+    .groups = "drop"
+  )
+
+# Join with field data for direct height measurement
+compare_height <- sum_internodes %>%
+  inner_join(field_data %>% select(plant, PH, X_pos, Y_pos), by = "plant") %>%
+  filter(!is.na(PH), !is.na(sum_nodes))
+
+# Linear regression
+height_model <- lm(sum_nodes ~ PH, data = compare_height)
+r_squared <- summary(height_model)$r.squared
+slope <- coef(height_model)[2]
+intercept <- coef(height_model)[1]
+
+cat("\nHeight comparison regression:\n")
+cat(sprintf("y = %.2fx + %.2f\n", slope, intercept))
+cat(sprintf("R² = %.3f\n", r_squared))
+
+# Create comparison plot
+equation_text <- sprintf("y = %.2fx + %.2f\nR² = %.3f", slope, intercept, r_squared)
+
+height_comparison_plot <- compare_height %>%
+  mutate(
+    Genotype_label = case_when(
+      genotype == "CTRL" ~ "CTRL",
+      genotype == "INV4M" ~ "<i>Inv4m</i>",
+      TRUE ~ genotype
+    )
+  ) %>%
+  ggplot(aes(x = PH, y = sum_nodes, color = Genotype_label)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "solid", linewidth = 1) +
+  annotate("text",
+           x = min(compare_height$PH, na.rm = TRUE) +
+             0.05 * diff(range(compare_height$PH, na.rm = TRUE)),
+           y = max(compare_height$sum_nodes, na.rm = TRUE) -
+             0.1 * diff(range(compare_height$sum_nodes, na.rm = TRUE)),
+           label = equation_text,
+           hjust = 0, vjust = 1, size = 5) +
+  labs(
+    title = "**Plant Height Comparison**",
+    subtitle = "Red line = 1:1 reference; Dashed = regression fit",
+    x = "Direct height measurement (cm)",
+    y = "Sum of internode lengths (cm)"
+  ) +
+  scale_color_manual(values = pal) +
+  pheno_theme
+
+print(height_comparison_plot)
+
+ggsave(file.path(paths$figures, "internode_height_validation.pdf"),
+       height_comparison_plot, width = 10, height = 8)
+ggsave(file.path(paths$figures, "internode_height_validation.png"),
+       height_comparison_plot, width = 10, height = 8, dpi = 300)
+```
+
+## 7. Dissection Validation
+
+```{r dissection-validation, fig.width=10, fig.height=8}
+# Join dissection data with processed internode data
+# Note: dissection uses 'from_top' column, not 'internode'
+compare_dissection <- dissection %>%
+  left_join(phytomere_processed, by = c("plant", "from_top")) %>%
+  filter(!is.na(length), !is.na(length_dissection))
+
+cat("Dissection comparison records:", nrow(compare_dissection), "\n")
+
+# Linear regression
+dissection_model <- lm(length_dissection ~ length, data = compare_dissection)
+slope_d <- round(coef(dissection_model)[2], 3)
+intercept_d <- round(coef(dissection_model)[1], 3)
+r_squared_d <- round(summary(dissection_model)$r.squared, 3)
+
+# Create equation text
+if (intercept_d >= 0) {
+  equation_d <- paste0("y = ", slope_d, "x + ", intercept_d)
+} else {
+  equation_d <- paste0("y = ", slope_d, "x - ", abs(intercept_d))
+}
+
+dissection_plot <- compare_dissection %>%
+  ggplot(aes(x = length, y = length_dissection)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  annotate("text",
+           x = 15, y = 30,
+           label = paste(equation_d, "\nR² =", r_squared_d),
+           hjust = 1.1, vjust = 1.1,
+           size = 6,
+           fontface = "bold") +
+  labs(
+    title = "**Dissection Validation**",
+    subtitle = "Comparing field measurements vs dissection measurements",
+    x = "Field measurement (cm)",
+    y = "Dissection measurement (cm)"
+  ) +
+  pheno_theme
+
+print(dissection_plot)
+
+ggsave(file.path(paths$figures, "internode_dissection_validation.pdf"),
+       dissection_plot, width = 10, height = 8)
+ggsave(file.path(paths$figures, "internode_dissection_validation.png"),
+       dissection_plot, width = 10, height = 8, dpi = 300)
+```
+
+## 8. Statistical Summary
+
+```{r statistical-summary}
+# Genotype effects on internode length by position
+internode_effects <- phytomere_processed %>%
+  group_by(donor, from_top) %>%
+  filter(n_distinct(genotype) == 2) %>%
+  summarise(
+    ctrl_mean = mean(length[genotype == "CTRL"], na.rm = TRUE),
+    inv4m_mean = mean(length[genotype == "INV4M"], na.rm = TRUE),
+    diff = inv4m_mean - ctrl_mean,
+    p_value = tryCatch(
+      t.test(length ~ genotype)$p.value,
+      error = function(e) NA_real_
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+cat("\nInternode length effects by position (Inv4m - CTRL):\n")
+print(internode_effects %>% filter(!is.na(p_value)))
+
+# Export summary statistics
+write_csv(summary_by_genotype, file.path(paths$intermediate, "internode_summary_by_genotype.csv"))
+write_csv(node_count, file.path(paths$intermediate, "internode_node_count_by_plant.csv"))
+write_csv(compare_height, file.path(paths$intermediate, "internode_height_comparison.csv"))
+write_csv(internode_effects, file.path(paths$intermediate, "internode_position_effects.csv"))
+
+cat("\nResults exported to:", paths$intermediate, "\n")
+```
+
+## 9. Key Findings
+
+```{r key-findings}
+cat("=== KEY FINDINGS ===\n\n")
+
+# Node count differences
+node_count_summary <- node_count %>%
+  group_by(donor, genotype) %>%
+  summarise(mean_nodes = mean(n_nodes), .groups = "drop") %>%
+  pivot_wider(names_from = genotype, values_from = mean_nodes) %>%
+  mutate(diff = INV4M - CTRL)
+
+cat("1. Node Count Differences:\n")
+print(node_count_summary)
+
+# Overall internode length effect
+overall_effect <- phytomere_processed %>%
+  group_by(genotype) %>%
+  summarise(mean_length = mean(length, na.rm = TRUE), .groups = "drop")
+
+cat("\n2. Overall Mean Internode Length:\n")
+print(overall_effect)
+
+# Height validation
+cat("\n3. Height Validation:\n")
+cat(sprintf("   Sum of internodes explains %.1f%% of plant height variance\n", r_squared * 100))
+```
+
+## 10. Session Information
+
+```{r session-info}
+sessionInfo()
+```

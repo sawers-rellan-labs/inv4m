@@ -1,17 +1,17 @@
 # inv4m Project Guide
 
 **Last Updated:** 2026-01-20
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 (Methods/Results) ⚠️
-**Version:** v1.4.0
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 + New Analyses ⚠️
+**Version:** v1.5.0
 
 ---
 
 ## START HERE: Inversion Paper Revision
 
-**Active Work:** The inversion paper is undergoing revision after a statistical model change. Before starting any work, read these files to understand current state:
+**Active Work:** The inversion paper is undergoing revision after a statistical model change. Three new analyses are also planned. Before starting any work, read these files to understand current state:
 
 ```
-scripts/00_agent_work/HANDOVER_tables_revision.md           # CRITICAL - Table values need updating
+scripts/00_agent_work/missing_analysis_plan_20260120.md     # NEW - Three additional analyses planned
 scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
 scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
@@ -21,9 +21,15 @@ README.md  # Figure/table coverage
 > "Read the handover document and master plan, then suggest where to start"
 
 **Current Priority (as of 2026-01-20):**
-1. **Phase 4: Methods & Results Writing**
+1. **New Analyses Status:**
+   - ✅ Internode measurements - **Complete** (`internode_analysis.Rmd`)
+   - ⚠️ GxE analysis - Script refactored, blocked on PSU2025/CLY2025 data
+   - ⬜ JMJ transcript-level DEG - Waiting for kallisto re-run on HPC
+2. **Phase 4: Methods & Results Writing**
    - MaizeNetome validation methods section
    - Results section review for consistency with new figures
+
+**New analysis plan:** `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
 **Recent completions:**
 - ✅ Trans-network results section (136 genes, 552 edges, GO enrichment)
