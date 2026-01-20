@@ -361,10 +361,31 @@ other dispersed divergent highland introgressions.
 
 \subsection{Inv4m accelerates flowering and promotes growth}
 
-Field trials demonstrated that \invfour significantly affects both flowering 
-time and plant architecture. Plants carrying the highland inversion allele 
-flowered earlier and grew taller than control lines, with these effects 
-consistent across both phosphorus treatments (Fig~\ref{fig:phenotypes}).
+Field trials demonstrated that \invfour significantly affects both flowering
+time and plant architecture (Fig~\ref{fig:phenotypes}A). Spatially-corrected
+phenotype analysis revealed that plants carrying the highland inversion allele
+flowered $1.30 \pm 0.27$ days earlier to anthesis ($p = 7.6 \times 10^{-6}$) and
+$1.05 \pm 0.22$ days earlier to silking ($p = 1.3 \times 10^{-5}$) compared to
+control lines. \invfour plants were also significantly taller, with a
+$6.48 \pm 1.11$ cm increase in plant height ($p = 2.2 \times 10^{-7}$). Harvest
+index showed a modest but significant increase of $0.11 \pm 0.04$
+($p = 0.01$), indicating that the enhanced vegetative growth did not come at
+the expense of reproductive allocation. These effects were consistent across
+phosphorus treatments, which were modeled as a covariate in the spatial
+correction.
+
+To investigate whether these macroscopic phenotypes were associated with
+changes in meristem organization, we examined shoot apical meristems (SAMs)
+from two-week-old seedlings grown in controlled environment chambers
+(Fig~\ref{fig:phenotypes}C,D). While SAM height showed a trend toward
+increase ($9.65 \pm 5.50$ $\mu$m, $p = 0.088$), the SAM radius was unchanged
+($0.03 \pm 1.12$ $\mu$m, $p = 0.98$). Importantly, the shape metrics capturing
+SAM elongation were significantly altered: the height-to-radius ratio increased
+by $0.158 \pm 0.074$ ($p = 0.038$) and the shape factor ($h/r^2$) increased by
+$2.49 \pm 1.14$ nm$^{-1}$ ($p = 0.035$), representing a 9\% elongation of the
+meristem dome. These findings suggest that the accelerated flowering and
+increased plant height in \invfour lines may originate from altered meristem
+geometry established early in development.
 
 \begin{figure*}[!ht]
 \centering
@@ -487,7 +508,7 @@ expression lacks functional enrichment}
 
 The leaf gene expression and lipid profile reveal distinct molecular and 
 metabolic responses to leaf stage, phosphorus availability, and \invfour 
-genotype (Fig~\ref{fig::volcano}). Increased leaf stage, which correlates with 
+genotype (Fig~\ref{fig:transcriptome}). Increased leaf stage, which correlates with 
 aging and senescence, leads to the downregulation of genes involved in floral 
 meristem determinacy (GO biological process enrichment, Fisher's exact test 
 \textit{FDR} $=1.28\times 10^{-5}$). This set was constituted by the MADS box 
@@ -502,7 +523,7 @@ cysteine protease homolog \textit{ccp16}. The KEGG pathway annotation shows
 that genes encoding photosynthetic antenna proteins (Fisher's exact test, 
 \textit{FDR} $=0.015$) are significantly downregulated in phosphorus deficiency 
 (\textit{lhcb10}) and increased leaf stage (\textit{lhcb1}, \textit{lhcb10}) 
-Fig~\ref{fig::volcano} B.
+Fig~\ref{fig:transcriptome} B.
 
 Downregulated genes under phosphorus starvation do not show enrichment in 
 specific biological processes. However, the most significant PSR gene was 
@@ -531,47 +552,88 @@ brassinosteroid biosynthesis (\textit{brc2}). Conversely, genes involved in
 galactolipid biosynthesis, which are crucial for maintaining photosynthetic 
 membranes are significantly downregulated.
 
-\subsection{\invfour plants show perturbations of a cell proliferation gene 
-expression network in leaves and have elongated shoot apical meristems}
+\subsection{Trans-regulatory network analysis reveals epigenetic regulators
+connecting \invfour to genome-wide expression changes}
 
-\subsection{\invfour coexpression network perturbation analysis }
+To investigate the potential trans-regulatory effects of the \invfour
+chromosomal inversion, we constructed a coexpression network linking DEGs
+within the introgressed region (regulators) to differentially expressed genes
+located elsewhere in the genome (trans targets). We validated these
+coexpression relationships against the MaizeNetome database, which catalogs
+experimentally-supported regulatory interactions in maize
+(Fig~\ref{fig::DEGnetwork}A).
 
+The trans-regulatory network comprised 136 genes connected by 552 coexpression
+edges. Of the 103 regulator genes within or flanking the introgression, 33
+were located within the \invfour proper and 70 in the flanking regions. These
+regulators showed coexpression relationships with 33 trans target genes
+distributed across all ten maize chromosomes. We classified edges as
+``Reference'' if present in the MaizeNetome database (16 edges, 2.9\%) or
+``Novel'' if specific to our \invfour network (536 edges, 97.1\%).
 
+The Reference network included known regulatory relationships involving
+\textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC =
++2.99$), a DNA replication factor, and \textit{outer cell layer2}
+(\textit{ocl2}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor
+involved in epidermal cell differentiation. Notably, the Reference network
+also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets,
+supporting a conserved regulatory role for this histone demethylase.
 
-A gene co-expression network analysis (Panel A) was performed to investigate the 
-trans-regulatory effects associated with the Inv4m chromosomal inversion in 
-maize leaves. This network comprised approximately 24 genes and 28 co-expression 
-edges, filtered to represent interactions between genes within the 15 Mb Inv4m 
-inversion on chromosome 4 and genes located elsewhere in the genome. Of these, 
-12 genes were located within the inversion, and 12 genes were located outside 
-the inversion. We observed that 10 genes within the network were upregulated 
-and 5 were downregulated in Inv4m plants.
+The Novel network revealed a previously uncharacterized \jmjiv neighborhood
+subgraph (Fig~\ref{fig::DEGnetwork}A, right panel). \jmjiv ($\log_2 FC =
+-2.84$) showed strong coexpression with \textit{Exocyst complex component
+SEC6} (\textit{sec6}; $\log_2 FC = +2.87$), which functions in vesicle
+trafficking and cell plate formation during cytokinesis. This connection
+suggests that the JMJ cluster may influence cell division through
+post-translational mechanisms beyond chromatin modification.
 
-Gene ontology (GO) enrichment analysis (Panel B) of this Inv4m 
-trans-coexpression network revealed an over-representation of terms related to 
-cell population proliferation and regulation of flower development (Fisher's 
-exact test p-values here). Within the enriched group for cell population 
-proliferation, we observed that the expression of mrlk (meristematic 
-receptor-like kinase), PCNA2 (encoding a proliferative cell nuclear antigen 2 
-protein, part of a clamp complex increasing processivity of DNA polymerase 
-delta), and MCM5 (encoding a minichromosome maintenance 5 protein, a helicase) 
-were all perturbed in Inv4m plants.
+Gene Ontology enrichment analysis of genes within \invfour proper
+(Fig~\ref{fig::DEGnetwork}B) revealed significant over-representation of
+negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.97
+\times 10^{-4}$, fold enrichment = 77.5) and positive regulation of growth
+(GO:0045927; $p = 1.73 \times 10^{-3}$, fold enrichment = 32.3). Both terms
+were driven by the \jmjii/\jmjiv cluster, which encodes JmjC domain-containing
+histone demethylases. The enrichment of growth regulation terms among
+\invfour-downregulated genes is consistent with the altered SAM geometry
+observed in \invfour plants, suggesting that perturbation of epigenetic
+regulators may underlie the developmental phenotypes.
 
-We specifically noted the perturbation of zcn26, an FT homolog (a gene known 
-for its role in flowering time) located outside the inversion. Furthermore, we 
-identified disruptions in genes involved in protein methylation, specifically 
-\textit{jmj2} and \textit{jmj21} (JMJ domain-containing proteins, shown in the 
-network), suggesting a potential role for epigenetic regulation.
+\subsection{WGCNA reveals widespread coexpression network disruption in
+\invfour plants}
 
-To determine whether these observed gene expression changes had phenotypic 
-consequences, we measured the shape and height of the vegetative meristems in 
-control and Inv4m individuals. We found that Inv4m plants have shoots with a 
-significant ($p<0.05$, one-tailed \textit{t-test}, 
-$H_a: \mu_{\textit{Inv4}} > \mu_{\textit{CTRL}}$) 9\% increase in SAM height 
-(9.65 $\mu$m, 0.37 $\mu$m lower bound with 95\% confidence), a 9\% increase in 
-shape coefficient (2.49 $\text{nm}^{-1}$, 0.59 $\text{nm}^{-1}$), indicating an 
-elongated meristem (Panel C).
+To assess whether the \invfour introgression causes broader network-level
+perturbations beyond individual DEGs, we performed weighted gene coexpression
+network analysis (WGCNA) using a consensus approach with 1000 bootstrap
+iterations (Fig~\ref{fig:wgcna}A). We constructed reference networks using
+CTRL samples and evaluated how module structure and connectivity changed in
+\invfour plants.
 
+The consensus network identified 13 coexpression modules containing 465 DEGs
+(FDR $< 0.05$). Comparison of intramodular connectivity ($k_{Within}$) between
+genotypes revealed systematic connectivity loss in \invfour samples
+(Fig~\ref{fig:wgcna}B). Most modules showed substantial decreases in
+$\Delta k_{Within}$, with the blue, yellow, and brown modules exhibiting the
+strongest disruption. This pattern indicates that genes normally coexpressed
+in wild-type plants lose their coordinated expression in \invfour, consistent
+with regulatory perturbation emanating from the introgressed region.
+
+Hub gene analysis revealed dramatic connectivity changes for key regulators
+(Fig~\ref{fig:wgcna}C). In CTRL samples, \jmjii was a highly connected hub
+gene with $k_{Within} = 19.4$; in \invfour samples, its connectivity collapsed
+to $k_{Within} = 0.33$, representing a 98\% reduction. Similarly, \jmjiv
+showed $k_{Within} = 15.4$ in CTRL versus $0.16$ in \invfour (99\% reduction).
+These JMJ genes transitioned from central network hubs to peripheral,
+disconnected nodes, suggesting that their downregulation disrupts the
+coexpression relationships they normally coordinate.
+
+In contrast, some upregulated genes showed increased connectivity in \invfour.
+The exocyst component \textit{sec6} ($\log_2 FC = +2.82$) maintained moderate
+connectivity ($k_{Within} = 5.5$ in CTRL, $0.54$ in \invfour), while genes in
+strongly upregulated modules gained new coexpression relationships. This
+bidirectional rewiring---loss of connectivity for downregulated chromatin
+regulators and gain for upregulated genes---is consistent with the JMJ cluster
+functioning as a master regulatory hub whose perturbation propagates through
+the transcriptome.
 
 \begin{figure*}[!ht]
 \centering
@@ -814,11 +876,11 @@ However, the variation at \invfour seems to have no major effect in the gene
 response to phosphorus. The \invfour x P interaction t-test (\textit{FDR} 
 $<0.005$) shows only one gene with differential response to phosphorus depending 
 on the \invfour karyotype. This gene is found in near \invfour, but outside 
-previously reported limits (Fig~\ref{fig::RNAseq} C). A single gene 
+previously reported limits (Fig~\ref{fig:transcriptome} C). A single gene 
 \textit{aldh2}, 3 Mb upstream of the reported \invfour limit, shows a different 
 response to phosphorus depending on the \invfour genotype. In phosphorus 
 deficiency \textit{aldh2} overexpresses in the CTRL plants, but it is not 
-responsive in the \invfour plant (Fig~\ref{fig::RNAseq} D).
+responsive in the \invfour plant (Fig~\ref{fig:transcriptome} D).
 
 \section{Discussion}
 
@@ -1050,43 +1112,6 @@ available at the
 \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour
 github repository}.
 
-
-
-\subsection{Trans coexpression network analysis}
-
-To identify genes regulated in \textit{trans} by \invfour, we constructed a
-bipartite co-expression network linking DEGs within the introgressed region
-(\textit{cis} regulators) to DEGs located elsewhere in the genome (\textit{trans}
-targets). Pearson correlation coefficients were calculated between all
-\textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized
-expression values. Edges were retained if $|r| > 0.5$ and the correlation was
-significant (\textit{p} $< 0.005$).
-
-To distinguish \invfour-specific effects from flanking introgression effects, we
-applied a strongest-regulator criterion: for each \textit{trans} target, we
-identified the \textit{cis} regulator with the highest absolute correlation.
-Targets were assigned to the \invfour network only if their strongest regulator
-was located within the 15 Mb inversion proper, not in the flanking introgressed
-regions. This approach recovered 50 genes in the \invfour trans-regulatory
-network (22 upregulated, 28 downregulated).
-
-We compared our co-expression edges against the MaizeNetome database
-\cite{feng2023} to classify edges as ``Reference'' (previously reported) or
-``Novel'' (\invfour-specific). Gene identifiers were converted from B73 NAM v4
-to v5 using published correspondence tables \cite{hufford2021}. Networks were
-visualized as minimum spanning trees (MST) constructed on standardized Euclidean
-distance derived from mutual information: $MI = 0.5 \times \log_2(1/(1-r^2))$.
-Edge polarity (concordant vs. discordant expression) was indicated by arrow or
-bar symbols.
-
-Gene Ontology enrichment analysis was performed on the trans network using
-\textit{clusterProfiler} \cite{yu2012} with the B73 NAM v5 GO annotation from
-\cite{fattel2024}. Gene sets were stratified by regulator location (flanking vs.
-\invfour) and direction of differential expression (up vs. down). Semantic
-redundancy among enriched terms was reduced using \textit{rrvgo} \cite{sayols2023}
-with a similarity threshold of 0.7. Enrichment results were visualized as bubble
-plots showing the top five terms per gene set ranked by adjusted \textit{p}-value.
-
 \subsection{WGCNA module perturbation analysis}
 
 To assess how \invfour disrupts gene coexpression structure, we performed weighted
@@ -1129,6 +1154,54 @@ Gene Ontology enrichment analysis was performed for each module using
 \textit{rrvgo} \cite{sayols2023} with a similarity threshold of 0.7, and the top
 Biological Process term per module was used to annotate the connectivity change
 boxplot.
+
+\subsection{Trans coexpression network analysis}
+
+To identify genes regulated in \textit{trans} by \invfour, we constructed a
+bipartite co-expression network linking DEGs within the introgressed region
+(\textit{cis} regulators) to DEGs located elsewhere in the genome (\textit{trans}
+targets). Pearson correlation coefficients were calculated between all
+\textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized
+expression values. Edges were retained if $|r| > 0.5$ and the correlation was
+significant (\textit{p} $< 0.005$).
+
+To distinguish \invfour-specific effects from flanking introgression effects, we
+applied a strongest-regulator criterion: for each \textit{trans} target, we
+identified the \textit{cis} regulator with the highest absolute correlation.
+Targets were assigned to the \invfour network only if their strongest regulator
+was located within the 15 Mb inversion proper, not in the flanking introgressed
+regions. This approach recovered 50 genes in the \invfour trans-regulatory
+network (22 upregulated, 28 downregulated).
+
+To validate our co-expression edges against known regulatory relationships, we
+queried the MaizeNetome database \cite{feng2023}, which provides genome-wide
+gene co-expression networks derived from 7,603 maize RNA-seq samples. Because
+the MaizeNetome search interface limits batch queries, we retrieved edges in
+three batches using B73 NAM v4 gene identifiers: (1) left flanking region
+(upstream of \invfour), (2) \invfour proper (the 15 Mb inversion), and
+(3) right flanking region (downstream of \invfour). Gene identifiers were
+converted from B73 NAM v4 to v5 using published correspondence tables
+\cite{hufford2021}. Edges present in MaizeNetome were classified as
+``Reference'' (representing conserved co-expression relationships detected
+across diverse maize tissues and genotypes), while edges absent from
+MaizeNetome were classified as ``Novel'' (\invfour-specific). Of the 552 edges
+in the \invfour trans-regulatory network, 16 (2.9\%) were Reference edges and
+536 (97.1\%) were Novel edges, indicating that \invfour creates largely novel
+co-expression relationships not observed in the broader maize transcriptome.
+
+Networks were visualized as minimum spanning trees (MST) constructed on
+standardized Euclidean distance derived from mutual information:
+$MI = 0.5 \times \log_2(1/(1-r^2))$. Edge polarity (concordant vs. discordant
+expression change) was indicated by arrow or bar symbols, respectively.
+
+Gene Ontology enrichment analysis was performed on the trans network using
+\textit{clusterProfiler} \cite{yu2012} with the B73 NAM v5 GO annotation from
+\cite{fattel2024}. Gene sets were stratified by regulator location (flanking vs.
+\invfour) and direction of differential expression (up vs. down). Semantic
+redundancy among enriched terms was reduced using \textit{rrvgo} \cite{sayols2023}
+with a similarity threshold of 0.7. Enrichment results were visualized as bubble
+plots showing the top five terms per gene set ranked by adjusted \textit{p}-value.
+
 
 \subsection{Filtering of \invfour DEGs by phenotype association}
 

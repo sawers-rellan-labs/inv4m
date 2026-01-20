@@ -415,7 +415,225 @@ write_csv(
 }
 ```
 
+---
 
+# SMO4 Expression (Supplementary Figure)
+
+SMO4 (Zm00001eb192850) encodes a ribosome biogenesis protein NOP53. The Arabidopsis
+ortholog *SMO4* regulates cell proliferation and organ size (Zhang et al. 2015 JIPB).
+Downregulation in Inv4m (logFC = -1.98) provides an independent link to cell
+proliferation control beyond MCM5/PCNA2.
+
+## Define SMO4 Gene
+
+```{r smo4_gene}
+smo4_gene <- tibble(
+  gene = "Zm00001eb192850",
+  symbol = "smo4",
+  description = "Ribosome biogenesis protein NOP53 (SMO4 ortholog)"
+)
+
+cat("SMO4 gene info:\n")
+print(smo4_gene)
+```
+
+## Extract SMO4 Expression
+
+```{r extract_smo4_psu2022}
+# Extract SMO4 from PSU2022
+smo4_in_psu <- smo4_gene$gene[smo4_gene$gene %in% rownames(expr_psu)]
+cat("SMO4 found in PSU2022:", length(smo4_in_psu) > 0, "\n")
+
+if (length(smo4_in_psu) > 0) {
+  smo4_expr_psu <- expr_psu[smo4_in_psu, , drop = FALSE] %>%
+    as.data.frame() %>%
+    rownames_to_column("gene") %>%
+    pivot_longer(
+      cols = -gene,
+      names_to = "sample",
+      values_to = "logCPM"
+    ) %>%
+    left_join(
+      meta_psu %>%
+        dplyr::select(library, Genotype, leaf_tissue, Treatment) %>%
+        mutate(sample = library),
+      by = "sample"
+    ) %>%
+    filter(!is.na(Genotype)) %>%
+    left_join(smo4_gene, by = "gene") %>%
+    mutate(
+      experiment = "PSU2022 (Field)",
+      tissue = paste0("Leaf ", leaf_tissue),
+      genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m")
+    )
+
+  cat("PSU2022 SMO4 expression records:", nrow(smo4_expr_psu), "\n")
+}
+```
+
+```{r extract_smo4_crow2020}
+# Extract SMO4 from Crow2020
+smo4_in_crow <- smo4_gene$gene[smo4_gene$gene %in% rownames(expr_crow)]
+cat("SMO4 found in Crow2020:", length(smo4_in_crow) > 0, "\n")
+
+if (length(smo4_in_crow) > 0) {
+  smo4_expr_crow <- expr_crow[smo4_in_crow, , drop = FALSE] %>%
+    as.data.frame() %>%
+    rownames_to_column("gene") %>%
+    pivot_longer(
+      cols = -gene,
+      names_to = "sample",
+      values_to = "logCPM"
+    ) %>%
+    left_join(
+      meta_crow %>%
+        dplyr::select(sample, genotype, tissue, temp),
+      by = "sample"
+    ) %>%
+    filter(!is.na(genotype)) %>%
+    left_join(smo4_gene, by = "gene") %>%
+    mutate(
+      experiment = "Crow2020 (Growth Chamber)",
+      tissue = str_replace(tissue, "_tissue$", "") %>%
+        str_replace("_", " ") %>%
+        str_replace("Primary root", "Root")
+    )
+
+  cat("Crow2020 SMO4 expression records:", nrow(smo4_expr_crow), "\n")
+}
+```
+
+```{r combine_smo4}
+# Combine both experiments
+smo4_combined <- bind_rows(
+  smo4_expr_psu %>%
+    dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment),
+  smo4_expr_crow %>%
+    dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment)
+)
+
+# Order factors
+smo4_combined <- smo4_combined %>%
+  mutate(
+    genotype = factor(genotype, levels = c("B73", "Inv4m")),
+    experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+  )
+
+{
+  cat("=== SMO4 COMBINED DATA ===\n")
+  cat("Total records:", nrow(smo4_combined), "\n")
+  cat("\nBy experiment:\n")
+  print(table(smo4_combined$experiment))
+}
+```
+
+## SMO4 Boxplot
+
+```{r smo4_boxplot, fig.width=14, fig.height=5}
+p_smo4_expr <- ggplot(
+  smo4_combined,
+  aes(x = tissue, y = logCPM, color = genotype)
+) +
+  geom_boxplot(
+    width = 0.5,
+    linewidth = 1,
+    outlier.shape = NA,
+    position = position_dodge(width = 0.7)
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(
+    size = 1.5,
+    dodge.width = 0.7,
+    alpha = 0.7
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  facet_grid(symbol ~ experiment, scales = "free_x", space = "free_x") +
+  scale_color_manual(values = genotype_colors, name = "Genotype") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text.x = element_text(
+      angle = 45, hjust = 1,
+      color = "black", face = "bold", size = 12
+    ),
+    axis.text.y = element_text(color = "black", face = "bold", size = 12),
+    axis.title = element_text(face = "bold", size = 14),
+    strip.text.x = element_text(face = "bold", size = 18),
+    strip.text.y = element_text(face = "bold.italic", size = 18),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    legend.position = "bottom",
+    legend.text = element_text(face = "bold", size = 12),
+    legend.title = element_text(face = "bold", size = 12),
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
+  ) +
+  labs(
+    x = NULL,
+    y = expression(bold(log[2]*"(CPM)"))
+  )
+
+print(p_smo4_expr)
+```
+
+## SMO4 Statistics
+
+```{r smo4_stats}
+smo4_summary <- smo4_combined %>%
+  group_by(experiment, tissue, symbol, genotype) %>%
+  summarise(
+    mean_logCPM = mean(logCPM, na.rm = TRUE),
+    sd_logCPM = sd(logCPM, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = genotype,
+    values_from = c(mean_logCPM, sd_logCPM, n),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    log2FC = mean_logCPM_Inv4m - mean_logCPM_B73,
+    direction = ifelse(log2FC < 0, "Down", "Up")
+  )
+
+{
+  cat("=== SMO4 EXPRESSION SUMMARY ===\n")
+  print(
+    smo4_summary %>%
+      dplyr::select(experiment, tissue, symbol, log2FC, direction) %>%
+      arrange(experiment, tissue)
+  )
+}
+```
+
+## Save SMO4 Outputs
+
+```{r save_smo4}
+# Save SMO4 plot
+saveRDS(p_smo4_expr, file.path(paths$figures, "smo4_expression_boxplot.rds"))
+ggsave(
+  file.path(paths$figures, "smo4_expression_boxplot.pdf"),
+  p_smo4_expr,
+  width = 14, height = 5
+)
+ggsave(
+  file.path(paths$figures, "smo4_expression_boxplot.png"),
+  p_smo4_expr,
+  width = 14, height = 5, dpi = 300
+)
+
+# Save summary table
+write_csv(
+  smo4_summary,
+  file.path(paths$intermediate, "smo4_expression_summary.csv")
+)
+
+{
+  cat("=== SMO4 SAVED OUTPUTS ===\n")
+  cat("  smo4_expression_boxplot.rds/pdf/png\n")
+  cat("  smo4_expression_summary.csv\n")
+}
+```
+
+---
 
 # Session Info
 

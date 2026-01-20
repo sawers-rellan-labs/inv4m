@@ -1,0 +1,441 @@
+---
+title: "Shoot Apical Meristem (SAM) Morphology Analysis"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+This notebook analyzes shoot apical meristem (SAM) morphology in Inv4m and
+control (B73) plants. SAMs were cleared and imaged using differential
+interference contrast (DIC) microscopy from two-week-old seedlings grown in
+controlled environment chambers.
+
+**Measurements:**
+
+- **Height (h)**: Distance from the base to the apex of the SAM (μm)
+- **Width**: Maximum diameter of the SAM (μm)
+- **Radius (r)**: Half of the width (μm)
+
+**Derived metrics (paraboloid model):**
+
+- **h/r ratio**: Height-to-radius ratio (dimensionless)
+- **Shape factor (h/r²)**: Indicates elongation; higher values = more elongated (nm⁻¹)
+- **Arc length, surface area, volume**: Geometric properties assuming paraboloid shape
+
+**Key hypothesis:** Inv4m plants have elongated SAMs compared to B73 controls,
+consistent with their accelerated flowering and increased plant height phenotypes.
+
+---
+
+# Load Libraries
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggfx)
+library(ggtext)
+library(ggpubr)
+library(ggbeeswarm)
+library(rstatix)
+library(broom)
+library(knitr)
+```
+
+---
+
+# Load and Process Data
+
+```{r load-data}
+# Data file: SAM measurements from DIC microscopy
+# Height and Width measured in micrometers (μm)
+data_file <- file.path(paths$data, "MeristemMeasurements_B73-INV_December2024.csv")
+
+# Check if file exists
+if (!file.exists(data_file)) {
+  stop("Data file not found: ", data_file,
+       "\nPlease copy MeristemMeasurements_B73-INV_December2024.csv to the data directory.")
+}
+
+microscopy_raw <- read.csv(data_file) %>%
+  dplyr::select(-starts_with("X"))  # Remove any empty columns
+
+cat("Raw data dimensions:", dim(microscopy_raw), "\n")
+cat("Columns:", paste(colnames(microscopy_raw), collapse = ", "), "\n")
+```
+
+```{r process-data}
+# Calculate derived metrics using paraboloid approximation of SAM shape
+microscopy <- microscopy_raw %>%
+  mutate(
+    # Basic derived measurements
+    radius = Width / 2,
+    hr_ratio = Height / radius,
+    shape_factor = 1000 * Height / (radius^2),  # Units: nm⁻¹ (1000 factor converts μm to nm)
+
+    # Paraboloid model calculations
+    arc_length = sqrt(radius^2 + 4 * Height^2 +
+                      (radius^2 / (2 * Height)) + asinh(2 * Height / radius)),
+    area_section = (4/3) * (Height * radius),
+    area_surface = pi * radius * ((radius^2 + 4 * Height^2)^(3/2) - radius^3) / (6 * Height^2),
+    volume = pi * (Height * radius^2) / 2
+  ) %>%
+  # Standardize genotype labels
+  mutate(
+    Genotype = case_when(
+      grepl("B73", Genotype, ignore.case = TRUE) ~ "CTRL",
+      grepl("INV", Genotype, ignore.case = TRUE) ~ "Inv4m",
+      TRUE ~ Genotype
+    ),
+    Genotype = factor(Genotype, levels = c("CTRL", "Inv4m"))
+  )
+
+cat("\nProcessed data dimensions:", dim(microscopy), "\n")
+cat("Genotype counts:\n")
+print(table(microscopy$Genotype))
+```
+
+---
+
+# Summary Statistics
+
+```{r summary-stats}
+# Define columns for analysis
+primary_metrics <- c("Height", "radius", "hr_ratio", "shape_factor")
+
+# Calculate summary statistics by genotype
+summary_stats <- microscopy %>%
+  group_by(Genotype) %>%
+  summarise(
+    n = n(),
+    across(
+      all_of(primary_metrics),
+      list(
+        mean = ~ mean(.x, na.rm = TRUE),
+        sd = ~ sd(.x, na.rm = TRUE),
+        sem = ~ sd(.x, na.rm = TRUE) / sqrt(sum(!is.na(.x))),
+        median = ~ median(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  )
+
+# Display summary
+summary_stats %>%
+  select(Genotype, n, starts_with("Height"), starts_with("radius")) %>%
+  kable(digits = 2, caption = "SAM Height and Radius Summary Statistics")
+
+summary_stats %>%
+  select(Genotype, n, starts_with("hr_ratio"), starts_with("shape_factor")) %>%
+  kable(digits = 3, caption = "SAM Shape Metrics Summary Statistics")
+```
+
+---
+
+# Statistical Analysis: Linear Model Effects
+
+We fit a linear model for each SAM metric to estimate the effect of Inv4m
+genotype compared to CTRL. This provides effect sizes with standard errors
+and p-values comparable to a two-sample t-test.
+
+```{r lm-effects}
+# Fit linear models and extract Inv4m effects
+lm_results <- map_df(primary_metrics, function(trait) {
+  formula <- as.formula(paste(trait, "~ Genotype"))
+  model <- lm(formula, data = microscopy)
+
+  tidy(model) %>%
+    filter(term == "GenotypeInv4m") %>%
+    mutate(
+      trait = trait,
+      # Calculate 95% CI
+      ci_lower = estimate - qt(0.975, model$df.residual) * std.error,
+      ci_upper = estimate + qt(0.975, model$df.residual) * std.error,
+      # Cohen's d effect size
+      cohens_d = estimate / sd(microscopy[[trait]], na.rm = TRUE)
+    ) %>%
+    select(trait, estimate, std.error, statistic, p.value, ci_lower, ci_upper, cohens_d)
+})
+
+# Add units and format for display
+lm_results_formatted <- lm_results %>%
+  mutate(
+    units = case_when(
+      trait == "Height" ~ "μm",
+      trait == "radius" ~ "μm",
+      trait == "hr_ratio" ~ "",
+      trait == "shape_factor" ~ "nm⁻¹"
+    ),
+    effect_str = case_when(
+      trait %in% c("Height", "radius") ~ sprintf("%.2f ± %.2f %s", estimate, std.error, units),
+      trait == "hr_ratio" ~ sprintf("%.3f ± %.3f", estimate, std.error),
+      trait == "shape_factor" ~ sprintf("%.2f ± %.2f %s", estimate, std.error, units)
+    ),
+    p_str = ifelse(p.value < 0.001, sprintf("%.2e", p.value), sprintf("%.4f", p.value)),
+    significance = case_when(
+      p.value < 0.0001 ~ "****",
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+cat("\n=== Inv4m Effect on SAM Morphology (lm coefficients) ===\n\n")
+lm_results_formatted %>%
+  select(trait, effect_str, p_str, significance, cohens_d) %>%
+  kable(
+    col.names = c("Trait", "Effect (Inv4m - CTRL)", "p-value", "Sig.", "Cohen's d"),
+    digits = 3,
+    caption = "Effect of Inv4m genotype on SAM morphology metrics"
+  )
+```
+
+---
+
+# Statistical Analysis: One-Tailed t-Tests
+
+Given our directional hypothesis that Inv4m plants have *larger/more elongated*
+SAMs, we also perform one-tailed t-tests.
+
+```{r t-tests}
+# Prepare data for t-tests
+to_plot <- microscopy %>%
+  pivot_longer(
+    cols = all_of(primary_metrics),
+    names_to = "trait",
+    values_to = "value"
+  ) %>%
+  mutate(
+    trait = factor(trait, levels = primary_metrics),
+    Genotype_label = case_when(
+      Genotype == "Inv4m" ~ "<i>Inv4m</i>",
+      Genotype == "CTRL" ~ "CTRL"
+    ),
+    Genotype_label = factor(Genotype_label, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
+
+# One-tailed t-tests (Inv4m > CTRL)
+t_test_results <- to_plot %>%
+  group_by(trait) %>%
+  t_test(
+    value ~ Genotype_label,
+    ref.group = "CTRL",
+    alternative = "less",  # Tests if CTRL < Inv4m
+    detailed = TRUE
+  ) %>%
+  add_significance("p") %>%
+  add_y_position(scales = "free_y")
+
+# Adjust y positions for plotting
+t_test_results$y.position <- 1.05 * t_test_results$y.position
+
+cat("\n=== One-Tailed t-Tests (H₀: μ_Inv4m ≤ μ_CTRL) ===\n\n")
+t_test_results %>%
+  select(trait, estimate1, estimate2, statistic, p, p.signif) %>%
+  mutate(
+    diff = estimate2 - estimate1,
+    pct_change = 100 * diff / estimate1
+  ) %>%
+  kable(
+    col.names = c("Trait", "Mean CTRL", "Mean Inv4m", "t", "p", "Sig.", "Diff", "% Change"),
+    digits = 3,
+    caption = "One-tailed t-tests comparing SAM metrics between genotypes"
+  )
+```
+
+---
+
+# Visualization
+
+## SAM Morphology Boxplots (Raw Values)
+
+```{r plot-setup}
+# Color palette matching other figures
+pal <- c(CTRL = "gold", `<i>Inv4m</i>` = "purple4")
+
+# Theme matching ionome/phenotype plots
+pheno_theme <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_markdown(hjust = 0.5, face = "bold"),
+    axis.title.y = element_markdown(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_markdown(color = "black", size = 20),
+    strip.background = element_blank(),
+    strip.text = element_markdown(size = 20),
+    legend.position = "none"
+  )
+
+# Y-axis labels with units
+yunit_labels <- c(
+  Height = "Height<br><i>h</i> [μm]",
+  radius = "Radius<br><i>r</i> [μm]",
+  hr_ratio = "Ratio<br><i>h/r</i>",
+  shape_factor = "Shape factor<br><i>h/r<sup>2</sup></i> [nm<sup>-1</sup>]"
+)
+```
+
+```{r plot-function}
+# Function to create individual trait plots
+plot_sam_trait <- function(trait_name, data, t_results) {
+  data %>%
+    filter(trait == trait_name) %>%
+    ggplot(aes(x = Genotype_label, y = value, color = Genotype_label)) +
+    ggtitle(gsub("_", " ", trait_name)) +
+    ylab(yunit_labels[trait_name]) +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    stat_pvalue_manual(
+      t_results %>% filter(trait == trait_name),
+      label = "p.signif",
+      size = 10,
+      bracket.size = 0.8,
+      hide.ns = TRUE
+    ) +
+    scale_color_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    pheno_theme +
+    theme(plot.margin = unit(c(1, 0.5, 1, 0.5), "lines"))
+}
+```
+
+```{r sam-boxplots, fig.width=12, fig.height=4}
+# Create plots for primary metrics
+sam_plots <- lapply(primary_metrics, plot_sam_trait, data = to_plot, t_results = t_test_results)
+
+# Arrange in single row
+sam_figure <- ggarrange(
+  plotlist = sam_plots,
+  nrow = 1,
+  ncol = 4,
+  align = "h"
+)
+
+print(sam_figure)
+```
+
+---
+
+# Export Results
+
+```{r export}
+# Export effect sizes for results text
+effects_export <- lm_results_formatted %>%
+  select(trait, estimate, std.error, p.value, ci_lower, ci_upper, cohens_d, units)
+
+write.csv(
+  effects_export,
+  file.path(paths$intermediate, "SAM_morphology_effects.csv"),
+  row.names = FALSE
+)
+
+# Export summary statistics
+write.csv(
+  summary_stats,
+  file.path(paths$intermediate, "SAM_morphology_summary_stats.csv"),
+  row.names = FALSE
+)
+
+# Save figure
+ggsave(
+  file.path(paths$figures, "SAM_morphology_boxplots.pdf"),
+  sam_figure,
+  width = 12,
+  height = 4
+)
+
+ggsave(
+  file.path(paths$figures, "SAM_morphology_boxplots.png"),
+  sam_figure,
+  width = 12,
+  height = 4,
+  dpi = 300
+)
+
+cat("\nExported files:\n")
+cat("- ", file.path(paths$intermediate, "SAM_morphology_effects.csv"), "\n")
+cat("- ", file.path(paths$intermediate, "SAM_morphology_summary_stats.csv"), "\n")
+cat("- ", file.path(paths$figures, "SAM_morphology_boxplots.pdf"), "\n")
+cat("- ", file.path(paths$figures, "SAM_morphology_boxplots.png"), "\n")
+```
+
+---
+
+# Results Summary for Manuscript
+
+```{r results-text}
+# Generate formatted text for results section
+cat("\n=== Formatted Results for Manuscript ===\n\n")
+
+for (i in 1:nrow(lm_results_formatted)) {
+  row <- lm_results_formatted[i, ]
+  trait_name <- switch(row$trait,
+    "Height" = "SAM height",
+    "radius" = "SAM radius",
+    "hr_ratio" = "height-to-radius ratio (h/r)",
+    "shape_factor" = "shape factor (h/r²)"
+  )
+
+  cat(sprintf(
+    "%s: %.2f ± %.2f %s (p = %s)\n",
+    trait_name,
+    row$estimate,
+    row$std.error,
+    row$units,
+    row$p_str
+  ))
+}
+
+# Percent changes
+cat("\n=== Percent Changes ===\n\n")
+pct_changes <- t_test_results %>%
+  mutate(
+    pct_change = 100 * (estimate2 - estimate1) / estimate1
+  ) %>%
+  select(trait, pct_change)
+
+for (i in 1:nrow(pct_changes)) {
+  cat(sprintf("%s: %.1f%% increase\n", pct_changes$trait[i], pct_changes$pct_change[i]))
+}
+```
+
+---
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -1049,8 +1049,6 @@ p3 <- plot_gene_temp_comparison_by_donor(
 print(p3)
 ```
 
-
-
 ```{r plot_multiple_genes, fig.width=12, fig.height=30}
 # # Multiple genes
 # genes_to_plot <- c("Zm00001eb191820", "PCNA2", "MCM5")
