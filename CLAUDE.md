@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-06
+**Last Updated:** 2026-01-20
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 (Methods/Results) ⚠️
-**Version:** v1.3.0
+**Version:** v1.4.0
 
 ---
 
@@ -20,15 +20,18 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-06):**
+**Current Priority (as of 2026-01-20):**
 1. **Phase 4: Methods & Results Writing**
    - MaizeNetome validation methods section
    - Results section review for consistency with new figures
-   - Add `shahan2018` to bibliography (WGCNA consensus citation)
 
 **Recent completions:**
+- ✅ Trans-network results section (136 genes, 552 edges, GO enrichment)
+- ✅ WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse)
+- ✅ PCNA2 + SMO4 cell proliferation supplementary figure
+- ✅ SAM morphology analysis notebook
+- ✅ Gene annotation correction: uba2 → smo4 (Zm00001eb192850)
 - ✅ WGCNA Figure 6 (dendrogram + GO-annotated boxplot + hub scatter)
-- ✅ WGCNA methods section in main.tex (Shahan et al. 2018)
 - ✅ JMJ cluster figure with expression boxplot (Panel A) + microsynteny (Panel B/C)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
@@ -125,7 +128,8 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
-| `make_jmj_expression_boxplot.Rmd` | JMJ cluster expression | ✅ |
+| `make_jmj_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
+| `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
 | `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
 
 ### Generated Outputs
@@ -407,8 +411,11 @@ git push origin main
 **Current Phase 4: Methods & Results**
 - [x] Limma methods updated
 - [x] WGCNA methods section (Shahan et al. 2018)
+- [x] Trans-network results section drafted
+- [x] WGCNA perturbation results section drafted
+- [x] Phenotypes + SAM results section drafted
 - [ ] MaizeNetome validation methods
-- [ ] Results section review
+- [ ] Results section final review
 
 **Phase 5: Review & Polish (not started)**
 - [ ] Internal consistency check

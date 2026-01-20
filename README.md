@@ -63,6 +63,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ✅ |
 | Figure (jmj) | JMJ cluster expression + microsynteny | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + Manual | ✅ |
+| Figure (cellprolif) | PCNA2 + SMO4 expression (supplementary) | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) | ✅ |
 | Figure 7 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -81,6 +82,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
 | Figure 3 assembly | 8-panel composite figure | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) | ⚠️ |
+| SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
 
 **Status Legend:** ✅ Ready | ⚠️ Needs work | ❌ Missing
 
@@ -151,6 +153,14 @@ Hub gene coverage: 55/65 (85%)
 ---
 
 ## Recent Updates
+
+**2026-01-20:** Results writing and supplementary figures:
+- ✅ Drafted trans-network results section (136 genes, 552 edges, jmj4 neighborhood)
+- ✅ Drafted WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse: 98-99%)
+- ✅ Added PCNA2 + SMO4 cell proliferation expression boxplot (supplementary figure)
+- ✅ Created `SAM_morphology_analysis.Rmd` - DIC microscopy SAM measurements
+- ✅ Fixed undefined LaTeX references (fig::volcano → fig:transcriptome)
+- ✅ Gene annotation correction: Zm00001eb192850 uba2 → smo4 (NOP53 ortholog)
 
 **2026-01-06:** WGCNA Figure 6 implementation complete:
 - ✅ Created `assemble_WGCNA_figure.Rmd` - 3-panel composition (A: dendrogram, B: boxplot, C: hub scatter)
