@@ -10,10 +10,26 @@ output:
     code_folding: hide
     fig_width: 12
     fig_height: 8
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "shared_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("shared_paper")
+
+# Also get inversion_paper paths for GDD lookup and output
+paths_inv <- setup_project_paths("inversion_paper")
+
 library(tidyverse)
 library(lubridate)
 library(janitor)
@@ -33,11 +49,25 @@ This R Markdown adapts the working PSU2025 statgenHTP + SpATS workflow to the PS
 ## 0. Configuration / file paths
 
 ```{r files}
-pheno_file <- "~/Desktop/PSU2025_pheno2.csv"
-meta_file  <- "~/Desktop/PSU2025_metadata.csv"
-gdd_lookup_file <- "gdd_lookup_table.csv"
+# Input files from data directory
+pheno_file <- file.path(paths$data, "PSU2025_pheno2.csv")
+meta_file  <- file.path(paths$data, "PSU2025_metadata.csv")
+
+# GDD lookup from inversion_paper intermediate
+gdd_lookup_file <- file.path(paths_inv$intermediate, "gdd_lookup_table.csv")
+
 planting_date <- mdy("5/20/2025")
 environment_name <- "PSU2025"
+
+# Verify input files exist
+if (!file.exists(pheno_file)) {
+  stop("PSU2025_pheno2.csv not found in: ", paths$data,
+       "\nPlease copy this file to the data directory.")
+}
+if (!file.exists(meta_file)) {
+  stop("PSU2025_metadata.csv not found in: ", paths$data,
+       "\nPlease copy this file to the data directory.")
+}
 ```
 
 ## 0b. Load GDD lookup table
@@ -444,9 +474,11 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
     filter(genotype %in% c("CTRL", "Inv4m")) %>%
     filter(complete.cases(.))
   
-  output_filename <- paste0(environment_name, "_spatially_corrected_phenotypes.csv")
+  # Export to inversion_paper intermediate (used by GxE analysis)
+  output_filename <- file.path(paths_inv$intermediate,
+                               paste0(environment_name, "_spatially_corrected_phenotypes.csv"))
   write_csv(psu2025_standardized, output_filename)
-  
+
   cat("Exported standardized dataset for GxE analysis:\n")
   cat("File:", output_filename, "\n")
   cat("Dimensions:", dim(psu2025_standardized), "\n")

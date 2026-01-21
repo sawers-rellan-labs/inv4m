@@ -1,10 +1,28 @@
 ---
 title: "Growing Degree Days Analysis for Maize Environments"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "shared_paper"),
+      envir = globalenv()
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("shared_paper")
+
+# Also get inversion_paper paths for output (GDD lookup used by spatial correction)
+paths_inv <- setup_project_paths("inversion_paper")
 ```
 
 ```{r load-libraries}
@@ -70,20 +88,24 @@ calculate_daily_gdd_from_hourly <- function(hourly_data) {
 ## Define Environments
 
 ```{r environment-setup}
+# NASA POWER temperature data files (need to be placed in data/)
 environments <- tibble(
   environment = c("PSU2025", "CLY2025", "PSU2022"),
   planting_date = mdy(c("5/20/2025", "4/04/2025", "5/26/2022")),
   temp_file = c(
-    "~/Desktop/POWER_PSU2025.csv",
-    "~/Desktop/POWER_CLY2025.csv",
-    "~/Desktop/POWER_PSU2022.csv"
-  ) #,
-  # pheno_file = c(
-  #   "PSU2025_spatially_corrected_phenotypes.csv",
-  #   "CLY2025_spatially_corrected_phenotypes.csv",
-  #   "PSU2022_spatially_corrected_phenotypes.csv"
-  # )
+    file.path(paths$data, "POWER_PSU2025.csv"),
+    file.path(paths$data, "POWER_CLY2025.csv"),
+    file.path(paths$data, "POWER_PSU2022.csv")
+  )
 )
+
+# Verify input files exist
+missing_files <- environments$temp_file[!file.exists(environments$temp_file)]
+if (length(missing_files) > 0) {
+  warning("Missing temperature files:\n",
+          paste(" -", missing_files, collapse = "\n"),
+          "\nDownload from NASA POWER and place in: ", paths$data)
+}
 ```
 
 ## Process Temperature Data
@@ -106,9 +128,12 @@ hourly_temp_100_dap <- environments %>%
   mutate(days_after_planting = as.integer(date - planting_date)) %>%
   filter(days_after_planting >= 0 & days_after_planting <= 100)
 
-write_csv(hourly_temp_100_dap, "hourly_temp_100_DAP.csv")
+# Export to data/ (used by GxE temperature sensitivity analysis)
+hourly_output <- file.path(paths$data, "hourly_temp_100_DAP.csv")
+write_csv(hourly_temp_100_dap, hourly_output)
 
-cat("Exported hourly_temp_100_DAP.csv with", nrow(hourly_temp_100_dap), "rows\n")
+cat("Exported hourly_temp_100_DAP.csv to:", hourly_output, "\n")
+cat("Rows:", nrow(hourly_temp_100_dap), "\n")
 ```
 
 ```{r add-days-after-planting}
@@ -225,10 +250,15 @@ ggplot(gdd_data, aes(x = days_after_planting, y = cumulative_gdd_from_planting,
 ## Export GDD Data
 
 ```{r export-gdd}
-write_csv(gdd_data, "gdd_all_environments.csv")
-write_csv(gdd_at_phenology, "gdd_lookup_table.csv")
+# Export GDD data to shared_paper intermediate
+gdd_all_output <- file.path(paths$intermediate, "gdd_all_environments.csv")
+write_csv(gdd_data, gdd_all_output)
+
+# Export GDD lookup to inversion_paper intermediate (used by spatial correction scripts)
+gdd_lookup_output <- file.path(paths_inv$intermediate, "gdd_lookup_table.csv")
+write_csv(gdd_at_phenology, gdd_lookup_output)
 
 cat("Exported files:\n")
-cat("- gdd_all_environments.csv\n")
-cat("- gdd_lookup_table.csv\n")
+cat("- ", gdd_all_output, "\n")
+cat("- ", gdd_lookup_output, "\n")
 ```

@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-20
+**Last Updated:** 2026-01-21
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 + New Analyses ⚠️
-**Version:** v1.5.0
+**Version:** v1.6.0
 
 ---
 
@@ -20,10 +20,10 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-20):**
+**Current Priority (as of 2026-01-21):**
 1. **New Analyses Status:**
    - ✅ Internode measurements - **Complete** (`internode_analysis.Rmd`)
-   - ⚠️ GxE analysis - Script refactored, blocked on PSU2025/CLY2025 data
+   - ✅ GxE analysis - **Complete** (`inv4mGxE_3_env.Rmd`) - 3 environments, 10 CSVs, 3 figures
    - ⬜ JMJ transcript-level DEG - Waiting for kallisto re-run on HPC
 2. **Phase 4: Methods & Results Writing**
    - MaizeNetome validation methods section
@@ -32,6 +32,7 @@ README.md  # Figure/table coverage
 **New analysis plan:** `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
 **Recent completions:**
+- ✅ GxE 3-environment analysis (PSU2022, PSU2025, CLY2025) with temperature sensitivity
 - ✅ Trans-network results section (136 genes, 552 edges, GO enrichment)
 - ✅ WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse)
 - ✅ PCNA2 + SMO4 cell proliferation supplementary figure

@@ -68,7 +68,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | **New Analyses** | | | |
 | Figure (internode) | Internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
 | Figure (jmj-tx) | JMJ2 transcript-level expression | `jmj_transcript_analysis.Rmd` (planned) | ⬜ Blocked |
-| Figure S-GxE | GxE interaction plots (3 environments) | [`inv4mGxE_3_env.Rmd`](scripts/shared_paper/inv4mGxE_3_env.Rmd) | ⬜ Blocked |
+| Figure S-GxE | GxE interaction plots (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/shared_paper/inv4mGxE_3_env.html) | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
@@ -77,7 +77,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | **Supplementary Tables** | | | |
 | Table S1 | Inv4m breakpoints and knob repeats | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table S2 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
-| Table S-GxE | GxE interaction statistics (3 environments) | [`inv4mGxE_3_env.Rmd`](scripts/shared_paper/inv4mGxE_3_env.Rmd) | ⬜ Planned |
+| Table S-GxE | GxE interaction statistics (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/shared_paper/inv4mGxE_3_env.html) | ✅ |
 | **Supporting Scripts** | | | |
 | Field perturbation pipeline | WGCNA consensus + preservation | `scripts/inversion_paper/field_perturbation/` (7 scripts) | ✅ |
 | WGCNA figure assembly | Figure 6 composition | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) | ✅ |
@@ -159,13 +159,19 @@ Hub gene coverage: 55/65 (85%)
 
 ## Recent Updates
 
+**2026-01-21:** GxE analysis pipeline complete:
+- ✅ **GxE analysis** - Full 3-environment analysis (PSU2022, PSU2025, CLY2025)
+  - Refactored spatial correction scripts with path standardization
+  - GDD integration from NASA POWER temperature data
+  - 10 output CSVs + 3 supplementary figures (interaction plots, forest plot, temperature reaction norms)
+  - HTML report: `docs/shared_paper/inv4mGxE_3_env.html`
+
 **2026-01-20:** New analyses implementation:
 - ✅ **Internode measurements** - Complete! Created `internode_analysis.Rmd` with 4 figures + 4 CSVs
   - Internode length profiles by position from top
   - Node count comparison by genotype
   - Height validation (sum of internodes vs direct measurement)
   - Dissection validation
-- ✅ **GxE analysis** - Script refactored with path standardization (blocked on PSU2025/CLY2025 data)
 - ⬜ **JMJ transcript-level DEG** - Waiting for kallisto re-run on HPC
 - See: `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
