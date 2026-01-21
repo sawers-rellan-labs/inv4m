@@ -67,7 +67,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 7 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **New Analyses** | | | |
 | Figure (internode) | Internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
-| Figure (jmj-tx) | JMJ2 transcript-level expression | `jmj_transcript_analysis.Rmd` (planned) | ⬜ Blocked |
+| Figure (jmj-tx) | JMJ paralog-level expression | `jmj_transcript_analysis.Rmd` (planned) | 🔶 In Progress |
 | Figure S-GxE | GxE interaction plots (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -89,7 +89,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 3 assembly | 8-panel composite figure | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) | ⚠️ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
 
-**Status Legend:** ✅ Ready | ⚠️ Needs work | ❌ Missing
+**Status Legend:** ✅ Ready | 🔶 In Progress | ⚠️ Needs work | ❌ Missing
 
 ---
 
@@ -159,7 +159,14 @@ Hub gene coverage: 55/65 (85%)
 
 ## Recent Updates
 
-**2026-01-21:** GxE analysis pipeline complete:
+**2026-01-21:** JMJ transcript-level DEG progress + GxE complete:
+- 🔶 **JMJ transcript-level DEG** - Corrected cDNA created, awaiting HPC re-run
+  - **Issue discovered:** V5 annotation incorrectly merges 4 JMJ paralogs (jmj9, psi, jmj6, jmj2) into one gene model (Zm00001eb191790) with 16 chimeric transcripts
+  - **Solution:** Created corrected cDNA fasta with each paralog as separate entry
+  - Created `create_corrected_cDNA_jmj.R` script
+  - Output: `results/inversion_paper/intermediate/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.cdna.jmj_corrected.fa` (72,527 transcripts)
+  - JMJ paralogs: T001 (jmj9), T006 (jmj6), T013 (jmj2), T017 (psi from V4)
+  - **Next:** Copy to HPC, build kallisto index, re-quantify 60 samples
 - ✅ **GxE analysis** - Full 3-environment analysis (PSU2022, PSU2025, CLY2025)
   - Refactored spatial correction scripts with path standardization
   - GDD integration from NASA POWER temperature data
@@ -172,7 +179,6 @@ Hub gene coverage: 55/65 (85%)
   - Node count comparison by genotype
   - Height validation (sum of internodes vs direct measurement)
   - Dissection validation
-- ⬜ **JMJ transcript-level DEG** - Waiting for kallisto re-run on HPC
 - See: `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
 **2026-01-20:** Results writing and supplementary figures:
