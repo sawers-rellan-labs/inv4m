@@ -13,7 +13,7 @@ output:
 knit: (function(input, ...) {
     rmarkdown::render(
       input,
-      output_dir = here::here("docs", "shared_paper"),
+      output_dir = here::here("docs", "inversion_paper"),
       envir = globalenv()
     )
   })
@@ -25,10 +25,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 # Setup project paths
 library(here)
 source(here("scripts", "utils", "setup_paths.R"))
-paths <- setup_project_paths("shared_paper")
-
-# Also get inversion_paper paths for GDD lookup and output
-paths_inv <- setup_project_paths("inversion_paper")
+paths <- setup_project_paths("inversion_paper")
 
 library(tidyverse)
 library(lubridate)
@@ -54,7 +51,7 @@ pheno_file <- file.path(paths$data, "PSU2025_pheno2.csv")
 meta_file  <- file.path(paths$data, "PSU2025_metadata.csv")
 
 # GDD lookup from inversion_paper intermediate
-gdd_lookup_file <- file.path(paths_inv$intermediate, "gdd_lookup_table.csv")
+gdd_lookup_file <- file.path(paths$intermediate, "gdd_lookup_table.csv")
 
 planting_date <- mdy("5/20/2025")
 environment_name <- "PSU2025"
@@ -475,7 +472,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
     filter(complete.cases(.))
   
   # Export to inversion_paper intermediate (used by GxE analysis)
-  output_filename <- file.path(paths_inv$intermediate,
+  output_filename <- file.path(paths$intermediate,
                                paste0(environment_name, "_spatially_corrected_phenotypes.csv"))
   write_csv(psu2025_standardized, output_filename)
 

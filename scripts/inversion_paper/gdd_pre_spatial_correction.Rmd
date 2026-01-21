@@ -7,7 +7,7 @@ output:
 knit: (function(input, ...) {
     rmarkdown::render(
       input,
-      output_dir = here::here("docs", "shared_paper"),
+      output_dir = here::here("docs", "inversion_paper"),
       envir = globalenv()
     )
   })
@@ -19,10 +19,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 # Setup project paths
 library(here)
 source(here("scripts", "utils", "setup_paths.R"))
-paths <- setup_project_paths("shared_paper")
-
-# Also get inversion_paper paths for output (GDD lookup used by spatial correction)
-paths_inv <- setup_project_paths("inversion_paper")
+paths <- setup_project_paths("inversion_paper")
 ```
 
 ```{r load-libraries}
@@ -255,7 +252,7 @@ gdd_all_output <- file.path(paths$intermediate, "gdd_all_environments.csv")
 write_csv(gdd_data, gdd_all_output)
 
 # Export GDD lookup to inversion_paper intermediate (used by spatial correction scripts)
-gdd_lookup_output <- file.path(paths_inv$intermediate, "gdd_lookup_table.csv")
+gdd_lookup_output <- file.path(paths$intermediate, "gdd_lookup_table.csv")
 write_csv(gdd_at_phenology, gdd_lookup_output)
 
 cat("Exported files:\n")

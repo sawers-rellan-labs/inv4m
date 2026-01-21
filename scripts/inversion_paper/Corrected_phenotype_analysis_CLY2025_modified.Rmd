@@ -13,7 +13,7 @@ output:
 knit: (function(input, ...) {
     rmarkdown::render(
       input,
-      output_dir = here::here("docs", "shared_paper"),
+      output_dir = here::here("docs", "inversion_paper"),
       envir = globalenv()
     )
   })
@@ -26,10 +26,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 # Setup project paths
 library(here)
 source(here("scripts", "utils", "setup_paths.R"))
-paths <- setup_project_paths("shared_paper")
-
-# Also get inversion_paper paths for GDD lookup if needed
-paths_inv <- setup_project_paths("inversion_paper")
+paths <- setup_project_paths("inversion_paper")
 ```
 
 ## Overview
@@ -74,7 +71,7 @@ environment_name <- "CLY2025"
 planting_date <- mdy("4/04/2025")
 
 # GDD lookup table from inversion_paper intermediate outputs
-gdd_lookup_file <- file.path(paths_inv$intermediate, "gdd_lookup_table.csv")
+gdd_lookup_file <- file.path(paths$intermediate, "gdd_lookup_table.csv")
 
 # Check if GDD lookup exists; if not, we'll use GDD columns from raw data
 if (file.exists(gdd_lookup_file)) {
@@ -647,7 +644,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
   cat("Plots with corrected data:", nrow(sp_corrected), "\n")
 
   # Export to inversion_paper intermediate (used by GxE analysis)
-  output_file <- file.path(paths_inv$intermediate,
+  output_file <- file.path(paths$intermediate,
                            paste0(environment_name, "_spatially_corrected_phenotypes.csv"))
   write_csv(sp_corrected, output_file)
   cat("Spatially corrected data exported to:", output_file, "\n")

@@ -272,7 +272,11 @@ After sourcing `setup_paths.R`, use:
 - `paths$figures` - `results/phosphorus_paper/figures/`
 - `paths$tables` - `results/phosphorus_paper/tables/`
 
-Note: HTML reports are routed to `docs/{paper}/` via the `knit:` field in YAML headers.
+**IMPORTANT: HTML Report Routing Convention**
+- Scripts in `scripts/{paper}/` render to `docs/{paper}/`
+- `render_notebook.R` determines output based on script location
+- All paper-related analysis scripts should be in `scripts/inversion_paper/` or `scripts/phosphorus_paper/`
+- Do NOT put paper-specific scripts in `scripts/shared_paper/` - move them to the appropriate paper folder
 
 ### Running WGCNA Field Perturbation Pipeline
 
