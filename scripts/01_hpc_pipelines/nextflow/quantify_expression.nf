@@ -57,8 +57,9 @@ workflow {
     if (!params.ref_transcriptome) { exit 1, "Parameter --ref_transcriptome is required." }
 
     // Input Channel - pair FASTQ files by sample name
+    // Illumina naming: L01_S1_L002_R1_001.fastq.gz / L01_S1_L002_R2_001.fastq.gz
     ch_samples_quantify = channel
-        .fromFilePairs("${params.seq_dir}/*_{1,2}.fastq{,.gz}", size: 2)
+        .fromFilePairs("${params.seq_dir}/*_R{1,2}_001.fastq.gz", size: 2)
         .map { sample_id, files ->
             tuple(sample_id, files[0], files[1])
         }
