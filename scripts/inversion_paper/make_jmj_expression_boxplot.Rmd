@@ -399,19 +399,13 @@ expected_lines <- expected_by_tissue %>%
   mutate(genotype = factor("Inv4m", levels = c("CTRL", "Inv4m")))
 
 # Prepare significance annotation data
-# Position stars just above the Inv4m boxplots (below CTRL)
+# Position stars just above the dashed red line (expected value)
+# Only include significant results (remove "ns")
 sig_annotations <- contrast_by_tissue %>%
-  dplyr::select(experiment, tissue, sig_stars, mean_Inv4m) %>%
-  # Calculate y position: slightly above the Inv4m data
-  left_join(
-    total_cluster_samples %>%
-      filter(genotype == "Inv4m") %>%
-      group_by(experiment, tissue) %>%
-      summarise(y_max = max(total_CPM), .groups = "drop"),
-    by = c("experiment", "tissue")
-  ) %>%
+  dplyr::select(experiment, tissue, sig_stars, expected_Inv4m) %>%
+  filter(sig_stars != "ns") %>%  # Only show stars for significant results
   mutate(
-    y_pos = y_max * 1.15,  # Position 15% above max Inv4m value
+    y_pos = expected_Inv4m * 1.08,  # Position just above the expected line
     genotype = factor("Inv4m", levels = c("CTRL", "Inv4m"))
   )
 
@@ -444,13 +438,13 @@ p_total_cluster <- ggplot(
     linetype = "dashed",
     color = "red"
   ) +
-  # Add significance stars above Inv4m boxplots
+  # Add significance stars just above the expected line (only for significant)
   geom_text(
     data = sig_annotations,
     aes(x = tissue, y = y_pos, label = sig_stars, group = genotype),
     inherit.aes = FALSE,
     position = position_dodge(width = 0.7),
-    size = 5,
+    size = 10,
     fontface = "bold",
     color = "black"
   ) +
