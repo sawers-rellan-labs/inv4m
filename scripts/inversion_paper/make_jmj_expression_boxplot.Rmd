@@ -284,7 +284,17 @@ total_cluster_samples <- bind_rows(psu_samples, crow_samples) %>%
 ## Calculate Expected Values
 
 ```{r expected_values}
-# Calculate B73 mean per experiment (across all tissues) for expected line
+# Calculate B73 mean per experiment and tissue for expected lines
+expected_by_tissue <- total_cluster_samples %>%
+  filter(genotype == "B73") %>%
+  group_by(experiment, tissue) %>%
+  summarise(
+    B73_mean = mean(total_CPM),
+    expected_Inv4m = mean(total_CPM) / 5,
+    .groups = "drop"
+  )
+
+# Also calculate overall expected per experiment (for stats)
 expected_overall <- total_cluster_samples %>%
   filter(genotype == "B73") %>%
   group_by(experiment) %>%
@@ -296,6 +306,8 @@ expected_overall <- total_cluster_samples %>%
 
 {
   cat("=== EXPECTED VALUES (B73/5) ===\n")
+  cat("\nBy tissue:\n")
+  print(expected_by_tissue)
   cat("\nOverall by experiment:\n")
   print(expected_overall)
 }
@@ -410,6 +422,10 @@ ttest_results <- total_cluster_samples %>%
 # Define colors (matching ionome style: gold for B73, purple for Inv4m)
 genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
 
+# Prepare expected line data - add genotype = "Inv4m" so it dodges to Inv4m position
+expected_lines <- expected_by_tissue %>%
+  mutate(genotype = factor("Inv4m", levels = c("B73", "Inv4m")))
+
 # Create boxplot with tissue on x-axis (matching jmj2/jmj4 plot layout)
 p_total_cluster <- ggplot(
   total_cluster_samples,
@@ -428,6 +444,17 @@ p_total_cluster <- ggplot(
     alpha = 0.7
   ) %>%
   with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  # Add expected line (B73/5) for each tissue at the Inv4m position
+  geom_errorbar(
+    data = expected_lines,
+    aes(x = tissue, ymin = expected_Inv4m, ymax = expected_Inv4m, group = genotype),
+    inherit.aes = FALSE,
+    position = position_dodge(width = 0.7),
+    width = 0.4,
+    linewidth = 1,
+    linetype = "dashed",
+    color = "black"
+  ) +
   facet_wrap(~ experiment, scales = "free_x") +
   scale_color_manual(values = genotype_colors, name = "Genotype") +
   theme_classic(base_size = 14) +
@@ -447,7 +474,8 @@ p_total_cluster <- ggplot(
   ) +
   labs(
     x = NULL,
-    y = "Total JMJ Cluster Expression (CPM)"
+    y = "Total JMJ Cluster Expression (CPM)",
+    caption = "Dashed black line = expected Inv4m (B73/5) under copy number scaling"
   )
 
 print(p_total_cluster)
