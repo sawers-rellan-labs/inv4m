@@ -1,0 +1,322 @@
+---
+title: "JMJ Paralog Expression Boxplot (PSU2022)"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 14,
+  fig.height = 5
+)
+
+# Load project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+This script creates an expression boxplot for all 5 JMJ cluster paralogs using
+transcript-level kallisto quantification from the JMJ-corrected cDNA reference.
+
+**JMJ Cluster Paralogs (genomic order):**
+
+| Transcript | Symbol | Description |
+|------------|--------|-------------|
+| Zm00001eb191790_T001 | jmj9 | First tandem copy |
+| Zm00001eb191790_T017 | psi | Pseudogene (from V4 annotation) |
+| Zm00001eb191790_T006 | jmj6 | Third tandem copy |
+| Zm00001eb191790_T013 | jmj2 | Fourth tandem copy |
+| Zm00001eb191820_T001 | jmj4 | Separate gene model |
+
+**Background:** The V5 annotation incorrectly merges jmj9, psi, jmj6, and jmj2
+into a single gene model (Zm00001eb191790) with 16 chimeric transcripts. We
+created a corrected cDNA reference that treats each paralog as a separate entry,
+enabling accurate transcript-level quantification.
+
+## Libraries
+
+```{r libraries}
+library(tidyverse)
+library(ggplot2)
+library(ggfx)
+library(ggbeeswarm)
+```
+
+## Define JMJ Paralogs
+
+```{r jmj_paralogs}
+# JMJ paralog transcripts (in genomic order)
+jmj_paralogs <- tibble(
+  transcript = c(
+    "Zm00001eb191790_T001",
+    "Zm00001eb191790_T017",
+    "Zm00001eb191790_T006",
+    "Zm00001eb191790_T013",
+    "Zm00001eb191820_T001"
+  ),
+  symbol = c("jmj9", "psi", "jmj6", "jmj2", "jmj4"),
+  position = c(1, 2, 3, 4, 5)
+)
+
+cat("JMJ cluster paralogs:\n")
+print(jmj_paralogs)
+```
+
+# Load Kallisto Data
+
+```{r config}
+# Kallisto output directory (JMJ-corrected run)
+quant_dir <- "/Volumes/rsstu/users/r/rrellan/DOE_CAREER/inv4m/PSU2022/kallisto/quant_out_jmj_corrected/kallisto_quant"
+
+# Check server mount
+if (!dir.exists(quant_dir)) {
+  stop("Server not mounted or kallisto output not found.\n  ", quant_dir)
+}
+```
+
+```{r load_kallisto}
+cat("Loading kallisto transcript-level data...\n")
+
+samples <- dir(quant_dir)
+cat("Found", length(samples), "samples\n")
+
+# Extract TPM for JMJ paralogs AND compute library sizes
+kallisto_data <- lapply(samples, function(x) {
+  abundance_file <- file.path(quant_dir, x, x, "abundance.tsv")
+
+  if (!file.exists(abundance_file)) {
+    warning("File not found: ", abundance_file)
+    return(NULL)
+  }
+
+  abundance <- read.table(abundance_file, sep = "\t", header = TRUE)
+
+  # Compute library size (total estimated counts)
+  lib_size <- sum(abundance$est_counts)
+
+  # Filter for JMJ paralogs
+  jmj_data <- abundance %>%
+    filter(target_id %in% jmj_paralogs$transcript) %>%
+    select(target_id, tpm, est_counts) %>%
+    mutate(sample = x, lib_size = lib_size)
+
+  jmj_data
+}) %>%
+  bind_rows()
+
+cat("Extracted", nrow(kallisto_data), "records\n")
+```
+
+## Filter Low Quality Libraries
+
+Samples with library size < 20 million reads are considered low quality
+(same threshold as DEG analysis).
+
+```{r filter_quality}
+# Get library sizes per sample
+lib_sizes <- kallisto_data %>%
+  distinct(sample, lib_size)
+
+# Mark low quality samples
+lib_sizes <- lib_sizes %>%
+  mutate(low_quality = lib_size < 2e7)
+
+{
+  cat("=== LIBRARY SIZE QC ===\n")
+  cat("Low quality libraries (< 20M reads):\n")
+  print(table(lib_sizes$low_quality))
+
+  if (any(lib_sizes$low_quality)) {
+    cat("\nExcluded samples:\n")
+    print(lib_sizes %>% filter(low_quality) %>% select(sample, lib_size))
+  }
+}
+
+# Filter out low quality samples
+good_samples <- lib_sizes %>%
+  filter(!low_quality) %>%
+  pull(sample)
+
+jmj_tpm <- kallisto_data %>%
+  filter(sample %in% good_samples) %>%
+  select(-lib_size)
+
+cat("\nRetained", n_distinct(jmj_tpm$sample), "samples\n")
+```
+
+# Add Metadata
+
+```{r add_metadata}
+# Load PSU2022 metadata
+meta <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
+
+# Join with paralog info and metadata
+jmj_expr <- jmj_tpm %>%
+  left_join(jmj_paralogs, by = c("target_id" = "transcript")) %>%
+  left_join(
+    meta %>% select(library, Genotype, leaf_tissue),
+    by = c("sample" = "library")
+  ) %>%
+  filter(!is.na(Genotype)) %>%
+  mutate(
+    genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m"),
+    tissue = paste0("Leaf ", leaf_tissue),
+    # Order symbols by genomic position
+    symbol = factor(symbol, levels = c("jmj9", "psi", "jmj6", "jmj2", "jmj4")),
+    genotype = factor(genotype, levels = c("B73", "Inv4m"))
+  )
+
+{
+  cat("=== DATA SUMMARY ===\n")
+  cat("Samples:", n_distinct(jmj_expr$sample), "\n")
+  cat("Paralogs:", n_distinct(jmj_expr$symbol), "\n")
+  cat("\nBy genotype:\n")
+  print(table(jmj_expr$genotype) / 5)
+  cat("\nBy tissue:\n")
+  print(table(jmj_expr$tissue) / 5)
+}
+```
+
+# Expression Boxplot
+
+```{r boxplot, fig.width=14, fig.height=5}
+genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
+
+p_jmj_paralogs <- ggplot(
+  jmj_expr,
+  aes(x = tissue, y = log2(tpm + 1), color = genotype)
+) +
+  geom_boxplot(
+    width = 0.5,
+    linewidth = 1,
+    outlier.shape = NA,
+    position = position_dodge(width = 0.7)
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(
+    size = 1.5,
+    dodge.width = 0.7,
+    alpha = 0.7
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  facet_wrap(~ symbol, nrow = 1) +
+  scale_color_manual(values = genotype_colors, name = "Genotype") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text.x = element_text(
+      angle = 45, hjust = 1,
+      color = "black", face = "bold", size = 11
+    ),
+    axis.text.y = element_text(color = "black", face = "bold"),
+    axis.title = element_text(face = "bold", size = 13),
+    strip.text = element_text(face = "bold.italic", size = 14),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    legend.position = "bottom",
+    legend.text = element_text(face = "bold"),
+    legend.title = element_text(face = "bold"),
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
+  ) +
+  labs(
+    x = NULL,
+    y = expression(bold(log[2]*"(TPM + 1)"))
+  )
+
+print(p_jmj_paralogs)
+```
+
+# Summary Statistics
+
+```{r summary_stats}
+jmj_summary <- jmj_expr %>%
+  group_by(tissue, symbol, genotype) %>%
+  summarise(
+    mean_tpm = mean(tpm, na.rm = TRUE),
+    sd_tpm = sd(tpm, na.rm = TRUE),
+    mean_log2 = mean(log2(tpm + 1), na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = genotype,
+    values_from = c(mean_tpm, sd_tpm, mean_log2, n),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    log2FC = mean_log2_Inv4m - mean_log2_B73,
+    direction = ifelse(log2FC < 0, "Down", "Up")
+  )
+
+cat("=== EXPRESSION SUMMARY ===\n")
+jmj_summary %>%
+  select(tissue, symbol, mean_tpm_B73, mean_tpm_Inv4m, log2FC, direction) %>%
+  arrange(symbol, tissue) %>%
+  print(n = 25)
+```
+
+## Mean log2FC by Paralog
+
+```{r mean_fc}
+jmj_summary %>%
+  group_by(symbol) %>%
+  summarise(
+    mean_log2FC = mean(log2FC),
+    .groups = "drop"
+  ) %>%
+  arrange(symbol)
+```
+
+# Save Outputs
+
+```{r save_outputs}
+# Save plot
+saveRDS(p_jmj_paralogs, file.path(paths$figures, "jmj_paralogs_expression_boxplot.rds"))
+ggsave(
+  file.path(paths$figures, "jmj_paralogs_expression_boxplot.pdf"),
+  p_jmj_paralogs,
+  width = 14, height = 5
+)
+ggsave(
+  file.path(paths$figures, "jmj_paralogs_expression_boxplot.png"),
+  p_jmj_paralogs,
+  width = 14, height = 5, dpi = 300
+)
+
+# Save data
+write_csv(jmj_expr, file.path(paths$intermediate, "jmj_paralogs_expression_data.csv"))
+write_csv(jmj_summary, file.path(paths$intermediate, "jmj_paralogs_expression_summary.csv"))
+
+{
+  cat("=== SAVED OUTPUTS ===\n")
+  cat("Figures:\n")
+  cat("  jmj_paralogs_expression_boxplot.pdf\n")
+  cat("  jmj_paralogs_expression_boxplot.png\n")
+  cat("  jmj_paralogs_expression_boxplot.rds\n")
+  cat("\nData:\n")
+  cat("  jmj_paralogs_expression_data.csv\n")
+  cat("  jmj_paralogs_expression_summary.csv\n")
+}
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
