@@ -231,7 +231,276 @@ jmj_combined <- jmj_combined %>%
 }
 ```
 
+---
 
+# Total JMJ Cluster Expression Analysis
+
+The JMJ cluster in B73 contains 5 paralogs (jmj9, psi, jmj6, jmj2, jmj4) that are >97% identical.
+In the V5 annotation, jmj9, psi, jmj6, and jmj2 are merged into a single gene model (Zm00001eb191790),
+while jmj4 is separate (Zm00001eb191820). The Inv4m inversion removes 4 copies, leaving only jmj4.
+
+To compare total cluster expression between genotypes, we sum the CPM values for jmj2 + jmj4
+(which captures all 5 paralogs in the V5 annotation). The expected Inv4m expression under
+copy-number scaling is B73/5 (one copy out of five).
+
+## Calculate Total Cluster Expression
+
+```{r total_cluster_calc}
+# Convert logCPM to CPM and sum jmj2 + jmj4 per sample
+# First, get unique sample info from PSU2022
+psu_samples <- jmj_expr_psu %>%
+  filter(symbol %in% c("jmj2", "jmj4")) %>%
+  mutate(CPM = 2^logCPM) %>%
+  group_by(sample, genotype, tissue, experiment) %>%
+  summarise(total_CPM = sum(CPM), .groups = "drop")
+
+# Then from Crow2020
+crow_samples <- jmj_expr_crow %>%
+  filter(symbol %in% c("jmj2", "jmj4")) %>%
+  mutate(CPM = 2^logCPM) %>%
+  group_by(sample, genotype, tissue, experiment) %>%
+  summarise(total_CPM = sum(CPM), .groups = "drop")
+
+# Combine
+total_cluster_samples <- bind_rows(psu_samples, crow_samples) %>%
+  mutate(
+    genotype = factor(genotype, levels = c("B73", "Inv4m")),
+    experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+  )
+
+{
+  cat("=== TOTAL JMJ CLUSTER EXPRESSION ===\n")
+  cat("Samples per experiment:\n")
+  print(table(total_cluster_samples$experiment, total_cluster_samples$genotype))
+  cat("\nMean total CPM by genotype and experiment:\n")
+  print(
+    total_cluster_samples %>%
+      group_by(experiment, genotype) %>%
+      summarise(mean_CPM = mean(total_CPM), sd_CPM = sd(total_CPM), n = n(), .groups = "drop")
+  )
+}
+```
+
+## Calculate Expected Values
+
+```{r expected_values}
+# Calculate B73 mean per experiment (across all tissues) for expected line
+expected_overall <- total_cluster_samples %>%
+  filter(genotype == "B73") %>%
+  group_by(experiment) %>%
+  summarise(
+    B73_mean = mean(total_CPM),
+    expected_Inv4m = mean(total_CPM) / 5,
+    .groups = "drop"
+  )
+
+{
+  cat("=== EXPECTED VALUES (B73/5) ===\n")
+  cat("\nOverall by experiment:\n")
+  print(expected_overall)
+}
+```
+
+## Statistical Tests
+
+### Chi-Square Goodness of Fit Test
+
+Test whether observed expression ratio matches expected copy number ratio (5:1).
+
+```{r chisq_test}
+# Chi-square test for each experiment
+chisq_results <- total_cluster_samples %>%
+  group_by(experiment) %>%
+  summarise(
+    B73_total = sum(total_CPM[genotype == "B73"]),
+    Inv4m_total = sum(total_CPM[genotype == "Inv4m"]),
+    B73_n = sum(genotype == "B73"),
+    Inv4m_n = sum(genotype == "Inv4m"),
+    .groups = "drop"
+  ) %>%
+  rowwise() %>%
+  mutate(
+    # Expected ratio under copy number hypothesis: B73 should be 5x Inv4m
+    # Expected Inv4m = (B73_total + Inv4m_total) / 6
+    # Expected B73 = 5 * Expected Inv4m
+    total_expression = B73_total + Inv4m_total,
+    expected_Inv4m = total_expression / 6,
+    expected_B73 = 5 * expected_Inv4m,
+    # Chi-square statistic
+    chisq_stat = (B73_total - expected_B73)^2 / expected_B73 +
+                 (Inv4m_total - expected_Inv4m)^2 / expected_Inv4m,
+    p_value = pchisq(chisq_stat, df = 1, lower.tail = FALSE),
+    # Observed ratio
+    observed_ratio = B73_total / Inv4m_total,
+    # Actual Inv4m proportion of total
+    Inv4m_proportion = Inv4m_total / total_expression,
+    expected_proportion = 1/6,
+    deficit = (expected_proportion - Inv4m_proportion) / expected_proportion * 100
+  ) %>%
+  ungroup()
+
+{
+  cat("=== CHI-SQUARE GOODNESS OF FIT TEST ===\n")
+  cat("H0: Expression ratio matches copy number (5:1 B73:Inv4m)\n\n")
+  for (i in 1:nrow(chisq_results)) {
+    exp_name <- chisq_results$experiment[i]
+    cat(sprintf("%s:\n", exp_name))
+    cat(sprintf("  Observed ratio (B73:Inv4m): %.2f:1\n", chisq_results$observed_ratio[i]))
+    cat(sprintf("  Expected ratio: 5:1\n"))
+    cat(sprintf("  Chi-square statistic: %.2f\n", chisq_results$chisq_stat[i]))
+    cat(sprintf("  P-value: %.2e\n", chisq_results$p_value[i]))
+    cat(sprintf("  Inv4m produces %.1f%% of expected expression\n\n",
+                100 - chisq_results$deficit[i]))
+  }
+}
+```
+
+### One-Sample T-Test Against Expected Value
+
+Test whether Inv4m expression differs from B73/5 (expected under copy number scaling).
+
+```{r ttest}
+# T-test for each experiment
+ttest_results <- total_cluster_samples %>%
+  group_by(experiment) %>%
+  summarise(
+    B73_mean = mean(total_CPM[genotype == "B73"]),
+    B73_sd = sd(total_CPM[genotype == "B73"]),
+    Inv4m_mean = mean(total_CPM[genotype == "Inv4m"]),
+    Inv4m_sd = sd(total_CPM[genotype == "Inv4m"]),
+    Inv4m_values = list(total_CPM[genotype == "Inv4m"]),
+    n_B73 = sum(genotype == "B73"),
+    n_Inv4m = sum(genotype == "Inv4m"),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    expected = B73_mean / 5
+  ) %>%
+  rowwise() %>%
+  mutate(
+    ttest = list(t.test(Inv4m_values, mu = expected)),
+    t_stat = ttest$statistic,
+    p_value = ttest$p.value,
+    df = ttest$parameter,
+    percent_of_expected = (Inv4m_mean / expected) * 100
+  ) %>%
+  ungroup() %>%
+  dplyr::select(-Inv4m_values, -ttest)
+
+{
+  cat("=== ONE-SAMPLE T-TEST ===\n")
+  cat("H0: Inv4m mean = B73 mean / 5\n\n")
+  for (i in 1:nrow(ttest_results)) {
+    exp_name <- ttest_results$experiment[i]
+    cat(sprintf("%s:\n", exp_name))
+    cat(sprintf("  B73 mean: %.2f CPM (n=%d)\n", ttest_results$B73_mean[i], ttest_results$n_B73[i]))
+    cat(sprintf("  Expected Inv4m (B73/5): %.2f CPM\n", ttest_results$expected[i]))
+    cat(sprintf("  Observed Inv4m mean: %.2f CPM (n=%d)\n", ttest_results$Inv4m_mean[i], ttest_results$n_Inv4m[i]))
+    cat(sprintf("  t = %.3f, df = %.1f, p = %.2e\n",
+                ttest_results$t_stat[i], ttest_results$df[i], ttest_results$p_value[i]))
+    cat(sprintf("  Inv4m produces %.1f%% of expected expression\n\n",
+                ttest_results$percent_of_expected[i]))
+  }
+}
+```
+
+## Total Cluster Expression Boxplot
+
+```{r total_cluster_boxplot, fig.width=10, fig.height=6}
+# Define colors (matching ionome style: gold for B73, purple for Inv4m)
+genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
+
+# Create boxplot with expected line
+p_total_cluster <- ggplot(
+  total_cluster_samples,
+  aes(x = genotype, y = total_CPM, color = genotype)
+) +
+  geom_boxplot(
+    width = 0.5,
+    linewidth = 1,
+    outlier.shape = NA
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  geom_quasirandom(
+    size = 2,
+    alpha = 0.7
+  ) %>%
+  with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+  # Add expected line (B73/5) for Inv4m
+  geom_errorbar(
+    data = expected_overall,
+    aes(x = 2, ymin = expected_Inv4m, ymax = expected_Inv4m),
+    inherit.aes = FALSE,
+    width = 0.4,
+    linewidth = 1,
+    linetype = "dashed",
+    color = "red"
+  ) +
+  facet_wrap(~ experiment, scales = "free_y") +
+  scale_color_manual(values = genotype_colors, name = "Genotype") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text.x = element_text(color = "black", face = "bold", size = 14),
+    axis.text.y = element_text(color = "black", face = "bold", size = 12),
+    axis.title = element_text(face = "bold", size = 14),
+    strip.text = element_text(face = "bold", size = 16),
+    strip.background = element_rect(fill = "grey95", color = NA),
+    legend.position = "none",
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
+  ) +
+  labs(
+    x = NULL,
+    y = "Total JMJ Cluster Expression (CPM)",
+    caption = "Dashed red line = expected Inv4m (B73/5) under copy number scaling"
+  )
+
+print(p_total_cluster)
+```
+
+## Save Total Cluster Analysis Outputs
+
+```{r save_total_cluster}
+# Save total cluster expression plot
+saveRDS(p_total_cluster, file.path(paths$figures, "jmj_total_cluster_expression.rds"))
+ggsave(
+  file.path(paths$figures, "jmj_total_cluster_expression.pdf"),
+  p_total_cluster,
+  width = 10, height = 6
+)
+ggsave(
+  file.path(paths$figures, "jmj_total_cluster_expression.png"),
+  p_total_cluster,
+  width = 10, height = 6, dpi = 300
+)
+
+# Save statistical results
+stats_combined <- bind_cols(
+  chisq_results %>%
+    dplyr::select(experiment, observed_ratio, chisq_stat, chisq_p = p_value),
+  ttest_results %>%
+    dplyr::select(t_stat, ttest_p = p_value, percent_of_expected)
+)
+
+write_csv(
+  stats_combined,
+  file.path(paths$intermediate, "jmj_total_cluster_stats.csv")
+)
+
+# Save sample-level data
+write_csv(
+  total_cluster_samples,
+  file.path(paths$intermediate, "jmj_total_cluster_samples.csv")
+)
+
+{
+  cat("=== TOTAL CLUSTER ANALYSIS SAVED ===\n")
+  cat("  jmj_total_cluster_expression.rds/pdf/png\n")
+  cat("  jmj_total_cluster_stats.csv\n")
+  cat("  jmj_total_cluster_samples.csv\n")
+}
+```
+
+---
 
 # Create Expression Boxplot (All 3 genes)
 
