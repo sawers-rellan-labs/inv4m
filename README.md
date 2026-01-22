@@ -67,7 +67,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 7 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **New Analyses** | | | |
 | Figure (internode) | Internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
-| Figure (jmj-tx) | JMJ paralog-level expression | `jmj_transcript_analysis.Rmd` (planned) | 🔶 In Progress |
+| Figure (jmj-tx) | JMJ paralog-level expression (5 paralogs) | [`jmj_paralog_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_paralog_expression_boxplot.html) | ✅ |
 | Figure S-GxE | GxE interaction plots (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -159,14 +159,14 @@ Hub gene coverage: 55/65 (85%)
 
 ## Recent Updates
 
-**2026-01-21:** JMJ transcript-level DEG progress + GxE complete:
-- 🔶 **JMJ transcript-level DEG** - Corrected cDNA created, awaiting HPC re-run
-  - **Issue discovered:** V5 annotation incorrectly merges 4 JMJ paralogs (jmj9, psi, jmj6, jmj2) into one gene model (Zm00001eb191790) with 16 chimeric transcripts
+**2026-01-21:** JMJ paralog-level analysis complete + GxE complete:
+- ✅ **JMJ paralog-level expression** - All 5 cluster members quantified (PSU2022)
+  - **Issue resolved:** V5 annotation incorrectly merges 4 JMJ paralogs into 16 chimeric transcripts
   - **Solution:** Created corrected cDNA fasta with each paralog as separate entry
-  - Created `create_corrected_cDNA_jmj.R` script
-  - Output: `results/inversion_paper/intermediate/Zea_mays.Zm-B73-REFERENCE-NAM-5.0.cdna.jmj_corrected.fa` (72,527 transcripts)
-  - JMJ paralogs: T001 (jmj9), T006 (jmj6), T013 (jmj2), T017 (psi from V4)
-  - **Next:** Copy to HPC, build kallisto index, re-quantify 60 samples
+  - Re-ran kallisto quantification with corrected reference (60 samples)
+  - Created `jmj_paralog_expression_boxplot.Rmd` showing jmj9, psi, jmj6, jmj2, jmj4
+  - Library size QC filtering applied (< 20M excluded, consistent with DEG analysis)
+  - HTML report: `docs/inversion_paper/jmj_paralog_expression_boxplot.html`
 - ✅ **GxE analysis** - Full 3-environment analysis (PSU2022, PSU2025, CLY2025)
   - Refactored spatial correction scripts with path standardization
   - GDD integration from NASA POWER temperature data
