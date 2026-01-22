@@ -313,11 +313,13 @@ expected_overall <- total_cluster_samples %>%
 }
 ```
 
-## Statistical Tests (Per Tissue)
+## Statistical Test (Per Tissue)
 
 ### Chi-Square Goodness of Fit Test
 
 Test whether observed expression ratio matches expected copy number ratio (5:1) for each tissue.
+The chi-squared test is the appropriate test here because we are directly testing whether
+observed proportions match expected proportions under the copy number hypothesis.
 
 ```{r chisq_test_tissue}
 # Chi-square test for each experiment AND tissue
@@ -341,72 +343,28 @@ chisq_by_tissue <- total_cluster_samples %>%
     observed_ratio = B73_total / Inv4m_total,
     percent_of_expected = (Inv4m_total / expected_Inv4m) * 100
   ) %>%
-  ungroup()
+  ungroup() %>%
+  # Add FDR adjustment across all tissues
+
+  mutate(
+    chisq_fdr = p.adjust(chisq_p, method = "fdr")
+  )
 
 # Display as table
 chisq_table <- chisq_by_tissue %>%
-  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p, percent_of_expected) %>%
+  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p, chisq_fdr, percent_of_expected) %>%
   mutate(
     observed_ratio = sprintf("%.2f:1", observed_ratio),
     chisq_stat = sprintf("%.2f", chisq_stat),
     chisq_p = sprintf("%.2e", chisq_p),
+    chisq_fdr = sprintf("%.2e", chisq_fdr),
     percent_of_expected = sprintf("%.1f%%", percent_of_expected)
   )
 
 knitr::kable(
   chisq_table,
-  col.names = c("Experiment", "Tissue", "Observed Ratio", "χ²", "P-value", "% of Expected"),
+  col.names = c("Experiment", "Tissue", "Observed Ratio", "χ²", "P-value", "FDR", "% of Expected"),
   caption = "Chi-square goodness of fit test: H0 = expression ratio matches copy number (5:1)"
-)
-```
-
-### One-Sample T-Test Against Expected Value
-
-Test whether Inv4m expression differs from B73/5 (expected under copy number scaling) for each tissue.
-
-```{r ttest_tissue}
-# T-test for each experiment AND tissue
-ttest_by_tissue <- total_cluster_samples %>%
-  group_by(experiment, tissue) %>%
-  summarise(
-    B73_mean = mean(total_CPM[genotype == "B73"]),
-    Inv4m_mean = mean(total_CPM[genotype == "Inv4m"]),
-    Inv4m_values = list(total_CPM[genotype == "Inv4m"]),
-    n_B73 = sum(genotype == "B73"),
-    n_Inv4m = sum(genotype == "Inv4m"),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    expected = B73_mean / 5
-  ) %>%
-  rowwise() %>%
-  mutate(
-    ttest = list(t.test(Inv4m_values, mu = expected)),
-    t_stat = ttest$statistic,
-    ttest_p = ttest$p.value,
-    df = ttest$parameter,
-    percent_of_expected = (Inv4m_mean / expected) * 100
-  ) %>%
-  ungroup() %>%
-  dplyr::select(-Inv4m_values, -ttest)
-
-# Display as table
-ttest_table <- ttest_by_tissue %>%
-  dplyr::select(experiment, tissue, B73_mean, expected, Inv4m_mean, t_stat, df, ttest_p, percent_of_expected) %>%
-  mutate(
-    B73_mean = sprintf("%.1f", B73_mean),
-    expected = sprintf("%.1f", expected),
-    Inv4m_mean = sprintf("%.1f", Inv4m_mean),
-    t_stat = sprintf("%.2f", t_stat),
-    df = sprintf("%.0f", df),
-    ttest_p = sprintf("%.2e", ttest_p),
-    percent_of_expected = sprintf("%.1f%%", percent_of_expected)
-  )
-
-knitr::kable(
-  ttest_table,
-  col.names = c("Experiment", "Tissue", "B73 Mean", "Expected (B73/5)", "Inv4m Mean", "t", "df", "P-value", "% of Expected"),
-  caption = "One-sample t-test: H0 = Inv4m mean equals B73/5"
 )
 ```
 
@@ -491,18 +449,12 @@ ggsave(
   width = 14, height = 7, dpi = 300
 )
 
-# Save per-tissue statistical results
-stats_by_tissue <- chisq_by_tissue %>%
-  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p) %>%
-  left_join(
-    ttest_by_tissue %>%
-      dplyr::select(experiment, tissue, t_stat, ttest_p, percent_of_expected),
-    by = c("experiment", "tissue")
-  )
-
+# Save per-tissue chi-square results with FDR
 write_csv(
-  stats_by_tissue,
-  file.path(paths$intermediate, "jmj_total_cluster_stats_by_tissue.csv")
+  chisq_by_tissue %>%
+    dplyr::select(experiment, tissue, B73_total, Inv4m_total, observed_ratio,
+                  chisq_stat, chisq_p, chisq_fdr, percent_of_expected),
+  file.path(paths$intermediate, "jmj_total_cluster_chisq_by_tissue.csv")
 )
 
 # Save sample-level data

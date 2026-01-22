@@ -1929,12 +1929,14 @@ expected_overall &lt;- total_cluster_samples %&gt;%
 ## 1 Crow2020 (Growth Chamber)     95.4           19.1
 ## 2 PSU2022 (Field)               94.4           18.9</code></pre>
 </div>
-<div id="statistical-tests-per-tissue" class="section level2">
-<h2>Statistical Tests (Per Tissue)</h2>
+<div id="statistical-test-per-tissue" class="section level2">
+<h2>Statistical Test (Per Tissue)</h2>
 <div id="chi-square-goodness-of-fit-test" class="section level3">
 <h3>Chi-Square Goodness of Fit Test</h3>
 <p>Test whether observed expression ratio matches expected copy number
-ratio (5:1) for each tissue.</p>
+ratio (5:1) for each tissue. The chi-squared test is the appropriate
+test here because we are directly testing whether observed proportions
+match expected proportions under the copy number hypothesis.</p>
 <pre class="r"><code># Chi-square test for each experiment AND tissue
 chisq_by_tissue &lt;- total_cluster_samples %&gt;%
   group_by(experiment, tissue) %&gt;%
@@ -1956,33 +1958,40 @@ chisq_by_tissue &lt;- total_cluster_samples %&gt;%
     observed_ratio = B73_total / Inv4m_total,
     percent_of_expected = (Inv4m_total / expected_Inv4m) * 100
   ) %&gt;%
-  ungroup()
+  ungroup() %&gt;%
+  # Add FDR adjustment across all tissues
+
+  mutate(
+    chisq_fdr = p.adjust(chisq_p, method = &quot;fdr&quot;)
+  )
 
 # Display as table
 chisq_table &lt;- chisq_by_tissue %&gt;%
-  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p, percent_of_expected) %&gt;%
+  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p, chisq_fdr, percent_of_expected) %&gt;%
   mutate(
     observed_ratio = sprintf(&quot;%.2f:1&quot;, observed_ratio),
     chisq_stat = sprintf(&quot;%.2f&quot;, chisq_stat),
     chisq_p = sprintf(&quot;%.2e&quot;, chisq_p),
+    chisq_fdr = sprintf(&quot;%.2e&quot;, chisq_fdr),
     percent_of_expected = sprintf(&quot;%.1f%%&quot;, percent_of_expected)
   )
 
 knitr::kable(
   chisq_table,
-  col.names = c(&quot;Experiment&quot;, &quot;Tissue&quot;, &quot;Observed Ratio&quot;, &quot;χ²&quot;, &quot;P-value&quot;, &quot;% of Expected&quot;),
+  col.names = c(&quot;Experiment&quot;, &quot;Tissue&quot;, &quot;Observed Ratio&quot;, &quot;χ²&quot;, &quot;P-value&quot;, &quot;FDR&quot;, &quot;% of Expected&quot;),
   caption = &quot;Chi-square goodness of fit test: H0 = expression ratio matches copy number (5:1)&quot;
 )</code></pre>
 <table>
 <caption>Chi-square goodness of fit test: H0 = expression ratio matches
 copy number (5:1)</caption>
 <colgroup>
-<col width="29%" />
-<col width="18%" />
-<col width="17%" />
-<col width="8%" />
-<col width="10%" />
+<col width="27%" />
 <col width="16%" />
+<col width="15%" />
+<col width="7%" />
+<col width="9%" />
+<col width="9%" />
+<col width="14%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1991,6 +2000,7 @@ copy number (5:1)</caption>
 <th align="left">Observed Ratio</th>
 <th align="left">χ²</th>
 <th align="left">P-value</th>
+<th align="left">FDR</th>
 <th align="left">% of Expected</th>
 </tr>
 </thead>
@@ -2001,6 +2011,7 @@ copy number (5:1)</caption>
 <td align="left">7.76:1</td>
 <td align="left">54.93</td>
 <td align="left">1.25e-13</td>
+<td align="left">3.24e-13</td>
 <td align="left">68.5%</td>
 </tr>
 <tr class="even">
@@ -2009,6 +2020,7 @@ copy number (5:1)</caption>
 <td align="left">11.95:1</td>
 <td align="left">93.45</td>
 <td align="left">4.17e-22</td>
+<td align="left">2.71e-21</td>
 <td align="left">46.3%</td>
 </tr>
 <tr class="odd">
@@ -2017,6 +2029,7 @@ copy number (5:1)</caption>
 <td align="left">10.15:1</td>
 <td align="left">120.42</td>
 <td align="left">5.13e-28</td>
+<td align="left">6.67e-27</td>
 <td align="left">53.8%</td>
 </tr>
 <tr class="even">
@@ -2025,6 +2038,7 @@ copy number (5:1)</caption>
 <td align="left">10.07:1</td>
 <td align="left">70.83</td>
 <td align="left">3.89e-17</td>
+<td align="left">1.26e-16</td>
 <td align="left">54.2%</td>
 </tr>
 <tr class="odd">
@@ -2033,6 +2047,7 @@ copy number (5:1)</caption>
 <td align="left">7.67:1</td>
 <td align="left">36.74</td>
 <td align="left">1.35e-09</td>
+<td align="left">2.19e-09</td>
 <td align="left">69.2%</td>
 </tr>
 <tr class="even">
@@ -2041,6 +2056,7 @@ copy number (5:1)</caption>
 <td align="left">8.71:1</td>
 <td align="left">91.90</td>
 <td align="left">9.11e-22</td>
+<td align="left">3.95e-21</td>
 <td align="left">61.8%</td>
 </tr>
 <tr class="odd">
@@ -2049,6 +2065,7 @@ copy number (5:1)</caption>
 <td align="left">6.75:1</td>
 <td align="left">22.01</td>
 <td align="left">2.72e-06</td>
+<td align="left">3.92e-06</td>
 <td align="left">77.4%</td>
 </tr>
 <tr class="even">
@@ -2057,6 +2074,7 @@ copy number (5:1)</caption>
 <td align="left">6.58:1</td>
 <td align="left">20.63</td>
 <td align="left">5.58e-06</td>
+<td align="left">7.25e-06</td>
 <td align="left">79.1%</td>
 </tr>
 <tr class="odd">
@@ -2065,6 +2083,7 @@ copy number (5:1)</caption>
 <td align="left">8.58:1</td>
 <td align="left">50.00</td>
 <td align="left">1.54e-12</td>
+<td align="left">3.34e-12</td>
 <td align="left">62.6%</td>
 </tr>
 <tr class="even">
@@ -2072,6 +2091,7 @@ copy number (5:1)</caption>
 <td align="left">Leaf 1</td>
 <td align="left">4.65:1</td>
 <td align="left">0.40</td>
+<td align="left">5.29e-01</td>
 <td align="left">5.29e-01</td>
 <td align="left">106.2%</td>
 </tr>
@@ -2081,6 +2101,7 @@ copy number (5:1)</caption>
 <td align="left">12.05:1</td>
 <td align="left">37.82</td>
 <td align="left">7.76e-10</td>
+<td align="left">1.44e-09</td>
 <td align="left">46.0%</td>
 </tr>
 <tr class="even">
@@ -2089,6 +2110,7 @@ copy number (5:1)</caption>
 <td align="left">7.86:1</td>
 <td align="left">10.68</td>
 <td align="left">1.08e-03</td>
+<td align="left">1.17e-03</td>
 <td align="left">67.7%</td>
 </tr>
 <tr class="odd">
@@ -2097,227 +2119,8 @@ copy number (5:1)</caption>
 <td align="left">10.15:1</td>
 <td align="left">19.37</td>
 <td align="left">1.08e-05</td>
+<td align="left">1.27e-05</td>
 <td align="left">53.8%</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div id="one-sample-t-test-against-expected-value" class="section level3">
-<h3>One-Sample T-Test Against Expected Value</h3>
-<p>Test whether Inv4m expression differs from B73/5 (expected under copy
-number scaling) for each tissue.</p>
-<pre class="r"><code># T-test for each experiment AND tissue
-ttest_by_tissue &lt;- total_cluster_samples %&gt;%
-  group_by(experiment, tissue) %&gt;%
-  summarise(
-    B73_mean = mean(total_CPM[genotype == &quot;B73&quot;]),
-    Inv4m_mean = mean(total_CPM[genotype == &quot;Inv4m&quot;]),
-    Inv4m_values = list(total_CPM[genotype == &quot;Inv4m&quot;]),
-    n_B73 = sum(genotype == &quot;B73&quot;),
-    n_Inv4m = sum(genotype == &quot;Inv4m&quot;),
-    .groups = &quot;drop&quot;
-  ) %&gt;%
-  mutate(
-    expected = B73_mean / 5
-  ) %&gt;%
-  rowwise() %&gt;%
-  mutate(
-    ttest = list(t.test(Inv4m_values, mu = expected)),
-    t_stat = ttest$statistic,
-    ttest_p = ttest$p.value,
-    df = ttest$parameter,
-    percent_of_expected = (Inv4m_mean / expected) * 100
-  ) %&gt;%
-  ungroup() %&gt;%
-  dplyr::select(-Inv4m_values, -ttest)
-
-# Display as table
-ttest_table &lt;- ttest_by_tissue %&gt;%
-  dplyr::select(experiment, tissue, B73_mean, expected, Inv4m_mean, t_stat, df, ttest_p, percent_of_expected) %&gt;%
-  mutate(
-    B73_mean = sprintf(&quot;%.1f&quot;, B73_mean),
-    expected = sprintf(&quot;%.1f&quot;, expected),
-    Inv4m_mean = sprintf(&quot;%.1f&quot;, Inv4m_mean),
-    t_stat = sprintf(&quot;%.2f&quot;, t_stat),
-    df = sprintf(&quot;%.0f&quot;, df),
-    ttest_p = sprintf(&quot;%.2e&quot;, ttest_p),
-    percent_of_expected = sprintf(&quot;%.1f%%&quot;, percent_of_expected)
-  )
-
-knitr::kable(
-  ttest_table,
-  col.names = c(&quot;Experiment&quot;, &quot;Tissue&quot;, &quot;B73 Mean&quot;, &quot;Expected (B73/5)&quot;, &quot;Inv4m Mean&quot;, &quot;t&quot;, &quot;df&quot;, &quot;P-value&quot;, &quot;% of Expected&quot;),
-  caption = &quot;One-sample t-test: H0 = Inv4m mean equals B73/5&quot;
-)</code></pre>
-<table>
-<caption>One-sample t-test: H0 = Inv4m mean equals B73/5</caption>
-<colgroup>
-<col width="23%" />
-<col width="14%" />
-<col width="8%" />
-<col width="15%" />
-<col width="9%" />
-<col width="6%" />
-<col width="2%" />
-<col width="8%" />
-<col width="12%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="left">Experiment</th>
-<th align="left">Tissue</th>
-<th align="left">B73 Mean</th>
-<th align="left">Expected (B73/5)</th>
-<th align="left">Inv4m Mean</th>
-<th align="left">t</th>
-<th align="left">df</th>
-<th align="left">P-value</th>
-<th align="left">% of Expected</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V1 Leaf</td>
-<td align="left">111.7</td>
-<td align="left">22.3</td>
-<td align="left">18.6</td>
-<td align="left">-2.36</td>
-<td align="left">16</td>
-<td align="left">3.12e-02</td>
-<td align="left">83.4%</td>
-</tr>
-<tr class="even">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V1 Primary_root</td>
-<td align="left">68.0</td>
-<td align="left">13.6</td>
-<td align="left">6.6</td>
-<td align="left">-5.23</td>
-<td align="left">18</td>
-<td align="left">5.71e-05</td>
-<td align="left">48.4%</td>
-</tr>
-<tr class="odd">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 Leaf</td>
-<td align="left">116.8</td>
-<td align="left">23.4</td>
-<td align="left">16.9</td>
-<td align="left">-2.64</td>
-<td align="left">14</td>
-<td align="left">1.95e-02</td>
-<td align="left">72.3%</td>
-</tr>
-<tr class="even">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 Primary_root</td>
-<td align="left">64.0</td>
-<td align="left">12.8</td>
-<td align="left">8.5</td>
-<td align="left">-2.79</td>
-<td align="left">17</td>
-<td align="left">1.26e-02</td>
-<td align="left">66.2%</td>
-</tr>
-<tr class="odd">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 S2_leaf_base</td>
-<td align="left">81.4</td>
-<td align="left">16.3</td>
-<td align="left">13.1</td>
-<td align="left">-2.25</td>
-<td align="left">16</td>
-<td align="left">3.91e-02</td>
-<td align="left">80.5%</td>
-</tr>
-<tr class="even">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 S2_leaf_tip</td>
-<td align="left">141.1</td>
-<td align="left">28.2</td>
-<td align="left">20.2</td>
-<td align="left">-2.97</td>
-<td align="left">15</td>
-<td align="left">9.45e-03</td>
-<td align="left">71.7%</td>
-</tr>
-<tr class="odd">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 Stem_SAM</td>
-<td align="left">89.3</td>
-<td align="left">17.9</td>
-<td align="left">14.6</td>
-<td align="left">-0.59</td>
-<td align="left">18</td>
-<td align="left">5.63e-01</td>
-<td align="left">81.8%</td>
-</tr>
-<tr class="even">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 leaf_base</td>
-<td align="left">114.1</td>
-<td align="left">22.8</td>
-<td align="left">17.3</td>
-<td align="left">-2.26</td>
-<td align="left">17</td>
-<td align="left">3.72e-02</td>
-<td align="left">75.9%</td>
-</tr>
-<tr class="odd">
-<td align="left">Crow2020 (Growth Chamber)</td>
-<td align="left">V3 leaf_sheath</td>
-<td align="left">80.2</td>
-<td align="left">16.0</td>
-<td align="left">11.0</td>
-<td align="left">-3.57</td>
-<td align="left">16</td>
-<td align="left">2.55e-03</td>
-<td align="left">68.6%</td>
-</tr>
-<tr class="even">
-<td align="left">PSU2022 (Field)</td>
-<td align="left">Leaf 1</td>
-<td align="left">105.6</td>
-<td align="left">21.1</td>
-<td align="left">13.0</td>
-<td align="left">-4.06</td>
-<td align="left">6</td>
-<td align="left">6.65e-03</td>
-<td align="left">61.5%</td>
-</tr>
-<tr class="odd">
-<td align="left">PSU2022 (Field)</td>
-<td align="left">Leaf 2</td>
-<td align="left">99.7</td>
-<td align="left">19.9</td>
-<td align="left">9.9</td>
-<td align="left">-13.47</td>
-<td align="left">4</td>
-<td align="left">1.76e-04</td>
-<td align="left">49.8%</td>
-</tr>
-<tr class="even">
-<td align="left">PSU2022 (Field)</td>
-<td align="left">Leaf 3</td>
-<td align="left">91.0</td>
-<td align="left">18.2</td>
-<td align="left">9.6</td>
-<td align="left">-8.98</td>
-<td align="left">5</td>
-<td align="left">2.86e-04</td>
-<td align="left">53.0%</td>
-</tr>
-<tr class="odd">
-<td align="left">PSU2022 (Field)</td>
-<td align="left">Leaf 4</td>
-<td align="left">82.6</td>
-<td align="left">16.5</td>
-<td align="left">8.1</td>
-<td align="left">-8.25</td>
-<td align="left">4</td>
-<td align="left">1.18e-03</td>
-<td align="left">49.3%</td>
 </tr>
 </tbody>
 </table>
@@ -2402,18 +2205,12 @@ ggsave(
   width = 14, height = 7, dpi = 300
 )
 
-# Save per-tissue statistical results
-stats_by_tissue &lt;- chisq_by_tissue %&gt;%
-  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p) %&gt;%
-  left_join(
-    ttest_by_tissue %&gt;%
-      dplyr::select(experiment, tissue, t_stat, ttest_p, percent_of_expected),
-    by = c(&quot;experiment&quot;, &quot;tissue&quot;)
-  )
-
+# Save per-tissue chi-square results with FDR
 write_csv(
-  stats_by_tissue,
-  file.path(paths$intermediate, &quot;jmj_total_cluster_stats_by_tissue.csv&quot;)
+  chisq_by_tissue %&gt;%
+    dplyr::select(experiment, tissue, B73_total, Inv4m_total, observed_ratio,
+                  chisq_stat, chisq_p, chisq_fdr, percent_of_expected),
+  file.path(paths$intermediate, &quot;jmj_total_cluster_chisq_by_tissue.csv&quot;)
 )
 
 # Save sample-level data
