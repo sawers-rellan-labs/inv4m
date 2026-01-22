@@ -315,56 +315,69 @@ expected_overall <- total_cluster_samples %>%
 
 ## Statistical Test (Per Tissue)
 
-### Chi-Square Goodness of Fit Test
+### Linear Contrast t-Test
 
-Test whether observed expression ratio matches expected copy number ratio (5:1) for each tissue.
-The chi-squared test is the appropriate test here because we are directly testing whether
-observed proportions match expected proportions under the copy number hypothesis.
+Test whether expression scales with copy number using a linear contrast:
 
-```{r chisq_test_tissue}
-# Chi-square test for each experiment AND tissue
-chisq_by_tissue <- total_cluster_samples %>%
+**H₀: μ_B73 - 5×μ_Inv4m = 0** (expression scales with 5:1 copy number)
+
+This Welch-type t-test properly accounts for uncertainty in both group means and is appropriate
+for small sample sizes (uses t-distribution with Welch-Satterthwaite degrees of freedom).
+
+```{r linear_contrast_test}
+# Linear contrast t-test for each experiment AND tissue
+# H0: mean_B73 - 5*mean_Inv4m = 0 (expression scales with copy number)
+contrast_by_tissue <- total_cluster_samples %>%
   group_by(experiment, tissue) %>%
   summarise(
-    B73_total = sum(total_CPM[genotype == "B73"]),
-    Inv4m_total = sum(total_CPM[genotype == "Inv4m"]),
-    B73_n = sum(genotype == "B73"),
-    Inv4m_n = sum(genotype == "Inv4m"),
+    mean_B73 = mean(total_CPM[genotype == "B73"]),
+    mean_Inv4m = mean(total_CPM[genotype == "Inv4m"]),
+    var_B73 = var(total_CPM[genotype == "B73"]),
+    var_Inv4m = var(total_CPM[genotype == "Inv4m"]),
+    n_B73 = sum(genotype == "B73"),
+    n_Inv4m = sum(genotype == "Inv4m"),
     .groups = "drop"
   ) %>%
-  rowwise() %>%
   mutate(
-    total_expression = B73_total + Inv4m_total,
-    expected_Inv4m = total_expression / 6,
-    expected_B73 = 5 * expected_Inv4m,
-    chisq_stat = (B73_total - expected_B73)^2 / expected_B73 +
-                 (Inv4m_total - expected_Inv4m)^2 / expected_Inv4m,
-    chisq_p = pchisq(chisq_stat, df = 1, lower.tail = FALSE),
-    observed_ratio = B73_total / Inv4m_total,
-    percent_of_expected = (Inv4m_total / expected_Inv4m) * 100
+    # Observed ratio
+    observed_ratio = mean_B73 / mean_Inv4m,
+    # Expected Inv4m under copy number scaling
+    expected_Inv4m = mean_B73 / 5,
+    # Percent of expected
+    percent_of_expected = (mean_Inv4m / expected_Inv4m) * 100,
+    # Linear contrast: mean_B73 - 5*mean_Inv4m
+    contrast = mean_B73 - 5 * mean_Inv4m,
+    # Standard error of contrast (note: coefficient 5 gets squared for variance)
+    se_contrast = sqrt(var_B73 / n_B73 + 25 * var_Inv4m / n_Inv4m),
+    # t statistic
+    t_stat = contrast / se_contrast,
+    # Welch-Satterthwaite degrees of freedom
+    df = (var_B73 / n_B73 + 25 * var_Inv4m / n_Inv4m)^2 /
+         ((var_B73 / n_B73)^2 / (n_B73 - 1) + (25 * var_Inv4m / n_Inv4m)^2 / (n_Inv4m - 1)),
+    # Two-tailed p-value
+    p_value = 2 * pt(abs(t_stat), df = df, lower.tail = FALSE)
   ) %>%
-  ungroup() %>%
   # Add FDR adjustment across all tissues
-
   mutate(
-    chisq_fdr = p.adjust(chisq_p, method = "fdr")
+    fdr = p.adjust(p_value, method = "fdr")
   )
 
 # Display as table
-chisq_table <- chisq_by_tissue %>%
-  dplyr::select(experiment, tissue, observed_ratio, chisq_stat, chisq_p, chisq_fdr, percent_of_expected) %>%
+contrast_table <- contrast_by_tissue %>%
+  dplyr::select(experiment, tissue, n_B73, n_Inv4m, observed_ratio, t_stat, df, p_value, fdr, percent_of_expected) %>%
   mutate(
     observed_ratio = sprintf("%.2f:1", observed_ratio),
-    chisq_stat = sprintf("%.2f", chisq_stat),
-    chisq_p = sprintf("%.2e", chisq_p),
-    chisq_fdr = sprintf("%.2e", chisq_fdr),
+    t_stat = sprintf("%.2f", t_stat),
+    df = sprintf("%.1f", df),
+    p_value = sprintf("%.3f", p_value),
+    fdr = sprintf("%.3f", fdr),
     percent_of_expected = sprintf("%.1f%%", percent_of_expected)
   )
 
 knitr::kable(
-  chisq_table,
-  col.names = c("Experiment", "Tissue", "Observed Ratio", "χ²", "P-value", "FDR", "% of Expected"),
-  caption = "Chi-square goodness of fit test: H0 = expression ratio matches copy number (5:1)"
+  contrast_table,
+  col.names = c("Experiment", "Tissue", "n B73", "n Inv4m", "Observed Ratio", "t", "df", "P-value", "FDR", "% of Expected"),
+  caption = "Linear contrast t-test: H₀ = μ_B73 - 5×μ_Inv4m = 0 (expression scales with copy number)"
 )
 ```
 
@@ -449,12 +462,13 @@ ggsave(
   width = 14, height = 7, dpi = 300
 )
 
-# Save per-tissue chi-square results with FDR
+# Save per-tissue linear contrast t-test results
 write_csv(
-  chisq_by_tissue %>%
-    dplyr::select(experiment, tissue, B73_total, Inv4m_total, observed_ratio,
-                  chisq_stat, chisq_p, chisq_fdr, percent_of_expected),
-  file.path(paths$intermediate, "jmj_total_cluster_chisq_by_tissue.csv")
+  contrast_by_tissue %>%
+    dplyr::select(experiment, tissue, n_B73, n_Inv4m, mean_B73, mean_Inv4m,
+                  observed_ratio, expected_Inv4m, percent_of_expected,
+                  contrast, se_contrast, t_stat, df, p_value, fdr),
+  file.path(paths$intermediate, "jmj_total_cluster_contrast_test.csv")
 )
 
 # Save sample-level data
@@ -466,7 +480,7 @@ write_csv(
 {
   cat("=== TOTAL CLUSTER ANALYSIS SAVED ===\n")
   cat("  jmj_total_cluster_expression.rds/pdf/png\n")
-  cat("  jmj_total_cluster_stats.csv\n")
+  cat("  jmj_total_cluster_contrast_test.csv\n")
   cat("  jmj_total_cluster_samples.csv\n")
 }
 ```
