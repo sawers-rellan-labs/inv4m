@@ -406,52 +406,48 @@ ttest_results <- total_cluster_samples %>%
 
 ## Total Cluster Expression Boxplot
 
-```{r total_cluster_boxplot, fig.width=10, fig.height=6}
+```{r total_cluster_boxplot, fig.width=14, fig.height=5}
 # Define colors (matching ionome style: gold for B73, purple for Inv4m)
 genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
 
-# Create boxplot with expected line
+# Create boxplot with tissue on x-axis (matching jmj2/jmj4 plot layout)
 p_total_cluster <- ggplot(
   total_cluster_samples,
-  aes(x = genotype, y = total_CPM, color = genotype)
+  aes(x = tissue, y = total_CPM, color = genotype)
 ) +
   geom_boxplot(
     width = 0.5,
     linewidth = 1,
-    outlier.shape = NA
+    outlier.shape = NA,
+    position = position_dodge(width = 0.7)
   ) %>%
   with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
   geom_quasirandom(
-    size = 2,
+    size = 1.5,
+    dodge.width = 0.7,
     alpha = 0.7
   ) %>%
   with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-  # Add expected line (B73/5) for Inv4m
-  geom_errorbar(
-    data = expected_overall,
-    aes(x = 2, ymin = expected_Inv4m, ymax = expected_Inv4m),
-    inherit.aes = FALSE,
-    width = 0.4,
-    linewidth = 1,
-    linetype = "dashed",
-    color = "red"
-  ) +
-  facet_wrap(~ experiment, scales = "free_y") +
+  facet_wrap(~ experiment, scales = "free_x") +
   scale_color_manual(values = genotype_colors, name = "Genotype") +
   theme_classic(base_size = 14) +
   theme(
-    axis.text.x = element_text(color = "black", face = "bold", size = 14),
+    axis.text.x = element_text(
+      angle = 45, hjust = 1,
+      color = "black", face = "bold", size = 12
+    ),
     axis.text.y = element_text(color = "black", face = "bold", size = 12),
     axis.title = element_text(face = "bold", size = 14),
-    strip.text = element_text(face = "bold", size = 16),
+    strip.text = element_text(face = "bold", size = 18),
     strip.background = element_rect(fill = "grey95", color = NA),
-    legend.position = "none",
+    legend.position = "bottom",
+    legend.text = element_text(face = "bold", size = 12),
+    legend.title = element_text(face = "bold", size = 12),
     panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
   ) +
   labs(
     x = NULL,
-    y = "Total JMJ Cluster Expression (CPM)",
-    caption = "Dashed red line = expected Inv4m (B73/5) under copy number scaling"
+    y = "Total JMJ Cluster Expression (CPM)"
   )
 
 print(p_total_cluster)
@@ -465,12 +461,12 @@ saveRDS(p_total_cluster, file.path(paths$figures, "jmj_total_cluster_expression.
 ggsave(
   file.path(paths$figures, "jmj_total_cluster_expression.pdf"),
   p_total_cluster,
-  width = 10, height = 6
+  width = 14, height = 5
 )
 ggsave(
   file.path(paths$figures, "jmj_total_cluster_expression.png"),
   p_total_cluster,
-  width = 10, height = 6, dpi = 300
+  width = 14, height = 5, dpi = 300
 )
 
 # Save statistical results
