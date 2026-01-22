@@ -446,7 +446,7 @@ p_total_cluster <- ggplot(
     position = position_dodge(width = 0.7),
     size = 10,
     fontface = "bold",
-    color = "black"
+    color = "red"
   ) +
   facet_grid(. ~ experiment, scales = "free_x", space = "free_x") +
   scale_color_manual(values = genotype_colors, name = "Genotype") +
