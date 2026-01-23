@@ -207,6 +207,13 @@
             line-height: 1.5;
         }
 
+        .analysis-card .figures {
+            font-size: 0.75rem;
+            color: var(--accent);
+            margin-top: 0.5rem;
+            font-weight: 600;
+        }
+
         /* Statistics */
         .stats {
             display: flex;
@@ -307,12 +314,16 @@
                 <span class="stat-label">Research Papers</span>
             </div>
             <div class="stat">
-                <span class="stat-number">20</span>
-                <span class="stat-label">Analysis Scripts</span>
+                <span class="stat-number">8</span>
+                <span class="stat-label">Main Figures</span>
             </div>
             <div class="stat">
-                <span class="stat-number">20</span>
-                <span class="stat-label">Interactive Reports</span>
+                <span class="stat-number">4</span>
+                <span class="stat-label">Supplementary Figures</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">20+</span>
+                <span class="stat-label">Analysis Scripts</span>
             </div>
         </div>
 
@@ -324,19 +335,16 @@
                     <div class="paper-number">1</div>
                     <div class="paper-title">
                         <h2>Inversion Paper</h2>
-                        <span class="status">✓ Complete (8 scripts)</span>
+                        <span class="status">Complete (8 main figures, 4 supplementary)</span>
                     </div>
                 </div>
 
                 <div class="category">
                     <h4 class="category-title">Genomic Analysis</h4>
                     <div class="analysis-card">
-                        <h3><a href="inversion_paper/Annotation_assembly.html">Annotation Assembly</a></h3>
-                        <p>Inv4m breakpoint identification and delimitation using genomic annotations</p>
-                    </div>
-                    <div class="analysis-card">
-                        <h3><a href="inversion_paper/plot_genotype_get_correlated_loci.html">Genotype Correlation</a></h3>
-                        <p>SNP distribution analysis and correlated loci identification</p>
+                        <h3><a href="inversion_paper/plot_genotype_get_correlated_loci.html">Genotype & Breakpoint Analysis</a></h3>
+                        <p>Inv4m delimitation, breakpoint identification, SNP distribution and correlation</p>
+                        <div class="figures">Figure 1, Figure S1, Table 1, Table S1</div>
                     </div>
                 </div>
 
@@ -344,7 +352,23 @@
                     <h4 class="category-title">Phenotypic Effects</h4>
                     <div class="analysis-card">
                         <h3><a href="inversion_paper/Corrected_phenotype_analysis_PSU2022.html">Phenotype Analysis</a></h3>
-                        <p>Effect of Inv4m on plant height, flowering time, and harvest index</p>
+                        <p>Effect of Inv4m on plant height, flowering time (DTA, DTS), and harvest index</p>
+                        <div class="figures">Figure 2</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/SAM_morphology_analysis.html">SAM Morphology</a></h3>
+                        <p>DIC microscopy analysis of shoot apical meristem dimensions</p>
+                        <div class="figures">Figure 2 (SAM panels)</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/internode_analysis.html">Internode Analysis</a></h3>
+                        <p>Internode length profiles, node count, and height validation</p>
+                        <div class="figures">Figure S4</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/inv4mGxE_3_env.html">GxE Analysis</a></h3>
+                        <p>Genotype × Environment interactions across 3 field environments (PSU2022, PSU2025, CLY2025)</p>
+                        <div class="figures">Figure S2, Figure S3, Table S3</div>
                     </div>
                 </div>
 
@@ -352,27 +376,56 @@
                     <h4 class="category-title">Transcriptomics</h4>
                     <div class="analysis-card">
                         <h3><a href="inversion_paper/differential_expression_leaf_treatment_model.html">Differential Expression</a></h3>
-                        <p>Global and local transcriptomic effects of Inv4m with volcano plots</p>
+                        <p>Limma analysis of Inv4m effects on gene expression with plant-level blocking</p>
+                        <div class="figures">Figure 3 (panels), Table 2, Table S2</div>
                     </div>
                     <div class="analysis-card">
-                        <h3><a href="inversion_paper/get_WGCNA_modules.html">WGCNA Modules</a></h3>
-                        <p>Co-expression network analysis and module identification</p>
+                        <h3><a href="inversion_paper/volcano_plot_analysis.html">Volcano Plots</a></h3>
+                        <p>Visualization of DEGs with labeled candidate genes</p>
+                        <div class="figures">Figure 3C, Figure 4</div>
                     </div>
                     <div class="analysis-card">
-                        <h3><a href="inversion_paper/Analyze_MaizeNetome_TransRegulation.html">Trans Network Analysis</a></h3>
-                        <p>Trans coexpression network of Inv4m-regulated genes</p>
-                    </div>
-                    <div class="analysis-card">
-                        <h3><a href="inversion_paper/GO_Enrichment_Trans_Network.html">Network GO Enrichment</a></h3>
-                        <p>Gene Ontology enrichment of trans-regulated gene networks</p>
+                        <h3><a href="inversion_paper/make_manhattan_plots.html">Manhattan Plots</a></h3>
+                        <p>Genome-wide visualization of expression effects by chromosome</p>
+                        <div class="figures">Figure 3 (panels D, E, G, H)</div>
                     </div>
                 </div>
 
                 <div class="category">
-                    <h4 class="category-title">Comparative Analysis</h4>
+                    <h4 class="category-title">Network Analysis</h4>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/Analyze_MaizeNetome_TransRegulation.html">Trans Coexpression Network</a></h3>
+                        <p>MaizeNetome-validated trans-regulatory network of Inv4m DEGs</p>
+                        <div class="figures">Figure 5</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/GO_Enrichment_Trans_Network.html">Network GO Enrichment</a></h3>
+                        <p>Gene Ontology enrichment of trans-regulated gene networks</p>
+                        <div class="figures">Figure 5 (GO panel)</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/assemble_WGCNA_figure.html">WGCNA Module Perturbation</a></h3>
+                        <p>Consensus network analysis showing module disruption in Inv4m</p>
+                        <div class="figures">Figure 6</div>
+                    </div>
+                </div>
+
+                <div class="category">
+                    <h4 class="category-title">JMJ Cluster Analysis</h4>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/make_jmj_expression_boxplot.html">JMJ Cluster Expression</a></h3>
+                        <p>Expression analysis of jmj2/jmj4 across tissues and experiments</p>
+                        <div class="figures">Figure 7 (Panel A)</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h3><a href="inversion_paper/jmj_paralog_expression_boxplot.html">JMJ Paralog Expression</a></h3>
+                        <p>Transcript-level expression of all 5 JMJ paralogs (jmj9, psi, jmj6, jmj2, jmj4)</p>
+                        <div class="figures">Supporting analysis</div>
+                    </div>
                     <div class="analysis-card">
                         <h3><a href="inversion_paper/Crow2020_reanalysis.html">Crow 2020 Reanalysis</a></h3>
-                        <p>Reanalysis of reference dataset for comparative insights</p>
+                        <p>Reanalysis of growth chamber dataset for JMJ expression validation</p>
+                        <div class="figures">Figure 7 (Panel A, Crow data)</div>
                     </div>
                 </div>
             </div>
@@ -383,7 +436,7 @@
                     <div class="paper-number">2</div>
                     <div class="paper-title">
                         <h2>Phosphorus Paper</h2>
-                        <span class="status">✓ Complete (12 scripts)</span>
+                        <span class="status">Complete (12 scripts)</span>
                     </div>
                 </div>
 
@@ -454,7 +507,7 @@
             <p>
                 <a href="https://github.com/sawers-rellan-labs/inv4m">GitHub Repository</a> ·
                 Sawers-Rellan Labs ·
-                Last Updated: December 2025
+                Last Updated: January 2026
             </p>
         </footer>
     </div>
