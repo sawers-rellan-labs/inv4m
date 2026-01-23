@@ -84,6 +84,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | WGCNA modules (legacy) | Co-expression network analysis | [`get_WGCNA_modules.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/get_WGCNA_modules.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
 | Crow 2020 reanalysis | Reference dataset reanalysis | [`Crow2020_reanalysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Crow2020_reanalysis.html) | ✅ |
+| 5-genome microsynteny | JMJ cluster panel B (jcvi pipeline) | `scripts/02_genomics_foundation/run_microsynteny_5genomes.sh` | 🔶 |
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ⚠️ |
 | Figure 3 assembly | 8-panel composite figure | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) | ⚠️ |
@@ -158,6 +159,16 @@ Hub gene coverage: 55/65 (85%)
 ---
 
 ## Recent Updates
+
+**2026-01-23:** GxE and Internode integrated into manuscript + 5-genome microsynteny scripts:
+- ✅ **GxE methods/results** - Added to main.tex (3 environments: PSU2022, PSU2025, CLY2025)
+- ✅ **Internode methods/results** - Added to main.tex (CLY2025 field dissection)
+- ✅ **Supplementary table** - tab::gxe with GxE interaction statistics
+- ✅ **Supplementary figures** - fig::gxe_forest and fig::internode placeholders
+- ✅ **5-genome microsynteny scripts** - `download_CML_genomes.sh` and `run_microsynteny_5genomes.sh`
+  - Downloads CML457/CML459 from MaizeGDB
+  - Runs jcvi pipeline with B73, PT, TIL18, CML457, CML459
+  - Currently running on HPC
 
 **2026-01-21:** JMJ paralog-level analysis complete + GxE complete:
 - ✅ **JMJ paralog-level expression** - All 5 cluster members quantified (PSU2022)
