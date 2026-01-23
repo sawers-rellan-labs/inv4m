@@ -62,6 +62,7 @@ consistent with their accelerated flowering and increased plant height phenotype
 ```{r libraries}
 library(dplyr)
 library(tidyr)
+library(purrr)
 library(ggplot2)
 library(ggfx)
 library(ggtext)
@@ -79,12 +80,12 @@ library(knitr)
 ```{r load-data}
 # Data file: SAM measurements from DIC microscopy
 # Height and Width measured in micrometers (μm)
-data_file <- file.path(paths$data, "MeristemMeasurements_B73-INV_December2024.csv")
+data_file <- file.path(paths$data, "MeristemMesurements_B73-INV_December2024.csv")
 
 # Check if file exists
 if (!file.exists(data_file)) {
   stop("Data file not found: ", data_file,
-       "\nPlease copy MeristemMeasurements_B73-INV_December2024.csv to the data directory.")
+       "\nPlease copy MeristemMesurements_B73-INV_December2024.csv to the data directory.")
 }
 
 microscopy_raw <- read.csv(data_file) %>%
