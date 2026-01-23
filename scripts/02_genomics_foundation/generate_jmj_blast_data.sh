@@ -37,7 +37,7 @@ START=177400000
 END=177590000
 
 # Default paths (can be overridden by command line arguments)
-REF_DIR="${REF_DIR:-/System/Volumes/Data/ref/zea}"
+REF_DIR="${REF_DIR:-${HOME}/ref/zea}"
 OUT_DIR="${OUT_DIR:-$(pwd)}"
 DATA_DIR="${DATA_DIR:-}"  # Optional: directory with existing cDNA fasta
 
@@ -71,7 +71,7 @@ print_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --ref-dir DIR    Directory containing BLAST databases (default: /System/Volumes/Data/ref/zea)"
+    echo "  --ref-dir DIR    Directory containing BLAST databases (default: ~/ref/zea)"
     echo "  --out-dir DIR    Output directory for results (default: current directory)"
     echo "  --data-dir DIR   Directory with existing jmj_5_candidates_v5_cDNA.fasta (skips cDNA extraction)"
     echo "  --help           Show this help message"
