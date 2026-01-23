@@ -55,10 +55,9 @@ and contains five jumonji-domain containing genes:
 
 ```{r libraries}
 library(GenomicRanges)
-library(ggbio)
 library(dplyr)
 library(ggplot2)
-library(ggpubr)
+library(cowplot)
 library(knitr)
 ```
 
@@ -252,71 +251,104 @@ kable(blast_summary,
 
 ## BLAST Hits Plot
 
-```{r blast-plot, fig.height=8, fig.width=12}
-# Split hits by transcript for faceted plotting
-hits_list <- split(hits, hits$transcript)
+```{r blast-plot, fig.height=6, fig.width=10}
+# Convert hits to data frame for ggplot2
+hits_df <- as.data.frame(hits) %>%
+  mutate(
+    transcript = factor(transcript, levels = TRANSCRIPT_ORDER),
+    gene = GENE_NAMES[as.character(transcript)]
+  ) %>%
+  filter(!is.na(transcript))  # Remove any NA transcripts
 
-# Create individual plots for each transcript
-blast_plots <- lapply(names(hits_list), function(tx) {
-  gr <- hits_list[[tx]]
-  gene_name <- GENE_NAMES[tx]
-
-  autoplot(gr, geom = "rect", aes(fill = identity)) +
-    ggplot2::xlim(CLUSTER_START, CLUSTER_END) +
-    scale_fill_viridis_c(name = "% Identity", option = "plasma", limits = c(85, 100)) +
-    ggplot2::ggtitle(paste0(gene_name, " (", tx, ")")) +
-    theme_minimal() +
-    theme(
-      legend.position = "none",
-      axis.title.y = element_blank(),
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank(),
-      plot.title = element_text(size = 10, hjust = 1)
-    )
-})
-
-# Combine with shared legend
-blast_plot <- ggarrange(
-  plotlist = lapply(blast_plots, function(p) p@ggplot),
-  ncol = 1,
-  align = "v",
-  common.legend = TRUE,
-  legend = "right"
-)
+# Create BLAST hits plot with faceting by transcript
+# Strip labels on LEFT, horizontal (angle=0), like the original
+blast_plot <- ggplot2::ggplot(hits_df) +
+  ggplot2::geom_rect(
+    ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = identity),
+    color = NA
+  ) +
+  ggplot2::facet_wrap(
+    ~ transcript,
+    strip.position = "left",
+    ncol = 1
+  ) +
+  ggplot2::scale_fill_continuous(name = "% identity") +
+  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
+  ggplot2::labs(x = NULL, y = NULL) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    legend.position = "bottom",
+    strip.text.y.left = ggplot2::element_text(angle = 0, hjust = 1, size = 8),
+    strip.background = ggplot2::element_blank(),
+    axis.text.y = ggplot2::element_blank(),
+    axis.ticks.y = ggplot2::element_blank(),
+    axis.text.x = ggplot2::element_blank(),
+    axis.ticks.x = ggplot2::element_blank(),
+    panel.grid = ggplot2::element_blank(),
+    panel.spacing = ggplot2::unit(0.1, "lines")
+  )
 
 print(blast_plot)
 ```
 
 ## Gene Annotation Plot
 
-```{r gene-plot, fig.height=3, fig.width=12}
-# Create gene annotation plot using autoplot
-gene_plot <- autoplot(exons, geom = "rect", aes(fill = transcript, color = transcript)) +
-  ggplot2::xlim(CLUSTER_START, CLUSTER_END) +
-  scale_fill_brewer(palette = "Set1", name = "Transcript") +
-  scale_color_brewer(palette = "Set1", name = "Transcript") +
-  ggplot2::labs(x = "Chromosome 4 Position (bp)") +
-  theme_minimal() +
-  theme(
+```{r gene-plot, fig.height=2, fig.width=10}
+# Convert exons to data frame
+exons_df <- as.data.frame(exons) %>%
+  mutate(gene = GENE_NAMES[as.character(transcript)])
+
+# Single track with all transcripts colored differently
+gene_plot <- ggplot2::ggplot(exons_df) +
+  ggplot2::geom_rect(
+    ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = transcript),
+    color = "black",
+    linewidth = 0.2
+  ) +
+  ggplot2::scale_fill_brewer(palette = "Set1", name = "Transcript") +
+  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
+  ggplot2::labs(x = "Chromosome 4 Position (bp)", y = "B73 genomic") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
     legend.position = "bottom",
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
+    axis.text.y = ggplot2::element_blank(),
+    axis.ticks.y = ggplot2::element_blank(),
+    axis.title.y = ggplot2::element_text(angle = 0, hjust = 1, vjust = 0.5, size = 8),
+    panel.grid = ggplot2::element_blank()
   )
 
-print(gene_plot@ggplot)
+print(gene_plot)
 ```
 
 ## Combined Figure
 
-```{r combined-figure, fig.height=12, fig.width=12}
-# Combine BLAST and gene annotation plots
-combined_plot <- ggarrange(
-  blast_plot,
-  gene_plot@ggplot,
+```{r combined-figure, fig.height=8, fig.width=10}
+# Combine BLAST hits and gene annotation
+# Remove legends from individual plots, add shared legend
+blast_plot_nolegend <- blast_plot + ggplot2::theme(legend.position = "none")
+gene_plot_nolegend <- gene_plot + ggplot2::theme(legend.position = "none")
+
+# Extract legends
+blast_legend <- cowplot::get_legend(blast_plot)
+gene_legend <- cowplot::get_legend(gene_plot)
+
+# Combine plots vertically with legends at bottom
+combined_plot <- cowplot::plot_grid(
+  blast_plot_nolegend,
+  gene_plot_nolegend,
   ncol = 1,
-  heights = c(3, 1),
-  align = "v"
+  align = "v",
+  axis = "lr",
+  rel_heights = c(2.5, 1)
+)
+
+# Add legends
+legends <- cowplot::plot_grid(blast_legend, gene_legend, ncol = 2)
+combined_plot <- cowplot::plot_grid(
+  combined_plot,
+  legends,
+  ncol = 1,
+  rel_heights = c(5, 1)
 )
 
 print(combined_plot)
@@ -334,16 +366,16 @@ output_png <- file.path(paths$figures, "jmj_cluster_blast.png")
 ggplot2::ggsave(
   output_pdf,
   plot = combined_plot,
-  width = 12,
-  height = 12,
+  width = 10,
+  height = 8,
   device = "pdf"
 )
 
 ggplot2::ggsave(
   output_png,
   plot = combined_plot,
-  width = 12,
-  height = 12,
+  width = 10,
+  height = 8,
   dpi = 300
 )
 
