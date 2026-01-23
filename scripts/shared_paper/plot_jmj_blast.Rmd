@@ -22,8 +22,8 @@ knitr::opts_chunk$set(
   echo = TRUE,
   message = FALSE,
   warning = FALSE,
-  fig.width = 12,
-  fig.height = 8
+  fig.width = 10,
+  fig.height = 3
 )
 
 # Setup project paths
@@ -100,22 +100,31 @@ CLUSTER_END <- 177590000
 # We need to add the cluster start position to convert to genomic coordinates
 COORD_OFFSET <- CLUSTER_START + 1  # +1 for 1-based coordinates
 
-# Transcript display order (5' to 3' in cluster)
+# Transcript display order (5' to 3' in cluster, by genomic position)
 TRANSCRIPT_ORDER <- c(
   "Zm00001eb191790_T001",  # jmj9
-  "Zm00001d051961_T002",   # jmj2 (V4)
-  "Zm00001eb191790_T006",  # psi
-  "Zm00001eb191790_T013",  # jmj6
+  "Zm00001d051961_T002",   # psi (V4 annotation - pseudogene)
+  "Zm00001eb191790_T006",  # jmj6
+  "Zm00001eb191790_T013",  # jmj2
   "Zm00001eb191820_T001"   # jmj4
 )
 
 # Gene name mapping for labels
 GENE_NAMES <- c(
   "Zm00001eb191790_T001" = "jmj9",
-  "Zm00001d051961_T002" = "jmj2",
-  "Zm00001eb191790_T006" = "psi",
-  "Zm00001eb191790_T013" = "jmj6",
+  "Zm00001d051961_T002" = "psi",
+  "Zm00001eb191790_T006" = "jmj6",
+  "Zm00001eb191790_T013" = "jmj2",
   "Zm00001eb191820_T001" = "jmj4"
+)
+
+# Gene colors (matching panel C)
+GENE_COLORS <- c(
+  "jmj9" = "#377EB8",   # blue
+  "psi" = "#E41A1C",    # red
+  "jmj6" = "#4DAF4A",   # green
+  "jmj2" = "#984EA3",   # purple
+  "jmj4" = "#FF7F00"    # orange
 )
 ```
 
@@ -251,9 +260,9 @@ kable(blast_summary,
 
 ## BLAST Hits Plot
 
-```{r blast-plot, fig.height=6, fig.width=10}
+```{r blast-plot, fig.height=2.5, fig.width=10}
 # Convert hits to data frame for ggplot2
-# Use gene names for faceting labels
+# Facet by transcript ID (on right), gene names as y-axis labels (on left)
 hits_df <- as.data.frame(hits) %>%
   mutate(
     transcript = factor(transcript, levels = TRANSCRIPT_ORDER),
@@ -262,64 +271,109 @@ hits_df <- as.data.frame(hits) %>%
   ) %>%
   filter(!is.na(transcript))  # Remove any NA transcripts
 
-# Create BLAST hits plot with faceting by gene name
-# Strip labels on RIGHT, clear background, gene names in italics
+# Create BLAST hits plot
+# Transcript IDs as strip labels on RIGHT, gene names on LEFT via y-axis
 blast_plot <- ggplot2::ggplot(hits_df) +
   ggplot2::geom_rect(
     ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = identity),
     color = NA
   ) +
   ggplot2::facet_wrap(
-    ~ gene,
+    ~ transcript,
     strip.position = "right",
     ncol = 1
   ) +
   ggplot2::scale_fill_continuous(name = "% identity") +
   ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
   ggplot2::labs(x = NULL, y = NULL) +
-  ggplot2::theme_grey() +
+  ggplot2::theme_grey(base_size = 8) +
   ggplot2::theme(
     legend.position = "left",
     legend.direction = "vertical",
-    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 8, face = "italic"),
+    legend.key.height = ggplot2::unit(0.8, "cm"),
+    legend.key.width = ggplot2::unit(0.3, "cm"),
+    legend.title = ggplot2::element_text(size = 6),
+    legend.text = ggplot2::element_text(size = 5),
+    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 5),
     strip.background = ggplot2::element_blank(),
     axis.text.y = ggplot2::element_blank(),
     axis.ticks.y = ggplot2::element_blank(),
     axis.text.x = ggplot2::element_blank(),
     axis.ticks.x = ggplot2::element_blank(),
     panel.grid = ggplot2::element_blank(),
-    panel.spacing = ggplot2::unit(0.1, "lines")
+    panel.spacing = ggplot2::unit(0.05, "lines"),
+    plot.margin = ggplot2::margin(l = 30, r = 5, t = 5, b = 5, unit = "pt")
   )
 
-print(blast_plot)
+# Add gene name labels on the left side of each facet (in white margin area)
+gene_labels_df <- hits_df %>%
+  group_by(transcript, gene) %>%
+  summarize(.groups = "drop") %>%
+  mutate(
+    x = CLUSTER_START - 2000,  # Position in white space to left of grey panel
+    y = 0.5
+  )
+
+blast_plot_with_labels <- blast_plot +
+  ggplot2::geom_text(
+    data = gene_labels_df,
+    ggplot2::aes(x = x, y = y, label = gene),
+    hjust = 1, fontface = "italic", size = 2,
+    inherit.aes = FALSE
+  ) +
+  ggplot2::coord_cartesian(
+    xlim = c(CLUSTER_START, CLUSTER_END),
+    clip = "off"
+  )
+
+print(blast_plot_with_labels)
 ```
 
 ## Gene Annotation Plot
 
-```{r gene-plot, fig.height=2, fig.width=10}
+```{r gene-plot, fig.height=1, fig.width=10}
 # Convert exons to data frame with gene names
 exons_df <- as.data.frame(exons) %>%
   mutate(gene = GENE_NAMES[as.character(transcript)])
 
+# Calculate gene label positions (center of each gene's exons, on TOP - outside grey panel)
+gene_label_positions <- exons_df %>%
+  group_by(gene) %>%
+  summarize(
+    x = mean(c(min(start), max(end))),
+    .groups = "drop"
+  ) %>%
+  mutate(y = 1.15)  # Position above the panel (will be in white margin area)
+
 # Single track with all transcripts colored by gene, strip on right with "B73 genomic" label
 gene_plot <- ggplot2::ggplot(exons_df) +
   ggplot2::geom_rect(
-    ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = gene, color = gene),
-    linewidth = 0.2
+    ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = gene),
+    color = NA
   ) +
-  ggplot2::scale_color_brewer(palette = "Set1", guide = "none") +
-  ggplot2::scale_fill_brewer(palette = "Set1", guide = "none") +
+  ggplot2::geom_text(
+    data = gene_label_positions,
+    ggplot2::aes(x = x, y = y, label = gene),
+    fontface = "italic", size = 2, vjust = 0
+  ) +
+  ggplot2::scale_fill_manual(values = GENE_COLORS, guide = "none") +
   ggplot2::facet_wrap(~ "B73 genomic", strip.position = "right", ncol = 1) +
-  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
+  ggplot2::coord_cartesian(
+    xlim = c(CLUSTER_START, CLUSTER_END),
+    ylim = c(0, 1),  # Same as cDNA tracks for matching bar heights
+    clip = "off"
+  ) +
   ggplot2::labs(x = "Chromosome 4 Position (bp)", y = NULL) +
-  ggplot2::theme_grey() +
+  ggplot2::theme_grey(base_size = 8) +
   ggplot2::theme(
     legend.position = "none",
-    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 8, face = "italic"),
+    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 5),
     strip.background = ggplot2::element_blank(),
     axis.text.y = ggplot2::element_blank(),
     axis.ticks.y = ggplot2::element_blank(),
-    panel.grid = ggplot2::element_blank()
+    axis.text.x = ggplot2::element_text(size = 6),
+    panel.grid = ggplot2::element_blank(),
+    plot.margin = ggplot2::margin(l = 30, r = 5, t = 15, b = 5, unit = "pt")  # Extra top margin for labels
   )
 
 print(gene_plot)
@@ -327,26 +381,27 @@ print(gene_plot)
 
 ## Combined Figure
 
-```{r combined-figure, fig.height=8, fig.width=10}
+```{r combined-figure, fig.height=3, fig.width=10}
 # Combine BLAST hits and gene annotation
 # Keep legend only on blast_plot (left side, vertical)
-blast_plot_with_legend <- blast_plot
-gene_plot_nolegend <- gene_plot + ggplot2::theme(legend.position = "none")
+blast_plot_for_legend <- blast_plot  # Use original without gene labels for legend extraction
 
 # Extract the legend from blast_plot
-blast_legend <- cowplot::get_legend(blast_plot_with_legend)
+blast_legend <- cowplot::get_legend(blast_plot_for_legend)
 
-# Remove legend from blast_plot for combining
-blast_plot_nolegend <- blast_plot + ggplot2::theme(legend.position = "none")
+# Remove legend from blast_plot_with_labels for combining
+blast_plot_nolegend <- blast_plot_with_labels + ggplot2::theme(legend.position = "none")
+gene_plot_nolegend <- gene_plot + ggplot2::theme(legend.position = "none")
 
 # Combine plots vertically
+# rel_heights adjusted so bar heights match visually
 plots_combined <- cowplot::plot_grid(
   blast_plot_nolegend,
   gene_plot_nolegend,
   ncol = 1,
   align = "v",
   axis = "lr",
-  rel_heights = c(2.5, 1)
+  rel_heights = c(5, 2)  # Extra height for gene labels + matching bar size
 )
 
 # Add legend on the left
@@ -354,7 +409,7 @@ combined_plot <- cowplot::plot_grid(
   blast_legend,
   plots_combined,
   nrow = 1,
-  rel_widths = c(0.15, 1)
+  rel_widths = c(0.08, 1)
 )
 
 print(combined_plot)
@@ -373,7 +428,7 @@ ggplot2::ggsave(
   output_pdf,
   plot = combined_plot,
   width = 10,
-  height = 8,
+  height = 3,
   device = "pdf"
 )
 
@@ -381,7 +436,7 @@ ggplot2::ggsave(
   output_png,
   plot = combined_plot,
   width = 10,
-  height = 8,
+  height = 3,
   dpi = 300
 )
 
