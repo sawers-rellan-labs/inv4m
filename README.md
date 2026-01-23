@@ -69,8 +69,6 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure S2 | GxE interaction plots (MI21 donor) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S3 | GxE effect sizes forest plot | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S4 | Internode analysis (4 panels: height, photos, schematic, profiles) | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) + photos | ✅ |
-| Figure S5 | PCNA2 + SMO4 expression | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) | ✅ |
-| Figure S6 | JMJ paralog-level expression (5 paralogs) | [`jmj_paralog_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_paralog_expression_boxplot.html) | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
