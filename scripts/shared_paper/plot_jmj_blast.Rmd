@@ -260,7 +260,7 @@ kable(blast_summary,
 
 ## BLAST Hits Plot
 
-```{r blast-plot, fig.height=2.5, fig.width=10}
+```{r blast-plot, fig.height=2, fig.width=10}
 # Convert hits to data frame for ggplot2
 # Facet by transcript ID (on right), gene names as y-axis labels (on left)
 hits_df <- as.data.frame(hits) %>%
@@ -272,7 +272,7 @@ hits_df <- as.data.frame(hits) %>%
   filter(!is.na(transcript))  # Remove any NA transcripts
 
 # Create BLAST hits plot
-# Transcript IDs as strip labels on RIGHT, gene names on LEFT via y-axis
+# Transcript IDs as strip labels on RIGHT, gene names on LEFT outside plot area
 blast_plot <- ggplot2::ggplot(hits_df) +
   ggplot2::geom_rect(
     ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = identity),
@@ -284,33 +284,33 @@ blast_plot <- ggplot2::ggplot(hits_df) +
     ncol = 1
   ) +
   ggplot2::scale_fill_continuous(name = "% identity") +
-  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
+  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END), clip = "off") +
   ggplot2::labs(x = NULL, y = NULL) +
-  ggplot2::theme_grey(base_size = 8) +
+  ggplot2::theme_grey(base_size = 10) +
   ggplot2::theme(
     legend.position = "left",
     legend.direction = "vertical",
     legend.key.height = ggplot2::unit(0.8, "cm"),
-    legend.key.width = ggplot2::unit(0.3, "cm"),
-    legend.title = ggplot2::element_text(size = 6),
-    legend.text = ggplot2::element_text(size = 5),
-    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 5),
+    legend.key.width = ggplot2::unit(0.5, "cm"),
+    legend.title = ggplot2::element_text(size = 9),
+    legend.text = ggplot2::element_text(size = 8),
+    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 8),
     strip.background = ggplot2::element_blank(),
     axis.text.y = ggplot2::element_blank(),
     axis.ticks.y = ggplot2::element_blank(),
     axis.text.x = ggplot2::element_blank(),
     axis.ticks.x = ggplot2::element_blank(),
     panel.grid = ggplot2::element_blank(),
-    panel.spacing = ggplot2::unit(0.05, "lines"),
-    plot.margin = ggplot2::margin(l = 30, r = 5, t = 5, b = 5, unit = "pt")
+    panel.spacing = ggplot2::unit(0.02, "lines"),
+    plot.margin = ggplot2::margin(l = 70, r = 5, t = 5, b = 5, unit = "pt")
   )
 
-# Add gene name labels on the left side of each facet (in white margin area)
+# Add gene name labels FAR to the left, outside the plot area (in white margin)
 gene_labels_df <- hits_df %>%
   group_by(transcript, gene) %>%
   summarize(.groups = "drop") %>%
   mutate(
-    x = CLUSTER_START - 2000,  # Position in white space to left of grey panel
+    x = CLUSTER_START - 12000,  # Position well outside grey panel (~5mm more to left)
     y = 0.5
   )
 
@@ -318,12 +318,8 @@ blast_plot_with_labels <- blast_plot +
   ggplot2::geom_text(
     data = gene_labels_df,
     ggplot2::aes(x = x, y = y, label = gene),
-    hjust = 1, fontface = "italic", size = 2,
+    hjust = 1, fontface = "italic", size = 3.5,
     inherit.aes = FALSE
-  ) +
-  ggplot2::coord_cartesian(
-    xlim = c(CLUSTER_START, CLUSTER_END),
-    clip = "off"
   )
 
 print(blast_plot_with_labels)
@@ -331,49 +327,60 @@ print(blast_plot_with_labels)
 
 ## Gene Annotation Plot
 
-```{r gene-plot, fig.height=1, fig.width=10}
+```{r gene-labels-plot, fig.height=0.4, fig.width=10}
 # Convert exons to data frame with gene names
 exons_df <- as.data.frame(exons) %>%
   mutate(gene = GENE_NAMES[as.character(transcript)])
 
-# Calculate gene label positions (center of each gene's exons, on TOP - outside grey panel)
+# Calculate gene label positions (center of each gene's exons)
 gene_label_positions <- exons_df %>%
   group_by(gene) %>%
   summarize(
     x = mean(c(min(start), max(end))),
     .groups = "drop"
   ) %>%
-  mutate(y = 1.15)  # Position above the panel (will be in white margin area)
+  mutate(y = 0.5)
 
+# Gene labels as a separate plot (goes in the white space between tracks)
+gene_labels_plot <- ggplot2::ggplot(gene_label_positions) +
+  ggplot2::geom_text(
+    ggplot2::aes(x = x, y = y, label = gene),
+    fontface = "italic", size = 3.5, vjust = 0.5
+  ) +
+  ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
+  ggplot2::labs(x = NULL, y = NULL) +
+  ggplot2::theme_void() +
+  ggplot2::theme(
+    plot.margin = ggplot2::margin(l = 70, r = 5, t = 0, b = 0, unit = "pt")
+  )
+
+print(gene_labels_plot)
+```
+
+```{r gene-plot, fig.height=0.8, fig.width=10}
 # Single track with all transcripts colored by gene, strip on right with "B73 genomic" label
 gene_plot <- ggplot2::ggplot(exons_df) +
   ggplot2::geom_rect(
     ggplot2::aes(xmin = start, xmax = end, ymin = 0, ymax = 1, fill = gene),
     color = NA
   ) +
-  ggplot2::geom_text(
-    data = gene_label_positions,
-    ggplot2::aes(x = x, y = y, label = gene),
-    fontface = "italic", size = 2, vjust = 0
-  ) +
   ggplot2::scale_fill_manual(values = GENE_COLORS, guide = "none") +
   ggplot2::facet_wrap(~ "B73 genomic", strip.position = "right", ncol = 1) +
   ggplot2::coord_cartesian(
     xlim = c(CLUSTER_START, CLUSTER_END),
-    ylim = c(0, 1),  # Same as cDNA tracks for matching bar heights
-    clip = "off"
+    ylim = c(0, 1)
   ) +
   ggplot2::labs(x = "Chromosome 4 Position (bp)", y = NULL) +
-  ggplot2::theme_grey(base_size = 8) +
+  ggplot2::theme_grey(base_size = 10) +
   ggplot2::theme(
     legend.position = "none",
-    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 5),
+    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 8),
     strip.background = ggplot2::element_blank(),
     axis.text.y = ggplot2::element_blank(),
     axis.ticks.y = ggplot2::element_blank(),
-    axis.text.x = ggplot2::element_text(size = 6),
+    axis.text.x = ggplot2::element_text(size = 9),
     panel.grid = ggplot2::element_blank(),
-    plot.margin = ggplot2::margin(l = 30, r = 5, t = 15, b = 5, unit = "pt")  # Extra top margin for labels
+    plot.margin = ggplot2::margin(l = 70, r = 5, t = 0, b = 5, unit = "pt")
   )
 
 print(gene_plot)
@@ -391,17 +398,18 @@ blast_legend <- cowplot::get_legend(blast_plot_for_legend)
 
 # Remove legend from blast_plot_with_labels for combining
 blast_plot_nolegend <- blast_plot_with_labels + ggplot2::theme(legend.position = "none")
-gene_plot_nolegend <- gene_plot + ggplot2::theme(legend.position = "none")
 
-# Combine plots vertically
-# rel_heights adjusted so bar heights match visually
+# Combine plots vertically: BLAST tracks -> gene labels (white space) -> gene track
+# rel_heights: 5 cDNA tracks need more space due to facet spacing,
+# gene track needs ~1.3 to match individual cDNA track bar height
 plots_combined <- cowplot::plot_grid(
   blast_plot_nolegend,
-  gene_plot_nolegend,
+  gene_labels_plot,
+  gene_plot,
   ncol = 1,
   align = "v",
   axis = "lr",
-  rel_heights = c(5, 2)  # Extra height for gene labels + matching bar size
+  rel_heights = c(5.5, 0.5, 1.8)
 )
 
 # Add legend on the left
