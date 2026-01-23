@@ -2,11 +2,12 @@
 # Row order matches blocks5 columns: B73, PT, mexicana, CML457, CML459
 # Larger y = higher on figure
 # Visual order top-to-bottom: TIL18, PT, CML457, CML459, B73
-0.5, 0.2, 0, left, center, gold, 1, B73
-0.5, 0.5, 0, left, center, indigo, 1, PT
-0.5, 0.6, 0, left, center, indigo, 1, TIL18
-0.5, 0.4, 0, left, center, indigo, 1, CML457
-0.5, 0.3, 0, left, center, indigo, 1, CML459
+# Spacing reduced to 0.05 (half of original 0.1)
+0.5, 0.30, 0, left, center, gold, 1, B73
+0.5, 0.45, 0, left, center, indigo, 1, PT
+0.5, 0.50, 0, left, center, indigo, 1, TIL18
+0.5, 0.40, 0, left, center, indigo, 1, CML457
+0.5, 0.35, 0, left, center, indigo, 1, CML459
 # edges connect visually adjacent tracks (by track index)
 e, 2, 1
 e, 1, 3
