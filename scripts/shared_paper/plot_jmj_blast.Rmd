@@ -51,27 +51,24 @@ and contains five jumonji-domain containing genes:
 | jmj4 | Zm00001eb191820_T001 | Full paralog |
 | jmj2 | Zm00001d051961_T002 | Full paralog (V4 annotation) |
 
----
-
 # Load Libraries
 
 ```{r libraries}
 library(GenomicRanges)
-library(ggbio)
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(knitr)
 ```
 
----
+***
 
 # Define File Paths
 
 ```{r file-paths}
 # Input files
 annotation_file <- file.path(paths$data, "jmj_annotation_5_genes.csv")
-blast_file <- file.path(paths$data, "B73_jmj_cluster_genomic_vs_candidates_v5_cDNA.blast")
+blast_file <- file.path(paths$intermediate, "B73_jmj_cluster_genomic_vs_candidates_v5_cDNA.blast")
 
 # Check files exist
 if (!file.exists(annotation_file)) {
@@ -81,7 +78,8 @@ if (!file.exists(annotation_file)) {
 
 if (!file.exists(blast_file)) {
   stop("BLAST file not found: ", blast_file,
-       "\nPlease run scripts/02_genomics_foundation/generate_jmj_blast_data.sh first.")
+       "\nPlease run scripts/02_genomics_foundation/generate_jmj_blast_data.sh first.",
+       "\nOutput should be saved to results/shared_paper/intermediate/")
 }
 
 cat("Input files:\n")
@@ -89,7 +87,7 @@ cat("  Annotation:", annotation_file, "\n")
 cat("  BLAST:", blast_file, "\n")
 ```
 
----
+***
 # Define Constants
 
 ```{r constants}
@@ -121,7 +119,7 @@ GENE_NAMES <- c(
 )
 ```
 
----
+***
 
 # Load Gene Annotation
 
@@ -161,7 +159,7 @@ exons$identity <- 100
 cat("Created GRanges object with", length(exons), "exons\n")
 ```
 
----
+***
 
 # Load BLAST Results
 
@@ -222,7 +220,7 @@ hits$transcript <- factor(hits$transcript, levels = TRANSCRIPT_ORDER)
 cat("Created GRanges object with", length(hits), "BLAST hits\n")
 ```
 
----
+***
 
 # Summary Statistics
 
@@ -247,27 +245,30 @@ kable(blast_summary,
       caption = "BLAST hit summary by transcript")
 ```
 
----
+***
 
 # Visualization
 
 ## BLAST Hits Plot
 
 ```{r blast-plot, fig.height=6}
-# Create BLAST hits plot
-blast_plot <- hits %>%
-  ggplot() +
-  stat_stepping(
-    aes(group = track, color = identity, fill = identity),
-    facets = transcript ~ .
-  ) +
+# Convert GRanges to data frame for plotting
+hits_df <- as.data.frame(hits) %>%
+  mutate(
+    transcript = factor(transcript, levels = TRANSCRIPT_ORDER),
+    gene = GENE_NAMES[as.character(transcript)]
+  )
+
+# Create BLAST hits plot using geom_segment
+blast_plot <- ggplot(hits_df, aes(x = start, xend = end, y = 0.5, yend = 0.5)) +
+  geom_segment(aes(color = identity), linewidth = 4) +
   facet_wrap(
-    transcript ~ .,
+    ~ transcript,
     strip.position = "right",
-    ncol = 1
+    ncol = 1,
+    scales = "free_y"
   ) +
   xlim(CLUSTER_START, CLUSTER_END) +
-  scale_fill_viridis_c(name = "% Identity", option = "plasma") +
   scale_color_viridis_c(name = "% Identity", option = "plasma") +
   labs(
     title = "BLAST Alignment of JMJ cDNA to Genomic Region",
@@ -281,29 +282,32 @@ blast_plot <- hits %>%
     axis.title.x = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    panel.grid.minor = element_blank()
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
   )
 
-print(blast_plot@ggplot)
+print(blast_plot)
 ```
 
 ## Gene Annotation Plot
 
 ```{r gene-plot, fig.height=3}
-# Create gene annotation plot
-gene_plot <- exons %>%
-  ggplot() +
-  stat_stepping(
-    aes(group = track, color = transcript, fill = transcript),
-    facets = transcript ~ .
-  ) +
+# Convert exons GRanges to data frame
+exons_df <- as.data.frame(exons) %>%
+  mutate(gene = GENE_NAMES[as.character(transcript)])
+
+# Create gene annotation plot using geom_segment
+gene_plot <- ggplot(exons_df, aes(x = start, xend = end, y = 0.5, yend = 0.5)) +
+  geom_segment(aes(color = transcript), linewidth = 6) +
   facet_wrap(
-    track ~ .,
+    ~ transcript,
     strip.position = "right",
-    ncol = 1
+    ncol = 1,
+    scales = "free_y"
   ) +
   xlim(CLUSTER_START, CLUSTER_END) +
-  scale_fill_brewer(palette = "Set1", name = "Transcript") +
   scale_color_brewer(palette = "Set1", name = "Transcript") +
   labs(
     x = "Chromosome 4 Position (bp)"
@@ -313,10 +317,13 @@ gene_plot <- exons %>%
     legend.position = "none",
     strip.text.y.right = element_text(angle = 0, hjust = 0),
     strip.background.y = element_blank(),
-    panel.grid.minor = element_blank()
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
   )
 
-print(gene_plot@ggplot)
+print(gene_plot)
 ```
 
 ## Combined Figure
@@ -324,8 +331,8 @@ print(gene_plot@ggplot)
 ```{r combined-figure, fig.height=10, fig.width=12}
 # Combine BLAST and gene annotation plots
 combined_plot <- ggarrange(
-  blast_plot@ggplot,
-  gene_plot@ggplot,
+  blast_plot,
+  gene_plot,
   ncol = 1,
   heights = c(2.5, 1),
   align = "hv",
@@ -335,7 +342,7 @@ combined_plot <- ggarrange(
 print(combined_plot)
 ```
 
----
+***
 
 # Export Figure
 
@@ -365,7 +372,7 @@ cat("  PDF:", output_pdf, "\n")
 cat("  PNG:", output_png, "\n")
 ```
 
----
+***
 
 # Session Info
 
