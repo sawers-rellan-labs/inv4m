@@ -1,0 +1,374 @@
+---
+title: "JMJ Cluster BLAST Visualization"
+author: "Sawers-Rellan Labs"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "shared_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+
+# Setup project paths
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("shared_paper")
+```
+
+# Overview
+
+This notebook visualizes the JMJ cluster region in the B73 maize genome by
+mapping cDNA sequences back to the genomic region. The visualization shows:
+
+1. **Gene annotation**: Exon structure of the 5 JMJ paralogs in the cluster
+2. **BLAST hits**: Alignment of cDNA sequences to the genomic region
+
+The JMJ cluster spans approximately 190 kb on chromosome 4 (177,400,000 - 177,590,000)
+and contains five jumonji-domain containing genes:
+
+| Gene | Transcript | Description |
+|------|------------|-------------|
+| jmj9 | Zm00001eb191790_T001 | Full paralog |
+| psi | Zm00001eb191790_T006 | Pseudogene |
+| jmj6 | Zm00001eb191790_T013 | Full paralog |
+| jmj4 | Zm00001eb191820_T001 | Full paralog |
+| jmj2 | Zm00001d051961_T002 | Full paralog (V4 annotation) |
+
+---
+
+# Load Libraries
+
+```{r libraries}
+library(GenomicRanges)
+library(ggbio)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(knitr)
+```
+
+---
+
+# Define File Paths
+
+```{r file-paths}
+# Input files
+annotation_file <- file.path(paths$data, "jmj_annotation_5_genes.csv")
+blast_file <- file.path(paths$data, "B73_jmj_cluster_genomic_vs_candidates_v5_cDNA.blast")
+
+# Check files exist
+if (!file.exists(annotation_file)) {
+  stop("Annotation file not found: ", annotation_file,
+       "\nPlease ensure jmj_annotation_5_genes.csv is in the data directory.")
+}
+
+if (!file.exists(blast_file)) {
+  stop("BLAST file not found: ", blast_file,
+       "\nPlease run scripts/02_genomics_foundation/generate_jmj_blast_data.sh first.")
+}
+
+cat("Input files:\n")
+cat("  Annotation:", annotation_file, "\n")
+cat("  BLAST:", blast_file, "\n")
+```
+
+---
+# Define Constants
+
+```{r constants}
+# JMJ cluster genomic coordinates (B73 NAM5)
+CLUSTER_CHROM <- "4"
+CLUSTER_START <- 177400000
+CLUSTER_END <- 177590000
+
+# The BLAST query coordinates are relative to the extracted region (0-based)
+# We need to add the cluster start position to convert to genomic coordinates
+COORD_OFFSET <- CLUSTER_START + 1  # +1 for 1-based coordinates
+
+# Transcript display order (5' to 3' in cluster)
+TRANSCRIPT_ORDER <- c(
+  "Zm00001eb191790_T001",  # jmj9
+  "Zm00001d051961_T002",   # jmj2 (V4)
+  "Zm00001eb191790_T006",  # psi
+  "Zm00001eb191790_T013",  # jmj6
+  "Zm00001eb191820_T001"   # jmj4
+)
+
+# Gene name mapping for labels
+GENE_NAMES <- c(
+  "Zm00001eb191790_T001" = "jmj9",
+  "Zm00001d051961_T002" = "jmj2",
+  "Zm00001eb191790_T006" = "psi",
+  "Zm00001eb191790_T013" = "jmj6",
+  "Zm00001eb191820_T001" = "jmj4"
+)
+```
+
+---
+
+# Load Gene Annotation
+
+```{r load-annotation}
+# Load annotation table
+jmj_annotation_table <- read.csv(annotation_file)
+
+cat("Annotation table dimensions:", dim(jmj_annotation_table), "\n")
+cat("Feature types:", unique(jmj_annotation_table$type), "\n")
+
+# Filter to exons only
+exon_table <- jmj_annotation_table %>%
+  filter(type == "exon")
+
+cat("Number of exons:", nrow(exon_table), "\n")
+```
+
+```{r create-exon-ranges}
+# Create GenomicRanges object for exons
+exon_ranges <- with(exon_table,
+  IRanges(start = start, end = end)
+)
+
+exons <- with(exon_table,
+  GRanges(
+    seqnames = seqnames,
+    ranges = exon_ranges,
+    transcript = transcript_id,
+    type = "exon",
+    track = "jmj_annotation"
+  )
+)
+
+# Add 100% identity for consistent coloring
+exons$identity <- 100
+
+cat("Created GRanges object with", length(exons), "exons\n")
+```
+
+---
+
+# Load BLAST Results
+
+```{r load-blast}
+# BLAST outfmt 6 column names
+blast_cols <- c(
+  "qseqid",    # Query sequence ID
+  "sseqid",    # Subject sequence ID
+  "identity",  # Percent identity
+  "length",    # Alignment length
+  "mismatch",  # Number of mismatches
+  "gapopen",   # Number of gap opens
+  "qstart",    # Query start
+  "qend",      # Query end
+  "sstart",    # Subject start
+  "send",      # Subject end
+  "evalue",    # E-value
+  "bitscore"   # Bit score
+)
+
+# Load BLAST results
+blast <- read.table(blast_file, header = FALSE, sep = "\t")
+colnames(blast) <- blast_cols
+
+cat("BLAST results dimensions:", dim(blast), "\n")
+cat("Unique subjects:", length(unique(blast$sseqid)), "\n")
+```
+
+```{r process-blast}
+# Convert coordinates from query-relative to genomic
+blast <- blast %>%
+  mutate(
+    qseqid = CLUSTER_CHROM,  # Chromosome 4
+    qstart = qstart + COORD_OFFSET,
+    qend = qend + COORD_OFFSET
+  )
+
+# Create GenomicRanges object for BLAST hits
+hit_ranges <- with(blast,
+  IRanges(start = qstart, end = qend)
+)
+
+hits <- with(blast,
+  GRanges(
+    type = "blast_hit",
+    seqnames = qseqid,
+    ranges = hit_ranges,
+    transcript = sseqid,
+    score = bitscore,
+    identity = identity,
+    track = sseqid
+  )
+)
+
+# Order transcripts for display
+hits$transcript <- factor(hits$transcript, levels = TRANSCRIPT_ORDER)
+
+cat("Created GRanges object with", length(hits), "BLAST hits\n")
+```
+
+---
+
+# Summary Statistics
+
+```{r blast-summary}
+# Summarize BLAST hits by transcript
+blast_summary <- blast %>%
+  group_by(sseqid) %>%
+  summarize(
+    n_hits = n(),
+    total_length = sum(length),
+    mean_identity = mean(identity),
+    max_identity = max(identity),
+    min_evalue = min(evalue),
+    .groups = "drop"
+  ) %>%
+  mutate(gene = GENE_NAMES[sseqid]) %>%
+  arrange(factor(sseqid, levels = TRANSCRIPT_ORDER))
+
+kable(blast_summary,
+      col.names = c("Transcript", "Hits", "Total bp", "Mean %ID", "Max %ID", "Min E-value", "Gene"),
+      digits = 2,
+      caption = "BLAST hit summary by transcript")
+```
+
+---
+
+# Visualization
+
+## BLAST Hits Plot
+
+```{r blast-plot, fig.height=6}
+# Create BLAST hits plot
+blast_plot <- hits %>%
+  ggplot() +
+  stat_stepping(
+    aes(group = track, color = identity, fill = identity),
+    facets = transcript ~ .
+  ) +
+  facet_wrap(
+    transcript ~ .,
+    strip.position = "right",
+    ncol = 1
+  ) +
+  xlim(CLUSTER_START, CLUSTER_END) +
+  scale_fill_viridis_c(name = "% Identity", option = "plasma") +
+  scale_color_viridis_c(name = "% Identity", option = "plasma") +
+  labs(
+    title = "BLAST Alignment of JMJ cDNA to Genomic Region",
+    x = "Chromosome 4 Position (bp)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "left",
+    strip.text.y.right = element_text(angle = 0, hjust = 0),
+    strip.background.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+print(blast_plot@ggplot)
+```
+
+## Gene Annotation Plot
+
+```{r gene-plot, fig.height=3}
+# Create gene annotation plot
+gene_plot <- exons %>%
+  ggplot() +
+  stat_stepping(
+    aes(group = track, color = transcript, fill = transcript),
+    facets = transcript ~ .
+  ) +
+  facet_wrap(
+    track ~ .,
+    strip.position = "right",
+    ncol = 1
+  ) +
+  xlim(CLUSTER_START, CLUSTER_END) +
+  scale_fill_brewer(palette = "Set1", name = "Transcript") +
+  scale_color_brewer(palette = "Set1", name = "Transcript") +
+  labs(
+    x = "Chromosome 4 Position (bp)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    strip.text.y.right = element_text(angle = 0, hjust = 0),
+    strip.background.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+print(gene_plot@ggplot)
+```
+
+## Combined Figure
+
+```{r combined-figure, fig.height=10, fig.width=12}
+# Combine BLAST and gene annotation plots
+combined_plot <- ggarrange(
+  blast_plot@ggplot,
+  gene_plot@ggplot,
+  ncol = 1,
+  heights = c(2.5, 1),
+  align = "hv",
+  common.legend = FALSE
+)
+
+print(combined_plot)
+```
+
+---
+
+# Export Figure
+
+```{r export}
+# Export combined figure
+output_pdf <- file.path(paths$figures, "jmj_cluster_blast.pdf")
+output_png <- file.path(paths$figures, "jmj_cluster_blast.png")
+
+ggsave(
+  output_pdf,
+  plot = combined_plot,
+  width = 12,
+  height = 10,
+  device = "pdf"
+)
+
+ggsave(
+  output_png,
+  plot = combined_plot,
+  width = 12,
+  height = 10,
+  dpi = 300
+)
+
+cat("Exported figures:\n")
+cat("  PDF:", output_pdf, "\n")
+cat("  PNG:", output_png, "\n")
+```
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
