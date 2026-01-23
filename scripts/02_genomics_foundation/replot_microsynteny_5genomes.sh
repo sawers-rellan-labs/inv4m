@@ -4,7 +4,7 @@
 #
 # Visual order (top to bottom): TIL18, PT, CML459, CML457, B73
 # Colors: TIL18/PT/CML459/CML457 = indigo (Inv4m), B73 = gold (CTRL)
-# No gene labels
+# No gene labels, SVG output
 #
 # Usage: Copy this script and blocks5_visual_reorder.layout to the microsynteny directory, then run
 
@@ -31,19 +31,19 @@ for f in blocks5 B73_PT_mexicana_CML457_CML459.bed blocks5_visual_reorder.layout
     fi
 done
 
-echo "=== Generate PDF figure ==="
+echo "=== Generate SVG figure ==="
 
 python3 -m jcvi.graphics.synteny blocks5 B73_PT_mexicana_CML457_CML459.bed blocks5_visual_reorder.layout \
     --glyphstyle=arrow \
     --notex \
-    --format pdf
+    --format svg
 
 # Rename output
-if [ -f blocks5.pdf ]; then
-    mv blocks5.pdf jmj_microsynteny_5genomes.pdf
+if [ -f blocks5.svg ]; then
+    mv blocks5.svg jmj_microsynteny_5genomes.svg
 fi
 
 echo ""
-ls -la jmj_microsynteny_5genomes.pdf
+ls -la jmj_microsynteny_5genomes.svg
 echo ""
-echo "Done. Copy jmj_microsynteny_5genomes.pdf to results/inversion_paper/figures/"
+echo "Done. Copy jmj_microsynteny_5genomes.svg to results/inversion_paper/figures/"

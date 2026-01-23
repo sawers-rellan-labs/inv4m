@@ -1,14 +1,14 @@
 # x,   y, rotation, ha, va, color, ratio, label
 # Row order matches blocks5 columns: B73, PT, mexicana, CML457, CML459
 # Larger y = higher on figure
-# Visual order top-to-bottom: TIL18, PT, CML459, CML457, B73
+# Visual order top-to-bottom: TIL18, PT, CML457, CML459, B73
 0.5, 0.2, 0, left, center, gold, 1, B73
 0.5, 0.5, 0, left, center, indigo, 1, PT
 0.5, 0.6, 0, left, center, indigo, 1, TIL18
-0.5, 0.3, 0, left, center, indigo, 1, CML457
-0.5, 0.4, 0, left, center, indigo, 1, CML459
+0.5, 0.4, 0, left, center, indigo, 1, CML457
+0.5, 0.3, 0, left, center, indigo, 1, CML459
 # edges connect visually adjacent tracks (by track index)
 e, 2, 1
-e, 1, 4
-e, 4, 3
-e, 3, 0
+e, 1, 3
+e, 3, 4
+e, 4, 0
