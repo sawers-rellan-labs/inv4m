@@ -387,6 +387,37 @@ meristem dome. These findings suggest that the accelerated flowering and
 increased plant height in \invfour lines may originate from altered meristem
 geometry established early in development.
 
+To test whether \invfour effects are consistent across environments, we
+analyzed phenotypes from three location-year combinations using the MI21 donor
+background. Two-way ANOVA revealed significant genotype $\times$ environment
+interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}). The
+strongest interaction was observed for plant height ($p < 8.7 \times 10^{-10}$,
+$\eta^2_p = 0.29$), followed by GDDA ($p < 7.1 \times 10^{-5}$, $\eta^2_p =
+0.14$) and DTA ($p < 2.9 \times 10^{-5}$, $\eta^2_p = 0.16$).
+
+Despite significant GxE interactions, the main effect of genotype was
+significant for all phenotypes, with \invfour showing consistent increases in
+plant height across environments (emmeans contrast: $+3.15$ cm, $p < 5.4 \times
+10^{-5}$) and earlier flowering (GDDS: $-7.97$ GDD, $p < 7.2 \times 10^{-4}$).
+Effect sizes varied substantially across environments (Supplementary
+Fig.~\ref{fig::gxe_forest}). For plant height, Cohen's $d$ ranged from 1.45
+(PSU2022) to 2.23 (PSU2025) in Pennsylvania environments, but was negative
+($d = -1.28$) in North Carolina (CLY2025). This reversal suggests that the
+magnitude and direction of \invfour effects on growth depend on environmental
+conditions.
+
+To characterize the architectural basis of \invfour effects on plant height,
+we measured internode lengths in the CLY2025 field experiment. In the MI21
+background, we measured 1,556 internodes from 112 control plants and 1,607
+internodes from 116 \invfour plants. Mean internode length was similar between
+genotypes (CTRL: $13.1 \pm 5.5$ cm; \invfour: $12.9 \pm 5.2$ cm). Internode
+profiles showed characteristic patterns with the longest internodes at
+positions 4--6 from the top, corresponding to the ear node region
+(Supplementary Fig.~\ref{fig::internode}). Total node count did not differ
+significantly between genotypes within the MI21 background, suggesting that
+\invfour effects on plant height are mediated by internode elongation rather
+than increased phytomer number.
+
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=0.8\linewidth]{figs/RNAseq.png}
@@ -969,6 +1000,58 @@ Days to anthesis (DTA) and days to silking (DTS) were converted to growing
 degree days (GDDA and GDDS, respectively) using daily temperature records from
 the Rock Springs weather station with a base temperature of 10°C and an upper
 threshold of 30°C.
+
+\subsection{Genotype $\times$ Environment analysis}
+
+To assess the consistency of \invfour effects across environments, we analyzed
+phenotype data from three location-year combinations: Pennsylvania 2022
+(PSU2022), Pennsylvania 2025 (PSU2025), and North Carolina 2025 (CLY2025). All
+environments used the MI21 donor background. Phenotypes analyzed included plant
+height (PH), days to anthesis (DTA), days to silking (DTS), and their
+thermal-time equivalents (GDDA, GDDS) calculated using growing degree days with
+a base temperature of 10°C and upper threshold of 30°C.
+
+Spatially corrected phenotype values were obtained for each environment using
+SpATS as described above. We then performed two-way ANOVA with genotype
+(\invfour vs. control) and environment as fixed factors:
+
+\begin{eqnarray}
+\label{eq:gxe_model}
+y_{ijk} = \mu + G_i + E_j + (G \times E)_{ij} + \varepsilon_{ijk}
+\end{eqnarray}
+
+where $G_i$ is the genotype effect, $E_j$ is the environment effect, and
+$(G \times E)_{ij}$ is the genotype-by-environment interaction. Effect sizes
+were quantified using partial eta-squared ($\eta^2_p$) for ANOVA effects and
+Cohen's $d$ for pairwise genotype comparisons within each environment. Marginal
+means and contrasts were estimated using the \textit{emmeans} package
+\cite{lenth2023}. P-values were adjusted for multiple testing using the
+Benjamini-Hochberg FDR method \cite{benjamini1995}.
+
+To examine temperature sensitivity of \invfour effects, we correlated genotype
+effect sizes (Cohen's $d$) with mean environmental temperature during the first
+100 days after planting, calculated from NASA POWER hourly temperature data.
+
+\subsection{Internode length measurements}
+
+To characterize the effect of \invfour on plant architecture, we measured
+internode lengths in the CLY2025 field experiment. At physiological maturity,
+plants were harvested and internodes were measured sequentially from the
+tassel-bearing node (position 1) downward. Internode position was recorded both
+as absolute node number (from ground level) and as position from the top (from
+tassel). The ear-bearing node was marked for each plant.
+
+Internode profiles were analyzed separately for each donor background (MI21 and
+TMEX). For the TMEX background, measurements were limited to the top 10
+internodes due to plant architecture differences. Within each donor, we
+compared \invfour and control genotypes using two-sample \textit{t}-tests for
+total node count. Internode length profiles were visualized by plotting length
+against position from top, with individual plant trajectories shown.
+
+To validate the internode measurements against whole-plant phenotypes, we
+compared the sum of measured internode lengths with directly measured plant
+height (PH) from field records using linear regression. Agreement between
+methods was assessed by $R^2$ and slope deviation from unity.
 
 \subsection{Tissue sampling, RNA extraction, and sequencing}
 
@@ -1559,6 +1642,37 @@ Leaf$\times$\invfour & Down & sec6 & 3.1 & -0.55 & Exocyst complex component Sec
 \end{tabular}%
 }
 \end{table}
+
+
+\begin{table}[!ht]
+\caption{\textbf{Genotype $\times$ Environment interaction statistics.} Two-way ANOVA results for \invfour effects across three location-year combinations (PSU2022, PSU2025, CLY2025) using the MI21 donor background. Interaction $p$-values and effect sizes ($\eta^2_p$) are shown for each phenotype.}
+\label{tab::gxe}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Trait} & \textbf{G$\times$E $p$-value} & \textbf{G$\times$E $\eta^2_p$} & \textbf{Genotype $p$} & \textbf{Environment $p$} & \textbf{G$\times$E sig.} & \textbf{G sig.} \\ \midrule
+PH   & $8.7 \times 10^{-10}$ & 0.29 & $1.5 \times 10^{-7}$ & $3.2 \times 10^{-106}$ & *** & *** \\
+DTA  & $2.9 \times 10^{-5}$  & 0.16 & $2.0 \times 10^{-4}$ & $2.4 \times 10^{-54}$  & *** & *** \\
+DTS  & $4.6 \times 10^{-3}$  & 0.08 & $4.4 \times 10^{-5}$ & $4.1 \times 10^{-44}$  & **  & *** \\
+GDDA & $7.1 \times 10^{-5}$  & 0.14 & $1.1 \times 10^{-4}$ & 0.51                   & *** & *** \\
+GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13}$  & **  & *** \\ \bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\begin{figure}[!ht]
+\includegraphics[width=\linewidth]{figs/SFig_GxE_effect_sizes_forest.png}
+\caption{\textbf{Effect sizes of \invfour across environments.} Forest plot showing Cohen's $d$ effect sizes for \invfour genotype comparisons within each environment (PSU2022, PSU2025, CLY2025) for plant height (PH), days to anthesis (DTA), days to silking (DTS), and thermal time equivalents (GDDA, GDDS). Error bars represent 95\% confidence intervals. Note the reversal of plant height effects in CLY2025 (North Carolina) compared to Pennsylvania environments.}
+\label{fig::gxe_forest}
+\end{figure}
+
+
+\begin{figure}[!ht]
+\includegraphics[width=\linewidth]{figs/internode_profiles_from_top.png}
+\caption{\textbf{Internode length profiles in \invfour and control plants.} Internode length (cm) plotted against position from the tassel-bearing node (position 1) for MI21 background plants in the CLY2025 field experiment. Lines connect measurements from individual plants. CTRL: yellow ($n = 112$ plants); \invfour: purple ($n = 116$ plants). The longest internodes occur at positions 4--6, corresponding to the ear node region.}
+\label{fig::internode}
+\end{figure}
 
 
 \end{document}

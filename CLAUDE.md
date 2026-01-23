@@ -432,7 +432,8 @@ git push origin main
 - [ ] Internal consistency check
 - [ ] Figure quality review
 - [ ] Caption review
-- [ ] References update (add shahan2018 to Inv4m.bib)
+- [x] References update (shahan2018 added)
+- [ ] Add lenth2023 citation for emmeans package
 
 **See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` for detailed roadmap
 
