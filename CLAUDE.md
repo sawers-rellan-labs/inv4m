@@ -1,7 +1,7 @@
 # inv4m Project Guide
 
 **Last Updated:** 2026-01-23
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Review & Polish ✅
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 Results Writing 🔶
 **Version:** v1.6.0
 
 ---
@@ -25,15 +25,14 @@ README.md  # Figure/table coverage
    - ✅ Internode measurements - **Complete** (`internode_analysis.Rmd`)
    - ✅ GxE analysis - **Complete** (`inv4mGxE_3_env.Rmd`) - 3 environments, 10 CSVs, 3 figures
    - ✅ JMJ transcript-level DEG - **Complete** (kallisto re-run done)
-2. **Phase 5: Review & Polish**
-   - ✅ Methods/results integration for GxE and Internode into main.tex
-   - ✅ MaizeNetome validation methods (trans coexpression network)
-   - ✅ WGCNA module perturbation methods section (consensus network + bootstrap)
-   - ⬜ MaizeNetome validation for the WGCNA analysis
-   - ⬜ Populate module preservation table (tab::preservation) from CSV
-   - ⬜ Copy module_support_plot.pdf to figs/module_support.png
-   - Internal consistency check (optional)
-   - Final proofreading (optional)
+2. **Phase 4: Results Writing (see TODO_05_results_writing.md, est. 8-10 hours)**
+   - ⬜ Results narrative - incomplete, does not match recent analysis
+   - ⬜ Discussion section - not written
+   - ⬜ MaizeNetome validation for the WGCNA analysis (methods)
+3. **Phase 5: Review & Polish (after results/discussion complete)**
+   - ⬜ Internal consistency check
+   - ⬜ Final proofreading
+   - ⬜ USER: Add preservation table/figure to Overleaf
 
 **New analysis plan:** `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
@@ -126,7 +125,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
-## Inversion Paper - Phase 5 Review & Polish 🔶
+## Inversion Paper - Phase 4 Results Writing 🔶
 
 ### Scripts (12 Rmd files in `scripts/inversion_paper/`)
 
@@ -422,26 +421,28 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper 🔶 Phase 5 In Progress
+### Inversion Paper 🔶 Phase 4 In Progress
 
 **Completed Phases:**
 - [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-4)
 - [x] Phase 2: Network Analysis (Figure 5, Figure 6 WGCNA, GO enrichment)
 - [x] Phase 3: Phenotype Integration (SAM data in Figure 2)
-- [x] Phase 4: Methods & Results Writing
 
-**Current Phase 5: Review & Polish**
+**Current Phase 4: Methods & Results Writing**
 - [x] All main figures complete (1-8)
 - [x] All supplementary figures complete (S1-S5)
 - [x] All tables complete (1-2, S1-S4)
-- [x] MaizeNetome validation methods (trans coexpression network)
-- [x] GxE and Internode methods/results integrated
-- [ ] MaizeNetome validation for WGCNA analysis
-- [ ] USER: Add preservation table/figure to Overleaf
-- [ ] Internal consistency check (optional)
-- [ ] Final proofreading (optional)
+- [x] Methods sections mostly complete
+- [ ] **Results narrative incomplete** - does not match recent analysis (est. 8-10 hours)
+- [ ] **Discussion section** - not written
+- [ ] MaizeNetome validation for WGCNA analysis (methods)
 
-**See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` for detailed roadmap
+**Phase 5: Review & Polish (not started)**
+- [ ] Internal consistency check
+- [ ] Final proofreading
+- [ ] USER: Add preservation table/figure to Overleaf
+
+**See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` and `TODO_05_results_writing.md` for detailed roadmap
 
 ---
 
