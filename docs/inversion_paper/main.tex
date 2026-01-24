@@ -1697,6 +1697,18 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 \label{fig::internode}
 \end{figure*}
 
+\clearpage
+
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/module_support.png}
+\caption{\textbf{WGCNA consensus module bootstrap support.} Horizontal bars show mean bootstrap support (Label Fraction Present, LFP) for each CTRL consensus module across 1000 iterations with 80\% gene subsampling. Error bars indicate standard error of the mean. Dashed lines indicate stability thresholds: green ($\geq 0.70$, Stable) and orange ($\geq 0.50$, Moderate). Most modules achieve stable or moderate support, indicating robust module assignments in the CTRL reference network.}
+\label{fig::module_support}
+\end{figure}
+
+\clearpage
+
 
 \begin{table}[!ht]
 \caption{\textbf{WGCNA module preservation statistics.} Summary of consensus module preservation between CTRL and \invfour genotypes. Adjacency correlation measures the similarity of within-module connectivity patterns between genotypes. Bootstrap support (LFP) indicates module stability in CTRL samples across 1000 iterations. Preservation status: Disrupted ($r < 0.3$), Weak ($0.3 \leq r < 0.5$). All modules show substantial disruption in \invfour, with adjacency correlations ranging from $-0.14$ (purple) to $0.42$ (turquoise).}
@@ -1712,13 +1724,6 @@ Module & Genes & Adj. Corr. & $\Delta k_{Within}$ & Bootstrap Support & Status \
 \end{tabular}
 \end{table}
 
-
-\begin{figure}[!ht]
-\centering
-\includegraphics[width=\linewidth]{figs/module_support.png}
-\caption{\textbf{WGCNA consensus module bootstrap support.} Horizontal bars show mean bootstrap support (Label Fraction Present, LFP) for each CTRL consensus module across 1000 iterations with 80\% gene subsampling. Error bars indicate standard error of the mean. Dashed lines indicate stability thresholds: green ($\geq 0.70$, Stable) and orange ($\geq 0.50$, Moderate). Most modules achieve stable or moderate support, indicating robust module assignments in the CTRL reference network.}
-\label{fig::module_support}
-\end{figure}
 
 
 \end{document}
