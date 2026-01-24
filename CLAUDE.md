@@ -1,7 +1,7 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-21
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 + New Analyses ⚠️
+**Last Updated:** 2026-01-23
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Review & Polish ✅
 **Version:** v1.6.0
 
 ---
@@ -20,18 +20,28 @@ README.md  # Figure/table coverage
 **Quick command for user:** Ask the agent to read handover docs:
 > "Read the handover document and master plan, then suggest where to start"
 
-**Current Priority (as of 2026-01-21):**
+**Current Priority (as of 2026-01-23):**
 1. **New Analyses Status:**
    - ✅ Internode measurements - **Complete** (`internode_analysis.Rmd`)
    - ✅ GxE analysis - **Complete** (`inv4mGxE_3_env.Rmd`) - 3 environments, 10 CSVs, 3 figures
-   - ⬜ JMJ transcript-level DEG - Waiting for kallisto re-run on HPC
-2. **Phase 4: Methods & Results Writing**
-   - MaizeNetome validation methods section
-   - Results section review for consistency with new figures
+   - ✅ JMJ transcript-level DEG - **Complete** (kallisto re-run done)
+2. **Phase 5: Review & Polish**
+   - ✅ Methods/results integration for GxE and Internode into main.tex
+   - ✅ MaizeNetome validation methods (trans coexpression network)
+   - ✅ WGCNA module perturbation methods section (consensus network + bootstrap)
+   - ⬜ MaizeNetome validation for the WGCNA analysis
+   - ⬜ Populate module preservation table (tab::preservation) from CSV
+   - ⬜ Copy module_support_plot.pdf to figs/module_support.png
+   - Internal consistency check (optional)
+   - Final proofreading (optional)
 
 **New analysis plan:** `scripts/00_agent_work/missing_analysis_plan_20260120.md`
 
 **Recent completions:**
+- ✅ MaizeNetome validation methods (trans coexpression network)
+- ✅ Methods/results integration for GxE and Internode into main.tex
+- ✅ JMJ transcript-level DEG analysis (kallisto re-run with corrected cDNA)
+- ✅ JMJ BLAST plot (Panel C) - track heights and Greek psi label
 - ✅ GxE 3-environment analysis (PSU2022, PSU2025, CLY2025) with temperature sensitivity
 - ✅ Trans-network results section (136 genes, 552 edges, GO enrichment)
 - ✅ WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse)
@@ -116,7 +126,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
-## Inversion Paper - Revision In Progress ⚠️
+## Inversion Paper - Phase 5 Review & Polish 🔶
 
 ### Scripts (12 Rmd files in `scripts/inversion_paper/`)
 
@@ -130,8 +140,8 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `GO_Enrichment_Trans_Network.Rmd` | Network GO analysis | ✅ |
 | `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis | ✅ |
 | `make_manhattan_plots.Rmd` | Manhattan plots (Fig 3 D,E,G,H) | ✅ |
-| `volcano_plot_analysis.Rmd` | Volcano plot (Fig 3 C / Fig 4) | ⚠️ |
-| `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ⚠️ |
+| `volcano_plot_analysis.Rmd` | Volcano plot (Fig 3 C / Fig 4) | ✅ |
+| `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ✅ |
 | `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
@@ -412,28 +422,24 @@ git push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper ⚠️ Phase 4 In Progress
+### Inversion Paper 🔶 Phase 5 In Progress
 
 **Completed Phases:**
 - [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-4)
 - [x] Phase 2: Network Analysis (Figure 5, Figure 6 WGCNA, GO enrichment)
 - [x] Phase 3: Phenotype Integration (SAM data in Figure 2)
+- [x] Phase 4: Methods & Results Writing
 
-**Current Phase 4: Methods & Results**
-- [x] Limma methods updated
-- [x] WGCNA methods section (Shahan et al. 2018)
-- [x] Trans-network results section drafted
-- [x] WGCNA perturbation results section drafted
-- [x] Phenotypes + SAM results section drafted
-- [ ] MaizeNetome validation methods
-- [ ] Results section final review
-
-**Phase 5: Review & Polish (not started)**
-- [ ] Internal consistency check
-- [ ] Figure quality review
-- [ ] Caption review
-- [x] References update (shahan2018 added)
-- [ ] Add lenth2023 citation for emmeans package
+**Current Phase 5: Review & Polish**
+- [x] All main figures complete (1-8)
+- [x] All supplementary figures complete (S1-S5)
+- [x] All tables complete (1-2, S1-S4)
+- [x] MaizeNetome validation methods (trans coexpression network)
+- [x] GxE and Internode methods/results integrated
+- [ ] MaizeNetome validation for WGCNA analysis
+- [ ] USER: Add preservation table/figure to Overleaf
+- [ ] Internal consistency check (optional)
+- [ ] Final proofreading (optional)
 
 **See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` for detailed roadmap
 
