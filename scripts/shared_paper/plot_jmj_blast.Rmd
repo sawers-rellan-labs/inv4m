@@ -109,22 +109,22 @@ TRANSCRIPT_ORDER <- c(
   "Zm00001eb191820_T001"   # jmj4
 )
 
-# Gene name mapping for labels
+# Gene name mapping for labels (plotmath expressions for parsing)
 GENE_NAMES <- c(
-  "Zm00001eb191790_T001" = "jmj9",
-  "Zm00001d051961_T002" = "psi",
-  "Zm00001eb191790_T006" = "jmj6",
-  "Zm00001eb191790_T013" = "jmj2",
-  "Zm00001eb191820_T001" = "jmj4"
+  "Zm00001eb191790_T001" = "italic(jmj9)",
+  "Zm00001d051961_T002" = "psi*'?'",
+  "Zm00001eb191790_T006" = "italic(jmj6)",
+  "Zm00001eb191790_T013" = "italic(jmj2)",
+  "Zm00001eb191820_T001" = "italic(jmj4)"
 )
 
-# Gene colors (matching panel C)
+# Gene colors (matching panel C) - keys match GENE_NAMES values
 GENE_COLORS <- c(
-  "jmj9" = "#377EB8",   # blue
-  "psi" = "#E41A1C",    # red
-  "jmj6" = "#4DAF4A",   # green
-  "jmj2" = "#984EA3",   # purple
-  "jmj4" = "#FF7F00"    # orange
+  "italic(jmj9)" = "#377EB8",   # blue
+  "psi*'?'" = "#E41A1C",        # red
+  "italic(jmj6)" = "#4DAF4A",   # green
+  "italic(jmj2)" = "#984EA3",   # purple
+  "italic(jmj4)" = "#FF7F00"    # orange
 )
 ```
 
@@ -318,7 +318,7 @@ blast_plot_with_labels <- blast_plot +
   ggplot2::geom_text(
     data = gene_labels_df,
     ggplot2::aes(x = x, y = y, label = gene),
-    hjust = 1, fontface = "italic", size = 3.5,
+    hjust = 1, size = 3.5, parse = TRUE,
     inherit.aes = FALSE
   )
 
@@ -341,16 +341,24 @@ gene_label_positions <- exons_df %>%
   ) %>%
   mutate(y = 0.5)
 
-# Gene labels as a separate plot (goes in the white space between tracks)
+# Gene labels as a faceted plot (same structure as other tracks for alignment)
+# Uses empty strip text on right to match width structure
 gene_labels_plot <- ggplot2::ggplot(gene_label_positions) +
   ggplot2::geom_text(
     ggplot2::aes(x = x, y = y, label = gene),
-    fontface = "italic", size = 3.5, vjust = 0.5
+    size = 3.5, vjust = 0.5, parse = TRUE
   ) +
+  ggplot2::facet_wrap(~ "", strip.position = "right", ncol = 1) +
   ggplot2::coord_cartesian(xlim = c(CLUSTER_START, CLUSTER_END)) +
   ggplot2::labs(x = NULL, y = NULL) +
-  ggplot2::theme_void() +
+  ggplot2::theme_grey(base_size = 10) +
   ggplot2::theme(
+    strip.text.y.right = ggplot2::element_text(angle = 0, hjust = 0, size = 8, color = "white"),
+    strip.background = ggplot2::element_blank(),
+    panel.background = ggplot2::element_blank(),
+    panel.grid = ggplot2::element_blank(),
+    axis.text = ggplot2::element_blank(),
+    axis.ticks = ggplot2::element_blank(),
     plot.margin = ggplot2::margin(l = 70, r = 5, t = 0, b = 0, unit = "pt")
   )
 
@@ -388,7 +396,7 @@ print(gene_plot)
 
 ## Combined Figure
 
-```{r combined-figure, fig.height=3, fig.width=10}
+```{r combined-figure, fig.height=3.5, fig.width=10}
 # Combine BLAST hits and gene annotation
 # Keep legend only on blast_plot (left side, vertical)
 blast_plot_for_legend <- blast_plot  # Use original without gene labels for legend extraction
@@ -409,7 +417,7 @@ plots_combined <- cowplot::plot_grid(
   ncol = 1,
   align = "v",
   axis = "lr",
-  rel_heights = c(5.5, 0.5, 1.8)
+  rel_heights = c(5.5, 0.5, 1.9)
 )
 
 # Add legend on the left
@@ -436,7 +444,7 @@ ggplot2::ggsave(
   output_pdf,
   plot = combined_plot,
   width = 10,
-  height = 3,
+  height = 3.5,
   device = "pdf"
 )
 
@@ -444,7 +452,7 @@ ggplot2::ggsave(
   output_png,
   plot = combined_plot,
   width = 10,
-  height = 3,
+  height = 3.5,
   dpi = 300
 )
 
