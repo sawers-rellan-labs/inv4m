@@ -69,6 +69,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure S2 | GxE interaction plots (MI21 donor) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S3 | GxE effect sizes forest plot | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S4 | Internode analysis (4 panels: height, photos, schematic, profiles) | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) + photos | ✅ |
+| Figure S5 | WGCNA module bootstrap support | `field_perturbation/05_bootstrap_support.Rmd` | ⬜ Add to Overleaf |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
@@ -76,6 +77,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Table S1 | Inv4m breakpoints and knob repeats | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table S2 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
 | Table S3 | GxE interaction statistics (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
+| Table S4 | Module preservation statistics | `field_perturbation/06_preservation.Rmd` | ⬜ Add to Overleaf |
 | **Supporting Scripts** | | | |
 | Field perturbation pipeline | WGCNA consensus + preservation | `scripts/inversion_paper/field_perturbation/` (7 scripts) | ✅ |
 | WGCNA figure assembly | Figure 6 composition | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) | ✅ |
@@ -151,97 +153,6 @@ Hub gene coverage: 55/65 (85%)
 - `data/locus_labels_master.csv` - Master label file (391 genes)
 - `data/locus_labels_proposed_top50.csv` - First 50 LLM-proposed with rationale
 - `data/locus_labels_proposed_remaining.csv` - Remaining 219 LLM-proposed
-
----
-
-## Recent Updates
-
-**2026-01-23:** GxE and Internode integrated into manuscript + 5-genome microsynteny scripts:
-- ✅ **GxE methods/results** - Added to main.tex (3 environments: PSU2022, PSU2025, CLY2025)
-- ✅ **Internode methods/results** - Added to main.tex (CLY2025 field dissection)
-- ✅ **Supplementary table** - tab::gxe with GxE interaction statistics
-- ✅ **Supplementary figures** - fig::gxe_forest and fig::internode placeholders
-- ✅ **5-genome microsynteny scripts** - `download_CML_genomes.sh` and `run_microsynteny_5genomes.sh`
-  - Downloads CML457/CML459 from MaizeGDB
-  - Runs jcvi pipeline with B73, PT, TIL18, CML457, CML459
-  - Currently running on HPC
-
-**2026-01-21:** JMJ paralog-level analysis complete + GxE complete:
-- ✅ **JMJ paralog-level expression** - All 5 cluster members quantified (PSU2022)
-  - **Issue resolved:** V5 annotation incorrectly merges 4 JMJ paralogs into 16 chimeric transcripts
-  - **Solution:** Created corrected cDNA fasta with each paralog as separate entry
-  - Re-ran kallisto quantification with corrected reference (60 samples)
-  - Created `jmj_paralog_expression_boxplot.Rmd` showing jmj9, psi, jmj6, jmj2, jmj4
-  - Library size QC filtering applied (< 20M excluded, consistent with DEG analysis)
-  - HTML report: `docs/inversion_paper/jmj_paralog_expression_boxplot.html`
-- ✅ **GxE analysis** - Full 3-environment analysis (PSU2022, PSU2025, CLY2025)
-  - Refactored spatial correction scripts with path standardization
-  - GDD integration from NASA POWER temperature data
-  - 10 output CSVs + 3 supplementary figures (interaction plots, forest plot, temperature reaction norms)
-  - HTML report: `docs/shared_paper/inv4mGxE_3_env.html`
-
-**2026-01-20:** New analyses implementation:
-- ✅ **Internode measurements** - Complete! Created `internode_analysis.Rmd` with 4 figures + 4 CSVs
-  - Internode length profiles by position from top
-  - Node count comparison by genotype
-  - Height validation (sum of internodes vs direct measurement)
-  - Dissection validation
-- See: `scripts/00_agent_work/missing_analysis_plan_20260120.md`
-
-**2026-01-20:** Results writing and supplementary figures:
-- ✅ Drafted trans-network results section (136 genes, 552 edges, jmj4 neighborhood)
-- ✅ Drafted WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse: 98-99%)
-- ✅ Added PCNA2 + SMO4 cell proliferation expression boxplot (supplementary figure)
-- ✅ Created `SAM_morphology_analysis.Rmd` - DIC microscopy SAM measurements
-- ✅ Fixed undefined LaTeX references (fig::volcano → fig:transcriptome)
-- ✅ Gene annotation correction: Zm00001eb192850 uba2 → smo4 (NOP53 ortholog)
-
-**2026-01-06:** WGCNA Figure 6 implementation complete:
-- ✅ Created `assemble_WGCNA_figure.Rmd` - 3-panel composition (A: dendrogram, B: boxplot, C: hub scatter)
-- ✅ Added GO term annotations to delta kWithin boxplot (rrvgo-reduced, y=0.5)
-- ✅ Boxplots colored by module with `scale_fill_identity()`
-- ✅ Added WGCNA consensus methods to main.tex (Shahan et al. 2018 citation)
-- ✅ Figure output: `WGCNA_module_perturbation.pdf/png` (12x12 inch, heights 0.5:1:1)
-
-**2026-01-05:** Gene label consolidation for WGCNA hub gene plots:
-- ✅ Created `consolidate_locus_labels.R` - Hierarchical label consolidation
-- ✅ Filtered MaizeGDB markers (umc, pco, bnlg, pza, gpm, etc.) using consensus map analysis
-- ✅ Generated 269 LLM-proposed labels from PANNZER descriptions
-- ✅ Final coverage: 391/465 genes (84%), hub genes 55/65 (85%)
-- ✅ Hub connectivity plot updated with base_size=25, ggrepel labels size=5
-
-**2026-01-05:** JMJ cluster figure with expression boxplot:
-- ✅ Created `make_jmj_expression_boxplot.Rmd` - jmj2/jmj4 expression across tissues
-- ✅ Figure shows consistent downregulation in Inv4m across PSU2022 and Crow2020
-- ✅ Ionome-style boxplots with gold (B73) and purple (Inv4m) color scheme
-- ✅ Caption updated in main.tex with 3 panels (A: expression, B: microsynteny, C: transcripts)
-
-**2026-01-04:** WGCNA module perturbation figure planning:
-- ✅ Created handover document for WGCNA figure implementation
-- ✅ Figure 6: Boxplot colors by module, GO annotations, hub connectivity
-- ✅ Assembly notebook `assemble_WGCNA_figure.Rmd` created (see 2026-01-06)
-- ✅ Pipeline data: `results/inversion_paper/field_perturbation/run_20251231_201332/`
-
-**2026-01-02:** Figure 3 panel generation infrastructure for inversion paper revision:
-- ✅ Created `assemble_figure3_RNAseq.Rmd` - Assembly notebook for 8-panel composite figure
-- ✅ Created `volcano_plot_analysis.Rmd` - Dedicated volcano plot script (Panel C)
-- ✅ Updated `make_manhattan_plots.Rmd` - Dynamic DEG counts in titles (Panels D, E, G, H)
-- ✅ Updated `differential_expression_leaf_treatment_model.Rmd` - MDS saved as RDS (Panel B)
-- ✅ Panel infrastructure: RDS for ggplot panels (B, C), PNG for raster panels (A, D-H)
-- ⚠️ Panel F (haplotype) needs ggsave update in genotype script
-- ⚠️ Figure composition needs final refinement
-
-**2025-12-23:** All inversion paper analysis scripts (8/8) are now fully operational and path-standardized:
-- ✅ Fixed `Crow2020_reanalysis.Rmd` - Removed hard-coded server paths
-- ✅ Standardized all output paths to use `paths$intermediate`
-- ✅ Removed vestigial directory creation code
-- ✅ All scripts render successfully with outputs in correct locations
-- ✅ 100% conformance to project directory structure
-
-**2025-12-22:** Completed phosphorus paper analysis pipeline:
-- ✅ All 12 scripts path-standardized and rendering successfully
-- ✅ Complete figure/table coverage mapped and verified
-- ✅ Infrastructure utilities (`setup_paths.R`, `render_notebook.R`) in place
 
 ---
 
