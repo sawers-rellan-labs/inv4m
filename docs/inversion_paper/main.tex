@@ -533,23 +533,25 @@ Flanking vs Outside &
 \end{table*}
 
 
-\subsection*{Leaf stage cause global changes in gene expression, while \invfour introgression drives local transcriptional effects.}
+\subsection*{Leaf developmental stage drives global transcriptional changes while \invfour effects are predominantly local}
 
-Our analysis of leaf transcriptome data revealed distinct patterns of gene expression driven by developmental stage, and \invfour introgression.
-The third dimension of expressionn MDS, with 8\% of explained variance, is associated with \invfour, separating samples by  genotype ($r=0.92$, $\textit{FDR} = 2.06\times 10^{-17}$).
-Out of 24011  genes detected in at least one leaf sample, we found 8159 differential expressed genes responding to leaf stage,In contrast, significant transcriptional responses to the \invfour introgression were predominantly localized to the inversion and its flanking regions (Fig~\ref{fig::RNAseq} F).
-To characterize the distribution of \invfour responsive genes, we classified differentially expressed genes (DEGs) according to their physical and genetic linkage to the inversion.
-We defined \textit{trans} regulated genes as those outside the inversion and its surrounding linkage drag, while \textit{cis} regulated genes were those within the 39 Mb shared introgression spanning the inversion.
-The distribution of DEGs responsive to \invfour introgression in the genome by location relative to the \invfour locus is presented in Table~\ref{tab:DEGs_distro}.
-Among the 970 DEGs responding to \invfour introgression, 646 were \textit{trans} regulated while 324 were regulated in \textit{cis}.
-The \textit{cis} regulated genes were proportionally distributed  (Fisher's exact test $p=0.28$) between the flanking regions (183 genes in 24 Mb) and \invfour proper (141 genes in 15 Mb).
-DEGs responding to \invfour were 40 times more likely to originate from the shared introgression (Fisher's exact test $p=2.38 \times 10^{-300}$) and 45 times more likely to come from the inversion proper compared to \textit{trans} regulated genes (Fisher's exact test $p=2.73 \times 10^{-142}$).
-This locus enrichment was even more pronounced among DEGs with high magnitude response, $log_2[\text{FC}]>2$, hereafter named top DEGs.
-Of 139 top DEGs, 96 were located in \textit{cis} (61 in flanking regions, 35 in \invfour proper) and 43 in \textit{trans}, representing 70\% and 35\% of top DEGs in the shared introgression and inversion proper, respectively. 
-These top DEGs were 102 times more likely to originate from the shared introgression, 112 times more likely from the flanking segments, and 87 times more likely from the \invfour proper compared to \textit{trans} regulated genes (Fisher's exact test $p < 1 \times 10^{-48}$).
-The peak of significance for differential expression due to \invfour introgression is located inside \invfour proper and corresponds to the cluster of \textit{JUMONJI} DNA demethylases that includes \jmjii, \jmjvi and \jmjiv (Fig~\ref{fig::RNAseq} F to I).
-However, the distributions of \textit{p-values} for differential expression due to \invfour do not differ between \invfour proper and flanking regions, while both regions have excess significance relative to the rest of the genome (Kolmogorov–Smirnov test $p=0.29$ and $p\leq 2.26 \times 10^{-16}$ respectively, Supplementary Figure S ).
-Although a majority of the DEGs in \invfour proper are downregulated (82 genes, 58\%), the proportion of repressed genes is not different to that in the flanking the regions (102 genes, 56\%) (Fisher's exact test $p=0.73$) with a similar result for top DEGs (Fisher's exact test $p=0.39$).
+To characterize the transcriptional landscape of \invfour introgression, we performed RNA-seq on leaves sampled across a developmental gradient from field-grown NILs. Multidimensional scaling (MDS) of gene expression revealed three major axes of variation (Fig~\ref{fig:transcriptome}A-B). The first two dimensions captured 38\% of total variance, corresponding to phosphorus treatment (26\%) and leaf developmental stage (12\%), as described in detail in our companion study \citep{rodriguez2026phosphorus}. The third dimension explained 8\% of variance and strongly correlated with genotype ($r = 0.92$, $\textit{FDR} = 2.06 \times 10^{-17}$), clearly separating \invfour from CTRL samples.
+
+The spatial distribution of differentially expressed genes (DEGs) revealed a striking contrast between leaf stage and \invfour effects (Fig~\ref{fig:transcriptome}D-E). Leaf developmental stage produced a genome-wide transcriptional response, with significant DEGs distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D). In contrast, the \invfour effect was sharply localized: a prominent peak of differential expression on chromosome 4 corresponded precisely to the introgressed region (Fig~\ref{fig:transcriptome}E).
+
+To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}). DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$). This enrichment was even stronger among high-confidence DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 high-confidence DEGs in the shared introgression represented a 141-fold enrichment over genomic background. Notably, there was no significant difference in DEG density between \invfour proper and the flanking regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment.
+
+The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I). These genes showed the strongest downregulation in \invfour plants, with \jmjii exhibiting a $\log_2 \text{FC} = -3.49$ ($\textit{FDR} < 10^{-20}$).
+
+% TODO: Add to Inv4m.bib:
+% @article{rodriguez2026phosphorus,
+%   author = {Rodr\'{i}guez-Zapata, Fausto and Stokes, Ruthie and Barnes, Allison C. and Tandukar, Nirwan and P\'{e}rez-Lim\'{o}n, Sergio and Perryman, Melanie and Pi\~{n}eros, Miguel A. and Ojeda-Rivera, Jonathan Odil\'{o}n and Runcie, Daniel and Sawers, Ruairidh and Rell\'{a}n-\'{A}lvarez, Rub\'{e}n},
+%   title = {Multi-Omics of Maize Chromosomal Inversion {Inv4m} in Phosphorus Deficiency Show Typical Starvation Responses with Leaf-Age Dependency, Rather Than Adaptive Contributions From the Inverted Karyotype},
+%   journal = {bioRxiv},
+%   year = {2026},
+%   note = {preprint},
+%   doi = {10.1101/XXXX}
+% }
 
 
 \begin{table*}[!ht]
@@ -767,8 +769,7 @@ kinase)\end{tabular} &
 \end{table*}
 
 
-\subsection{WGCNA shows \invfour perturpation of existing coexpression modules in
-B73 plants}
+\subsection{WGCNA shows that \invfour introgression disrupts extant coexpression modules of the B73 genomic background}
 
 To assess whether the \invfour introgression causes broader network-level
 perturbations beyond individual DEGs, we performed weighted gene coexpression
@@ -828,8 +829,7 @@ the transcriptome.
 
 \clearpage
 
-\subsection{Trans-regulatory network analysis reveals epigenetic regulators
-connecting \invfour to genome-wide expression changes}
+\subsection{Trans-regulatory network analysis detects potential \invfour epigenetic regulators acting on a growth related module }
 
 To investigate the potential trans-regulatory effects of the \invfour
 chromosomal inversion, we constructed a coexpression network linking DEGs
