@@ -1711,15 +1711,27 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 
 \begin{table}[!ht]
-\caption{\textbf{WGCNA module preservation statistics.} Summary of consensus module preservation between CTRL and \invfour genotypes. Adjacency correlation measures the similarity of within-module connectivity patterns between genotypes. Bootstrap support (LFP) indicates module stability in CTRL samples across 1000 iterations. Preservation status: Disrupted ($r < 0.3$), Weak ($0.3 \leq r < 0.5$). All modules show substantial disruption in \invfour, with adjacency correlations ranging from $-0.14$ (purple) to $0.42$ (turquoise).}
+\caption{\textbf{WGCNA module preservation statistics.} Summary of consensus module preservation between CTRL and \invfour genotypes. Adjacency correlation measures the similarity of within-module connectivity patterns between genotypes. $\Delta k_{Within}$ indicates median change in intramodular connectivity (negative = loss). Bootstrap support (LFP) indicates module stability in CTRL samples across 1000 iterations. All modules show reduced connectivity in \invfour, with adjacency correlations ranging from $-0.14$ to $0.42$.}
 \label{tab::preservation}
 \centering
 \small
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-Module & Genes & Adj. Corr. & $\Delta k_{Within}$ & Bootstrap Support & Status \\
+Module & Genes & Adj. Corr. & $\Delta k_{Within}$ & Bootstrap Support \\
 \midrule
-\textit{[Table to be generated from preservation\_summary.csv]} & & & & & \\
+blue & 51 & 0.01 & $-0.71$ & 0.79 \\
+yellow & 36 & 0.06 & $-0.59$ & 0.68 \\
+brown & 46 & 0.19 & $-0.59$ & 0.68 \\
+pink & 30 & 0.02 & $-0.54$ & 0.72 \\
+tan & 12 & 0.41 & $-0.54$ & 0.68 \\
+greenyellow & 16 & 0.28 & $-0.51$ & 0.80 \\
+black & 32 & 0.33 & $-0.47$ & 0.69 \\
+purple & 22 & $-0.14$ & $-0.43$ & 0.74 \\
+green & 36 & 0.14 & $-0.39$ & 0.69 \\
+red & 34 & 0.16 & $-0.32$ & 0.63 \\
+turquoise & 55 & 0.42 & $-0.19$ & 0.54 \\
+magenta & 24 & 0.07 & $-0.08$ & 0.71 \\
+salmon & 11 & $-0.03$ & 0.01 & 0.52 \\
 \bottomrule
 \end{tabular}
 \end{table}

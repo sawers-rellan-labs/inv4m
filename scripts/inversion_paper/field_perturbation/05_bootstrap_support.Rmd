@@ -368,7 +368,8 @@ cat("Progress tracking functions defined\n")
 log_progress("=== STARTING CTRL BOOTSTRAP SUPPORT ===")
 
 # Configure parallelization
-n_cores <- max(1, parallel::detectCores() - 1)
+detected_cores <- parallel::detectCores()
+n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
 plan(multisession, workers = n_cores)
 
 log_progress("CTRL: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
@@ -648,6 +649,17 @@ ggsave(
   p_ctrl,
   width = 10, height = 6
 )
+ggsave(
+  file.path(OUTPUT_DIR, "ctrl", "module_support_plot.png"),
+  p_ctrl,
+  width = 10, height = 6, dpi = 300
+)
+# Also save as module_support.png for Overleaf (matches main.tex reference)
+ggsave(
+  file.path(OUTPUT_DIR, "ctrl", "module_support.png"),
+  p_ctrl,
+  width = 10, height = 6, dpi = 300
+)
 ```
 
 ---
@@ -692,6 +704,11 @@ ggsave(
   file.path(OUTPUT_DIR, "inv4m", "module_support_plot.pdf"),
   p_inv4m,
   width = 10, height = 6
+)
+ggsave(
+  file.path(OUTPUT_DIR, "inv4m", "module_support_plot.png"),
+  p_inv4m,
+  width = 10, height = 6, dpi = 300
 )
 ```
 

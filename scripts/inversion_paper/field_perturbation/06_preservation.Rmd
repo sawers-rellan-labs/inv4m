@@ -471,6 +471,33 @@ write_csv(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.csv"
 write_csv(disrupted_modules, file.path(OUTPUT_DIR, "disrupted_modules.csv"))
 saveRDS(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.rds"))
 
+# Generate LaTeX table for Overleaf (sorted by descending |Δ kWithin|)
+preservation_latex <- preservation_summary %>%
+  arrange(desc(abs(median_delta_k))) %>%
+  dplyr::select(
+    Module = color,
+    Genes = n_genes,
+    `Adj. Corr.` = adjacency_correlation,
+    `Δ kWithin` = median_delta_k,
+    `Bootstrap Support` = ctrl_lfp
+  ) %>%
+  mutate(
+    `Adj. Corr.` = round(`Adj. Corr.`, 2),
+    `Δ kWithin` = round(`Δ kWithin`, 2),
+    `Bootstrap Support` = round(`Bootstrap Support`, 2)
+  )
+
+# Write LaTeX table
+latex_table <- knitr::kable(
+  preservation_latex,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "WGCNA module preservation statistics between CTRL and Inv4m genotypes.",
+  label = "preservation"
+)
+writeLines(latex_table, file.path(OUTPUT_DIR, "preservation_table.tex"))
+cat("Saved: preservation_table.tex\n")
+
 {
   cat("\n=== INTEGRATED PRESERVATION SUMMARY ===\n")
   cat("Total modules:", nrow(preservation_summary), "\n")
