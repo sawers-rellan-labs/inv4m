@@ -1,0 +1,387 @@
+---
+title: "JMJ Pink Module Characterization"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+# Overview
+
+**Purpose**: Characterize the pink WGCNA module, which contains the JMJ2/JMJ4
+histone demethylase cluster. This post-hoc analysis explores the functional
+coherence of genes co-expressed with JMJ2/JMJ4 in CTRL samples.
+
+**Key findings**:
+
+- The pink module contains 30 DEGs including jmj2 and jmj4
+- GO enrichment reveals "positive regulation of growth" driven by jmj2/jmj4
+- Module includes DNA replication (rfc3), ribosome biogenesis, and chromatin genes
+- Supports the hypothesis that JMJ2/JMJ4 are epigenetic regulators of growth
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(knitr)
+})
+
+# Load project paths
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+```{r define_paths}
+# Field perturbation run directory
+run_dir <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+
+# Input files
+CONSENSUS_FILE <- file.path(run_dir, "04_consensus_networks/ctrl/consensus_modules.csv")
+GO_BP_FILE <- file.path(run_dir, "07_module_annotation/all_modules_GO_BP.csv")
+LABELS_FILE <- here("data", "locus_labels_master.csv")
+
+# Verify files exist
+stopifnot(file.exists(CONSENSUS_FILE))
+stopifnot(file.exists(GO_BP_FILE))
+stopifnot(file.exists(LABELS_FILE))
+
+cat("All input files found.\n")
+```
+
+---
+
+# Load Data
+
+```{r load_data}
+# Load CTRL consensus module assignments
+ctrl_modules <- read_csv(CONSENSUS_FILE, show_col_types = FALSE)
+
+# Load GO BP enrichment results
+go_bp <- read_csv(GO_BP_FILE, show_col_types = FALSE)
+
+# Load gene annotations with expression data
+labels <- read_csv(LABELS_FILE, show_col_types = FALSE)
+
+cat("Loaded", nrow(ctrl_modules), "genes with module assignments\n")
+cat("Loaded", nrow(go_bp), "GO BP enrichment terms\n")
+cat("Loaded", nrow(labels), "gene annotations\n")
+```
+
+---
+
+# Pink Module Genes
+
+The pink module contains jmj2 and jmj4, the JUMONJI histone demethylases that
+are consistently downregulated in Inv4m plants.
+
+```{r extract_pink_module}
+# Extract pink module genes
+pink_genes <- ctrl_modules %>%
+  filter(color == "pink") %>%
+  pull(gene)
+
+cat("Pink module contains", length(pink_genes), "genes\n")
+
+# Verify jmj2/jmj4 are present
+jmj_genes <- c("Zm00001eb191790", "Zm00001eb191820")
+cat("jmj2 in pink module:", jmj_genes[1] %in% pink_genes, "\n")
+cat("jmj4 in pink module:", jmj_genes[2] %in% pink_genes, "\n")
+```
+
+---
+
+# Annotated DEG Table
+
+Table sorted by statistical significance (FDR, ascending = most significant first).
+
+```{r annotate_pink_genes}
+# Join pink genes with annotations
+pink_annotated <- ctrl_modules %>%
+  filter(color == "pink") %>%
+  left_join(labels, by = "gene") %>%
+  mutate(
+    # Use locus_label if available, else locus_symbol
+    symbol = case_when(
+      !is.na(locus_label) & locus_label != "" ~ locus_label,
+      !is.na(locus_symbol) & locus_symbol != "" ~ locus_symbol,
+      TRUE ~ "—"
+    ),
+    # Clean up description - use desc_merged or desc_pannzer
+    description = case_when(
+      !is.na(desc_merged) & desc_merged != "" ~ desc_merged,
+      !is.na(desc_pannzer) & desc_pannzer != "" ~ desc_pannzer,
+      TRUE ~ "—"
+    ),
+    # Format log2FC and FDR
+    log2FC = round(logFC, 2),
+    FDR_val = adj.P.Val
+  ) %>%
+  # Sort by FDR (most significant first)
+  arrange(FDR_val) %>%
+  select(gene, symbol, description, log2FC, FDR_val)
+
+# Display count
+cat("Annotated", nrow(pink_annotated), "pink module genes\n")
+```
+
+```{r display_table}
+# Create formatted table
+pink_table <- pink_annotated %>%
+  mutate(
+    FDR = formatC(FDR_val, format = "e", digits = 1),
+    # Truncate long descriptions
+    description = str_trunc(description, 50)
+  ) %>%
+  select(gene, symbol, description, log2FC, FDR)
+
+# Display with kable
+kable(
+  pink_table,
+  col.names = c("Gene ID", "Label", "Description", "log2FC", "FDR"),
+  caption = "Pink module DEGs sorted by statistical significance (FDR)"
+)
+```
+
+---
+
+# GO Enrichment for Pink Module
+
+```{r go_enrichment}
+# Filter GO BP results for pink module
+pink_go <- go_bp %>%
+  filter(module_color == "pink") %>%
+  arrange(pvalue) %>%
+  select(ID, Description, GeneRatio, pvalue, Count, geneID) %>%
+  mutate(
+    pvalue_fmt = formatC(pvalue, format = "e", digits = 2),
+    Description = str_trunc(Description, 60)
+  )
+
+cat("Pink module has", nrow(pink_go), "enriched GO BP terms\n")
+```
+
+```{r display_go_table}
+# Display top GO terms
+kable(
+  pink_go %>%
+    head(15) %>%
+    select(ID, Description, GeneRatio, pvalue_fmt, Count),
+  col.names = c("GO ID", "Description", "Gene Ratio", "p-value", "Count"),
+  caption = "Top 15 GO Biological Process terms for pink module"
+)
+```
+
+---
+
+# Growth-Related Genes
+
+Highlight genes related to growth, cell cycle, and cell proliferation.
+
+```{r growth_genes}
+# Define growth-related GO terms
+growth_go_ids <- pink_go %>%
+  filter(grepl("growth|proliferation|cell cycle|chromatin|epigenetic|ribosom",
+               Description, ignore.case = TRUE)) %>%
+  pull(ID)
+
+# Extract genes from these terms
+growth_gene_string <- pink_go %>%
+  filter(ID %in% growth_go_ids) %>%
+  pull(geneID) %>%
+  paste(collapse = "/")
+
+growth_genes <- unique(unlist(str_split(growth_gene_string, "/")))
+
+cat("Growth-related genes in pink module:", length(growth_genes), "\n")
+
+# Annotate growth genes
+growth_annotated <- pink_annotated %>%
+  filter(gene %in% growth_genes) %>%
+  mutate(
+    FDR = formatC(FDR_val, format = "e", digits = 1)
+  ) %>%
+  select(gene, symbol, description, log2FC, FDR)
+
+kable(
+  growth_annotated,
+  col.names = c("Gene ID", "Symbol", "Description", "log2FC", "FDR"),
+  caption = "Pink module genes in growth-related GO terms"
+)
+```
+
+---
+
+# Functional Categories
+
+```{r functional_categories}
+# Manually categorize key genes
+categories <- tribble(
+  ~category, ~genes, ~description,
+  "Epigenetic regulators", "jmj2, jmj4, swc6", "Histone demethylases and chromatin remodeling",
+  "DNA replication", "rfc3", "Replication factor C - cell cycle progression",
+  "Ribosome biogenesis", "rpl29, rps8, rps18, ddx14, noc2, bcd135b", "Protein synthesis capacity for growth",
+  "Translation initiation", "eif2b, eif2b2, lurp8", "Translation machinery",
+  "Growth signaling", "bpg2", "Brassinosteroid pathway - growth regulation"
+)
+
+kable(
+  categories,
+  col.names = c("Category", "Genes", "Biological Role"),
+  caption = "Functional categories in the pink module"
+)
+```
+
+---
+
+# Summary
+
+The pink module represents a coherent **growth/chromatin regulatory network**
+centered on the JMJ2/JMJ4 histone demethylases:
+
+1. **Epigenetic control**: jmj2/jmj4 (histone demethylation) and swc6 (chromatin remodeling)
+2. **Cell proliferation machinery**: rfc3 (DNA replication), ribosomal proteins
+3. **Translation capacity**: Multiple translation initiation factors
+4. **Growth signaling**: bpg2 (brassinosteroid pathway)
+
+The GO enrichment confirms:
+
+- **"Positive regulation of growth"** (p = 0.0017) - driven by jmj2/jmj4
+- **"Ribosome biogenesis"** (p = 0.0003) - protein synthesis capacity
+- **"Chromatin remodeling"** (p = 0.013) - epigenetic regulation
+
+This supports the hypothesis that JMJ2/JMJ4 downregulation in Inv4m disrupts
+a coordinated program of epigenetic regulation and growth-related gene expression.
+
+---
+
+# Save Outputs
+
+```{r save_outputs}
+# Save annotated table (CSV)
+write_csv(
+  pink_annotated %>%
+    mutate(FDR = formatC(FDR_val, format = "e", digits = 2)) %>%
+    select(gene, symbol, description, log2FC, FDR),
+  file.path(paths$intermediate, "pink_module_annotated_DEGs.csv")
+)
+
+# Save GO enrichment
+write_csv(
+  pink_go %>% select(-pvalue_fmt),
+  file.path(paths$intermediate, "pink_module_GO_BP.csv")
+)
+
+cat("\nSaved outputs:\n")
+cat("  - pink_module_annotated_DEGs.csv\n")
+cat("  - pink_module_GO_BP.csv\n")
+```
+
+```{r generate_latex_table}
+# Generate LaTeX table for main.tex
+latex_header <- '\\begin{table}[!ht]
+\\caption{\\textbf{Pink module DEGs co-expressed with \\jmjii/\\jmjiv.} Genes assigned to the pink WGCNA consensus module, which contains the JMJ2/JMJ4 histone demethylase cluster. Sorted by statistical significance (FDR). GO enrichment for this module includes ``positive regulation of growth\'\' ($p = 0.0017$) and ``ribosome biogenesis\'\' ($p = 0.0003$).}
+\\label{tab::pink_module}
+\\centering
+\\small
+\\begin{tabular}{@{}lllrr@{}}
+\\toprule
+\\textbf{Gene ID} & \\textbf{Label} & \\textbf{Description} & \\textbf{log$_2$FC} & \\textbf{FDR} \\\\
+\\midrule'
+
+latex_footer <- '\\bottomrule
+\\end{tabular}
+\\end{table}'
+
+# Format each row
+format_latex_row <- function(gene, symbol, desc, log2fc, fdr) {
+  # Format label
+  label <- if (is.na(symbol) || symbol == "" || symbol == "—") {
+    "---"
+  } else {
+    paste0("\\textit{", symbol, "}")
+  }
+
+  # Format description
+  desc_clean <- if (is.na(desc) || desc == "" || desc == "—") {
+    "---"
+  } else {
+    str_trunc(desc, 40) %>%
+      str_replace_all("_", "\\\\_") %>%
+      str_replace_all("&", "\\\\&") %>%
+      str_replace_all("%", "\\\\%")
+  }
+
+  # Format log2FC with sign
+  log2fc_fmt <- if (log2fc >= 0) {
+    paste0("$+", sprintf("%.2f", log2fc), "$")
+  } else {
+    paste0("$", sprintf("%.2f", log2fc), "$")
+  }
+
+  # Format FDR in scientific notation
+  fdr_exp <- floor(log10(fdr))
+  fdr_mant <- fdr / 10^fdr_exp
+  fdr_fmt <- paste0("$", sprintf("%.1f", fdr_mant), " \\times 10^{", fdr_exp, "}$")
+
+  paste(gene, label, desc_clean, log2fc_fmt, fdr_fmt, sep = " & ", collapse = "") %>%
+    paste0(" \\\\")
+}
+
+# Generate all rows
+latex_rows <- pink_annotated %>%
+  rowwise() %>%
+  mutate(
+    latex_row = format_latex_row(gene, symbol, description, log2FC, FDR_val)
+  ) %>%
+  pull(latex_row)
+
+# Combine into full table
+latex_table <- paste(
+  latex_header,
+  paste(latex_rows, collapse = "\n"),
+  latex_footer,
+  sep = "\n"
+)
+
+# Save to tables folder
+writeLines(latex_table, file.path(paths$tables, "pink_module_DEGs.tex"))
+
+cat("\nLaTeX table saved:\n")
+cat("  - tables/pink_module_DEGs.tex\n")
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

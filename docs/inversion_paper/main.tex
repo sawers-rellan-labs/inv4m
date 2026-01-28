@@ -1710,6 +1710,16 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 \clearpage
 
 
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=0.9\linewidth]{figs/go_enrichment_BP_rrvgo.png}
+\caption{\textbf{Gene Ontology enrichment of WGCNA consensus modules.} Bubble plot showing Biological Process (BP) GO term enrichment for each CTRL consensus module. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). GO terms were reduced using rrvgo semantic similarity to eliminate redundancy. Module labels include gene counts in parentheses. Notable enrichments include chromatin organization (blue module), translation (brown), and cellular response to stress (yellow).}
+\label{fig::module_go}
+\end{figure*}
+
+\clearpage
+
+
 \begin{table}[!ht]
 \caption{\textbf{WGCNA module preservation statistics.} Summary of consensus module preservation between CTRL and \invfour genotypes. Adjacency correlation measures the similarity of within-module connectivity patterns between genotypes. $\Delta k_{Within}$ indicates median change in intramodular connectivity (negative = loss). Bootstrap support (LFP) indicates module stability in CTRL samples across 1000 iterations. All modules show reduced connectivity in \invfour, with adjacency correlations ranging from $-0.14$ to $0.42$.}
 \label{tab::preservation}
@@ -1736,6 +1746,49 @@ salmon & 11 & $-0.03$ & 0.01 & 0.52 \\
 \end{tabular}
 \end{table}
 
+
+\begin{table}[!ht]
+\caption{\textbf{Pink module DEGs co-expressed with \jmjii/\jmjiv.} Genes assigned to the pink WGCNA consensus module, which contains the JMJ2/JMJ4 histone demethylase cluster. Sorted by statistical significance (FDR). GO enrichment for this module includes ``positive regulation of growth'' ($p = 0.0017$) and ``ribosome biogenesis'' ($p = 0.0003$).}
+\label{tab::pink_module}
+\centering
+\small
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+\textbf{Gene ID} & \textbf{Label} & \textbf{Description} & \textbf{log$_2$FC} & \textbf{FDR} \\
+\midrule
+Zm00001eb191790 & \textit{jmj2} & JUMONJI-transcription factor 2 & $-3.49$ & $1.2 \times 10^{-22}$ \\
+Zm00001eb191820 & \textit{jmj4} & JUMONJI-transcription factor 4 & $-2.84$ & $1.9 \times 10^{-20}$ \\
+Zm00001eb188750 & \textit{hsp70-17} & Heat shock 70 kDa protein 17 & $-6.48$ & $6.9 \times 10^{-15}$ \\
+Zm00001eb196760 & --- & --- & $-8.29$ & $9.2 \times 10^{-14}$ \\
+Zm00001eb195120 & \textit{swc6} & SWR1 complex subunit 6 & $-1.15$ & $6.4 \times 10^{-13}$ \\
+Zm00001eb196830 & \textit{pan1} & PAN domain-containing protein & $-5.35$ & $3.9 \times 10^{-11}$ \\
+Zm00001eb249540 & \textit{rpl29} & 50S ribosomal protein L29, chloroplastic & $+4.41$ & $6.9 \times 10^{-10}$ \\
+Zm00001eb192350 & \textit{pkwd1} & Protein kinase family protein / WD-40... & $-2.20$ & $1.9 \times 10^{-9}$ \\
+Zm00001eb195790 & \textit{traf1} & TRAF-type domain-containing protein & $+3.15$ & $3.4 \times 10^{-9}$ \\
+Zm00001eb192360 & \textit{ppr5} & Pentatricopeptide repeat-containing p... & $-0.89$ & $6.9 \times 10^{-9}$ \\
+Zm00001eb195560 & \textit{lurp8} & Protein LURP-one-related 8 & $-5.49$ & $5.3 \times 10^{-8}$ \\
+Zm00001eb360380 & --- & --- & $+0.60$ & $1.5 \times 10^{-4}$ \\
+Zm00001eb188350 & \textit{rfc3} & Replication factor C subunit 3 & $-0.83$ & $1.8 \times 10^{-4}$ \\
+Zm00001eb194610 & \textit{yae1} & Essential protein Yae1 N-terminal dom... & $-2.54$ & $4.1 \times 10^{-4}$ \\
+Zm00001eb193640 & \textit{ycge} & HTH-type transcriptional repressor YcgE & $+0.95$ & $5.8 \times 10^{-4}$ \\
+Zm00001eb195550 & \textit{eif2b2} & Eukaryotic translation initiation fac... & $+0.98$ & $1.7 \times 10^{-3}$ \\
+Zm00001eb196080 & \textit{bpg2} & GTP-binding protein BRASSINAZOLE INSE... & $+0.45$ & $2.0 \times 10^{-3}$ \\
+Zm00001eb122880 & \textit{ddx14} & DEAD-box ATP-dependent RNA helicase 14 & $-0.23$ & $2.0 \times 10^{-2}$ \\
+Zm00001eb220970 & \textit{noc2} & Nucleolar complex protein 2-like protein & $-0.35$ & $2.0 \times 10^{-2}$ \\
+Zm00001eb017010 & \textit{sec} & Secreted protein & $-1.47$ & $2.0 \times 10^{-2}$ \\
+Zm00001eb353990 & \textit{cchh1} & Transcription factor IIIA & $-0.33$ & $2.4 \times 10^{-2}$ \\
+Zm00001eb432550 & \textit{bcd135b} & Ribosomal RNA processing protein A & $-0.43$ & $2.7 \times 10^{-2}$ \\
+Zm00001eb330750 & \textit{eif2b} & Eukaryotic translation initiation fac... & $-0.27$ & $3.3 \times 10^{-2}$ \\
+Zm00001eb194670 & \textit{degp9} & Protease Do-like protein 9 & $-0.29$ & $3.9 \times 10^{-2}$ \\
+Zm00001eb205670 & \textit{rps8} & 40S ribosomal protein S8 & $-0.34$ & $4.4 \times 10^{-2}$ \\
+Zm00001eb080580 & --- & --- & $-0.34$ & $4.4 \times 10^{-2}$ \\
+Zm00001eb012770 & \textit{rps18} & Ribosomal protein S18 & $-0.26$ & $4.4 \times 10^{-2}$ \\
+Zm00001eb273610 & \textit{cchh40} & Zinc finger CCCH domain-containing pr... & $-0.22$ & $4.5 \times 10^{-2}$ \\
+Zm00001eb126770 & \textit{cl59140\_1} & --- & $-0.35$ & $4.6 \times 10^{-2}$ \\
+Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0.28$ & $4.8 \times 10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
 \end{document}
