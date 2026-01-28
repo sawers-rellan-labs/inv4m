@@ -11,7 +11,7 @@
 
 <meta name="author" content="Analysis Pipeline" />
 
-<meta name="date" content="2026-01-22" />
+<meta name="date" content="2026-01-28" />
 
 <title>JMJ Paralog Expression Boxplot (PSU2022)</title>
 
@@ -1570,7 +1570,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">JMJ Paralog Expression Boxplot
 (PSU2022)</h1>
 <h4 class="author">Analysis Pipeline</h4>
-<h4 class="date">2026-01-22</h4>
+<h4 class="date">2026-01-28</h4>
 
 </div>
 
@@ -2261,130 +2261,6 @@ cat(&quot;\n\nTwo-way ANOVA (genotype × tissue):\n&quot;)</code></pre>
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 </div>
-<div id="chi-square-test-does-inv4m-expression-match-copy-number-expectation" class="section level2">
-<h2>Chi-Square Test: Does Inv4m Expression Match Copy Number
-Expectation?</h2>
-<p><strong>Null hypothesis:</strong> Expression scales linearly with
-copy number. If B73 has 5 copies and Inv4m has 1 copy, then under H0: -
-Expected ratio = 5:1 (B73 : Inv4m) - Inv4m should contribute 1/6 = 16.7%
-of combined expression</p>
-<pre class="r"><code># Get total counts (summed across all samples) for each genotype
-total_by_genotype &lt;- jmj_total %&gt;%
-  group_by(genotype) %&gt;%
-  summarise(
-    total_counts = sum(total_counts),
-    n_samples = n(),
-    .groups = &quot;drop&quot;
-  )
-
-cat(&quot;=== CHI-SQUARE GOODNESS OF FIT TEST ===\n\n&quot;)</code></pre>
-<pre><code>## === CHI-SQUARE GOODNESS OF FIT TEST ===</code></pre>
-<pre class="r"><code>cat(&quot;H0: Expression ratio matches copy number ratio (5:1)\n&quot;)</code></pre>
-<pre><code>## H0: Expression ratio matches copy number ratio (5:1)</code></pre>
-<pre class="r"><code>cat(&quot;H1: Inv4m expression is less than expected from copy number\n\n&quot;)</code></pre>
-<pre><code>## H1: Inv4m expression is less than expected from copy number</code></pre>
-<pre class="r"><code># Observed counts
-obs_B73 &lt;- total_by_genotype$total_counts[total_by_genotype$genotype == &quot;B73&quot;]
-obs_Inv4m &lt;- total_by_genotype$total_counts[total_by_genotype$genotype == &quot;Inv4m&quot;]
-total_obs &lt;- obs_B73 + obs_Inv4m
-
-cat(&quot;Observed total counts:\n&quot;)</code></pre>
-<pre><code>## Observed total counts:</code></pre>
-<pre class="r"><code>cat(&quot;  B73:   &quot;, format(round(obs_B73), big.mark = &quot;,&quot;), &quot;\n&quot;)</code></pre>
-<pre><code>##   B73:    64,582</code></pre>
-<pre class="r"><code>cat(&quot;  Inv4m: &quot;, format(round(obs_Inv4m), big.mark = &quot;,&quot;), &quot;\n&quot;)</code></pre>
-<pre><code>##   Inv4m:  8,659</code></pre>
-<pre class="r"><code>cat(&quot;  Total: &quot;, format(round(total_obs), big.mark = &quot;,&quot;), &quot;\n\n&quot;)</code></pre>
-<pre><code>##   Total:  73,241</code></pre>
-<pre class="r"><code># Observed proportion
-obs_prop_inv4m &lt;- obs_Inv4m / total_obs
-cat(&quot;Observed Inv4m proportion:&quot;, round(obs_prop_inv4m * 100, 2), &quot;%\n&quot;)</code></pre>
-<pre><code>## Observed Inv4m proportion: 11.82 %</code></pre>
-<pre class="r"><code>cat(&quot;Expected under H0 (1/6):  &quot;, round(100/6, 2), &quot;%\n\n&quot;)</code></pre>
-<pre><code>## Expected under H0 (1/6):   16.67 %</code></pre>
-<pre class="r"><code># Expected counts under H0 (5:1 ratio = 5/6 : 1/6)
-exp_B73 &lt;- total_obs * (5/6)
-exp_Inv4m &lt;- total_obs * (1/6)
-
-cat(&quot;Expected counts under H0 (5:1 ratio):\n&quot;)</code></pre>
-<pre><code>## Expected counts under H0 (5:1 ratio):</code></pre>
-<pre class="r"><code>cat(&quot;  B73:   &quot;, format(round(exp_B73), big.mark = &quot;,&quot;), &quot;\n&quot;)</code></pre>
-<pre><code>##   B73:    61,034</code></pre>
-<pre class="r"><code>cat(&quot;  Inv4m: &quot;, format(round(exp_Inv4m), big.mark = &quot;,&quot;), &quot;\n\n&quot;)</code></pre>
-<pre><code>##   Inv4m:  12,207</code></pre>
-<pre class="r"><code># Chi-square goodness of fit test
-observed &lt;- c(obs_B73, obs_Inv4m)
-expected_prop &lt;- c(5/6, 1/6)
-
-chisq_result &lt;- chisq.test(observed, p = expected_prop)
-
-cat(&quot;Chi-square test result:\n&quot;)</code></pre>
-<pre><code>## Chi-square test result:</code></pre>
-<pre class="r"><code>cat(&quot;  X² =&quot;, round(chisq_result$statistic, 2), &quot;\n&quot;)</code></pre>
-<pre><code>##   X² = 1237.56</code></pre>
-<pre class="r"><code>cat(&quot;  df =&quot;, chisq_result$parameter, &quot;\n&quot;)</code></pre>
-<pre><code>##   df = 1</code></pre>
-<pre class="r"><code>cat(&quot;  p  =&quot;, format(chisq_result$p.value, digits = 3, scientific = TRUE), &quot;\n\n&quot;)</code></pre>
-<pre><code>##   p  = 4.2e-271</code></pre>
-<pre class="r"><code># Effect size: how much less than expected?
-deficit &lt;- (exp_Inv4m - obs_Inv4m) / exp_Inv4m * 100
-cat(&quot;Inv4m expression deficit:\n&quot;)</code></pre>
-<pre><code>## Inv4m expression deficit:</code></pre>
-<pre class="r"><code>cat(&quot;  Observed:&quot;, format(round(obs_Inv4m), big.mark = &quot;,&quot;), &quot;counts\n&quot;)</code></pre>
-<pre><code>##   Observed: 8,659 counts</code></pre>
-<pre class="r"><code>cat(&quot;  Expected:&quot;, format(round(exp_Inv4m), big.mark = &quot;,&quot;), &quot;counts\n&quot;)</code></pre>
-<pre><code>##   Expected: 12,207 counts</code></pre>
-<pre class="r"><code>cat(&quot;  Deficit: &quot;, round(deficit, 1), &quot;% below expectation\n&quot;)</code></pre>
-<pre><code>##   Deficit:  29.1 % below expectation</code></pre>
-</div>
-<div id="alternative-per-tissue-chi-square-tests" class="section level2">
-<h2>Alternative: Per-Tissue Chi-Square Tests</h2>
-<pre class="r"><code>cat(&quot;=== PER-TISSUE CHI-SQUARE TESTS ===\n\n&quot;)</code></pre>
-<pre><code>## === PER-TISSUE CHI-SQUARE TESTS ===</code></pre>
-<pre class="r"><code>tissue_chisq &lt;- jmj_total %&gt;%
-  group_by(tissue, genotype) %&gt;%
-  summarise(total_counts = sum(total_counts), .groups = &quot;drop&quot;) %&gt;%
-  pivot_wider(names_from = genotype, values_from = total_counts) %&gt;%
-  mutate(
-    total = B73 + Inv4m,
-    obs_prop_inv4m = Inv4m / total,
-    exp_Inv4m = total * (1/6),
-    exp_B73 = total * (5/6)
-  ) %&gt;%
-  rowwise() %&gt;%
-  mutate(
-    chisq = chisq.test(c(B73, Inv4m), p = c(5/6, 1/6))$statistic,
-    p_value = chisq.test(c(B73, Inv4m), p = c(5/6, 1/6))$p.value,
-    deficit_pct = (exp_Inv4m - Inv4m) / exp_Inv4m * 100
-  ) %&gt;%
-  ungroup()
-
-tissue_chisq %&gt;%
-  select(tissue, obs_prop_inv4m, deficit_pct, chisq, p_value) %&gt;%
-  mutate(
-    obs_prop_inv4m = paste0(round(obs_prop_inv4m * 100, 1), &quot;%&quot;),
-    deficit_pct = paste0(round(deficit_pct, 1), &quot;%&quot;),
-    chisq = round(chisq, 1),
-    p_value = format(p_value, digits = 2, scientific = TRUE)
-  ) %&gt;%
-  rename(
-    `Inv4m %` = obs_prop_inv4m,
-    `Deficit` = deficit_pct,
-    `X²` = chisq,
-    `p-value` = p_value
-  ) %&gt;%
-  print()</code></pre>
-<pre><code>## # A tibble: 4 × 5
-##   tissue `Inv4m %` Deficit  `X²` `p-value` 
-##   &lt;chr&gt;  &lt;chr&gt;     &lt;chr&gt;   &lt;dbl&gt; &lt;chr&gt;     
-## 1 Leaf 1 19.7%     -18%     113. &quot; 1.9e-26&quot;
-## 2 Leaf 2 7.9%      52.6%   1221. &quot;2.0e-267&quot;
-## 3 Leaf 3 12.1%     27.4%    269. &quot; 1.8e-60&quot;
-## 4 Leaf 4 8.4%      49.9%    788. &quot;1.9e-173&quot;</code></pre>
-<pre class="r"><code>cat(&quot;\nExpected Inv4m % under H0: 16.7%\n&quot;)</code></pre>
-<pre><code>## 
-## Expected Inv4m % under H0: 16.7%</code></pre>
-</div>
 </div>
 <div id="per-paralog-summary-statistics" class="section level1">
 <h1>Per-Paralog Summary Statistics</h1>
@@ -2534,14 +2410,14 @@ write_csv(jmj_total_summary, file.path(paths$intermediate, &quot;jmj_total_clust
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.5.2 (2025-10-31)
 ## Platform: aarch64-apple-darwin20
-## Running under: macOS Sequoia 15.7.3
+## Running under: macOS Tahoe 26.2
 ## 
 ## Matrix products: default
 ## BLAS:   /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib 
 ## LAPACK: /Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
 ## 
 ## locale:
-## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+## [1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
 ## 
 ## time zone: America/New_York
 ## tzcode source: internal
@@ -2565,11 +2441,11 @@ write_csv(jmj_total_summary, file.path(paths$intermediate, &quot;jmj_total_clust
 ## [25] otel_0.2.0         parallel_4.5.2     tools_4.5.2        tzdb_0.5.0        
 ## [29] vctrs_0.6.5        R6_2.6.1           lifecycle_1.0.4    magick_2.9.0      
 ## [33] bit_4.6.0          vroom_1.6.7        vipor_0.4.7        ragg_1.5.0        
-## [37] pkgconfig_2.0.3    beeswarm_0.4.0     pillar_1.11.1      bslib_0.9.0       
+## [37] beeswarm_0.4.0     pkgconfig_2.0.3    pillar_1.11.1      bslib_0.9.0       
 ## [41] gtable_0.3.6       glue_1.8.0         Rcpp_1.1.0         systemfonts_1.3.1 
-## [45] xfun_0.55          tidyselect_1.2.1   knitr_1.51         farver_2.1.2      
-## [49] htmltools_0.5.9    labeling_0.4.3     rmarkdown_2.30     compiler_4.5.2    
-## [53] S7_0.2.1</code></pre>
+## [45] xfun_0.55          tidyselect_1.2.1   knitr_1.51         dichromat_2.0-0.1 
+## [49] farver_2.1.2       htmltools_0.5.9    labeling_0.4.3     rmarkdown_2.30    
+## [53] compiler_4.5.2     S7_0.2.1</code></pre>
 </div>
 
 
