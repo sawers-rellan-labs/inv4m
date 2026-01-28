@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m and its effects on phosphorus stress response.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering, plant height, and growth-related gene networks**.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
@@ -12,10 +12,11 @@ Analysis pipeline for the maize chromosomal inversion Inv4m and its effects on p
 
 This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m inversion in maize (*Zea mays*), focusing on:
 
-- Differential gene expression under phosphorus stress
-- Lipid metabolism and membrane remodeling
-- Ionome profiling
-- Growth and phenotype analysis
+- Phenotypic effects on flowering time and plant height
+- Gene-by-environment interactions across field environments
+- Differential gene expression and candidate gene identification (JMJ cluster)
+- WGCNA network perturbation analysis
+- Phosphorus stress response (companion paper)
 - GO/KEGG pathway enrichment
 
 ## Phosphorus Paper: Figure/Table Coverage
