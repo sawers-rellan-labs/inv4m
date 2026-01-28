@@ -92,7 +92,7 @@ dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
 # Load preservation summary (with all metrics)
 preservation_summary <- readRDS(file.path(PRESERVATION_DIR, "preservation_summary.rds"))
 
-# Load disrupted modules
+# Load disrupted modules (statistically supported by t-test)
 disrupted_modules <- read_csv(
   file.path(PRESERVATION_DIR, "disrupted_modules.csv"),
   show_col_types = FALSE
@@ -140,7 +140,7 @@ effects_df <- read_csv(
 {
   cat("=== INPUT DATA ===\n")
   cat("Preservation summary:", nrow(preservation_summary), "modules\n")
-  cat("Disrupted modules:", nrow(disrupted_modules), "\n")
+  cat("Disrupted modules (adj. corr. < 0.5):", nrow(disrupted_modules), "\n")
   cat("Genes with module assignments:", nrow(ctrl_modules), "\n")
   cat("Genes with delta_k:", nrow(delta_k), "\n")
   cat("GO term-gene mappings:", nrow(TERM2GENE), "\n\n")
@@ -151,8 +151,7 @@ effects_df <- read_csv(
             dplyr::select(module, color, n_genes, adjacency_correlation,
                           median_delta_k, ctrl_stability))
   } else {
-    cat("No disrupted modules identified.\n")
-    cat("Will analyze modules with weakest preservation.\n")
+    cat("All modules show high preservation.\n")
   }
 }
 ```
@@ -728,10 +727,18 @@ if (exists("go_results_rrvgo") && nrow(go_results_rrvgo) > 0) {
     # Save RDS for composition
     saveRDS(p_go_bp, file.path(OUTPUT_DIR, "go_enrichment_BP_rrvgo.rds"))
 
+    # Also save to main figures directory for Overleaf
+    ggsave(
+      file.path(paths$figures, "go_enrichment_BP_rrvgo.png"),
+      p_go_bp,
+      width = 14, height = 10, dpi = 300
+    )
+
     cat("\nBP supplementary figure saved:\n")
     cat("  - go_enrichment_BP_rrvgo.pdf\n")
     cat("  - go_enrichment_BP_rrvgo.png\n")
     cat("  - go_enrichment_BP_rrvgo.rds\n")
+    cat("  - Also copied to:", file.path(paths$figures, "go_enrichment_BP_rrvgo.png"), "\n")
   }
 } else {
   cat("\nNo rrvgo-reduced GO results available for supplementary figure.\n")
@@ -937,7 +944,7 @@ if (nrow(hub_genes) > 0) {
 module_themes <- preservation_summary %>%
   dplyr::select(
     module, color, n_genes, adjacency_correlation, median_delta_k,
-    pct_decreased, ctrl_lfp, ctrl_stability, jaccard, preservation_status
+    pct_decreased, ctrl_lfp, ctrl_stability, jaccard
   )
 
 # Add top GO terms (BP, CC, MF)
@@ -997,7 +1004,7 @@ write_csv(
   cat("\n=== MODULE BIOLOGICAL THEMES WITH SUPPORT ===\n")
   print(module_themes %>%
           dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
-                        adjacency_correlation, preservation_status, top_BP))
+                        adjacency_correlation, top_BP))
 }
 ```
 
@@ -1095,21 +1102,6 @@ comprehensive_summary <- comprehensive_summary %>%
     n_GO_total = n_BP_terms + n_CC_terms + n_MF_terms
   )
 
-# Classify final disruption status
-comprehensive_summary <- comprehensive_summary %>%
-  mutate(
-    disrupted_final = case_when(
-      adjacency_correlation < 0.3 ~ "Strong",
-      adjacency_correlation < 0.5 ~ "Moderate",
-      adjacency_correlation < 0.7 & median_delta_k < -0.05 ~ "Weak",
-      TRUE ~ "Not disrupted"
-    ),
-    disrupted_final = factor(
-      disrupted_final,
-      levels = c("Strong", "Moderate", "Weak", "Not disrupted")
-    )
-  )
-
 write_csv(
   comprehensive_summary,
   file.path(OUTPUT_DIR, "comprehensive_module_summary.csv")
@@ -1117,15 +1109,17 @@ write_csv(
 
 {
   cat("\n=== COMPREHENSIVE MODULE SUMMARY ===\n")
-  cat("\nDisruption classification:\n")
-  print(table(comprehensive_summary$disrupted_final))
+  cat("\nAdjacency correlation range:",
+      round(min(comprehensive_summary$adjacency_correlation), 2), "to",
+      round(max(comprehensive_summary$adjacency_correlation), 2), "\n")
+  cat("Modules with adj. correlation < 0.30:",
+      sum(comprehensive_summary$adjacency_correlation < 0.30), "\n")
 
-  cat("\nTop disrupted modules:\n")
+  cat("\nModules sorted by adjacency correlation:\n")
   print(
     comprehensive_summary %>%
-      filter(disrupted_final != "Not disrupted") %>%
       dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
-                    adjacency_correlation, disrupted_final, pct_upregulated) %>%
+                    adjacency_correlation, pct_upregulated) %>%
       arrange(adjacency_correlation)
   )
 }
@@ -1152,9 +1146,10 @@ summary_stats <- tibble(
     "Modules with MF enrichment",
     "Hub genes identified",
     "Hub genes with connectivity loss",
-    "Strong disruption modules",
-    "Moderate disruption modules",
-    "Weak disruption modules"
+    "Modules with adj. correlation < 0.30",
+    "Modules with adj. correlation 0.30-0.50",
+    "Min adjacency correlation",
+    "Max adjacency correlation"
   ),
   value = c(
     n_modules_analyzed,
@@ -1166,9 +1161,10 @@ summary_stats <- tibble(
     n_modules_with_mf,
     nrow(hub_genes),
     sum(hub_genes$hub_disrupted, na.rm = TRUE),
-    sum(comprehensive_summary$disrupted_final == "Strong", na.rm = TRUE),
-    sum(comprehensive_summary$disrupted_final == "Moderate", na.rm = TRUE),
-    sum(comprehensive_summary$disrupted_final == "Weak", na.rm = TRUE)
+    sum(comprehensive_summary$adjacency_correlation < 0.30),
+    sum(comprehensive_summary$adjacency_correlation >= 0.30 & comprehensive_summary$adjacency_correlation < 0.50),
+    round(min(comprehensive_summary$adjacency_correlation), 3),
+    round(max(comprehensive_summary$adjacency_correlation), 3)
   )
 )
 

@@ -64,6 +64,7 @@ suppressPackageStartupMessages({
   library(here)
   library(patchwork)
   library(ggrepel)
+  library(rstatix)
 })
 
 # Enable multi-threading
@@ -355,6 +356,51 @@ write_csv(module_delta_k, file.path(OUTPUT_DIR, "delta_kWithin_modules.csv"))
 }
 ```
 
+## Statistical Test for Connectivity Change
+
+**Approach**: For each module, test whether the mean Δ kWithin is significantly
+different from zero using a one-sample t-test. Apply FDR correction across all
+modules.
+
+```{r delta_k_ttest}
+# One-sample t-test per module: H0: mean(delta_kWithin) = 0
+delta_k_tests <- delta_k %>%
+  group_by(module, color) %>%
+  rstatix::t_test(delta_kWithin ~ 1, mu = 0, alternative = "two.sided") %>%
+  ungroup() %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  dplyr::select(module, color, statistic, df, p, p.adj) %>%
+  dplyr::rename(t_statistic = statistic, p_value = p, p_adj_fdr = p.adj)
+
+# Merge with module_delta_k
+module_delta_k <- module_delta_k %>%
+  left_join(
+    delta_k_tests %>% dplyr::select(module, t_statistic, p_value, p_adj_fdr),
+    by = "module"
+  )
+
+# Update CSV with t-test results
+write_csv(module_delta_k, file.path(OUTPUT_DIR, "delta_kWithin_modules.csv"))
+
+{
+  cat("\n=== T-TEST: Δ kWithin ≠ 0 (FDR-corrected) ===\n")
+  cat("Modules with significant connectivity change (FDR < 0.05):",
+      sum(module_delta_k$p_adj_fdr < 0.05, na.rm = TRUE), "of",
+      nrow(module_delta_k), "\n\n")
+  print(
+    module_delta_k %>%
+      dplyr::select(module, color, n_genes, mean_delta_k, t_statistic, p_adj_fdr) %>%
+      mutate(
+        mean_delta_k = round(mean_delta_k, 3),
+        t_statistic = round(t_statistic, 2),
+        p_adj_fdr = signif(p_adj_fdr, 3),
+        sig = ifelse(p_adj_fdr < 0.05, "*", "")
+      ) %>%
+      arrange(p_adj_fdr)
+  )
+}
+```
+
 ---
 
 # Module Mapping Between Conditions
@@ -435,22 +481,9 @@ preservation_summary <- adjacency_preservation %>%
       dplyr::select(ctrl_module, best_inv4m_match = inv4m_module, jaccard),
     by = c("module" = "ctrl_module")
   ) %>%
-  mutate(
-    # Classification
-    preservation_status = case_when(
-      adjacency_correlation < 0.3 ~ "Disrupted",
-      adjacency_correlation < 0.5 ~ "Weak",
-      adjacency_correlation < 0.7 ~ "Moderate",
-      TRUE ~ "Preserved"
-    ),
-    preservation_status = factor(
-      preservation_status,
-      levels = c("Disrupted", "Weak", "Moderate", "Preserved")
-    )
-  ) %>%
   arrange(adjacency_correlation)
 
-# Identify disrupted modules
+# Identify disrupted modules (statistically supported by t-test)
 # Criteria: adjacency correlation < 0.5 OR significant connectivity loss
 disrupted_modules <- preservation_summary %>%
   filter(
@@ -462,8 +495,7 @@ disrupted_modules <- preservation_summary %>%
 preservation_summary <- preservation_summary %>%
   mutate(
     across(where(is.list), ~ sapply(.x, function(x) if(length(x) == 0) NA else x[1])),
-    ctrl_stability = as.character(ctrl_stability),
-    preservation_status = as.character(preservation_status)
+    ctrl_stability = as.character(ctrl_stability)
   )
 
 # Save results
@@ -471,48 +503,69 @@ write_csv(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.csv"
 write_csv(disrupted_modules, file.path(OUTPUT_DIR, "disrupted_modules.csv"))
 saveRDS(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.rds"))
 
-# Generate LaTeX table for Overleaf (sorted by descending |Δ kWithin|)
+# Generate LaTeX table for Overleaf (sorted by FDR p-value)
 preservation_latex <- preservation_summary %>%
-  arrange(desc(abs(median_delta_k))) %>%
+  arrange(p_adj_fdr) %>%
   dplyr::select(
-    Module = color,
-    Genes = n_genes,
-    `Adj. Corr.` = adjacency_correlation,
-    `Δ kWithin` = median_delta_k,
-    `Bootstrap Support` = ctrl_lfp
-  ) %>%
-  mutate(
-    `Adj. Corr.` = round(`Adj. Corr.`, 2),
-    `Δ kWithin` = round(`Δ kWithin`, 2),
-    `Bootstrap Support` = round(`Bootstrap Support`, 2)
+    color, n_genes, adjacency_correlation, median_delta_k, p_adj_fdr, ctrl_lfp
   )
 
-# Write LaTeX table
-latex_table <- knitr::kable(
-  preservation_latex,
-  format = "latex",
-  booktabs = TRUE,
-  caption = "WGCNA module preservation statistics between CTRL and Inv4m genotypes.",
-  label = "preservation"
+# Format p-values for LaTeX scientific notation
+format_pval_latex <- function(p) {
+  if (is.na(p)) return("---")
+  if (p < 0.001) {
+    exp <- floor(log10(p))
+    mant <- p / 10^exp
+    return(sprintf("$%.1f \\times 10^{%d}$", mant, exp))
+  } else {
+    return(sprintf("%.3f", p))
+  }
+}
+
+# Build LaTeX table with proper p-value formatting
+latex_lines <- c(
+  "\\begin{table}[!ht]",
+  "\\caption{\\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected p-value from one-sample t-test of $\\Delta k_{Within} \\neq 0$. Adj.\\ Corr.\\ = adjacency correlation between CTRL and Inv4m networks. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}",
+  "\\label{tab::preservation}",
+  "\\centering",
+  "\\small",
+  "\\begin{tabular}{@{}lrrrrr@{}}",
+  "\\toprule",
+  "\\textbf{Module} & \\textbf{Genes} & \\textbf{Adj. Corr.} & \\textbf{$\\Delta k_{Within}$} & \\textbf{FDR} & \\textbf{LFP} \\\\",
+  "\\midrule"
 )
-writeLines(latex_table, file.path(OUTPUT_DIR, "preservation_table.tex"))
+
+for (i in 1:nrow(preservation_latex)) {
+  row <- preservation_latex[i, ]
+  p_formatted <- format_pval_latex(row$p_adj_fdr)
+  latex_lines <- c(latex_lines, sprintf(
+    "%s & %d & %.2f & %.2f & %s & %.2f \\\\",
+    row$color, row$n_genes, round(row$adjacency_correlation, 2),
+    round(row$median_delta_k, 2), p_formatted, round(row$ctrl_lfp, 2)
+  ))
+}
+
+latex_lines <- c(latex_lines, "\\bottomrule", "\\end{tabular}", "\\end{table}")
+
+writeLines(latex_lines, file.path(OUTPUT_DIR, "preservation_table.tex"))
 cat("Saved: preservation_table.tex\n")
 
 {
   cat("\n=== INTEGRATED PRESERVATION SUMMARY ===\n")
   cat("Total modules:", nrow(preservation_summary), "\n")
-  cat("\nPreservation status:\n")
-  print(table(preservation_summary$preservation_status))
-  cat("\nDisrupted modules:", nrow(disrupted_modules), "\n")
+  cat("\nAdjacency correlation range:",
+      round(min(preservation_summary$adjacency_correlation), 2), "to",
+      round(max(preservation_summary$adjacency_correlation), 2), "\n")
+  cat("Modules with adj. correlation < 0.30:",
+      sum(preservation_summary$adjacency_correlation < 0.30), "\n")
 
-  if (nrow(disrupted_modules) > 0) {
-    cat("\nDisrupted module details:\n")
-    print(
-      disrupted_modules %>%
-        dplyr::select(module, color, n_genes, adjacency_correlation,
-                      median_delta_k, ctrl_stability, jaccard)
-    )
-  }
+  cat("\nModules with lowest preservation (adj. corr. < 0.5):\n")
+  print(
+    preservation_summary %>%
+      filter(adjacency_correlation < 0.5) %>%
+      dplyr::select(module, color, n_genes, adjacency_correlation,
+                    median_delta_k, ctrl_stability, jaccard)
+  )
 }
 ```
 
@@ -523,30 +576,22 @@ cat("Saved: preservation_table.tex\n")
 ```{r adjacency_correlation_plot, fig.width=10, fig.height=6}
 p_adj_cor <- ggplot(
   preservation_summary,
-  aes(x = n_genes, y = adjacency_correlation, color = preservation_status)
+  aes(x = n_genes, y = adjacency_correlation, fill = color)
 ) +
-  geom_point(size = 4, alpha = 0.8) +
-  geom_hline(yintercept = c(0.3, 0.5, 0.7), linetype = "dashed", color = "gray50") +
+  geom_point(size = 4, alpha = 0.8, shape = 21, color = "black") +
+  geom_hline(yintercept = c(0.3, 0.5), linetype = "dashed", color = "gray50") +
   geom_text_repel(
     aes(label = color),
     size = 3,
     max.overlaps = 15
   ) +
-  scale_color_manual(
-    values = c(
-      "Disrupted" = "#D55E00",
-      "Weak" = "#E69F00",
-      "Moderate" = "#56B4E9",
-      "Preserved" = "#009E73"
-    )
-  ) +
+  scale_fill_identity() +
   theme_minimal(base_size = 12) +
   labs(
     title = "Module Preservation: Adjacency Correlation (CTRL vs Inv4m)",
     subtitle = "Based on consensus adjacency matrices",
     x = "Module Size (genes)",
-    y = "Adjacency Correlation",
-    color = "Status"
+    y = "Adjacency Correlation"
   )
 
 print(p_adj_cor)
@@ -576,6 +621,19 @@ delta_k_plot <- delta_k %>%
   ) %>%
   mutate(color = factor(color, levels = module_order))
 
+# Prepare significance annotation from t-test results
+sig_annotation <- module_delta_k %>%
+  mutate(
+    color = factor(color, levels = module_order),
+    sig_label = case_when(
+      p_adj_fdr < 0.001 ~ "***",
+      p_adj_fdr < 0.01 ~ "**",
+      p_adj_fdr < 0.05 ~ "*",
+      TRUE ~ ""
+    )
+  ) %>%
+  dplyr::select(color, sig_label)
+
 # Prepare GO term annotation data (if available)
 if (!is.null(top_bp_terms) && nrow(top_bp_terms) > 0) {
   go_annotation <- top_bp_terms %>%
@@ -590,10 +648,24 @@ if (!is.null(top_bp_terms) && nrow(top_bp_terms) > 0) {
   has_go_annotation <- FALSE
 }
 
+# Get y position for significance markers (above each boxplot)
+sig_y_pos <- delta_k_plot %>%
+  group_by(color) %>%
+  summarize(y_max = max(delta_kWithin, na.rm = TRUE), .groups = "drop") %>%
+  left_join(sig_annotation, by = "color") %>%
+  mutate(y_sig = y_max + 0.08)
+
 # Create boxplot with module colors
 p_delta_k <- ggplot(delta_k_plot, aes(x = color, y = delta_kWithin, fill = color)) +
   geom_boxplot(outlier.size = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_text(
+    data = sig_y_pos,
+    aes(x = color, y = y_sig, label = sig_label),
+    inherit.aes = FALSE,
+    size = 6,
+    vjust = 0
+  ) +
   scale_fill_identity() +
   theme_minimal(base_size = 25) +
   theme(
@@ -667,32 +739,24 @@ cat("Saved: delta_kWithin_boxplot.pdf/png/rds\n")
 ```{r correlation_vs_delta, fig.width=10, fig.height=6}
 p_compare <- ggplot(
   preservation_summary,
-  aes(x = median_delta_k, y = adjacency_correlation, color = preservation_status)
+  aes(x = median_delta_k, y = adjacency_correlation, fill = color)
 ) +
-  geom_point(aes(size = n_genes), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray50") +
+  geom_point(aes(size = n_genes), alpha = 0.8, shape = 21, color = "black") +
+  geom_hline(yintercept = 0.3, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   geom_text_repel(
     aes(label = color),
     size = 3,
     max.overlaps = 15
   ) +
-  scale_color_manual(
-    values = c(
-      "Disrupted" = "#D55E00",
-      "Weak" = "#E69F00",
-      "Moderate" = "#56B4E9",
-      "Preserved" = "#009E73"
-    )
-  ) +
+  scale_fill_identity() +
   scale_size_continuous(range = c(3, 10)) +
   theme_minimal(base_size = 12) +
   labs(
     title = "Module Perturbation: Adjacency Correlation vs Δ kWithin",
-    subtitle = "Bottom-left quadrant = most disrupted modules",
+    subtitle = "Lower values indicate greater perturbation",
     x = "Median Δ kWithin",
     y = "Adjacency Correlation",
-    color = "Preservation",
     size = "Module Size"
   )
 
@@ -712,32 +776,24 @@ ggsave(
 ```{r support_vs_preservation, fig.width=10, fig.height=6}
 p_support_pres <- ggplot(
   preservation_summary,
-  aes(x = ctrl_lfp, y = adjacency_correlation, color = preservation_status)
+  aes(x = ctrl_lfp, y = adjacency_correlation, fill = color)
 ) +
-  geom_point(aes(size = n_genes), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray50") +
+  geom_point(aes(size = n_genes), alpha = 0.8, shape = 21, color = "black") +
+  geom_hline(yintercept = 0.3, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0.7, linetype = "dashed", color = "gray50") +
   geom_text_repel(
     aes(label = color),
     size = 3,
     max.overlaps = 15
   ) +
-  scale_color_manual(
-    values = c(
-      "Disrupted" = "#D55E00",
-      "Weak" = "#E69F00",
-      "Moderate" = "#56B4E9",
-      "Preserved" = "#009E73"
-    )
-  ) +
+  scale_fill_identity() +
   scale_size_continuous(range = c(3, 10)) +
   theme_minimal(base_size = 12) +
   labs(
     title = "Module Bootstrap Support vs Preservation",
-    subtitle = "X: CTRL module stability | Y: Preservation in Inv4m",
+    subtitle = "X: CTRL module stability | Y: Adjacency correlation in Inv4m",
     x = "CTRL Bootstrap Support (LFP)",
     y = "Adjacency Correlation",
-    color = "Preservation",
     size = "Module Size"
   )
 
@@ -758,10 +814,11 @@ ggsave(
 summary_stats <- tibble(
   metric = c(
     "Total CTRL modules analyzed",
-    "Disrupted modules (adj_cor < 0.5 or Δk criteria)",
-    "Weak preservation (0.3-0.5)",
-    "Moderate preservation (0.5-0.7)",
-    "Preserved (>= 0.7)",
+    "Modules with adj. correlation < 0.30",
+    "Modules with adj. correlation 0.30-0.50",
+    "Modules with adj. correlation >= 0.50",
+    "Min adjacency correlation",
+    "Max adjacency correlation",
     "Mean adjacency correlation",
     "Median adjacency correlation",
     "Genes with decreased kWithin",
@@ -770,10 +827,11 @@ summary_stats <- tibble(
   ),
   value = c(
     nrow(preservation_summary),
-    nrow(disrupted_modules),
-    sum(preservation_summary$preservation_status == "Weak"),
-    sum(preservation_summary$preservation_status == "Moderate"),
-    sum(preservation_summary$preservation_status == "Preserved"),
+    sum(preservation_summary$adjacency_correlation < 0.30),
+    sum(preservation_summary$adjacency_correlation >= 0.30 & preservation_summary$adjacency_correlation < 0.50),
+    sum(preservation_summary$adjacency_correlation >= 0.50),
+    round(min(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
+    round(max(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
     round(mean(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
     round(median(preservation_summary$adjacency_correlation, na.rm = TRUE), 3),
     sum(delta_k$delta_kWithin < 0, na.rm = TRUE),
@@ -788,7 +846,7 @@ write_csv(summary_stats, file.path(OUTPUT_DIR, "preservation_analysis_summary.cs
   cat("\n=== SAVED OUTPUTS ===\n")
   cat("preservation_summary.csv: integrated module metrics\n")
   cat("preservation_summary.rds: R object for downstream\n")
-  cat("disrupted_modules.csv: modules meeting disruption criteria\n")
+  cat("disrupted_modules.csv: modules with adj. corr. < 0.5 or significant Δk\n")
   cat("delta_kWithin_genes.csv: gene-level connectivity change\n")
   cat("delta_kWithin_modules.csv: module-level summary\n")
   cat("module_mapping.csv: CTRL → Inv4m module correspondence\n")
