@@ -30,7 +30,7 @@
 \newcommand{\jmjix}{\textit{jmj9}\xspace}
 \newcommand{\arabidopis}{\textit{Arabidopsis}\xspace}
 
-\usepackage{hyperref}
+\usepackage[hyperfigures=false]{hyperref}
 
 \newcolumntype{b}{X}
 \newcolumntype{s}{>{\hsize=.5\hsize}X}
@@ -792,8 +792,8 @@ component associated with plant height in GWAS \cite{peiffer2014}, and
 antigen 2, a DNA replication factor and marker of cell proliferation
 (Table~\ref{tab::greenyellow_module}). The module also includes \textit{ropgef14}
 ($\log_2 \text{FC} = -2.98$), a Rho GTPase activator required for polarized cell
-growth. The co-expression of these functionally distinct genes---exocytosis,
-DNA replication, and cell polarity---in a highly stable module suggests
+growth. The co-expression of these functionally distinct genes--exocytosis,
+DNA replication, and cell polarity--in a highly stable module suggests
 coordinated regulation of cell division and growth in the B73 background.
 
 The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height
@@ -828,8 +828,8 @@ downregulation disrupting the coexpression relationships they normally coordinat
 In contrast, the exocyst component \textit{sec6} ($\log_2 FC = +2.87$), located
 within \invfour, showed $k_{Within} = 0.83$ in CTRL but $0.008$ in \invfour,
 suggesting its upregulation decouples it from native coexpression partners. This
-bidirectional rewiring---connectivity loss for downregulated chromatin regulators
-and altered connectivity for upregulated genes---is consistent with the JMJ
+bidirectional rewiring--connectivity loss for downregulated chromatin regulators
+and altered connectivity for upregulated genes is consistent with the JMJ
 cluster functioning as a regulatory hub whose perturbation propagates through
 the transcriptome.
 
@@ -957,11 +957,11 @@ repeats can generate chromosomal inversions
 % [PLACEHOLDER: cite inversion origin via ectopic recombination]
 .
 
-The asymmetric structure of the breakpoints---with inverted repeat arrays
-present only at the upstream boundary (Fig~\ref{fig::design}B)---and the
+The asymmetric structure of the breakpoints, with inverted repeat arrays
+present only at the upstream boundary (Fig~\ref{fig::design}B), and the
 variation in heterochromatic knob content across genomes (TIL18 carries the
 4L knob \cite{bilinski2018,albert2010}, PT is knobless, and B73 has a TR-1
-knob \cite{ghaffari2013}) suggest that knob dynamics have continued to shape
+knob, \cite{ghaffari2013},suggest that knob dynamics have continued to shape
 chromosome 4 architecture after the inversion origin. The conservation of
 \invfour across \mex populations \cite{pyhajarvi2013} despite this ongoing
 repeat turnover indicates strong selection maintaining the inverted haplotype.
@@ -1044,8 +1044,8 @@ WGCNA analysis showed that JMJ genes function as network hubs in CTRL
 ($k_{Within} = 0.89$--$0.90$) but become peripheral in \invfour
 ($k_{Within} = 0.36$--$0.44$; Fig~\ref{fig:wgcna}C). Eleven of 13 modules
 showed significant connectivity loss (one-sample $t$-test, $\textit{FDR} < 0.05$;
-Table~\ref{tab::preservation}), with the pink module---enriched for ribosome
-biogenesis and growth regulation (Table~\ref{tab::pink_module})---showing
+Table~\ref{tab::preservation}), with the pink module--enriched for ribosome
+biogenesis and growth regulation (Table~\ref{tab::pink_module})--showing
 near-complete structural collapse (adjacency correlation $= 0.020$). The
 trans-regulatory network connects JMJ genes to cell proliferation factors
 including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A),
@@ -1055,7 +1055,7 @@ elongation $\rightarrow$ accelerated flowering and increased height.
 
 The greenyellow module provides complementary evidence for this model. With the
 highest bootstrap support among all modules (LFP $= 0.80$), it contains both
-\textit{sec6}---the plant height GWAS candidate \cite{peiffer2014}---and
+\textit{sec6}--the plant height GWAS candidate \cite{peiffer2014}--and
 \textit{pcna2}, a DNA replication factor marking actively dividing cells
 (Table~\ref{tab::greenyellow_module}). The upregulation of these genes in
 \invfour ($\log_2 \text{FC} = +2.87$ and $+2.99$, respectively), alongside
@@ -1791,16 +1791,16 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 \invfour & Down & ccta      & 15.8 & -1.69 & CCT-alpha                                   \\
 \invfour & Down & arf1      & 15.8 & -2.78 & ADP-ribosylation factor                     \\
 \invfour & Down & hsp70-17  & 14.2 & -6.48 & Heat shock 70 kDa protein 17                \\
-\invfour & Down & Zm..0240  & 14.2 & -9.16 & ---                                         \\
+\invfour & Down & Zm..0240  & 14.2 & -9.16 &                                          \\
 \invfour & Down & ropgef14  & 13.6 & -2.98 & Rop guanine nucleotide exchange factor 14   \\
 \invfour & Down & trxl2     & 13.2 & -6.10 & Thioredoxin-like 3-1, chloroplastic         \\
 \invfour & Down & ank       & 13.0 & -1.83 & Ankyrin repeat-containing protein           \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & ychf      & 16.9 & 6.50  & ---                                         \\
+\invfour & Up   & ychf      & 16.9 & 6.50  &                                          \\
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & sec6      & 16.5 & 2.87  & Exocyst complex component Sec6              \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & zfrvt     & 15.6 & 1.97  & ---                                         \\
+\invfour & Up   & zfrvt     & 15.6 & 1.97  &                                          \\
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & pig3      & 15.0 & 1.97  & Quinone oxidoreductase PIG3                 \\
 \rowcolor[HTML]{EFEFEF}
@@ -1808,7 +1808,7 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & gbp1      & 13.7 & 8.96  & GTP-binding protein-related                 \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & Zm..5370  & 13.6 & 1.63  & ---                                         \\
+\invfour & Up   & Zm..5370  & 13.6 & 1.63  &                                          \\
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & kan1      & 13.6 & 1.68  & KANADI1                                     \\
 \rowcolor[HTML]{EFEFEF}
@@ -1816,11 +1816,11 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & jmj21     & 13.5 & 2.28  & JUMONJI-transcription factor 21             \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & Zm..9580  & 13.2 & 7.38  & ---                                         \\
+\invfour & Up   & Zm..9580  & 13.2 & 7.38  &                                          \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & mybsant   & 12.4 & 6.96  & ---                                         \\
+\invfour & Up   & mybsant   & 12.4 & 6.96  &                                          \\
 \rowcolor[HTML]{EFEFEF}
-\invfour & Up   & engd2     & 12.3 & 6.14  & ---                                         \\
+\invfour & Up   & engd2     & 12.3 & 6.14  &                                          \\
 \rowcolor[HTML]{EFEFEF}
 \invfour & Up   & gpm458    & 11.2 & 10.47 & Oil body-associated protein like            \\ \midrule
 Leaf$\times$\invfour & Down & sec6 & 3.1 & -0.55 & Exocyst complex component Sec6              \\ \bottomrule
@@ -1963,7 +1963,7 @@ Zm00001eb279370 & \textit{phi1b} & Phi-1-like phosphate-induced protein & $+0.72
 Zm00001eb191790 & \textit{jmj2} & JUMONJI-transcription factor 2 & $-3.49$ & $1.2 \times 10^{-22}$ \\
 Zm00001eb191820 & \textit{jmj4} & JUMONJI-transcription factor 4 & $-2.84$ & $1.9 \times 10^{-20}$ \\
 Zm00001eb188750 & \textit{hsp70-17} & Heat shock 70 kDa protein 17 & $-6.48$ & $6.9 \times 10^{-15}$ \\
-Zm00001eb196760 & --- & --- & $-8.29$ & $9.2 \times 10^{-14}$ \\
+Zm00001eb196760 &  &  & $-8.29$ & $9.2 \times 10^{-14}$ \\
 Zm00001eb195120 & \textit{swc6} & SWR1 complex subunit 6 & $-1.15$ & $6.4 \times 10^{-13}$ \\
 Zm00001eb196830 & \textit{pan1} & PAN domain-containing protein & $-5.35$ & $3.9 \times 10^{-11}$ \\
 Zm00001eb249540 & \textit{rpl29} & 50S ribosomal protein L29, chloroplastic & $+4.41$ & $6.9 \times 10^{-10}$ \\
@@ -1971,7 +1971,7 @@ Zm00001eb192350 & \textit{pkwd1} & Protein kinase family protein / WD-40... & $-
 Zm00001eb195790 & \textit{traf1} & TRAF-type domain-containing protein & $+3.15$ & $3.4 \times 10^{-9}$ \\
 Zm00001eb192360 & \textit{ppr5} & Pentatricopeptide repeat-containing p... & $-0.89$ & $6.9 \times 10^{-9}$ \\
 Zm00001eb195560 & \textit{lurp8} & Protein LURP-one-related 8 & $-5.49$ & $5.3 \times 10^{-8}$ \\
-Zm00001eb360380 & --- & --- & $+0.60$ & $1.5 \times 10^{-4}$ \\
+Zm00001eb360380 &  &  & $+0.60$ & $1.5 \times 10^{-4}$ \\
 Zm00001eb188350 & \textit{rfc3} & Replication factor C subunit 3 & $-0.83$ & $1.8 \times 10^{-4}$ \\
 Zm00001eb194610 & \textit{yae1} & Essential protein Yae1 N-terminal dom... & $-2.54$ & $4.1 \times 10^{-4}$ \\
 Zm00001eb193640 & \textit{ycge} & HTH-type transcriptional repressor YcgE & $+0.95$ & $5.8 \times 10^{-4}$ \\
@@ -1985,10 +1985,10 @@ Zm00001eb432550 & \textit{bcd135b} & Ribosomal RNA processing protein A & $-0.43
 Zm00001eb330750 & \textit{eif2b} & Eukaryotic translation initiation fac... & $-0.27$ & $3.3 \times 10^{-2}$ \\
 Zm00001eb194670 & \textit{degp9} & Protease Do-like protein 9 & $-0.29$ & $3.9 \times 10^{-2}$ \\
 Zm00001eb205670 & \textit{rps8} & 40S ribosomal protein S8 & $-0.34$ & $4.4 \times 10^{-2}$ \\
-Zm00001eb080580 & --- & --- & $-0.34$ & $4.4 \times 10^{-2}$ \\
+Zm00001eb080580 &  &  & $-0.34$ & $4.4 \times 10^{-2}$ \\
 Zm00001eb012770 & \textit{rps18} & Ribosomal protein S18 & $-0.26$ & $4.4 \times 10^{-2}$ \\
 Zm00001eb273610 & \textit{cchh40} & Zinc finger CCCH domain-containing pr... & $-0.22$ & $4.5 \times 10^{-2}$ \\
-Zm00001eb126770 & \textit{cl59140\_1} & --- & $-0.35$ & $4.6 \times 10^{-2}$ \\
+Zm00001eb126770 & \textit{cl59140\_1} &  & $-0.35$ & $4.6 \times 10^{-2}$ \\
 Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0.28$ & $4.8 \times 10^{-2}$ \\
 \bottomrule
 \end{tabular}

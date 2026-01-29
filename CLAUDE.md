@@ -1,48 +1,47 @@
 # inv4m Project Guide
 
 **Last Updated:** 2026-01-29
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Review & Polish 🔶
-**Version:** v1.8.0
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Figure Review 🔴
+**Version:** v1.9.0
 
 ---
 
 ## START HERE: Inversion Paper Revision
 
-**Current State:** Manuscript text is COMPLETE (results + discussion). Title updated to reflect GxE findings. 4 placeholder references remain to be filled.
+**Current State:** Manuscript text is COMPLETE. Now in FIGURE REVIEW phase (9 high-priority tasks).
 
-**New Title:** "Introgression of Mexican highland chromosomal inversion *Inv4m* into temperate maize modulates flowering, plant height, and growth-related gene networks"
+**New Title:** "Introgression of teosinte *mexicana* chromosomal inversion *Inv4m* into temperate maize modulates flowering time, plant height, and growth-regulatory gene networks"
 
 ```
 scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
 scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
-scripts/00_agent_work/DISCUSSION_PLAN_20260128.md  # Discussion section plan
 README.md  # Figure/table coverage
 ```
 
-**Current Priority (as of 2026-01-28):**
-1. **Phase 5: Review & Polish**
-   - ⬜ Fill 4 placeholder references (search `% [PLACEHOLDER:` in main.tex)
-   - ⬜ MaizeNetome validation for WGCNA (methods) - low priority
-   - ⬜ Internal consistency check
-   - ⬜ Final proofreading
+**🔴 CURRENT PRIORITY: Figure Review (9 tasks - ALL HIGH PRIORITY)**
 
-**Placeholder references to fill:**
-1. `cite inversion origin via ectopic recombination` - Breakpoint section
-2. `cite JMJ biochemical function review` - JMJ section
-3. `cite Arabidopsis JMJ flowering` - JMJ section
-4. `cite compensation in tandem duplicates` - Limitations section
+| # | Task | Status |
+|---|------|--------|
+| 1 | Review layout of fig:phenotypes | ⬜ |
+| 2 | Review layout of fig:wgcna | ⬜ |
+| 3 | Review layout of fig::transnetwork | ⬜ |
+| 4 | Review font size/labels of fig:jmj_cluster | ⬜ |
+| 5 | Review font size/labels of fig::gxe_interaction | ⬜ |
+| 6 | Fix gxe_forest: add CI or remove | ⬜ |
+| 7 | Make fig::internode single row panel | ⬜ |
+| 8 | Increase font size in fig::module_support | ⬜ |
+| 9 | Increase font size in fig::module_go | ⬜ |
+
+**After figure review:**
+- Fill 4 placeholder references (search `% [PLACEHOLDER:` in main.tex)
+- MaizeNetome validation for WGCNA (methods) - low priority
+- Internal consistency check
+- Final proofreading
 
 **Recent completions (2026-01-29):**
+- ✅ Renamed fig::DEGnetwork → fig::transnetwork (image + all references)
 - ✅ Greenyellow module characterization added (sec6, pcna2, ropgef14)
 - ✅ Table S5 (greenyellow) added before Table S6 (pink) - ordered by stability
-- ✅ New notebook: `greenyellow_module_characterization.Rmd`
-
-**Previous completions (2026-01-28):**
-- ✅ Discussion section complete (7 subsections, ~170 lines)
-- ✅ Title updated to reflect GxE findings
-- ✅ README.md and docs/index.html updated
-- ✅ All results sections complete (3.1-3.7)
-- ✅ All figures and tables complete
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
