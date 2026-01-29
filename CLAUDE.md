@@ -1,8 +1,8 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-28
+**Last Updated:** 2026-01-29
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Review & Polish 🔶
-**Version:** v1.7.0
+**Version:** v1.8.0
 
 ---
 
@@ -32,7 +32,12 @@ README.md  # Figure/table coverage
 3. `cite Arabidopsis JMJ flowering` - JMJ section
 4. `cite compensation in tandem duplicates` - Limitations section
 
-**Recent completions (2026-01-28):**
+**Recent completions (2026-01-29):**
+- ✅ Greenyellow module characterization added (sec6, pcna2, ropgef14)
+- ✅ Table S5 (greenyellow) added before Table S6 (pink) - ordered by stability
+- ✅ New notebook: `greenyellow_module_characterization.Rmd`
+
+**Previous completions (2026-01-28):**
 - ✅ Discussion section complete (7 subsections, ~170 lines)
 - ✅ Title updated to reflect GxE findings
 - ✅ README.md and docs/index.html updated
