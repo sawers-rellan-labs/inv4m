@@ -35,8 +35,7 @@
 \newcolumntype{b}{X}
 \newcolumntype{s}{>{\hsize=.5\hsize}X}
 
-\title{Introgression of Mexican highland chromosomal inversion \textit{Inv4m} into temperate 
-maize modulates flowering, plant height, and growth-related gene networks}
+\title{Introgression of teosinte \mex chromosomal inversion \textit{Inv4m} into temperate maize modulates flowering time, plant height, and growth gene networks}
 
 
 \author[$1$,$2$,*]{Fausto Rodríguez-Zapata}
@@ -64,7 +63,7 @@ maize modulates flowering, plant height, and growth-related gene networks}
 
 \keywords{ Local Adaptation, Highland Maize, Teosinte Mexicana Introgression, Chromosomal Inversion}
 
-\runningtitle{The Role of \textit{Invm4} in adaptation to low phosphorus availability} % For use in the footer
+\runningtitle{The Role of \textit{Invm4} in local adaptation} % For use in the footer
 
 %% For the footnote.
 %% Give the last name of the first author if only one author;
@@ -783,6 +782,20 @@ enrichment confirmed these modules represent biologically coherent gene sets
 by \jmjii and \jmjiv (Table~\ref{tab::pink_module}), indicating these histone demethylases participate
 in a coordinated growth-regulatory program in B73.
 
+The greenyellow module, with the highest bootstrap support (LFP $= 0.80$),
+showed enrichment for developmental cell growth ($p = 8.5 \times 10^{-4}$),
+cell tip growth ($p = 6.0 \times 10^{-4}$), and regulation of DNA replication
+($p = 0.019$). This module contains two genes with independent functional
+support: \textit{sec6} ($\log_2 \text{FC} = +2.87$), encoding an exocyst complex
+component associated with plant height in GWAS \cite{peiffer2014}, and
+\textit{pcna2} ($\log_2 \text{FC} = +2.99$), encoding proliferating cell nuclear
+antigen 2, a DNA replication factor and marker of cell proliferation
+(Table~\ref{tab::greenyellow_module}). The module also includes \textit{ropgef14}
+($\log_2 \text{FC} = -2.98$), a Rho GTPase activator required for polarized cell
+growth. The co-expression of these functionally distinct genes---exocytosis,
+DNA replication, and cell polarity---in a highly stable module suggests
+coordinated regulation of cell division and growth in the B73 background.
+
 Comparison of intramodular connectivity ($k_{Within}$) between genotypes revealed
 systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B). Adjacency
 correlation between CTRL and \invfour networks ranged from $-0.14$ to $0.42$
@@ -1032,6 +1045,16 @@ including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::DEGnetwork}A),
 suggesting a mechanistic chain: JMJ downregulation $\rightarrow$ altered
 H3K4 methylation $\rightarrow$ growth gene misexpression $\rightarrow$ SAM
 elongation $\rightarrow$ accelerated flowering and increased height.
+
+The greenyellow module provides complementary evidence for this model. With the
+highest bootstrap support among all modules (LFP $= 0.80$), it contains both
+\textit{sec6}---the plant height GWAS candidate \cite{peiffer2014}---and
+\textit{pcna2}, a DNA replication factor marking actively dividing cells
+(Table~\ref{tab::greenyellow_module}). The upregulation of these genes in
+\invfour ($\log_2 \text{FC} = +2.87$ and $+2.99$, respectively), alongside
+downregulation of the cell polarity regulator \textit{ropgef14}
+($\log_2 \text{FC} = -2.98$), suggests coordinated rewiring of growth-related
+gene expression consistent with altered cell proliferation dynamics.
 
 \subsection*{Chromosomal inversions maintain coadapted allele complexes}
 
@@ -1886,6 +1909,36 @@ purple & 22 & -0.14 & -0.43 & $3.8 \times 10^{-8}$ & 0.74 \\
 tan & 12 & 0.41 & -0.54 & $7.1 \times 10^{-7}$ & 0.68 \\
 magenta & 24 & 0.07 & -0.08 & 0.051 & 0.71 \\
 salmon & 11 & -0.03 & 0.01 & 0.630 & 0.52 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table}[!ht]
+\caption{\textbf{Greenyellow module DEGs containing growth and cell division genes.} Genes assigned to the greenyellow WGCNA consensus module, which has the highest bootstrap support (LFP = 0.80) among all modules. Contains the plant height GWAS candidate \textit{sec6} and the cell proliferation marker \textit{pcna2}. Sorted by statistical significance (FDR). GO enrichment includes ``developmental cell growth'' ($p = 8.5 \times 10^{-4}$) and ``regulation of DNA replication'' ($p = 0.019$).}
+\label{tab::greenyellow_module}
+\centering
+\small
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+\textbf{Gene ID} & \textbf{Label} & \textbf{Description} & \textbf{log$_2$FC} & \textbf{FDR} \\
+\midrule
+Zm00001eb194380 & \textit{sec6} & Exocyst complex component Sec6 & $+2.87$ & $2.9 \times 10^{-17}$ \\
+Zm00001eb188240 & \textit{ropgef14} & Rop guanine nucleotide exchange factor 14 & $-2.98$ & $2.6 \times 10^{-14}$ \\
+Zm00001eb112470 & \textit{engd2} & GTPase-like protein & $+6.14$ & $4.9 \times 10^{-13}$ \\
+Zm00001eb191260 & \textit{pbl19} & Serine/threonine-protein kinase PBL19 & $-1.39$ & $3.5 \times 10^{-9}$ \\
+Zm00001eb195290 & \textit{pap1} & PAP-associated domain-containing protein & $+1.45$ & $4.7 \times 10^{-8}$ \\
+Zm00001eb386670 & \textit{rglg2} & E3 ubiquitin-protein ligase RGLG2 & $-1.01$ & $5.2 \times 10^{-4}$ \\
+Zm00001eb187450 & \textit{mybr58} & MYB-related transcription factor 58 & $+1.74$ & $3.1 \times 10^{-3}$ \\
+Zm00001eb192050 & \textit{pcna2} & Proliferating cell nuclear antigen 2 & $+2.99$ & $9.3 \times 10^{-3}$ \\
+Zm00001eb290800 & \textit{pk8} & Protein kinase domain-containing & $-0.37$ & $2.5 \times 10^{-2}$ \\
+Zm00001eb392440 & \textit{iqm1} & IQ calmodulin-binding motif protein & $-0.85$ & $2.6 \times 10^{-2}$ \\
+Zm00001eb080160 & \textit{hipp16} & Heavy metal-associated protein 16 & $-0.99$ & $3.4 \times 10^{-2}$ \\
+Zm00001eb404820 & \textit{esk1} & Protein ESKIMO-like & $-0.65$ & $3.4 \times 10^{-2}$ \\
+Zm00001eb064190 & \textit{parg} & Poly(ADP-ribose) glycohydrolase & $-0.29$ & $4.2 \times 10^{-2}$ \\
+Zm00001eb190580 & \textit{pla2} & Phospholipase A2 homolog 1 & $-0.69$ & $4.8 \times 10^{-2}$ \\
+Zm00001eb375460 & \textit{pk3} & Protein kinase domain-containing & $-0.74$ & $4.8 \times 10^{-2}$ \\
+Zm00001eb279370 & \textit{phi1b} & Phi-1-like phosphate-induced protein & $+0.72$ & $5.0 \times 10^{-2}$ \\
 \bottomrule
 \end{tabular}
 \end{table}

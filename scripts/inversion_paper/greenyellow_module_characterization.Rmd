@@ -1,0 +1,437 @@
+---
+title: "Greenyellow Module Characterization"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+# Overview
+
+**Purpose**: Characterize the greenyellow WGCNA module, which contains the plant
+height GWAS candidate *sec6* and the cell proliferation marker *pcna2*. This
+module has the highest bootstrap support (LFP = 0.80) among all WGCNA modules.
+
+**Key findings**:
+
+- The greenyellow module contains 16 DEGs including sec6 and pcna2
+- GO enrichment reveals "developmental cell growth" (p = 8.5e-4) driven by ropgef14/pla2
+- Module includes DNA replication (pcna2), exocytosis (sec6), and cell polarity genes
+- Supports the hypothesis that Inv4m perturbs a growth/cell division network
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(knitr)
+})
+
+# Load project paths
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+```{r define_paths}
+# Field perturbation run directory
+run_dir <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+
+# Input files
+CONSENSUS_FILE <- file.path(run_dir, "04_consensus_networks/ctrl/consensus_modules.csv")
+GO_BP_FILE <- file.path(run_dir, "07_module_annotation/all_modules_GO_BP.csv")
+LABELS_FILE <- here("data", "locus_labels_master.csv")
+SUPPORT_FILE <- file.path(run_dir, "05_bootstrap_support/ctrl/module_support.csv")
+
+# Verify files exist
+stopifnot(file.exists(CONSENSUS_FILE))
+stopifnot(file.exists(GO_BP_FILE))
+stopifnot(file.exists(LABELS_FILE))
+stopifnot(file.exists(SUPPORT_FILE))
+
+cat("All input files found.\n")
+```
+
+---
+
+# Load Data
+
+```{r load_data}
+# Load CTRL consensus module assignments
+ctrl_modules <- read_csv(CONSENSUS_FILE, show_col_types = FALSE)
+
+# Load GO BP enrichment results
+go_bp <- read_csv(GO_BP_FILE, show_col_types = FALSE)
+
+# Load gene annotations with expression data
+labels <- read_csv(LABELS_FILE, show_col_types = FALSE)
+
+# Load module support statistics
+support <- read_csv(SUPPORT_FILE, show_col_types = FALSE)
+
+cat("Loaded", nrow(ctrl_modules), "genes with module assignments\n")
+cat("Loaded", nrow(go_bp), "GO BP enrichment terms\n")
+cat("Loaded", nrow(labels), "gene annotations\n")
+```
+
+---
+
+# Module Bootstrap Support
+
+The greenyellow module has the highest bootstrap support among all modules.
+
+```{r module_support}
+# Extract greenyellow support stats
+gy_support <- support %>%
+  filter(color == "greenyellow")
+
+cat("Greenyellow module bootstrap support:\n")
+cat("  Mean LFP:", round(gy_support$mean_lfp, 3), "\n")
+cat("  Stability:", gy_support$stability, "\n")
+cat("  N genes:", gy_support$n_genes, "\n")
+
+# Compare to other modules
+cat("\nTop 5 modules by LFP:\n")
+support %>%
+  arrange(desc(mean_lfp)) %>%
+  head(5) %>%
+  select(color, mean_lfp, n_genes, stability) %>%
+  kable()
+```
+
+---
+
+# Greenyellow Module Genes
+
+The greenyellow module contains sec6 (plant height GWAS candidate) and pcna2
+(proliferating cell nuclear antigen), both upregulated in Inv4m plants.
+
+```{r extract_greenyellow_module}
+# Extract greenyellow module genes
+gy_genes <- ctrl_modules %>%
+  filter(color == "greenyellow") %>%
+  pull(gene)
+
+cat("Greenyellow module contains", length(gy_genes), "genes\n")
+
+# Verify key genes are present
+key_genes <- c(
+  "Zm00001eb194380",  # sec6
+  "Zm00001eb192050",  # pcna2
+  "Zm00001eb188240"   # ropgef14
+)
+cat("\nsec6 in greenyellow module:", key_genes[1] %in% gy_genes, "\n")
+cat("pcna2 in greenyellow module:", key_genes[2] %in% gy_genes, "\n")
+cat("ropgef14 in greenyellow module:", key_genes[3] %in% gy_genes, "\n")
+```
+
+---
+
+# Annotated DEG Table
+
+Table sorted by statistical significance (FDR, ascending = most significant first).
+
+```{r annotate_greenyellow_genes}
+# Join greenyellow genes with annotations
+gy_annotated <- ctrl_modules %>%
+  filter(color == "greenyellow") %>%
+  left_join(labels, by = "gene") %>%
+  mutate(
+    # Use locus_label if available, else locus_symbol
+    symbol = case_when(
+      !is.na(locus_label) & locus_label != "" ~ locus_label,
+      !is.na(locus_symbol) & locus_symbol != "" ~ locus_symbol,
+      TRUE ~ "---"
+    ),
+    # Clean up description - use desc_merged or desc_pannzer
+    description = case_when(
+      !is.na(desc_merged) & desc_merged != "" ~ desc_merged,
+      !is.na(desc_pannzer) & desc_pannzer != "" ~ desc_pannzer,
+      TRUE ~ "---"
+    ),
+    # Format log2FC and FDR
+    log2FC = round(logFC, 2),
+    FDR_val = adj.P.Val
+  ) %>%
+  # Sort by FDR (most significant first)
+  arrange(FDR_val) %>%
+  select(gene, symbol, description, log2FC, FDR_val)
+
+# Display count
+cat("Annotated", nrow(gy_annotated), "greenyellow module genes\n")
+```
+
+```{r display_table}
+# Create formatted table
+gy_table <- gy_annotated %>%
+  mutate(
+    FDR = formatC(FDR_val, format = "e", digits = 1),
+    # Truncate long descriptions
+    description = str_trunc(description, 50)
+  ) %>%
+  select(gene, symbol, description, log2FC, FDR)
+
+# Display with kable
+kable(
+  gy_table,
+  col.names = c("Gene ID", "Label", "Description", "log2FC", "FDR"),
+  caption = "Greenyellow module DEGs sorted by statistical significance (FDR)"
+)
+```
+
+---
+
+# GO Enrichment for Greenyellow Module
+
+```{r go_enrichment}
+# Filter GO BP results for greenyellow module
+gy_go <- go_bp %>%
+  filter(module_color == "greenyellow") %>%
+  arrange(pvalue) %>%
+  select(ID, Description, GeneRatio, pvalue, Count, geneID) %>%
+  mutate(
+    pvalue_fmt = formatC(pvalue, format = "e", digits = 2),
+    Description = str_trunc(Description, 60)
+  )
+
+cat("Greenyellow module has", nrow(gy_go), "enriched GO BP terms\n")
+```
+
+```{r display_go_table}
+# Display top GO terms
+kable(
+  gy_go %>%
+    head(20) %>%
+    select(ID, Description, GeneRatio, pvalue_fmt, Count),
+  col.names = c("GO ID", "Description", "Gene Ratio", "p-value", "Count"),
+  caption = "Top 20 GO Biological Process terms for greenyellow module"
+)
+```
+
+---
+
+# Growth-Related GO Terms
+
+Highlight GO terms related to growth, cell cycle, and cell proliferation.
+
+```{r growth_go_terms}
+# Filter for growth-related terms
+growth_go <- gy_go %>%
+  filter(grepl("growth|proliferation|cell cycle|DNA replication|cell division|cytokinesis|cell tip",
+               Description, ignore.case = TRUE))
+
+cat("Growth-related GO terms in greenyellow module:\n\n")
+
+kable(
+  growth_go %>%
+    select(ID, Description, GeneRatio, pvalue_fmt, geneID),
+  col.names = c("GO ID", "Description", "Gene Ratio", "p-value", "Genes"),
+  caption = "Growth-related GO terms in greenyellow module"
+)
+```
+
+---
+
+# Functional Categories
+
+```{r functional_categories}
+# Manually categorize key genes
+categories <- tribble(
+  ~category, ~genes, ~description,
+  "Cell proliferation", "pcna2", "DNA replication licensing - cell cycle S phase",
+  "Exocytosis/Cytokinesis", "sec6", "Exocyst complex - vesicle trafficking, cell plate formation",
+  "Cell polarity/Growth", "ropgef14, pla2", "Rho GTPase signaling - polarized cell growth",
+  "DNA repair", "parg, pcna2", "Poly(ADP-ribose) metabolism, DNA damage response",
+  "Transcription factor", "mybr58", "MYB-related TF - potentially growth-related targets",
+  "Signaling kinases", "pbl19, pk3, pk8", "Protein kinases - signal transduction"
+)
+
+kable(
+  categories,
+  col.names = c("Category", "Genes", "Biological Role"),
+  caption = "Functional categories in the greenyellow module"
+)
+```
+
+---
+
+# Key Genes: sec6 and pcna2
+
+## sec6 (Exocyst complex component)
+
+- **Gene ID**: Zm00001eb194380
+- **log2FC**: +2.87 (upregulated in Inv4m)
+- **FDR**: 2.9e-17
+- **GWAS support**: Plant height candidate (Peiffer et al. 2014)
+- **Function**: Exocyst complex component involved in vesicle trafficking and
+  cell plate formation during cytokinesis
+
+## pcna2 (Proliferating cell nuclear antigen 2)
+
+- **Gene ID**: Zm00001eb192050
+- **log2FC**: +2.99 (upregulated in Inv4m)
+- **FDR**: 9.3e-03
+- **Function**: DNA replication processivity factor, marker of cell proliferation,
+  essential for S phase progression
+
+## ropgef14 (Rop guanine nucleotide exchange factor 14)
+
+- **Gene ID**: Zm00001eb188240
+- **log2FC**: -2.98 (downregulated in Inv4m)
+- **FDR**: 2.6e-14
+- **Function**: Activator of Rho-type GTPases, required for polarized cell growth
+  including pollen tube elongation
+
+---
+
+# Summary
+
+The greenyellow module represents a coherent **cell growth/division network**
+with the highest bootstrap support (LFP = 0.80) among all WGCNA modules:
+
+1. **Cell proliferation**: pcna2 (DNA replication), parg (DNA repair)
+2. **Cytokinesis**: sec6 (exocyst complex, cell plate formation)
+3. **Polarized growth**: ropgef14, pla2 (Rho GTPase signaling, tip growth)
+4. **Signaling**: Multiple protein kinases (pbl19, pk3, pk8)
+
+The GO enrichment confirms:
+
+- **"Developmental cell growth"** (p = 8.5e-4) - polarized growth genes
+- **"Cell tip growth"** (p = 6.0e-4) - pollen tube elongation genes
+- **"Regulation of DNA replication"** (p = 0.019) - pcna2
+
+The presence of both sec6 (GWAS plant height candidate) and pcna2 (cell
+proliferation marker) in this highly stable module supports the hypothesis
+that Inv4m introgression perturbs a coordinated cell growth/division program,
+consistent with the altered SAM morphology and plant height phenotypes.
+
+---
+
+# Save Outputs
+
+```{r save_outputs}
+# Save annotated table (CSV)
+write_csv(
+  gy_annotated %>%
+    mutate(FDR = formatC(FDR_val, format = "e", digits = 2)) %>%
+    select(gene, symbol, description, log2FC, FDR),
+  file.path(paths$intermediate, "greenyellow_module_annotated_DEGs.csv")
+)
+
+# Save GO enrichment
+write_csv(
+  gy_go %>% select(-pvalue_fmt),
+  file.path(paths$intermediate, "greenyellow_module_GO_BP.csv")
+)
+
+cat("\nSaved outputs:\n")
+cat("  - greenyellow_module_annotated_DEGs.csv\n")
+cat("  - greenyellow_module_GO_BP.csv\n")
+```
+
+```{r generate_latex_table}
+# Generate LaTeX table for main.tex
+latex_header <- '\\begin{table}[!ht]
+\\caption{\\textbf{Greenyellow module DEGs containing growth and cell division genes.} Genes assigned to the greenyellow WGCNA consensus module, which has the highest bootstrap support (LFP = 0.80) among all modules. Contains the plant height GWAS candidate \\textit{sec6} and the cell proliferation marker \\textit{pcna2}. Sorted by statistical significance (FDR). GO enrichment includes ``developmental cell growth\'\' ($p = 8.5 \\times 10^{-4}$) and ``regulation of DNA replication\'\' ($p = 0.019$).}
+\\label{tab::greenyellow_module}
+\\centering
+\\small
+\\begin{tabular}{@{}lllrr@{}}
+\\toprule
+\\textbf{Gene ID} & \\textbf{Label} & \\textbf{Description} & \\textbf{log$_2$FC} & \\textbf{FDR} \\\\
+\\midrule'
+
+latex_footer <- '\\bottomrule
+\\end{tabular}
+\\end{table}'
+
+# Format each row
+format_latex_row <- function(gene, symbol, desc, log2fc, fdr) {
+  # Format label
+  label <- if (is.na(symbol) || symbol == "" || symbol == "---") {
+    "---"
+  } else {
+    paste0("\\textit{", symbol, "}")
+  }
+
+  # Format description
+  desc_clean <- if (is.na(desc) || desc == "" || desc == "---") {
+    "---"
+  } else {
+    str_trunc(desc, 40) %>%
+      str_replace_all("_", "\\\\_") %>%
+      str_replace_all("&", "\\\\&") %>%
+      str_replace_all("%", "\\\\%")
+  }
+
+  # Format log2FC with sign
+  log2fc_fmt <- if (log2fc >= 0) {
+    paste0("$+", sprintf("%.2f", log2fc), "$")
+  } else {
+    paste0("$", sprintf("%.2f", log2fc), "$")
+  }
+
+  # Format FDR in scientific notation
+  fdr_exp <- floor(log10(fdr))
+  fdr_mant <- fdr / 10^fdr_exp
+  fdr_fmt <- paste0("$", sprintf("%.1f", fdr_mant), " \\times 10^{", fdr_exp, "}$")
+
+  paste(gene, label, desc_clean, log2fc_fmt, fdr_fmt, sep = " & ", collapse = "") %>%
+    paste0(" \\\\")
+}
+
+# Generate all rows
+latex_rows <- gy_annotated %>%
+  rowwise() %>%
+  mutate(
+    latex_row = format_latex_row(gene, symbol, description, log2FC, FDR_val)
+  ) %>%
+  pull(latex_row)
+
+# Combine into full table
+latex_table <- paste(
+  latex_header,
+  paste(latex_rows, collapse = "\n"),
+  latex_footer,
+  sep = "\n"
+)
+
+# Save to tables folder
+writeLines(latex_table, file.path(paths$tables, "greenyellow_module_DEGs.tex"))
+
+cat("\nLaTeX table saved:\n")
+cat("  - tables/greenyellow_module_DEGs.tex\n")
+```
+
+---
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
