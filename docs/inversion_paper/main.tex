@@ -846,13 +846,13 @@ the transcriptome.
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width= 0.85\linewidth]{figs/DEG_network.png}
+\includegraphics[width= 0.85\linewidth]{figs/transnetwork.png}
 \caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
 \textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow). Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants. Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
 \textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships. The network includes   \textit{proliferating cell nuclear antigen2} (\textit{pcna2}, \textit{outer cell layer2} (\textit{ocl2}), and  \jmjii .
 \textit{Right:} Novel edges specific to the \invfour network, showing the \jmjiv neighborhood subgraph that includes \textit{Exocyst complex component SEC6} (\textit{sec6}) .
 \textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). Gene labels identify representative members of enriched terms. Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.}
-\label{fig::DEGnetwork}
+\label{fig::transnetwork}
 \end{figure*}
 
 
@@ -881,7 +881,7 @@ within the introgressed region (regulators) to differentially expressed genes
 located elsewhere in the genome (trans targets). We validated these
 coexpression relationships against the MaizeNetome database, which catalogs
 experimentally-supported regulatory interactions in maize
-(Fig~\ref{fig::DEGnetwork}A).
+(Fig~\ref{fig::transnetwork}A).
 
 The trans-regulatory network comprised 135 genes connected by 552 coexpression
 edges. Of the 103 regulator genes within or flanking the introgression, 33
@@ -901,7 +901,7 @@ also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets,
 supporting a conserved regulatory role for this histone demethylase.
 
 The Novel network revealed a previously uncharacterized \jmjiv neighborhood
-subgraph (Fig~\ref{fig::DEGnetwork}A, right panel). \jmjiv ($\log_2 FC =
+subgraph (Fig~\ref{fig::transnetwork}A, right panel). \jmjiv ($\log_2 FC =
 -2.84$) showed strong coexpression with \textit{Exocyst complex component
 SEC6} (\textit{sec6}; $\log_2 FC = +2.87$), which functions in vesicle
 trafficking and cell plate formation during cytokinesis. This connection
@@ -909,7 +909,7 @@ suggests that the JMJ cluster may influence cell division through
 post-translational mechanisms beyond chromatin modification.
 
 Gene Ontology enrichment analysis of genes within \invfour proper
-(Fig~\ref{fig::DEGnetwork}B) revealed significant over-representation of
+(Fig~\ref{fig::transnetwork}B) revealed significant over-representation of
 negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.97
 \times 10^{-4}$, fold enrichment = 77.5) and positive regulation of growth
 (GO:0045927; $p = 1.73 \times 10^{-3}$, fold enrichment = 32.3). Both terms
@@ -1048,7 +1048,7 @@ Table~\ref{tab::preservation}), with the pink module---enriched for ribosome
 biogenesis and growth regulation (Table~\ref{tab::pink_module})---showing
 near-complete structural collapse (adjacency correlation $= 0.020$). The
 trans-regulatory network connects JMJ genes to cell proliferation factors
-including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::DEGnetwork}A),
+including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A),
 suggesting a mechanistic chain: JMJ downregulation $\rightarrow$ altered
 H3K4 methylation $\rightarrow$ growth gene misexpression $\rightarrow$ SAM
 elongation $\rightarrow$ accelerated flowering and increased height.
