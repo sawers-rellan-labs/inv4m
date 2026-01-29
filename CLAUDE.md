@@ -1,54 +1,43 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-23
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 4 Results Writing 🔶
-**Version:** v1.6.0
+**Last Updated:** 2026-01-28
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Review & Polish 🔶
+**Version:** v1.7.0
 
 ---
 
 ## START HERE: Inversion Paper Revision
 
-**Active Work:** The inversion paper is undergoing revision after a statistical model change. Three new analyses are also planned. Before starting any work, read these files to understand current state:
+**Current State:** Manuscript text is COMPLETE (results + discussion). Title updated to reflect GxE findings. 4 placeholder references remain to be filled.
+
+**New Title:** "Introgression of Mexican highland chromosomal inversion *Inv4m* into temperate maize modulates flowering, plant height, and growth-related gene networks"
 
 ```
-scripts/00_agent_work/missing_analysis_plan_20260120.md     # NEW - Three additional analyses planned
 scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
 scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
+scripts/00_agent_work/DISCUSSION_PLAN_20260128.md  # Discussion section plan
 README.md  # Figure/table coverage
 ```
 
-**Quick command for user:** Ask the agent to read handover docs:
-> "Read the handover document and master plan, then suggest where to start"
-
-**Current Priority (as of 2026-01-23):**
-1. **New Analyses Status:**
-   - ✅ Internode measurements - **Complete** (`internode_analysis.Rmd`)
-   - ✅ GxE analysis - **Complete** (`inv4mGxE_3_env.Rmd`) - 3 environments, 10 CSVs, 3 figures
-   - ✅ JMJ transcript-level DEG - **Complete** (kallisto re-run done)
-2. **Phase 4: Results Writing (see TODO_05_results_writing.md, est. 8-10 hours)**
-   - ⬜ Results narrative - incomplete, does not match recent analysis
-   - ⬜ Discussion section - not written
-   - ⬜ MaizeNetome validation for the WGCNA analysis (methods)
-3. **Phase 5: Review & Polish (after results/discussion complete)**
+**Current Priority (as of 2026-01-28):**
+1. **Phase 5: Review & Polish**
+   - ⬜ Fill 4 placeholder references (search `% [PLACEHOLDER:` in main.tex)
+   - ⬜ MaizeNetome validation for WGCNA (methods) - low priority
    - ⬜ Internal consistency check
    - ⬜ Final proofreading
-   - ⬜ USER: Add preservation table/figure to Overleaf
 
-**New analysis plan:** `scripts/00_agent_work/missing_analysis_plan_20260120.md`
+**Placeholder references to fill:**
+1. `cite inversion origin via ectopic recombination` - Breakpoint section
+2. `cite JMJ biochemical function review` - JMJ section
+3. `cite Arabidopsis JMJ flowering` - JMJ section
+4. `cite compensation in tandem duplicates` - Limitations section
 
-**Recent completions:**
-- ✅ MaizeNetome validation methods (trans coexpression network)
-- ✅ Methods/results integration for GxE and Internode into main.tex
-- ✅ JMJ transcript-level DEG analysis (kallisto re-run with corrected cDNA)
-- ✅ JMJ BLAST plot (Panel C) - track heights and Greek psi label
-- ✅ GxE 3-environment analysis (PSU2022, PSU2025, CLY2025) with temperature sensitivity
-- ✅ Trans-network results section (136 genes, 552 edges, GO enrichment)
-- ✅ WGCNA perturbation results (jmj2/jmj4 hub connectivity collapse)
-- ✅ PCNA2 + SMO4 cell proliferation supplementary figure
-- ✅ SAM morphology analysis notebook
-- ✅ Gene annotation correction: uba2 → smo4 (Zm00001eb192850)
-- ✅ WGCNA Figure 6 (dendrogram + GO-annotated boxplot + hub scatter)
-- ✅ JMJ cluster figure with expression boxplot (Panel A) + microsynteny (Panel B/C)
+**Recent completions (2026-01-28):**
+- ✅ Discussion section complete (7 subsections, ~170 lines)
+- ✅ Title updated to reflect GxE findings
+- ✅ README.md and docs/index.html updated
+- ✅ All results sections complete (3.1-3.7)
+- ✅ All figures and tables complete
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
