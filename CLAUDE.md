@@ -10,7 +10,7 @@
 
 **Current State:** Manuscript text is COMPLETE. Now in FIGURE REVIEW phase (9 high-priority tasks).
 
-**New Title:** "Introgression of teosinte *mexicana* chromosomal inversion *Inv4m* into temperate maize modulates flowering time, plant height, and growth-regulatory gene networks"
+**New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
 ```
 scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions

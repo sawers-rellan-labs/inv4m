@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering, plant height, and growth-related gene networks**.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
