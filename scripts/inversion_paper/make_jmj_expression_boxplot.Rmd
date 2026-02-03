@@ -190,7 +190,7 @@ if (length(jmj_in_crow) > 0) {
    filter(!is.na(genotype)) %>%
    left_join(jmj_genes, by = "gene") %>%
    mutate(
-     experiment = "Crow2020 (Growth Chamber)",
+     experiment = "Crow et al., 2020 (Growth Chamber)",
      # Clean up tissue names
      tissue = str_replace(tissue, "_tissue$", "") %>%
        str_replace("_", " ") %>%
@@ -218,7 +218,7 @@ jmj_combined <- jmj_combined %>%
  mutate(
    symbol = factor(symbol, levels = c("jmj2", "jmj4", "jmj21")),
    genotype = factor(genotype, levels = c("B73", "Inv4m")),
-   experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+   experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
  )
 
 {
@@ -266,7 +266,7 @@ total_cluster_samples <- bind_rows(psu_samples, crow_samples) %>%
   mutate(
     genotype = recode(genotype, "B73" = "CTRL"),
     genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
-    experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
   )
 
 {
@@ -453,21 +453,23 @@ p_total_cluster <- ggplot(
   theme_classic(base_size = 14) +
   theme(
     axis.text.x = element_text(
-      angle = 45, hjust = 1,
-      color = "black", face = "bold", size = 12
+      angle = 30, hjust = 1,
+      color = "black", face = "bold", size = 14
     ),
-    axis.text.y = element_text(color = "black", face = "bold", size = 12),
-    axis.title = element_text(face = "bold", size = 14),
+    axis.text.y = element_text(color = "black", face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 16),
     strip.text = element_text(face = "bold", size = 18),
     strip.background = element_rect(fill = "grey95", color = NA),
-    legend.position = "bottom",
+    legend.position = c(0.9, 0.9),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "white", color = NA),
     legend.text = element_text(face = "bold", size = 12),
     legend.title = element_text(face = "bold", size = 12),
     panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
   ) +
   labs(
     x = NULL,
-    y = "Total JMJ Cluster Expression (CPM)",
+    y = "Total JMJ Cluster Expression\n(CPM)",
     caption = "Dashed red line = expected Inv4m (CTRL/5). Significance: * FDR<0.05, ** FDR<0.01, *** FDR<0.001"
   )
 
@@ -543,22 +545,24 @@ p_jmj_expr <- ggplot(
   theme_classic(base_size = 14) +
   theme(
     axis.text.x = element_text(
-      angle = 45, hjust = 1,
-      color = "black", face = "bold", size = 11
+      angle = 30, hjust = 1,
+      color = "black", face = "bold", size = 14
     ),
-    axis.text.y = element_text(color = "black", face = "bold"),
-    axis.title = element_text(face = "bold", size = 13),
+    axis.text.y = element_text(color = "black", face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 16),
     strip.text.x = element_text(face = "bold", size = 16),
     strip.text.y = element_text(face = "bold.italic", size = 16),
     strip.background = element_rect(fill = "grey95", color = NA),
-    legend.position = "bottom",
-    legend.text = element_text(face = "bold"),
-    legend.title = element_text(face = "bold"),
+    legend.position = c(0.9, 0.9),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.text = element_text(face = "bold", size = 12),
+    legend.title = element_text(face = "bold", size = 12),
     panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
   ) +
   labs(
     x = NULL,
-    y = expression(bold(log[2]*"(CPM)"))
+    y = expression(atop(bold(log[2]), bold("(CPM)")))
   )
 
 print(p_jmj_expr)
@@ -594,22 +598,24 @@ p_jmj_cluster <- ggplot(
   theme_classic(base_size = 14) +
   theme(
     axis.text.x = element_text(
-      angle = 45, hjust = 1,
-      color = "black", face = "bold", size = 12
+      angle = 30, hjust = 1,
+      color = "black", face = "bold", size = 14
     ),
-    axis.text.y = element_text(color = "black", face = "bold", size = 12),
-    axis.title = element_text(face = "bold", size = 14),
+    axis.text.y = element_text(color = "black", face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 16),
     strip.text.x = element_text(face = "bold", size = 18),
     strip.text.y = element_text(face = "bold.italic", size = 18),
     strip.background = element_rect(fill = "grey95", color = NA),
-    legend.position = "bottom",
+    legend.position = c(0.9, 0.9),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "white", color = NA),
     legend.text = element_text(face = "bold", size = 12),
     legend.title = element_text(face = "bold", size = 12),
     panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
   ) +
   labs(
     x = NULL,
-    y = expression(bold(log[2]*"(CPM)"))
+    y = expression(atop(bold(log[2]), bold("(CPM)")))
   )
 
 print(p_jmj_cluster)
@@ -781,7 +787,7 @@ if (length(cellprolif_in_crow) > 0) {
     filter(!is.na(genotype)) %>%
     left_join(cellprolif_genes, by = "gene") %>%
     mutate(
-      experiment = "Crow2020 (Growth Chamber)",
+      experiment = "Crow et al., 2020 (Growth Chamber)",
       tissue = str_replace(tissue, "_tissue$", "") %>%
         str_replace("_", " ") %>%
         str_replace("Primary root", "Root")
@@ -805,7 +811,7 @@ cellprolif_combined <- cellprolif_combined %>%
   mutate(
     symbol = factor(symbol, levels = c("pcna2", "smo4")),
     genotype = factor(genotype, levels = c("B73", "Inv4m")),
-    experiment = factor(experiment, levels = c("Crow2020 (Growth Chamber)", "PSU2022 (Field)"))
+    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
   )
 
 {
@@ -843,22 +849,24 @@ p_cellprolif_expr <- ggplot(
   theme_classic(base_size = 14) +
   theme(
     axis.text.x = element_text(
-      angle = 45, hjust = 1,
-      color = "black", face = "bold", size = 12
+      angle = 30, hjust = 1,
+      color = "black", face = "bold", size = 14
     ),
-    axis.text.y = element_text(color = "black", face = "bold", size = 12),
-    axis.title = element_text(face = "bold", size = 14),
+    axis.text.y = element_text(color = "black", face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 16),
     strip.text.x = element_text(face = "bold", size = 18),
     strip.text.y = element_text(face = "bold.italic", size = 18),
     strip.background = element_rect(fill = "grey95", color = NA),
-    legend.position = "bottom",
+    legend.position = c(0.9, 0.9),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "white", color = NA),
     legend.text = element_text(face = "bold", size = 12),
     legend.title = element_text(face = "bold", size = 12),
     panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
   ) +
   labs(
     x = NULL,
-    y = expression(bold(log[2]*"(CPM)"))
+    y = expression(atop(bold(log[2]), bold("(CPM)")))
   )
 
 print(p_cellprolif_expr)
