@@ -105,7 +105,7 @@ print(p_B)
 
 ## Panel C: Hub Gene Connectivity
 
-```{r preview_C, fig.width=12, fig.height=16
+```{r preview_C, fig.width=12, fig.height=16}
 print(p_C)
 ```
 
@@ -113,31 +113,41 @@ print(p_C)
 
 # Alternative Layouts
 
-## Vertical Stack (A, B, C)
+## Layout: A on top, B and C side by side below
 
-```{r vertical_layout, fig.width=12, fig.height=20}
-fig_vertical <- plot_grid(
-  p_A,
+```{r combined_layout, fig.width=14, fig.height=12}
+# Bottom row: B and C side by side
+bottom_row <- plot_grid(
   p_B,
   p_C,
+  ncol = 2,
+  labels = c("B", "C"),
+  rel_widths = c(1, 1)
+)
+
+# Combined: A on top, B+C below
+fig_combined <- plot_grid(
+  p_A,
+  bottom_row,
   ncol = 1,
-  labels = c("A", "B", "C"),
-  rel_heights = c(0.1, 0.5, 0.4)
+  labels = c("A", ""),
+  rel_heights = c(0.3, 0.7)
 )
 
 ggsave(
   file.path(paths$figures, "WGCNA_module_perturbation.png"),
-  fig_vertical,
-  width = 12, height = 20
+  fig_combined,
+  width = 14, height = 12,
+  dpi = 300
 )
 
 ggsave(
-  file.path(paths$figures, "WGCNA_module_perturbation.svg"),
-  fig_vertical,
-  width = 12, height = 20
+  file.path(paths$figures, "WGCNA_module_perturbation.pdf"),
+  fig_combined,
+  width = 14, height = 12
 )
 
-print(fig_vertical)
+print(fig_combined)
 ```
 
 ---
