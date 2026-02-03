@@ -61,6 +61,7 @@ library(knitr)
 library(SpATS)
 library(statgenHTP)
 library(ggbeeswarm)
+library(cowplot)
 ```
 
 ## 1b. Configuration and load GDD lookup table
@@ -387,39 +388,143 @@ pheno_theme2 <- theme_classic2(base_size = 20) +
 if (length(sig_traits) == 0) {
   warning("No traits significant after FDR correction.")
 } else {
-  plot_data_sig <- NIL_corrected %>%
+  # --- Main Figure 2 Panel A: 6 traits with units ---
+  main_traits <- c("PH", "DTA", "DTS", "HI", "STWHV", "CD")
+  trait_units <- c(PH = "cm", DTA = "Days", DTS = "Days", HI = "", STWHV = "g", CD = "mm")
+
+  plot_data_main <- NIL_corrected %>%
     pivot_longer(
       cols = all_of(usable_phenotypes),
       names_to = "trait",
       values_to = "value"
     ) %>%
+    filter(trait %in% main_traits, !is.na(value)) %>%
+    mutate(
+      trait = factor(trait, levels = main_traits),
+      genotype = factor(genotype, levels = c("CTRL", "Inv4m"))
+    )
+
+  test_main <- htest %>%
+    filter(trait %in% main_traits)
+
+  # Theme with bold strip text, no title, rotated x-axis with ggtext
+ pheno_theme_panel <- theme_classic2(base_size = 20) +
+    theme(
+      plot.title = element_blank(),
+      axis.title.y = element_text(size = 18),
+      axis.title.x = element_blank(),
+      axis.text.x = element_markdown(size = 18, face = "bold", color = "black"),
+      axis.text.y = element_text(size = 16),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 20, face = "bold"),
+      legend.position = "none"
+    )
+
+  # Create individual plots with custom y-axis labels
+  make_trait_plot <- function(trait_name, data, tests, units) {
+    d <- filter(data, trait == trait_name)
+    t <- filter(tests, trait == trait_name)
+    y_label <- units[trait_name]
+
+    p <- ggplot(d, aes(x = genotype, y = value, color = genotype)) +
+      geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+      geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+      scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+      scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
+      labs(title = trait_name, y = y_label, x = NULL) +
+      stat_pvalue_manual(t, tip.length = 0.01, step.height = 0.08, size = 8, bracket.size = 0.8) +
+      scale_y_continuous(expand = expansion(mult = c(0.1, 0.15))) +
+      pheno_theme_panel +
+      theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+
+    # Custom 1-day breaks for DTA/DTS
+    if (trait_name %in% c("DTA", "DTS")) {
+      y_range <- range(d$value, na.rm = TRUE)
+      p <- p + scale_y_continuous(
+        breaks = seq(floor(y_range[1]), ceiling(y_range[2]), by = 1),
+        expand = expansion(mult = c(0.1, 0.15))
+      )
+    }
+    return(p)
+  }
+
+  trait_plots <- lapply(main_traits, make_trait_plot, data = plot_data_main, tests = test_main, units = trait_units)
+
+  main_panel <- cowplot::plot_grid(
+    plotlist = trait_plots,
+    nrow = 2,
+    ncol = 3,
+    align = "hv",
+    axis = "tblr"
+  )
+
+  print(main_panel)
+
+  # Save main panel for Figure 2 (2 rows x 3 cols)
+  ggsave(
+    file.path(paths$figures, "field_phenotypes_panel.pdf"),
+    main_panel,
+    width = 10, height = 7, dpi = 300
+  )
+  ggsave(
+    file.path(paths$figures, "field_phenotypes_panel.png"),
+    main_panel,
+    width = 10, height = 7, dpi = 300
+  )
+  cat("Saved field phenotypes panel to:", file.path(paths$figures, "field_phenotypes_panel.png"), "\n")
+
+  # --- Supplementary: GDDA, GDDS panel ---
+  gdd_traits <- c("GDDA", "GDDS")
+  gdd_traits_present <- intersect(gdd_traits, sig_traits)
+
+  if (length(gdd_traits_present) > 0) {
+    plot_data_gdd <- NIL_corrected %>%
+      pivot_longer(cols = all_of(usable_phenotypes), names_to = "trait", values_to = "value") %>%
+      filter(trait %in% gdd_traits_present, !is.na(value)) %>%
+      mutate(trait = factor(trait, levels = gdd_traits_present))
+
+    test_gdd <- htest %>% filter(trait %in% gdd_traits_present)
+
+    gdd_plot <- ggplot(plot_data_gdd, aes(x = genotype, y = value, color = genotype)) +
+      geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+      geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+      scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+      labs(y = "GDD (°C·days)", x = NULL) +
+      stat_pvalue_manual(test_gdd, tip.length = 0.01, step.height = 0.08, size = 8, bracket.size = 0.8) +
+      scale_y_continuous(expand = expansion(mult = c(0.1, 0.15))) +
+      facet_wrap(~ trait, scales = "free_y", ncol = 2) +
+      pheno_theme_panel
+
+    print(gdd_plot)
+
+    ggsave(file.path(paths$figures, "gdd_phenotypes_panel.pdf"), gdd_plot, width = 6, height = 4, dpi = 300)
+    ggsave(file.path(paths$figures, "gdd_phenotypes_panel.png"), gdd_plot, width = 6, height = 4, dpi = 300)
+    cat("Saved GDD phenotypes panel to:", file.path(paths$figures, "gdd_phenotypes_panel.png"), "\n")
+  }
+
+  # --- All significant traits plot (for reference) ---
+  plot_data_sig <- NIL_corrected %>%
+    pivot_longer(cols = all_of(usable_phenotypes), names_to = "trait", values_to = "value") %>%
     filter(trait %in% sig_traits, !is.na(value)) %>%
     mutate(trait = as.character(trait))
 
-  test_to_plot <- htest %>%
-    filter(trait %in% sig_traits)
+  test_to_plot <- htest %>% filter(trait %in% sig_traits)
 
   diff_plot <- ggplot(plot_data_sig, aes(x = genotype, y = value, color = genotype)) +
-    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>% 
+    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
     with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-    geom_quasirandom(size = 2) %>% 
+    geom_quasirandom(size = 2) %>%
     with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
     scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
-    labs(
-      title = "Inv4m vs CTRL: Spatially Corrected Phenotypes (FDR-Adjusted)",
-      y = "Corrected Value",
-      x = "Genotype"
-    ) +
-    stat_pvalue_manual(
-      test_to_plot,
-      tip.length = 0.01,
-      step.height = 0.08,
-      size = 10,
-      bracket.size = 0.8
-    ) +
+    labs(title = "Inv4m vs CTRL: Spatially Corrected Phenotypes (FDR-Adjusted)", y = "Corrected Value", x = "Genotype") +
+    stat_pvalue_manual(test_to_plot, tip.length = 0.01, step.height = 0.08, size = 10, bracket.size = 0.8) +
     scale_y_continuous(expand = expansion(mult = c(0.1, 0.15))) +
     facet_wrap(~ factor(trait, levels = sig_traits), scales = "free_y", ncol = 4) +
-    pheno_theme2
+    pheno_theme_panel
 
   print(diff_plot)
 }
