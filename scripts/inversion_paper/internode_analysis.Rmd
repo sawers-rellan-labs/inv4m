@@ -428,7 +428,123 @@ write_csv(internode_effects, file.path(paths$intermediate, "internode_position_e
 cat("\nResults exported to:", paths$intermediate, "\n")
 ```
 
-## 9. Key Findings
+## 9. Internode-by-Position T-Tests with FDR Correction
+
+```{r internode-ttest-fdr}
+# Hypothesis: The difference in plant height is mainly due to internode 2 (just below tassel)
+# Test: t-test for each internode position, corrected for multiple testing
+
+# Focus on MI21 donor for the main analysis
+internode_ttest <- phytomere_processed %>%
+  filter(donor == "MI21") %>%
+  group_by(from_top) %>%
+  filter(n_distinct(genotype) == 2, n() >= 6) %>%  # Ensure both genotypes present with sufficient n
+  t_test(length ~ genotype, detailed = TRUE) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance("p.adj") %>%
+  arrange(from_top)
+
+cat("=== T-TESTS BY INTERNODE POSITION (MI21 donor) ===\n")
+cat("H₀: No difference in internode length between CTRL and Inv4m\n")
+cat("FDR correction applied across all positions\n\n")
+
+print(internode_ttest %>%
+        select(from_top, n1, n2, estimate, estimate1, estimate2, statistic, p, p.adj, p.adj.signif))
+
+# Calculate effect sizes (difference and percent change)
+internode_effects_detailed <- phytomere_processed %>%
+  filter(donor == "MI21") %>%
+  group_by(from_top) %>%
+  filter(n_distinct(genotype) == 2) %>%
+  summarise(
+    n_ctrl = sum(genotype == "CTRL"),
+    n_inv4m = sum(genotype == "INV4M"),
+    ctrl_mean = mean(length[genotype == "CTRL"], na.rm = TRUE),
+    inv4m_mean = mean(length[genotype == "INV4M"], na.rm = TRUE),
+    diff_cm = inv4m_mean - ctrl_mean,
+    pct_change = 100 * (inv4m_mean - ctrl_mean) / ctrl_mean,
+    .groups = "drop"
+  ) %>%
+  left_join(internode_ttest %>% select(from_top, p, p.adj, p.adj.signif), by = "from_top") %>%
+  arrange(from_top)
+
+cat("\n=== EFFECT SIZES BY INTERNODE POSITION ===\n")
+print(internode_effects_detailed)
+
+# Summarize contribution to total height difference
+total_diff <- sum(internode_effects_detailed$diff_cm, na.rm = TRUE)
+internode_contribution <- internode_effects_detailed %>%
+  mutate(
+    contribution_cm = diff_cm,
+    contribution_pct = 100 * diff_cm / total_diff
+  ) %>%
+  select(from_top, diff_cm, contribution_pct, p.adj, p.adj.signif) %>%
+  arrange(desc(abs(contribution_pct)))
+
+cat("\n=== CONTRIBUTION TO TOTAL HEIGHT DIFFERENCE ===\n")
+cat(sprintf("Total height difference (sum of internode diffs): %.2f cm\n\n", total_diff))
+print(internode_contribution)
+
+# Test hypothesis: Is internode 2 the main contributor?
+internode2_contrib <- internode_contribution %>% filter(from_top == 2)
+if (nrow(internode2_contrib) > 0) {
+  cat("\n=== HYPOTHESIS TEST: Internode 2 contribution ===\n")
+  cat(sprintf("Internode 2 difference: %.2f cm (%.1f%% of total)\n",
+              internode2_contrib$diff_cm, internode2_contrib$contribution_pct))
+  cat(sprintf("FDR-adjusted p-value: %.4f (%s)\n",
+              internode2_contrib$p.adj, internode2_contrib$p.adj.signif))
+}
+
+# Export results
+write_csv(internode_ttest, file.path(paths$intermediate, "internode_ttest_by_position.csv"))
+write_csv(internode_effects_detailed, file.path(paths$intermediate, "internode_effects_detailed.csv"))
+write_csv(internode_contribution, file.path(paths$intermediate, "internode_contribution_to_height.csv"))
+
+cat("\nResults exported to:", paths$intermediate, "\n")
+```
+
+### 9.1 Visualization of Significant Differences
+
+```{r internode-significance-plot, fig.width=10, fig.height=8}
+# Create a bar plot showing internode contribution with significance markers
+contribution_plot <- internode_contribution %>%
+  mutate(
+    from_top = factor(from_top),
+    significant = p.adj < 0.05
+  ) %>%
+  ggplot(aes(x = from_top, y = diff_cm, fill = significant)) +
+  geom_col(width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text(aes(label = p.adj.signif,
+                y = diff_cm + sign(diff_cm) * 0.3),
+            size = 6, fontface = "bold") +
+  scale_fill_manual(values = c("TRUE" = "purple4", "FALSE" = "gray70"),
+                    labels = c("TRUE" = "FDR < 0.05", "FALSE" = "ns"),
+                    name = "Significance") +
+  scale_x_discrete(limits = rev) +
+  coord_flip() +
+  labs(
+    title = "**Internode Length Difference (*Inv4m* − CTRL)**",
+    subtitle = "MI21 donor; significance after FDR correction",
+    x = "Internode position (from top)",
+    y = "Difference (cm)"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    plot.title = element_markdown(),
+    plot.subtitle = element_text(size = 14),
+    legend.position = "top"
+  )
+
+print(contribution_plot)
+
+ggsave(file.path(paths$figures, "internode_contribution_barplot.pdf"),
+       contribution_plot, width = 10, height = 8)
+ggsave(file.path(paths$figures, "internode_contribution_barplot.png"),
+       contribution_plot, width = 10, height = 8, dpi = 300)
+```
+
+## 11. Key Findings
 
 ```{r key-findings}
 cat("=== KEY FINDINGS ===\n\n")
@@ -456,7 +572,7 @@ cat("\n3. Height Validation:\n")
 cat(sprintf("   Sum of internodes explains %.1f%% of plant height variance\n", r_squared * 100))
 ```
 
-## 10. Session Information
+## 12. Session Information
 
 ```{r session-info}
 sessionInfo()

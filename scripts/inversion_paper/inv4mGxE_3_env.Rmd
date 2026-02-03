@@ -201,7 +201,7 @@ for (current_donor in "MI21") {
                       ci = TRUE, var.equal = FALSE)
   
   psu2022_summary <- psu2022_results %>%
-    left_join(psu2022_cohens_d %>% select(trait, effsize, magnitude), 
+    left_join(psu2022_cohens_d %>% select(trait, effsize, magnitude, conf.low, conf.high),
               by = "trait") %>%
     mutate(donor = current_donor, environment = "PSU2022")
   
@@ -253,7 +253,7 @@ for (current_donor in "MI21") {
                       ci = TRUE, var.equal = FALSE) 
   
   psu_summary <- psu_results %>%
-    left_join(psu_cohens_d %>% select(trait, effsize, magnitude), 
+    left_join(psu_cohens_d %>% select(trait, effsize, magnitude, conf.low, conf.high),
               by = "trait") %>%
     mutate(donor = current_donor, environment = "PSU2025")
   
@@ -305,7 +305,7 @@ for (current_donor in "MI21") {
                       ci = TRUE, var.equal = FALSE)
   
   cly_summary <- cly_results %>%
-    left_join(cly_cohens_d %>% select(trait, effsize, magnitude), 
+    left_join(cly_cohens_d %>% select(trait, effsize, magnitude, conf.low, conf.high),
               by = "trait") %>%
     mutate(donor = current_donor, environment = "CLY2025")
   
@@ -615,22 +615,31 @@ write_csv(overall_summary, file.path(paths$intermediate, "three_env_overall_geno
 ### 5.1 Interaction Plots by Donor
 
 ```{r interaction-plots-by-donor, fig.width=15, fig.height=10}
-pheno_theme <- theme_classic2(base_size = 16) +
+pheno_theme <- theme_classic2(base_size = 25) +
   theme(
     plot.title = element_markdown(hjust = 0.5, face = "bold"),
     axis.title.y = element_markdown(),
     axis.title.x = element_blank(),
     axis.text.x = element_text(face = "bold", color = "black"),
     strip.background = element_blank(),
-    strip.text = element_markdown(size = 14),
+    strip.text = element_markdown(size = 20),
     legend.position = "none"
   )
 
 for (donor in common_donors) {
   cat("\n=== Creating interaction plots for", donor, "===\n")
   
+  # Create trait labels with units
+  trait_labels <- c(
+    "DTA" = "DTA (days)",
+    "DTS" = "DTS (days)",
+    "GDDA" = "GDDA (°C × days)",
+    "GDDS" = "GDDS (°C × days)",
+    "PH" = "PH (cm)"
+  )
+
   interaction_stats <- gxe_all_data %>%
-    pivot_longer(cols = all_of(shared_phenotypes), 
+    pivot_longer(cols = all_of(shared_phenotypes),
                  names_to = "trait", values_to = "value") %>%
     group_by(trait, genotype, environment) %>%
     summarise(
@@ -640,7 +649,8 @@ for (donor in common_donors) {
       .groups = "drop"
     ) %>%
     mutate(
-      trait = factor(trait, levels = shared_phenotypes),
+      trait_label = factor(trait_labels[trait],
+                           levels = trait_labels[shared_phenotypes]),
       environment = factor(environment, levels = c("PSU2022", "PSU2025", "CLY2025"))
     )
   
@@ -653,19 +663,18 @@ for (donor in common_donors) {
                      ymax = mean_value + se_value),
                   width = 0.1, size = 1) +
     scale_color_manual(values = c("CTRL" = "gold", "INV4M" = "purple4")) +
-    facet_wrap(~ factor(trait, 
-                        levels= c("DTA", "DTS","PH", "GDDA", "GDDS",  "BL", "BW", "EBA")),
-               scales = "free_y", ncol = 3) +
+    facet_wrap(~ trait_label, scales = "free_y", ncol = 3) +
     labs(
-      title = paste("**Genotype × Environment Interaction Effects:**", 
-                   donor, "**donor**"),
-      subtitle = "Genotype means ± SE across environments",
+      title = "**Genotype × Environment Interaction**",
       x = "Environment",
-      y = "Trait Value",
+      y = "Value",
       color = "Genotype"
     ) +
     pheno_theme +
-    theme(legend.position = "top")
+    theme(
+      legend.position = "top",
+      axis.text.x = element_text(angle = 45, hjust = 1, face = "bold", color = "black")
+    )
   
   print(interaction_plot)
 
@@ -681,9 +690,9 @@ for (donor in common_donors) {
 
 ```{r effect-size-comparison, fig.width=12, fig.height=10}
 all_effect_sizes <- bind_rows(
-  psu2022_all_results %>% select(trait, donor, environment, magnitude, effsize),
-  psu2025_all_results %>% select(trait, donor, environment, magnitude, effsize),
-  cly2025_all_results %>% select(trait, donor, environment, magnitude, effsize)
+  psu2022_all_results %>% select(trait, donor, environment, magnitude, effsize, conf.low, conf.high),
+  psu2025_all_results %>% select(trait, donor, environment, magnitude, effsize, conf.low, conf.high),
+  cly2025_all_results %>% select(trait, donor, environment, magnitude, effsize, conf.low, conf.high)
 ) %>%
   filter(donor %in% common_donors) %>%
   mutate(
@@ -691,37 +700,38 @@ all_effect_sizes <- bind_rows(
     environment = factor(environment, levels = c("PSU2022", "PSU2025", "CLY2025"))
   )
 
-forest_plot <- ggplot(all_effect_sizes, 
-                     aes(x = effsize, y = interaction(trait, donor), 
+forest_plot <- ggplot(all_effect_sizes,
+                     aes(x = effsize, y = trait,
                          color = environment)) +
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.6) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
+                 height = 0.2, position = position_dodge(width = 0.4),
+                 linewidth = 0.8) +
   geom_point(size = 3, position = position_dodge(width = 0.4)) +
-  geom_text(aes(label = paste0("(", magnitude, ")")),
-            position = position_dodge(width = 0.4),
-            hjust = -0.2, size = 3) +
-  scale_color_manual(values = c("PSU2022" = "forestgreen", 
-                                "PSU2025" = "royalblue", 
+  scale_color_manual(values = c("PSU2022" = "forestgreen",
+                                "PSU2025" = "royalblue",
                                 "CLY2025" = "tomato")) +
   labs(
-    title = "**Effect Sizes (Cohen's d) of inv4m Across Environments**",
-    subtitle = "Positive values indicate INV4M > CTRL",
-    x = "Cohen's d (Effect Size)",
-    y = "Trait × Donor",
+    title = "**Effect Sizes of *Inv4m* Across Environments**",
+    x = "Cohen's d",
+    y = "Trait",
     color = "Environment"
   ) +
-  pheno_theme +
+  theme_classic(base_size = 25) +
   theme(
     legend.position = "top",
-    axis.text.y = element_text(size = 10)
+    plot.title = element_markdown()
   )
 
 print(forest_plot)
 
 # Save forest plot for supplementary material
 ggsave(file.path(paths$figures, "SFig_GxE_effect_sizes_forest.pdf"),
-       forest_plot, width = 12, height = 10)
+       forest_plot, width = 10, height = 8)
 ggsave(file.path(paths$figures, "SFig_GxE_effect_sizes_forest.png"),
-       forest_plot, width = 12, height = 10, dpi = 300)
+       forest_plot, width = 10, height = 8, dpi = 300)
+ggsave(file.path(paths$figures, "effectsizeGxE.png"),
+       forest_plot, width = 10, height = 8, dpi = 300)
 ```
 
 ## 6. Summary and Export Results

@@ -349,7 +349,7 @@ other dispersed divergent highland introgressions.
 
 
   \begin{figure*}[!ht]
-  \includegraphics[width=0.95\linewidth]{figs/effects.png}
+  \includegraphics[width=\linewidth]{figs/effects.png}
   \centering
   \caption{\textbf{Effect of \invfour on field phenotypes and shoot apical meristem architecture.}
   \textbf{(A)} Spatially-corrected phenotype values (BLUEs from SpATS mixed models) for plant height (PH, cm), days to anthesis (DTA, days), days to silking (DTS, days), harvest index (HI), stover dry weight at harvest (STWHV, g), and collar diameter (CD, mm) comparing CTRL (yellow) and \invfour (purple) genotypes. Phosphorus treatment was modeled as a covariate and data are pooled across treatments.
@@ -1852,7 +1852,7 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width=0.9\linewidth]{figs/GxE_interaction.png}
+\includegraphics[width=\linewidth]{figs/GxE_interaction.png}
 \caption{\textbf{Genotype $\times$ environment interaction plots for the MI21 donor background.} Mean trait values ($\pm$ SE) for CTRL (gold) and \invfour (purple) genotypes across three environments: PSU2022 and PSU2025 (Pennsylvania) and CLY2025 (North Carolina). Panels show days to anthesis (DTA), days to silking (DTS), plant height (PH), and thermal time equivalents (GDDA, GDDS). Non-parallel lines indicate genotype $\times$ environment interactions. Note the crossing interaction for plant height, where \invfour is taller in Pennsylvania environments but shorter in North Carolina, consistent with environment-dependent effects on growth.}
 \label{fig::gxe_interaction}
 \end{figure*}
@@ -1866,14 +1866,44 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width= 0.7 \linewidth]{figs/internodes.png}
+\includegraphics[width=\linewidth]{figs/internodes.png}
 \caption{\textbf{Internode length analysis in \invfour and control plants.}
 \textbf{(A)} Plant height comparison between CTRL and \invfour in the MI21 background (CLY2025 field experiment). Boxplots show plant height (cm) with individual data points. P-value from linear mixed model.
 \textbf{(B)} Representative dissected plant showing whole plant architecture including root system and stem with visible node demarcations.
 \textbf{(C)} Detail of tassel and upper stem region. Scale bar in cm.
-\textbf{(D)} Internode length profiles by position from top. Boxplots show internode length (cm) at each position for CTRL (gold, $n = 112$ plants) and \invfour (purple, $n = 116$ plants). The longest internodes occur at positions 4--6, corresponding to the ear node region. \textit{Inset}: Schematic illustration of maize plant architecture indicating internode numbering scheme from the tassel-bearing node (position 1) downward.}
+\textbf{(D)} Internode length profiles by position from top. Boxplots show internode length (cm) at each position for CTRL (gold, $n = 112$ plants) and \invfour (purple, $n = 116$ plants). Asterisk indicates internode 2, which shows the largest difference ($-4.12$ cm, $-18.5\%$; FDR $= 3.7 \times 10^{-18}$) and accounts for 93\% of the total height difference (Table~\ref{tab::internode_effects}). \textit{Inset}: Schematic illustration of maize plant architecture indicating internode numbering scheme from the tassel-bearing node (position 1) downward.}
 \label{fig::internode}
 \end{figure*}
+
+
+\begin{table}[!ht]
+\caption{\textbf{Internode length differences between \invfour and control plants by position.} T-tests comparing internode length at each position from the tassel (position 1) downward. FDR correction applied across all 16 positions. Internode 2 (immediately below the tassel) accounts for 93\% of the total height difference. MI21 donor background, CLY2025 field experiment ($n = 112$ CTRL, $n = 116$ \invfour plants).}
+\label{tab::internode_effects}
+\centering
+\small
+\begin{tabular}{@{}crrrrrr@{}}
+\toprule
+\textbf{Position} & \textbf{CTRL (cm)} & \textbf{\invfour (cm)} & \textbf{Diff (cm)} & \textbf{\% Change} & \textbf{FDR} & \textbf{Sig.} \\
+\midrule
+1 & 24.19 & 25.09 & $+0.91$ & $+3.8$ & 0.150 & ns \\
+\textbf{2} & \textbf{22.27} & \textbf{18.15} & $\mathbf{-4.12}$ & $\mathbf{-18.5}$ & $\mathbf{3.7 \times 10^{-18}}$ & \textbf{****} \\
+3 & 11.86 & 10.73 & $-1.12$ & $-9.5$ & $3.0 \times 10^{-6}$ & **** \\
+4 & 12.38 & 11.28 & $-1.09$ & $-8.8$ & $1.4 \times 10^{-11}$ & **** \\
+5 & 12.98 & 12.40 & $-0.59$ & $-4.5$ & $3.8 \times 10^{-4}$ & *** \\
+6 & 13.17 & 13.02 & $-0.15$ & $-1.2$ & 0.245 & ns \\
+7 & 13.13 & 13.19 & $+0.06$ & $+0.5$ & 0.713 & ns \\
+8 & 15.22 & 15.17 & $-0.05$ & $-0.3$ & 0.816 & ns \\
+9 & 15.11 & 15.86 & $+0.75$ & $+5.0$ & $9.4 \times 10^{-4}$ & *** \\
+10 & 13.09 & 14.12 & $+1.03$ & $+7.9$ & $9.0 \times 10^{-5}$ & **** \\
+11 & 10.68 & 11.43 & $+0.75$ & $+7.0$ & 0.004 & ** \\
+12 & 8.62 & 9.00 & $+0.38$ & $+4.5$ & 0.240 & ns \\
+13 & 5.82 & 6.16 & $+0.34$ & $+5.9$ & 0.238 & ns \\
+14 & 4.43 & 4.51 & $+0.08$ & $+1.9$ & 0.713 & ns \\
+15 & 4.17 & 3.81 & $-0.36$ & $-8.7$ & 0.245 & ns \\
+16 & 4.00 & 2.75 & $-1.25$ & $-31.3$ & 0.238 & ns \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \clearpage
 
