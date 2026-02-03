@@ -365,58 +365,68 @@ cat("Progress tracking functions defined\n")
 # Bootstrap Support: CTRL
 
 ```{r bootstrap_ctrl}
-log_progress("=== STARTING CTRL BOOTSTRAP SUPPORT ===")
+# Check for cached bootstrap results
+ctrl_cache_file <- file.path(OUTPUT_DIR, "ctrl", "bootstrap_results.rds")
 
-# Configure parallelization
-detected_cores <- parallel::detectCores()
-n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
-plan(multisession, workers = n_cores)
+if (file.exists(ctrl_cache_file)) {
+  cat("Loading cached CTRL bootstrap results from:", ctrl_cache_file, "\n")
+  log_progress("CTRL: Loading cached bootstrap results")
+  ctrl_bootstrap <- readRDS(ctrl_cache_file)
+  cat("Loaded", length(ctrl_bootstrap), "cached bootstrap iterations\n")
+} else {
+  log_progress("=== STARTING CTRL BOOTSTRAP SUPPORT ===")
 
-log_progress("CTRL: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
-log_progress("CTRL: Progress updates every ", LOG_FREQUENCY, " iterations")
+  # Configure parallelization
+  detected_cores <- parallel::detectCores()
+  n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
+  plan(multisession, workers = n_cores)
 
-start_time <- Sys.time()
+  log_progress("CTRL: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
+  log_progress("CTRL: Progress updates every ", LOG_FREQUENCY, " iterations")
 
-# Initialize progress counter
-ctrl_counter_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_counter")
-ctrl_lock_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_lock")
-writeLines("0", ctrl_counter_file)
+  start_time <- Sys.time()
 
-# Run bootstrap iterations using reference network parameters
-ctrl_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
-  result <- run_bootstrap_iteration(
-    datExpr_CTRL,
-    power_ctrl,
-    min_module_size = min_module_size_ctrl,
-    deep_split = deep_split_ctrl,
-    network_type = NETWORK_TYPE,
-    iteration_num = i
-  )
+  # Initialize progress counter
+  ctrl_counter_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_counter")
+  ctrl_lock_file <- file.path(OUTPUT_DIR, "ctrl", ".progress_lock")
+  writeLines("0", ctrl_counter_file)
 
-  # Track progress
-  completed <- increment_and_get_count(ctrl_counter_file, ctrl_lock_file)
-  log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "CTRL")
+  # Run bootstrap iterations using reference network parameters
+  ctrl_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
+    result <- run_bootstrap_iteration(
+      datExpr_CTRL,
+      power_ctrl,
+      min_module_size = min_module_size_ctrl,
+      deep_split = deep_split_ctrl,
+      network_type = NETWORK_TYPE,
+      iteration_num = i
+    )
 
-  result
-}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+    # Track progress
+    completed <- increment_and_get_count(ctrl_counter_file, ctrl_lock_file)
+    log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "CTRL")
 
-# Clean up counter files
-unlink(ctrl_counter_file)
-unlink(ctrl_lock_file)
+    result
+  }, .options = furrr_options(seed = TRUE), .progress = FALSE)
 
-plan(sequential)
+  # Clean up counter files
+  unlink(ctrl_counter_file)
+  unlink(ctrl_lock_file)
 
-elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
-elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+  plan(sequential)
 
-log_progress("=== CTRL BOOTSTRAP COMPLETE ===")
-log_progress("CTRL: Total runtime: ", round(elapsed, 2), " minutes")
-log_progress("CTRL: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+  elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
-cat("CTRL bootstrap complete:", round(elapsed, 2), "minutes\n")
+  log_progress("=== CTRL BOOTSTRAP COMPLETE ===")
+  log_progress("CTRL: Total runtime: ", round(elapsed, 2), " minutes")
+  log_progress("CTRL: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
 
-# Save raw bootstrap results
-saveRDS(ctrl_bootstrap, file.path(OUTPUT_DIR, "ctrl", "bootstrap_results.rds"))
+  cat("CTRL bootstrap complete:", round(elapsed, 2), "minutes\n")
+
+  # Save raw bootstrap results
+  saveRDS(ctrl_bootstrap, ctrl_cache_file)
+}
 ```
 
 ```{r ctrl_support}
@@ -469,57 +479,70 @@ log_progress("CTRL support complete: ", sum(ctrl_support$stability == "Stable"),
 # Bootstrap Support: Inv4m
 
 ```{r bootstrap_inv4m}
-log_progress("=== STARTING INV4M BOOTSTRAP SUPPORT ===")
+# Check for cached bootstrap results
+inv4m_cache_file <- file.path(OUTPUT_DIR, "inv4m", "bootstrap_results.rds")
 
-set.seed(456)  # Different seed
+if (file.exists(inv4m_cache_file)) {
+  cat("Loading cached Inv4m bootstrap results from:", inv4m_cache_file, "\n")
+  log_progress("Inv4m: Loading cached bootstrap results")
+  inv4m_bootstrap <- readRDS(inv4m_cache_file)
+  cat("Loaded", length(inv4m_bootstrap), "cached bootstrap iterations\n")
+} else {
+  log_progress("=== STARTING INV4M BOOTSTRAP SUPPORT ===")
 
-plan(multisession, workers = n_cores)
+  set.seed(456)  # Different seed
 
-log_progress("Inv4m: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
-log_progress("Inv4m: Progress updates every ", LOG_FREQUENCY, " iterations")
+  # Configure parallelization (in case CTRL was cached and n_cores not set)
+  detected_cores <- parallel::detectCores()
+  n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
+  plan(multisession, workers = n_cores)
 
-start_time <- Sys.time()
+  log_progress("Inv4m: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
+  log_progress("Inv4m: Progress updates every ", LOG_FREQUENCY, " iterations")
 
-# Initialize progress counter
-inv4m_counter_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_counter")
-inv4m_lock_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_lock")
-writeLines("0", inv4m_counter_file)
+  start_time <- Sys.time()
 
-# Run bootstrap iterations using reference network parameters
-inv4m_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
-  result <- run_bootstrap_iteration(
-    datExpr_Inv4m,
-    power_inv4m,
-    min_module_size = min_module_size_inv4m,
-    deep_split = deep_split_inv4m,
-    network_type = NETWORK_TYPE,
-    iteration_num = i
-  )
+  # Initialize progress counter
+  inv4m_counter_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_counter")
+  inv4m_lock_file <- file.path(OUTPUT_DIR, "inv4m", ".progress_lock")
+  writeLines("0", inv4m_counter_file)
 
-  # Track progress
-  completed <- increment_and_get_count(inv4m_counter_file, inv4m_lock_file)
-  log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "Inv4m")
+  # Run bootstrap iterations using reference network parameters
+  inv4m_bootstrap <- future_map(1:N_BOOTSTRAP, function(i) {
+    result <- run_bootstrap_iteration(
+      datExpr_Inv4m,
+      power_inv4m,
+      min_module_size = min_module_size_inv4m,
+      deep_split = deep_split_inv4m,
+      network_type = NETWORK_TYPE,
+      iteration_num = i
+    )
 
-  result
-}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+    # Track progress
+    completed <- increment_and_get_count(inv4m_counter_file, inv4m_lock_file)
+    log_iteration_progress(completed, N_BOOTSTRAP, start_time, LOG_FREQUENCY, "Inv4m")
 
-# Clean up counter files
-unlink(inv4m_counter_file)
-unlink(inv4m_lock_file)
+    result
+  }, .options = furrr_options(seed = TRUE), .progress = FALSE)
 
-plan(sequential)
+  # Clean up counter files
+  unlink(inv4m_counter_file)
+  unlink(inv4m_lock_file)
 
-elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
-elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+  plan(sequential)
 
-log_progress("=== INV4M BOOTSTRAP COMPLETE ===")
-log_progress("Inv4m: Total runtime: ", round(elapsed, 2), " minutes")
-log_progress("Inv4m: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+  elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
-cat("Inv4m bootstrap complete:", round(elapsed, 2), "minutes\n")
+  log_progress("=== INV4M BOOTSTRAP COMPLETE ===")
+  log_progress("Inv4m: Total runtime: ", round(elapsed, 2), " minutes")
+  log_progress("Inv4m: Average per iteration: ", round(elapsed_sec / N_BOOTSTRAP, 2), " seconds")
 
-# Save raw bootstrap results
-saveRDS(inv4m_bootstrap, file.path(OUTPUT_DIR, "inv4m", "bootstrap_results.rds"))
+  cat("Inv4m bootstrap complete:", round(elapsed, 2), "minutes\n")
+
+  # Save raw bootstrap results
+  saveRDS(inv4m_bootstrap, inv4m_cache_file)
+}
 ```
 
 ```{r inv4m_support}
@@ -631,13 +654,10 @@ p_ctrl <- ggplot(
   geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
   scale_fill_identity() +
   coord_flip() +
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 25) +
+  theme(plot.title = element_text(hjust = 1)) +
   labs(
     title = "CTRL Consensus Module Bootstrap Support",
-    subtitle = sprintf(
-      "n = %d bootstrap iterations | Stable >= %.2f | Moderate >= %.2f | Error bars = SEM",
-      N_BOOTSTRAP, STABILITY_STABLE, STABILITY_MODERATE
-    ),
     x = "Module",
     y = "Mean Support (LFP)"
   )
@@ -687,13 +707,10 @@ p_inv4m <- ggplot(
   geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed", color = "orange") +
   scale_fill_identity() +
   coord_flip() +
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 25) +
+  theme(plot.title = element_text(hjust = 1)) +
   labs(
     title = "Inv4m Consensus Module Bootstrap Support",
-    subtitle = sprintf(
-      "n = %d bootstrap iterations | Stable >= %.2f | Moderate >= %.2f | Error bars = SEM",
-      N_BOOTSTRAP, STABILITY_STABLE, STABILITY_MODERATE
-    ),
     x = "Module",
     y = "Mean Support (LFP)"
   )
