@@ -122,6 +122,7 @@ bottom_row <- plot_grid(
   p_C,
   ncol = 2,
   labels = c("B", "C"),
+  label_size = 35,
   rel_widths = c(1, 1)
 )
 
@@ -131,6 +132,7 @@ fig_combined <- plot_grid(
   bottom_row,
   ncol = 1,
   labels = c("A", ""),
+  label_size = 35,
   rel_heights = c(0.3, 0.7)
 )
 

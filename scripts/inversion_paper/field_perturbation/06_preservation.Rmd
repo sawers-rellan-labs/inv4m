@@ -696,7 +696,7 @@ if (has_go_annotation) {
       inherit.aes = FALSE
     ) +
     coord_cartesian(clip = "off", ylim = c(NA, 1.1)) +
-    theme(plot.margin = margin(t = 120, r = 10, b = 10, l = 10))
+    theme(plot.margin = margin(t = 60, r = 10, b = 10, l = 10))
 
   print(p_delta_k_annotated)
 

@@ -804,15 +804,18 @@ dev.off()
 
 # Save as ggplot objects for figure composition
 p_dendro_ctrl <- as.ggplot(~{
+  par(yaxt = "n")
   plotDendroAndColors(
     ctrl_tree$tree,
     labels2colors(ctrl_tree$modules),
-    "CTRL Modules",
+    "",
     dendroLabels = FALSE,
     hang = 0.03,
-    addGuide = TRUE,
+    addGuide = FALSE,
     guideHang = 0.05,
-    main = ""
+    main = "",
+    xlab = "",
+    ylab = ""
   )
 })
 saveRDS(p_dendro_ctrl, file.path(OUTPUT_DIR, "ctrl", "dendrogram_plot.rds"))
