@@ -839,7 +839,7 @@ the transcriptome.
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width=0.6\linewidth]{figs/WGCNA_module_perturbation.png}
+\includegraphics[width=\linewidth]{figs/WGCNA_module_perturbation.png}
 \caption{\textbf{WGCNA module perturbation analysis reveals widespread network disruption in \invfour plants.}
 \textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10--35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
 \textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes. Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Eleven of 13 modules show significant connectivity loss.
@@ -861,20 +861,8 @@ the transcriptome.
 
 
 
-\begin{figure*}[!ht]
-\centering
-\includegraphics[width=\linewidth]{figs/jmjcluster.png}
-\caption{\textbf{The \jmjii/\jmjiv cluster is constitutively downregulated in \invfour and shows lineage-specific expansion in B73.}
-\textbf{(A)} Total JMJ cluster expression (sum of \jmjii + \jmjiv) across tissues and experiments. Boxplots show CPM expression in CTRL (gold) and \invfour (purple) genotypes. Left: Crow et al. (2020) growth chamber data across 9 tissue types. Right: PSU2022 field data across 4 leaf positions. Dashed red line indicates expected \invfour expression under copy number scaling (CTRL/5), assuming the single remaining \jmjiv copy produces 1/5 of the total cluster output. Red asterisks denote significant deviation from expectation (linear contrast $t$-test, FDR $<$ 0.05: *, $<$ 0.01: **, $<$ 0.001: ***).
-\textbf{(B)} Microsynteny of the JUMONJI gene cluster across five \textit{Zea} genomes.
-From top to bottom: the teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}), the highland landrace Palomero Toluque\~{n}o (PT), and the tropical inbred lines CML457 and CML459 each contain a single \textit{jmj6} ortholog, while B73 (bottom) has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6}, \jmjii, \jmjiv).
-Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes. Coordinates in Mb.
-\textbf{(C)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
-The NAM v5 annotation consolidates \jmjii, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}).
-The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
-Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
-\label{fig:jmj_cluster}
-\end{figure*}
+
+
 
 
 \subsection{Trans-regulatory network analysis detects potential \invfour epigenetic regulators acting on a growth related module }
@@ -923,6 +911,10 @@ histone demethylases. The enrichment of growth regulation terms among
 observed in \invfour plants, suggesting that perturbation of epigenetic
 regulators may underlie the developmental phenotypes.
 
+
+
+
+
 \subsection{JMJ cluster expression differences reflect copy number variation, with additional regulatory effects evident in field conditions}
 
 The \jmjii/\jmjiv cluster exhibited the strongest transcriptional response to \invfour introgression, with \jmjii showing $\log_2 \text{FC} = -3.49$ (\textit{FDR} $< 10^{-20}$), the largest effect size among all DEGs. This apparent downregulation was consistent across all 13 tissue-experiment combinations examined, including both PSU2022 field samples (V13 adult leaves) and Crow et al. (2020) growth chamber samples spanning roots, leaves, and shoot apical meristems (Fig~\ref{fig:jmj_cluster}A).
@@ -932,6 +924,7 @@ However, microsynteny analysis across five \textit{Zea} genomes revealed that th
 To test whether the observed expression differences could be explained by copy number alone, we compared total cluster expression in \invfour plants against the expectation under simple dosage scaling (CTRL/5). In field samples, \invfour expression was consistently and significantly below this expectation: Leaf 1 achieved 61.5\% of expected levels ($t = 2.94$, \textit{FDR} $= 0.031$), while Leaves 2--4 showed only 49--53\% of expected expression (\textit{FDR} $< 0.015$ for all). This pattern suggests that beyond copy number reduction, additional regulatory mechanisms suppress JMJ cluster transcription in the field.
 
 In contrast, growth chamber data showed a less consistent pattern. Only 4 of 9 tissues exhibited significant deviation from copy number expectation after FDR correction, with expression levels ranging from 48\% (V1 root) to 83\% (V1 leaf) of expected values. Notably, the shoot apical meristem showed no significant deviation (81.8\% of expected, \textit{FDR} $= 0.57$). This environment-dependent pattern may reflect condition-specific regulatory mechanisms acting on the JMJ cluster beyond the baseline copy number effect.
+
 
 \section{Discussion}
 
@@ -1005,6 +998,25 @@ seasons where earlier flowering provides no advantage. The 432 genes within
 \invfour (Table~\ref{tab:DEGs_distro}) are maintained as a coadapted unit by
 suppressed recombination \cite{gonzalez-segovia2019-jy}, preserving
 highland-adapted allele combinations.
+
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/jmjcluster.png}
+\caption{\textbf{The \jmjii/\jmjiv cluster is constitutively downregulated in \invfour and shows lineage-specific expansion in B73.}
+\textbf{(A)} Total JMJ cluster expression (sum of \jmjii + \jmjiv) across tissues and experiments. Boxplots show CPM expression in CTRL (gold) and \invfour (purple) genotypes. Left: Crow et al. (2020) growth chamber data across 9 tissue types. Right: PSU2022 field data across 4 leaf positions. Dashed red line indicates expected \invfour expression under copy number scaling (CTRL/5), assuming the single remaining \jmjiv copy produces 1/5 of the total cluster output. Red asterisks denote significant deviation from expectation (linear contrast $t$-test, FDR $<$ 0.05: *, $<$ 0.01: **, $<$ 0.001: ***).
+\textbf{(B)} Microsynteny of the JUMONJI gene cluster across five \textit{Zea} genomes.
+From top to bottom: the teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}), the highland landrace Palomero Toluque\~{n}o (PT), and the tropical inbred lines CML457 and CML459 each contain a single \textit{jmj6} ortholog, while B73 (bottom) has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6}, \jmjii, \jmjiv).
+Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes. Coordinates in Mb.
+\textbf{(C)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
+The NAM v5 annotation consolidates \jmjii, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}).
+The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
+Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
+\label{fig:jmj_cluster}
+\end{figure*}
+
+\clearpage
+
 
 \subsection*{JMJ histone demethylases emerge as flowering time candidates}
 
@@ -1506,6 +1518,8 @@ assistance with field work and laboratory analyses.
 
 \pagebreak
 \onecolumn
+
+
 \section*{Supplement}
 
 \beginsupplement
@@ -1920,7 +1934,7 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width=0.9\linewidth]{figs/go_enrichment_BP_rrvgo.png}
+\includegraphics[width=\linewidth]{figs/go_enrichment_BP_rrvgo.png}
 \caption{\textbf{Gene Ontology enrichment of WGCNA consensus modules.} Bubble plot showing Biological Process (BP) GO term enrichment for each CTRL consensus module. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). GO terms were reduced using rrvgo semantic similarity to eliminate redundancy. Module labels include gene counts in parentheses. Notable enrichments include chromatin organization (blue module), translation (brown), and cellular response to stress (yellow).}
 \label{fig::module_go}
 \end{figure*}
