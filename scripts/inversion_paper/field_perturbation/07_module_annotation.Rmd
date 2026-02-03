@@ -888,6 +888,10 @@ write_csv(
 
 ```{r hub_connectivity, fig.width=10, fig.height=8}
 if (nrow(hub_genes) > 0) {
+  # Add fontface column for jmj4 bold styling
+  hub_genes <- hub_genes %>%
+    mutate(label_fontface = ifelse(display_label == "jmj4", "bold", "plain"))
+
   p_hub <- ggplot(
     hub_genes,
     aes(x = kWithin_ctrl, y = kWithin_inv4m, color = color)
@@ -895,7 +899,7 @@ if (nrow(hub_genes) > 0) {
     geom_point(aes(size = abs(logFC)), alpha = 0.7) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
     geom_text_repel(
-      aes(label = display_label),
+      aes(label = display_label, fontface = label_fontface),
       size = 5,
       color = "black",
       max.overlaps = 25,
