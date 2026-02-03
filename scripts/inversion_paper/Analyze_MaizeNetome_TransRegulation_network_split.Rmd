@@ -597,7 +597,7 @@ cat("\n=== Whole Inv4m Trans Network ===\n")
 cat("Edges:", nrow(whole_edges), "\n")
 cat("Nodes:", nrow(whole_nodes), "\n")
 
-visualize_mst(whole_edges, whole_nodes, effects_df, font_size = 18)
+visualize_mst(whole_edges, whole_nodes, effects_df, font_size = 20)
 ```
 
 ---
@@ -624,7 +624,7 @@ if (nrow(reference_edges) > 0) {
   cat("Edges:", nrow(ref_edges), "\n")
   cat("Nodes:", nrow(ref_nodes), "\n")
 
-  visualize_mst(ref_edges, ref_nodes, effects_df, font_size = 20)
+  visualize_mst(ref_edges, ref_nodes, effects_df, font_size = 25)
 } else {
   cat("No Reference edges found\n")
 }
@@ -656,7 +656,7 @@ if (nrow(novel_edges) > 0) {
   cat("Edges:", nrow(novel_edges_prep), "\n")
   cat("Nodes:", nrow(novel_nodes), "\n")
 
-  visualize_mst(novel_edges_prep, novel_nodes, effects_df, font_size = 20)
+  visualize_mst(novel_edges_prep, novel_nodes, effects_df, font_size = 22)
 } else {
   cat("No Novel edges found\n")
 }
@@ -744,7 +744,7 @@ if (nrow(novel_edges_prep) > 0 && length(jmj4_all_genes) > 0) {
       dplyr::select(from, to, width, arrows.to.type, color)
 
     visNetwork(jmj4_nodes, jmj4_vis_edges) %>%
-      visNodes(font = list(size = 24, multi = "html")) %>%
+      visNodes(font = list(size = 25, multi = "html")) %>%
       visEdges(arrows = "to") %>%
       visOptions(
         highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
