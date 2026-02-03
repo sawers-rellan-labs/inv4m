@@ -317,85 +317,16 @@ effects_df <- read.csv(
 ) %>%
  filter(predictor == "Inv4m")
 
-# Load curated labels
-curated <- read.csv(
-  file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv"),
+# Load consolidated labels from master file (includes curated + symbol + LLM-proposed)
+master_labels <- read.csv(
+  file.path(paths$data, "locus_labels_master.csv"),
   na.strings = c("NA", NA, "")
 ) %>%
   dplyr::select(gene, locus_label)
 
-effects_df$locus_label[effects_df$locus_label == "A0A1D6NG77"] <- NA
-
 effects_df <- effects_df %>%
-  left_join(curated, by = "gene", suffix = c("", "_curated")) %>%
-  mutate(locus_label = coalesce(locus_label_curated, locus_label)) %>%
-  dplyr::select(-locus_label_curated)
-
-# Additional curated updates
-curated_updates <- tibble::tribble(
-  ~gene,              ~locus_label,
-  "Zm00001eb384770",  "zcn26",
-  "Zm00001eb192330",  "roc4-1",
-  "Zm00001eb193260",  "trxl2",
-  "Zm00001eb194300",  "paspa",
-  "Zm00001eb213980",  "dywl",
-  "Zm00001eb194080",  "ugt85a2",
-  "Zm00001eb112470",  "engd2",
-  "Zm00001eb332450",  "roc4-2",
-  "Zm00001eb193270",  "trxl5",
-  "Zm00001eb066620",  "tipin",
-  "Zm00001eb241410",  "etfa",
-  "Zm00001eb013800",  "mrlk",
-  "Zm00001eb249540",  "prpl29",
-  "Zm00001eb000540",  "prd3",
-  "Zm00001eb060540",  "actin-1",
-  "Zm00001eb192580",  "map4k8",
-  "Zm00001eb193120",  "o3l1",
-  "Zm00001eb043750",  "cdrk9",
-  "Zm00001eb034810",  "mgd2",
-  "Zm00001eb241920",  "gpx1",
-  "Zm00001eb162710",  "spx4",
-  "Zm00001eb038730",  "pht7",
-  "Zm00001eb370610",  "rfk1",
-  "Zm00001eb386270",  "spx6",
-  "Zm00001eb335670",  "sqd3",
-  "Zm00001eb151650",  "pap1",
-  "Zm00001eb154650",  "ppa1",
-  "Zm00001eb280120",  "pfk1",
-  "Zm00001eb036910",  "gpx3",
-  "Zm00001eb406610",  "glk4",
-  "Zm00001eb048730",  "spx2",
-  "Zm00001eb361620",  "ppa2",
-  "Zm00001eb297970",  "sqd2",
-  "Zm00001eb347070",  "sqd1",
-  "Zm00001eb144680",  "rns1",
-  "Zm00001eb430590",  "nrx3",
-  "Zm00001eb247580",  "ppck3",
-  "Zm00001eb351780",  "ugp3",
-  "Zm00001eb222510",  "pht1",
-  "Zm00001eb126380",  "phos1",
-  "Zm00001eb047070",  "pht2",
-  "Zm00001eb041390",  "rns3",
-  "Zm00001eb116580",  "spd1",
-  "Zm00001eb069630",  "oct4",
-  "Zm00001eb083520",  "dgd1",
-  "Zm00001eb130570",  "sag21",
-  "Zm00001eb239700",  "ppa3",
-  "Zm00001eb258130",  "mgd3",
-  "Zm00001eb202100",  "pap14",
-  "Zm00001eb144670",  "rns2",
-  "Zm00001eb087720",  "pht13",
-  "Zm00001eb277280",  "gst19",
-  "Zm00001eb339870",  "pld16",
-  "Zm00001eb289800",  "pah1",
-  "Zm00001eb369590",  "nrx1",
-  "Zm00001eb238670",  "pep2"
-)
-
-effects_df <- effects_df %>%
-  left_join(curated_updates, by = "gene", suffix = c("", "_new")) %>%
-  mutate(locus_label = coalesce(locus_label_new, locus_label)) %>%
-  dplyr::select(-locus_label_new)
+  dplyr::select(-any_of("locus_label")) %>%
+  left_join(master_labels, by = "gene")
 
 field_degs <- effects_df %>%
   filter(is_hiconf_DEG) %>%
@@ -742,7 +673,7 @@ targets (kan1, sec6, nii2, roc4-2, etc.).
 ```{r jmj4_neighborhood}
 # Define the jmj4 neighborhood genes (from manual selection of novel MST)
 jmj4_neighborhood_labels <- c(
-  "jmj4", "engd2", "roc4-2", "kan1", "sec6", "nii2", "tet2", "flz22", "pza01976"
+  "jmj4", "engd2", "roc4-2", "kan1", "sec6", "nii2", "tet2", "flz22", "plat1"
 )
 
 # Genes with only assembly IDs (no locus labels)
