@@ -659,7 +659,8 @@ create_bubble_plot <- function(go_data, ontology_name, module_sizes) {
       label_order = 1:n(),
       Description = forcats::fct_reorder(Description, label_order)
     ) %>%
-    ungroup()
+    ungroup() %>%
+    droplevels()  # Drop unused module levels
 
   if (nrow(to_plot) == 0) {
     cat("No terms with p < 0.05 for", ontology_name, "\n")
@@ -684,14 +685,14 @@ create_bubble_plot <- function(go_data, ontology_name, module_sizes) {
       labels = scales::wrap_format(50),
       limits = rev(levels(to_plot$Description))
     ) +
-    scale_x_discrete(labels = labels, drop = FALSE) +
+    scale_x_discrete(labels = labels, drop = TRUE) +
     geom_point(shape = 21) +
     scale_size(range = c(4, 8), name = "Count") +
     ylab(NULL) +
     xlab(NULL) +
-    DOSE::theme_dose(font.size = 12) +
+    DOSE::theme_dose(font.size = 16) +
     theme(
-      plot.title = element_text(face = "bold", size = 14),
+      plot.title = element_text(face = "bold", size = 20),
       axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
     )
 
