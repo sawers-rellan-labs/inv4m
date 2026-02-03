@@ -1,14 +1,14 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-01-29
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Figure Review 🔴
-**Version:** v1.9.0
+**Last Updated:** 2026-02-03
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 5 Final Polish 🟡
+**Version:** v2.0.0
 
 ---
 
 ## START HERE: Inversion Paper Revision
 
-**Current State:** Manuscript text is COMPLETE. Now in FIGURE REVIEW phase (9 high-priority tasks).
+**Current State:** Manuscript text COMPLETE. Figure review COMPLETE. Now filling placeholder references.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -18,30 +18,31 @@ scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
 ```
 
-**🔴 CURRENT PRIORITY: Figure Review (9 tasks - ALL HIGH PRIORITY)**
+**✅ FIGURE REVIEW COMPLETE (all 9 tasks done 2026-02-03)**
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | Review layout of fig:phenotypes | ⬜ |
-| 2 | Review layout of fig:wgcna | ⬜ |
-| 3 | Review layout of fig::transnetwork | ⬜ |
-| 4 | Review font size/labels of fig:jmj_cluster | ⬜ |
-| 5 | Review font size/labels of fig::gxe_interaction | ⬜ |
-| 6 | Fix gxe_forest: add CI or remove | ⬜ |
-| 7 | Make fig::internode single row panel | ⬜ |
-| 8 | Increase font size in fig::module_support | ⬜ |
-| 9 | Increase font size in fig::module_go | ⬜ |
+| 1 | Review layout of fig:phenotypes | ✅ |
+| 2 | Review layout of fig:wgcna | ✅ |
+| 3 | Review layout of fig::transnetwork | ✅ |
+| 4 | Review font size/labels of fig:jmj_cluster | ✅ |
+| 5 | Review font size/labels of fig::gxe_interaction | ✅ |
+| 6 | Fix gxe_forest: add CI or remove | ✅ |
+| 7 | Make fig::internode single row panel | ✅ |
+| 8 | Increase font size in fig::module_support | ✅ |
+| 9 | Increase font size in fig::module_go | ✅ |
 
-**After figure review:**
-- Fill 4 placeholder references (search `% [PLACEHOLDER:` in main.tex)
+**🔴 CURRENT PRIORITY: Fill 4 placeholder references**
+Search `% [PLACEHOLDER:` in main.tex:
+1. `cite inversion origin via ectopic recombination`
+2. `cite JMJ biochemical function review`
+3. `cite Arabidopsis JMJ flowering`
+4. `cite compensation in tandem duplicates`
+
+**After placeholders:**
 - MaizeNetome validation for WGCNA (methods) - low priority
 - Internal consistency check
 - Final proofreading
-
-**Recent completions (2026-01-29):**
-- ✅ Renamed fig::DEGnetwork → fig::transnetwork (image + all references)
-- ✅ Greenyellow module characterization added (sec6, pcna2, ropgef14)
-- ✅ Table S5 (greenyellow) added before Table S6 (pink) - ordered by stability
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
