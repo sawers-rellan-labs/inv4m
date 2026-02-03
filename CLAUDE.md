@@ -32,17 +32,16 @@ README.md  # Figure/table coverage
 | 8 | Increase font size in fig::module_support | ✅ |
 | 9 | Increase font size in fig::module_go | ✅ |
 
-**🔴 CURRENT PRIORITY: Fill 4 placeholder references**
-Search `% [PLACEHOLDER:` in main.tex:
-1. `cite inversion origin via ectopic recombination`
-2. `cite JMJ biochemical function review`
-3. `cite Arabidopsis JMJ flowering`
-4. `cite compensation in tandem duplicates`
+**✅ PLACEHOLDER REFERENCES FILLED (2026-02-03)**
+1. `\cite{wellenreuther2018}` - ectopic recombination
+2. `\cite{klose2007}` - JMJ biochemistry
+3. `\cite{gan2014}` - Arabidopsis JMJ flowering
+4. `\cite{iohannes2023}` - paralog compensation
 
-**After placeholders:**
-- MaizeNetome validation for WGCNA (methods) - low priority
+**🔴 CURRENT PRIORITY: Final review**
 - Internal consistency check
 - Final proofreading
+- MaizeNetome validation for WGCNA (methods) - low priority
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
