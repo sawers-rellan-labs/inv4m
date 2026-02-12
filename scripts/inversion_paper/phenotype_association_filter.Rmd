@@ -80,11 +80,19 @@ SHARED_END   <- 195900523
 # Load Gene Annotations
 
 ```{r load-annotations}
-# Gene symbols
+# Gene symbols (for multi-alias expansion, e.g. jmj2/jmj6/jmj9)
 gene_symbols <- read.delim(
   file.path(paths$data, "gene_symbol.tab"),
   stringsAsFactors = FALSE
 )
+
+# Master labels (consolidated: curated > symbol > llm_proposed)
+master_labels <- read.csv(
+  file.path(paths$data, "locus_labels_master.csv"),
+  stringsAsFactors = FALSE
+) %>%
+  dplyr::select(gene_model = 1, master_label = 4) %>%
+  dplyr::filter(!is.na(master_label) & master_label != "")
 
 # PANNZER functional descriptions — keep first per gene
 gene_pannzer <- read.delim(
@@ -595,14 +603,21 @@ location_label <- function(in_inv4m, in_flank) {
   )
 }
 
-# All gene_symbol.tab aliases (for expanding multi-alias genes like jmj2/jmj6/jmj9)
+# Genes with multiple aliases in gene_symbol.tab (for row expansion, e.g. jmj2/jmj6/jmj9)
 gene_symbol_aliases <- gene_symbols %>%
   dplyr::filter(!is.na(locus_symbol) & locus_symbol != "")
 
+# Identify multi-alias genes (genes with >1 alias in gene_symbol.tab)
+multi_alias_genes <- gene_symbol_aliases %>%
+  group_by(gene_model) %>%
+  dplyr::filter(n() > 1) %>%
+  ungroup()
+
 # Annotate and expand: use desc (PANNZER) as primary description,
-# expand genes with multiple aliases in gene_symbol.tab
+# use locus_labels_master.csv for shorthand labels,
+# expand only multi-alias genes (e.g. jmj2/jmj6/jmj9) from gene_symbol.tab
 annotate_and_expand <- function(df) {
-  # First, supplement description: prefer desc (PANNZER functional) over desc_merged
+  # Supplement description: prefer desc (PANNZER functional) over desc_merged
   df <- df %>%
     mutate(
       description = ifelse(!is.na(desc) & desc != "", desc, desc_merged),
@@ -610,23 +625,29 @@ annotate_and_expand <- function(df) {
                            "Uncharacterized protein", description)
     )
 
-  # Split into genes with aliases and those without
-  genes_with_aliases <- df %>%
+  # Expand multi-alias genes (creates multiple rows)
+  genes_with_multi_aliases <- df %>%
+    dplyr::filter(gene %in% multi_alias_genes$gene_model) %>%
     inner_join(
-      gene_symbol_aliases %>% dplyr::select(gene_model, alias = locus_symbol),
+      multi_alias_genes %>% dplyr::select(gene_model, alias = locus_symbol),
       by = c("gene" = "gene_model"),
       relationship = "many-to-many"
     ) %>%
-    # Use alias as label, keep everything else
     mutate(locus_symbol = alias) %>%
     dplyr::select(-alias)
 
-  genes_without_aliases <- df %>%
-    dplyr::filter(!(gene %in% gene_symbol_aliases$gene_model)) %>%
-    mutate(locus_symbol = ifelse(is.na(locus_symbol) | locus_symbol == "",
-                                 "", locus_symbol))
+  # All other genes: use master label
+  other_genes <- df %>%
+    dplyr::filter(!(gene %in% multi_alias_genes$gene_model)) %>%
+    left_join(master_labels, by = c("gene" = "gene_model")) %>%
+    mutate(locus_symbol = ifelse(
+      !is.na(master_label) & master_label != "",
+      master_label,
+      ifelse(is.na(locus_symbol) | locus_symbol == "", "", locus_symbol)
+    )) %>%
+    dplyr::select(-master_label)
 
-  bind_rows(genes_with_aliases, genes_without_aliases)
+  bind_rows(genes_with_multi_aliases, other_genes)
 }
 
 # FT top DEGs table
