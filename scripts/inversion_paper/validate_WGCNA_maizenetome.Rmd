@@ -213,17 +213,23 @@ knitr::kable(edge_summary, format = "simple")
 # Key statistics
 n_reference <- nrow(mn_results)
 n_detected_ctrl <- sum(mn_results$sig_ctrl)
+n_detected_inv4m <- sum(mn_results$sig_inv4m)
 n_preserved <- sum(mn_results$status == "preserved")
 n_lost <- sum(mn_results$status == "lost")
+n_gained <- sum(mn_results$status == "gained")
 
 cat("\n=== KEY STATISTICS ===\n")
 cat("MaizeNetome reference edges:", n_reference, "\n")
 cat("Detected in CTRL (FDR < 0.05):", n_detected_ctrl,
     "(", round(100 * n_detected_ctrl / n_reference, 1), "%)\n")
+cat("Detected in Inv4m (FDR < 0.05):", n_detected_inv4m,
+    "(", round(100 * n_detected_inv4m / n_reference, 1), "%)\n")
 cat("Lost in Inv4m:", n_lost, "/", n_detected_ctrl,
     "(", round(100 * n_lost / n_detected_ctrl, 1), "%)\n")
 cat("Preserved in Inv4m:", n_preserved, "/", n_detected_ctrl,
     "(", round(100 * n_preserved / n_detected_ctrl, 1), "%)\n")
+cat("Gained in Inv4m (not in CTRL):", n_gained, "\n")
+cat("Net change:", n_detected_inv4m - n_detected_ctrl, "edges\n")
 ```
 
 ***
@@ -269,27 +275,33 @@ cat("Genes losing ALL connections:", n_genes_total_loss,
 
 # Visualization
 
-```{r figure_edge_fate, fig.width=8, fig.height=5}
-# Edge fate summary
+```{r figure_edge_fate, fig.width=10, fig.height=5}
+# Edge fate summary - show detection in both genotypes and edge dynamics
 edge_plot_data <- data.frame(
-  Status = c("Detected in CTRL", "Preserved", "Lost"),
-  Count = c(n_detected_ctrl, n_preserved, n_lost),
-  Type = c("Detection", "Fate", "Fate")
+  Status = c("CTRL", "Inv4m", "Lost", "Preserved", "Gained"),
+  Count = c(n_detected_ctrl, n_detected_inv4m, n_lost, n_preserved, n_gained),
+  Type = c("Detection", "Detection", "Dynamics", "Dynamics", "Dynamics")
 )
 edge_plot_data$Status <- factor(edge_plot_data$Status, levels = edge_plot_data$Status)
 
-p_edges <- ggplot(edge_plot_data, aes(x = Status, y = Count, fill = Type)) +
+p_edges <- ggplot(edge_plot_data, aes(x = Status, y = Count, fill = Status)) +
   geom_col(color = "black", width = 0.6) +
   geom_text(aes(label = Count), vjust = -0.5, size = 5) +
-  scale_fill_manual(values = c("Detection" = "steelblue", "Fate" = "coral")) +
+  scale_fill_manual(values = c(
+    "CTRL" = "#3498DB",
+    "Inv4m" = "#9B59B6",
+    "Lost" = "#E74C3C",
+    "Preserved" = "#27AE60",
+    "Gained" = "#F39C12"
+  )) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "none") +
   labs(
-    title = "MaizeNetome Reference Edge Disruption by Inv4m",
+    title = "MaizeNetome Reference Edge Detection and Dynamics",
     subtitle = sprintf(
-      "%d reference edges tested | %d%% of detected edges lost in Inv4m",
-      n_reference, round(100 * n_lost / n_detected_ctrl)
+      "%d reference edges | CTRL detects %d, Inv4m detects %d (net: %+d)",
+      n_reference, n_detected_ctrl, n_detected_inv4m, n_detected_inv4m - n_detected_ctrl
     ),
     x = NULL,
     y = "Number of MaizeNetome Edges"
@@ -299,7 +311,7 @@ print(p_edges)
 
 ggsave(
   file.path(paths$figures, "maizenetome_edge_disruption.pdf"),
-  p_edges, width = 8, height = 5
+  p_edges, width = 10, height = 5
 )
 ```
 
@@ -356,10 +368,14 @@ summary_stats <- tibble(
     "WGCNA genes analyzed",
     "MaizeNetome reference edges (among WGCNA genes)",
     "Reference edges detected in CTRL (FDR < 0.05)",
-    "Detection rate (%)",
-    "Edges preserved in Inv4m",
-    "Edges lost in Inv4m",
-    "Edge loss rate (% of detected)",
+    "Reference edges detected in Inv4m (FDR < 0.05)",
+    "CTRL detection rate (%)",
+    "Inv4m detection rate (%)",
+    "Edges preserved (in both)",
+    "Edges lost (CTRL only)",
+    "Edges gained (Inv4m only)",
+    "Edge loss rate (% of CTRL detected)",
+    "Net edge change",
     "Genes with reference edges in CTRL",
     "Genes losing all reference connections",
     "Complete loss rate (%)"
@@ -368,10 +384,14 @@ summary_stats <- tibble(
     length(wgcna_genes),
     n_reference,
     n_detected_ctrl,
+    n_detected_inv4m,
     round(100 * n_detected_ctrl / n_reference, 1),
+    round(100 * n_detected_inv4m / n_reference, 1),
     n_preserved,
     n_lost,
+    n_gained,
     round(100 * n_lost / n_detected_ctrl, 1),
+    n_detected_inv4m - n_detected_ctrl,
     n_genes_with_edges,
     n_genes_total_loss,
     round(100 * n_genes_total_loss / n_genes_with_edges, 1)
@@ -398,19 +418,23 @@ cat("QUESTION: Does Inv4m disrupt established coexpression networks?\n\n")
 
 cat("EDGE-LEVEL ANALYSIS\n")
 cat(sprintf("  Reference edges tested: %d\n", n_reference))
-cat(sprintf("  Detected in CTRL: %d (%.1f%% detection rate)\n",
+cat(sprintf("  Detected in CTRL: %d (%.1f%%)\n",
     n_detected_ctrl, 100 * n_detected_ctrl / n_reference))
-cat(sprintf("  Lost in Inv4m: %d (%.1f%% of detected)\n",
+cat(sprintf("  Detected in Inv4m: %d (%.1f%%)\n",
+    n_detected_inv4m, 100 * n_detected_inv4m / n_reference))
+cat(sprintf("  Lost (CTRL only): %d (%.1f%% of CTRL)\n",
     n_lost, 100 * n_lost / n_detected_ctrl))
-cat(sprintf("  Preserved in Inv4m: %d\n\n", n_preserved))
+cat(sprintf("  Preserved (both): %d\n", n_preserved))
+cat(sprintf("  Gained (Inv4m only): %d\n", n_gained))
+cat(sprintf("  Net change: %+d edges\n\n", n_detected_inv4m - n_detected_ctrl))
 
 cat("VERTEX-LEVEL ANALYSIS\n")
 cat(sprintf("  Genes with reference edges: %d\n", n_genes_with_edges))
 cat(sprintf("  Genes losing ALL connections: %d (%.1f%%)\n\n",
     n_genes_total_loss, 100 * n_genes_total_loss / n_genes_with_edges))
 
-cat("CONCLUSION: Inv4m introgression causes substantial disruption of\n")
-cat("MaizeNetome reference coexpression relationships.\n")
+cat("CONCLUSION: Inv4m causes net loss of MaizeNetome reference edges.\n")
+cat("While some edges are gained, more are lost than gained.\n")
 cat("============================================================\n")
 ```
 
