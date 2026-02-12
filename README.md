@@ -74,7 +74,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure S6 | WGCNA module GO enrichment | `field_perturbation/07_module_annotation.Rmd` | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
-| Table 2 | FT/PH gene candidates | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
+| Table 2 | FT/PH gene candidates | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
 | **Supplementary Tables** | | | |
 | Table S1 | Inv4m breakpoints and knob repeats | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table S2 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
@@ -93,6 +93,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
 | Greenyellow module | Greenyellow module characterization (sec6/pcna2) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
 | JMJ pink module | Pink module characterization (jmj2/jmj4 growth network) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
+| Phenotype association filter | FT/PH candidate gene overlap with DEGs | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
 
 **Status Legend:** ✅ Ready | 🔶 In Progress | ⚠️ Needs work | ❌ Missing
 
