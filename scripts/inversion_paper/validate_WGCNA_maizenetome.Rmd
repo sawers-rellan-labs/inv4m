@@ -362,6 +362,69 @@ edge_summary %>%
   print()
 ```
 
+## Sign Concordance Analysis
+
+Since WGCNA uses signed networks, we verify that "shared" edges have concordant
+correlation signs between CTRL and Inv4m. An edge with r = +0.8 in CTRL and
+r = -0.7 in Inv4m would be significant in both but represents a biological
+reversal, not preservation.
+
+```{r sign_concordance}
+# Join CTRL and Inv4m edges to compare correlation signs
+shared_edge_correlations <- inner_join(
+ ctrl_edges %>% dplyr::select(edge_id, r_ctrl = r),
+  inv4m_edges %>% dplyr::select(edge_id, r_inv4m = r),
+  by = "edge_id"
+) %>%
+  mutate(
+    sign_ctrl = sign(r_ctrl),
+    sign_inv4m = sign(r_inv4m),
+    same_sign = sign_ctrl == sign_inv4m,
+    sign_pattern = case_when(
+      r_ctrl > 0 & r_inv4m > 0 ~ "pos → pos",
+      r_ctrl > 0 & r_inv4m < 0 ~ "pos → neg (FLIP)",
+      r_ctrl < 0 & r_inv4m > 0 ~ "neg → pos (FLIP)",
+      r_ctrl < 0 & r_inv4m < 0 ~ "neg → neg"
+    )
+  )
+
+cat("=== SIGN CONCORDANCE IN SHARED EDGES ===\n")
+cat("Total shared edges:", nrow(shared_edge_correlations), "\n\n")
+
+cat("Same sign (truly preserved):", sum(shared_edge_correlations$same_sign),
+    "(", round(100 * mean(shared_edge_correlations$same_sign), 1), "%)\n")
+cat("Opposite sign (sign flip):", sum(!shared_edge_correlations$same_sign),
+    "(", round(100 * mean(!shared_edge_correlations$same_sign), 1), "%)\n\n")
+
+cat("=== SIGN PATTERN BREAKDOWN ===\n")
+shared_edge_correlations %>%
+  count(sign_pattern) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n)) %>%
+  print()
+
+# Store for later use
+n_truly_preserved <- sum(shared_edge_correlations$same_sign)
+n_sign_flips <- sum(!shared_edge_correlations$same_sign)
+```
+
+```{r sign_concordance_maizenetome}
+# Check sign concordance specifically for MaizeNetome edges
+shared_mn_correlations <- shared_edge_correlations %>%
+  filter(edge_id %in% maizenetome_edges$edge_id)
+
+cat("\n=== SIGN CONCORDANCE IN MAIZENETOME EDGES ===\n")
+cat("MaizeNetome edges in both networks:", nrow(shared_mn_correlations), "\n")
+cat("Same sign:", sum(shared_mn_correlations$same_sign),
+    "(", round(100 * mean(shared_mn_correlations$same_sign), 1), "%)\n")
+cat("Sign flip:", sum(!shared_mn_correlations$same_sign),
+    "(", round(100 * mean(!shared_mn_correlations$same_sign), 1), "%)\n")
+
+# Store for summary
+n_mn_truly_preserved <- sum(shared_mn_correlations$same_sign)
+n_mn_sign_flips <- sum(!shared_mn_correlations$same_sign)
+```
+
 ---
 
 # Network Statistics Summary
@@ -383,12 +446,18 @@ network_stats <- tibble(
     "Inv4m Novel edges (not in MaizeNetome)",
     "Inv4m % in MaizeNetome",
     "--- Network Disruption ---",
-    "Shared edges (preserved)",
+    "Shared edges (significant in both)",
     "Lost edges (CTRL only)",
     "Gained edges (Inv4m only)",
     "Edge loss rate (%)",
     "Edge gain rate (%)",
-    "Net edge change"
+    "Net edge change",
+    "--- Sign Concordance ---",
+    "Shared edges with same sign",
+    "Shared edges with sign flip",
+    "% same sign",
+    "MaizeNetome edges same sign",
+    "MaizeNetome edges sign flip"
   ),
   Value = c(
     length(wgcna_genes),
@@ -409,7 +478,13 @@ network_stats <- tibble(
     length(inv4m_only_edges),
     round(100 * length(ctrl_only_edges) / length(ctrl_edge_set), 2),
     round(100 * length(inv4m_only_edges) / length(inv4m_edge_set), 2),
-    nrow(inv4m_edges) - nrow(ctrl_edges)
+    nrow(inv4m_edges) - nrow(ctrl_edges),
+    "",
+    n_truly_preserved,
+    n_sign_flips,
+    round(100 * n_truly_preserved / length(shared_edges), 2),
+    n_mn_truly_preserved,
+    n_mn_sign_flips
   )
 )
 
@@ -730,7 +805,7 @@ inv4m_edges_export <- inv4m_edges %>%
 
 write_csv(inv4m_edges_export, file.path(paths$intermediate, "wgcna_inv4m_edges.csv"))
 
-# Export edge comparison summary
+# Export edge comparison summary with sign concordance
 edge_comparison <- data.frame(
   edge_id = unique(c(ctrl_edge_set, inv4m_edge_set))
 ) %>%
@@ -743,6 +818,11 @@ edge_comparison <- data.frame(
       in_ctrl & !in_inv4m ~ "Lost",
       !in_ctrl & in_inv4m ~ "Gained"
     )
+  ) %>%
+  left_join(
+    shared_edge_correlations %>%
+      dplyr::select(edge_id, r_ctrl, r_inv4m, same_sign, sign_pattern),
+    by = "edge_id"
   )
 
 write_csv(edge_comparison, file.path(paths$intermediate, "wgcna_edge_comparison.csv"))
@@ -787,6 +867,14 @@ cat("  Shared edges:", scales::comma(length(shared_edges)), "\n")
 cat("  Lost edges:", scales::comma(length(ctrl_only_edges)),
     "(", round(100 * length(ctrl_only_edges) / nrow(ctrl_edges), 1), "% of CTRL)\n")
 cat("  Gained edges:", scales::comma(length(inv4m_only_edges)), "\n\n")
+
+cat("SIGN CONCORDANCE (signed network validation)\n")
+cat("  Shared edges with same sign:", scales::comma(n_truly_preserved),
+    "(", round(100 * n_truly_preserved / length(shared_edges), 1), "%)\n")
+cat("  Shared edges with sign flip:", scales::comma(n_sign_flips),
+    "(", round(100 * n_sign_flips / length(shared_edges), 1), "%)\n")
+cat("  MaizeNetome edges - same sign:", n_mn_truly_preserved, "/", nrow(shared_mn_correlations),
+    "(", round(100 * n_mn_truly_preserved / nrow(shared_mn_correlations), 1), "%)\n\n")
 
 if (fisher_result$p.value < 0.05) {
   cat("MAIZENETOME VALIDATION\n")
