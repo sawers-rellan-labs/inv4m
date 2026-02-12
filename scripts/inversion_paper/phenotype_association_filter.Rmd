@@ -1,0 +1,852 @@
+---
+title: "Phenotype Association Filter — Inv4m DEGs × FT/PH Candidates"
+author: "Fausto Rodriguez Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Identify Inv4m DEGs that overlap published flowering time (FT) and
+plant height (PH) candidate gene lists. Produces Table 2 (`tab:FT_PH_candidates`)
+in the manuscript.
+
+**Methods reference**: Lines 1406–1432 of `main.tex`
+
+**Sources for FT candidates**:
+
+1. Wang et al. 2021 — 991 highland-adapted FT genes (v3 IDs)
+2. Li et al. 2022 — 62 FT genes (v4 IDs)
+3. GWAS Atlas — "days to flowering" PPTO:0000155 (v4 coords)
+4. Tibbs-Cortes et al. 2024 — plasticity SNPs for DTS/DTA (v5 coords)
+
+**Sources for PH candidates**:
+
+1. Li et al. 2022 — 23 PH genes (v4 IDs, hardcoded)
+2. GWAS Atlas — "plant height" PPTO:0000126 (v4 coords)
+3. Tibbs-Cortes et al. 2024 — plasticity SNPs for PH (v5 coords)
+
+# Setup
+
+```{r libraries}
+library(tidyverse)
+library(GenomicRanges)
+library(rtracklayer)
+library(xtable)
+```
+
+```{r constants}
+# Thresholds
+FDR_THRESHOLD <- 0.05
+LOGFC_THRESHOLD <- 1.5
+FLANK_BP <- 5000 # ±5 kb extension for GWAS SNP–gene overlap
+
+# Inv4m region boundaries (v5 coordinates)
+INV4M_START <- 172883675 # Zm00001eb190470 gene start
+INV4M_END   <- 188132113 # Zm00001eb194800 gene end
+
+# Shared introgression region (broader)
+SHARED_START <- 157012149
+SHARED_END   <- 195900523
+```
+
+# Load Gene Annotations
+
+```{r load-annotations}
+# Gene symbols
+gene_symbols <- read.delim(
+  file.path(paths$data, "gene_symbol.tab"),
+  stringsAsFactors = FALSE
+)
+
+# PANNZER functional descriptions — keep first per gene
+gene_pannzer <- read.delim(
+  file.path(paths$data, "PANNZER_DESC.tab"),
+  stringsAsFactors = FALSE
+) %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+# v3 → v5 cross-reference (no header; one-to-many comma-separated)
+v3_v5_raw <- read.delim(
+  file.path(paths$data, "B73v3_to_B73v5.tsv"),
+  header = FALSE,
+  col.names = c("v3", "v5_list"),
+  stringsAsFactors = FALSE
+)
+v3_v5 <- v3_v5_raw %>%
+  separate_rows(v5_list, sep = ",") %>%
+  dplyr::rename(v5 = v5_list) %>%
+  dplyr::filter(v5 != "")
+
+# v4 → v5 cross-reference
+v4_v5_raw <- read.delim(
+  file.path(paths$data, "B73v4_to_B73v5.tsv"),
+  header = FALSE,
+  col.names = c("v4", "v5_list"),
+  stringsAsFactors = FALSE
+)
+v4_v5 <- v4_v5_raw %>%
+  separate_rows(v5_list, sep = ",") %>%
+  dplyr::rename(v5 = v5_list) %>%
+  dplyr::filter(v5 != "")
+
+cat("v3→v5 mappings:", nrow(v3_v5), "\n")
+cat("v4→v5 mappings:", nrow(v4_v5), "\n")
+```
+
+# Load Gene Coordinates
+
+```{r load-gff-v5}
+# v5 GFF — genes on chr 1-10 only
+v5_gff <- import(file.path(paths$data,
+  "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3"))
+v5_genes <- v5_gff[v5_gff$type == "gene" &
+                    seqnames(v5_gff) %in% as.character(1:10)]
+v5_genes$gene_id <- sub("^gene:", "", v5_genes$ID)
+names(v5_genes) <- v5_genes$gene_id
+
+# Extended ±5 kb version for SNP overlap
+v5_genes_ext <- v5_genes
+start(v5_genes_ext) <- pmax(1, start(v5_genes_ext) - FLANK_BP)
+end(v5_genes_ext) <- end(v5_genes_ext) + FLANK_BP
+
+cat("v5 genes loaded:", length(v5_genes), "\n")
+```
+
+```{r load-gff-v4}
+# v4 GFF — genes on chr 1-10 only
+v4_gff <- import(file.path(paths$data,
+  "Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.gff3"))
+v4_genes <- v4_gff[v4_gff$type == "gene" &
+                    seqnames(v4_gff) %in% as.character(1:10)]
+v4_genes$gene_id <- sub("^gene:", "", v4_genes$ID)
+names(v4_genes) <- v4_genes$gene_id
+
+# Extended ±5 kb version for GWAS Atlas SNP overlap
+v4_genes_ext <- v4_genes
+start(v4_genes_ext) <- pmax(1, start(v4_genes_ext) - FLANK_BP)
+end(v4_genes_ext) <- end(v4_genes_ext) + FLANK_BP
+
+cat("v4 genes loaded:", length(v4_genes), "\n")
+```
+
+# Load Differential Expression Results
+
+```{r load-effects}
+effects_all <- read.csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  stringsAsFactors = FALSE
+)
+
+# Filter to Inv4m predictor, keep best p-value per gene
+effects <- effects_all %>%
+  dplyr::filter(predictor == "Inv4m") %>%
+  mutate(
+    is_significant = adj.P.Val < FDR_THRESHOLD,
+    is_topDEG = is_significant & abs(logFC) > LOGFC_THRESHOLD
+  ) %>%
+  group_by(gene) %>%
+  arrange(adj.P.Val) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("Total Inv4m-tested genes:", nrow(effects), "\n")
+cat("Significant DEGs (FDR < 0.05):", sum(effects$is_significant), "\n")
+cat("Top DEGs (|logFC| >", LOGFC_THRESHOLD, "):",
+    sum(effects$is_topDEG), "\n")
+```
+
+# Build Flowering Time Candidate List
+
+## Wang et al. 2021 (991 highland-adapted FT genes)
+
+```{r ft-wang2021}
+liwang <- read.csv(
+  file.path(paths$data, "floweringTime_genes_liwang.csv"),
+  stringsAsFactors = FALSE
+)
+
+# Convert v3 IDs to v5
+wang_v5 <- liwang %>%
+  dplyr::select(v3 = gene) %>%
+  inner_join(v3_v5, by = "v3", relationship = "many-to-many") %>%
+  pull(v5) %>%
+  unique()
+
+cat("Wang 2021: ", nrow(liwang), "v3 genes →", length(wang_v5), "v5 genes\n")
+```
+
+## Li et al. 2022 (62 FT genes)
+
+```{r ft-li2022}
+li2022_ft_v4 <- readLines(file.path(paths$data, "li2022_FT.list"))
+li2022_ft_v4 <- li2022_ft_v4[li2022_ft_v4 != ""]
+
+li2022_ft_v5 <- v4_v5 %>%
+  dplyr::filter(v4 %in% li2022_ft_v4) %>%
+  pull(v5) %>%
+  unique()
+
+cat("Li 2022 FT:", length(li2022_ft_v4), "v4 genes →",
+    length(li2022_ft_v5), "v5 genes\n")
+```
+
+## GWAS Atlas — days to flowering (PPTO:0000155)
+
+```{r ft-gwas-atlas}
+atlas <- read.delim(
+  file.path(paths$data, "gwas_association_result_for_maize.txt"),
+  stringsAsFactors = FALSE,
+  comment.char = "",
+  check.names = FALSE
+)
+
+# Standardise column names
+colnames(atlas)[colnames(atlas) == "#GaP_id"] <- "idx"
+colnames(atlas)[colnames(atlas) == "Trait accession"] <- "TOID"
+colnames(atlas)[colnames(atlas) == "P-value"] <- "p.value"
+colnames(atlas)[colnames(atlas) == "PMID"] <- "PUBMID"
+colnames(atlas)[colnames(atlas) == "First author"] <- "first_author"
+
+# FT associations
+atlas_ft <- atlas %>% dplyr::filter(TOID == "PPTO:0000155")
+
+# Build GRanges for FT SNPs (v4 coordinates)
+atlas_ft_gr <- with(atlas_ft,
+  GRanges(
+    seqnames = Chr,
+    ranges = IRanges(start = Pos, end = Pos),
+    idx = idx,
+    p.value = as.numeric(p.value),
+    PUBMID = PUBMID,
+    first_author = first_author
+  )
+)
+
+# Overlap with v4 genes (±5 kb)
+olap <- findOverlaps(atlas_ft_gr, v4_genes_ext)
+
+atlas_ft_hits <- data.frame(
+  v4 = v4_genes_ext$gene_id[subjectHits(olap)],
+  p.value = atlas_ft_gr$p.value[queryHits(olap)],
+  stringsAsFactors = FALSE
+) %>%
+  group_by(v4) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%  # best p-value per gene
+  ungroup()
+
+# Convert to v5
+atlas_ft_v5 <- atlas_ft_hits %>%
+  inner_join(v4_v5, by = "v4", relationship = "many-to-many") %>%
+  group_by(v5) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("GWAS Atlas FT: ", nrow(atlas_ft), "SNPs →",
+    nrow(atlas_ft_hits), "v4 genes →",
+    length(unique(atlas_ft_v5$v5)), "v5 genes\n")
+```
+
+## Tibbs-Cortes et al. 2024 — FT plasticity SNPs
+
+```{r ft-tibbs-cortes}
+plasticity <- read.csv(
+  file.path(paths$data, "Supplemental_Table_S3.csv"),
+  skip = 1,
+  stringsAsFactors = FALSE
+)
+
+# FT traits: DTS_slope, DTS_intcp, DTA_slope, DTA_intcp
+tibbs_ft_long <- plasticity %>%
+  dplyr::select(seqnames = Chr, start = bp, Marker,
+                DTS_slope, DTS_intcp, DTA_slope, DTA_intcp) %>%
+  tidyr::pivot_longer(
+    cols = c(DTS_slope, DTS_intcp, DTA_slope, DTA_intcp),
+    values_to = "P", names_to = "trait"
+  ) %>%
+  dplyr::filter(!is.na(P))
+
+# Build GRanges (v5 coordinates)
+tibbs_ft_gr <- with(tibbs_ft_long,
+  GRanges(
+    seqnames = seqnames,
+    ranges = IRanges(start = start, end = start),
+    P = P,
+    Marker = Marker
+  )
+)
+
+# Overlap with v5 genes (±5 kb)
+olap <- findOverlaps(tibbs_ft_gr, v5_genes_ext)
+
+tibbs_ft_hits <- data.frame(
+  gene = v5_genes_ext$gene_id[subjectHits(olap)],
+  p.value = tibbs_ft_gr$P[queryHits(olap)],
+  stringsAsFactors = FALSE
+) %>%
+  dplyr::filter(!is.na(gene)) %>%
+  dplyr::distinct() %>%
+  group_by(gene) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("Tibbs-Cortes FT:", nrow(tibbs_ft_long), "SNP-trait pairs →",
+    length(unique(tibbs_ft_hits$gene)), "v5 genes\n")
+```
+
+## Combine FT Candidate List
+
+```{r ft-combine}
+FT_candidates <- sort(unique(c(
+  wang_v5,
+  li2022_ft_v5,
+  atlas_ft_v5$v5,
+  tibbs_ft_hits$gene
+)))
+
+cat("Nonredundant FT candidates:", length(FT_candidates),
+    "(expected ~2224)\n")
+```
+
+# Build Plant Height Candidate List
+
+## Li et al. 2022 (23 PH genes)
+
+```{r ph-li2022}
+# Hardcoded v4 IDs from original analysis
+li2022_ph_v4 <- c(
+  "Zm00001d010396", "Zm00001d011069", "Zm00001d029657", "Zm00001d029656",
+  "Zm00001d029658", "Zm00001d029659", "Zm00001d029758", "Zm00001d029884",
+  "Zm00001d032747", "Zm00001d032776", "Zm00001d032788", "Zm00001d032790",
+  "Zm00001d032791", "Zm00001d033204", "Zm00001d033206", "Zm00001d033205",
+  "Zm00001d033223", "Zm00001d033224", "Zm00001d033225", "Zm00001d033226",
+  "Zm00001d033228", "Zm00001d033227"
+)
+
+li2022_ph_v5 <- v4_v5 %>%
+  dplyr::filter(v4 %in% li2022_ph_v4) %>%
+  pull(v5) %>%
+  unique()
+
+cat("Li 2022 PH:", length(li2022_ph_v4), "v4 genes →",
+    length(li2022_ph_v5), "v5 genes\n")
+```
+
+## GWAS Atlas — plant height (PPTO:0000126)
+
+```{r ph-gwas-atlas}
+atlas_ph <- atlas %>% dplyr::filter(TOID == "PPTO:0000126")
+
+atlas_ph_gr <- with(atlas_ph,
+  GRanges(
+    seqnames = Chr,
+    ranges = IRanges(start = Pos, end = Pos),
+    idx = idx,
+    p.value = as.numeric(p.value),
+    PUBMID = PUBMID,
+    first_author = first_author
+  )
+)
+
+olap <- findOverlaps(atlas_ph_gr, v4_genes_ext)
+
+atlas_ph_hits <- data.frame(
+  v4 = v4_genes_ext$gene_id[subjectHits(olap)],
+  p.value = atlas_ph_gr$p.value[queryHits(olap)],
+  stringsAsFactors = FALSE
+) %>%
+  group_by(v4) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+atlas_ph_v5 <- atlas_ph_hits %>%
+  inner_join(v4_v5, by = "v4", relationship = "many-to-many") %>%
+  group_by(v5) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("GWAS Atlas PH:", nrow(atlas_ph), "SNPs →",
+    nrow(atlas_ph_hits), "v4 genes →",
+    length(unique(atlas_ph_v5$v5)), "v5 genes\n")
+```
+
+## Tibbs-Cortes et al. 2024 — PH plasticity SNPs
+
+```{r ph-tibbs-cortes}
+tibbs_ph_long <- plasticity %>%
+  dplyr::select(seqnames = Chr, start = bp, Marker,
+                PH_slope, PH_intcp) %>%
+  tidyr::pivot_longer(
+    cols = c(PH_slope, PH_intcp),
+    values_to = "P", names_to = "trait"
+  ) %>%
+  dplyr::filter(!is.na(P))
+
+tibbs_ph_gr <- with(tibbs_ph_long,
+  GRanges(
+    seqnames = seqnames,
+    ranges = IRanges(start = start, end = start),
+    P = P,
+    Marker = Marker
+  )
+)
+
+olap <- findOverlaps(tibbs_ph_gr, v5_genes_ext)
+
+tibbs_ph_hits <- data.frame(
+  gene = v5_genes_ext$gene_id[subjectHits(olap)],
+  p.value = tibbs_ph_gr$P[queryHits(olap)],
+  stringsAsFactors = FALSE
+) %>%
+  dplyr::filter(!is.na(gene)) %>%
+  dplyr::distinct() %>%
+  group_by(gene) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
+cat("Tibbs-Cortes PH:", nrow(tibbs_ph_long), "SNP-trait pairs →",
+    length(unique(tibbs_ph_hits$gene)), "v5 genes\n")
+```
+
+## Combine PH Candidate List
+
+```{r ph-combine}
+PH_candidates <- sort(unique(c(
+  li2022_ph_v5,
+  atlas_ph_v5$v5,
+  tibbs_ph_hits$gene
+)))
+
+cat("Nonredundant PH candidates:", length(PH_candidates),
+    "(expected ~1272)\n")
+```
+
+# Join DEGs × Candidates
+
+```{r annotate-effects}
+# Flag candidate status in effects table
+effects <- effects %>%
+  mutate(
+    is_FT_candidate = gene %in% FT_candidates,
+    is_PH_candidate = gene %in% PH_candidates
+  )
+
+cat("Inv4m DEGs that are FT candidates:",
+    sum(effects$is_significant & effects$is_FT_candidate), "\n")
+cat("Inv4m top DEGs that are FT candidates:",
+    sum(effects$is_topDEG & effects$is_FT_candidate), "\n")
+cat("Inv4m DEGs that are PH candidates:",
+    sum(effects$is_significant & effects$is_PH_candidate), "\n")
+cat("Inv4m top DEGs that are PH candidates:",
+    sum(effects$is_topDEG & effects$is_PH_candidate), "\n")
+```
+
+```{r build-gwas-pvalues}
+# Collect best GWAS p-value per gene across all sources (FT)
+gwas_pval_ft <- bind_rows(
+  atlas_ft_v5 %>% dplyr::select(gene = v5, p.value),
+  tibbs_ft_hits %>% dplyr::select(gene, p.value)
+) %>%
+  group_by(gene) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::rename(gwas_pvalue_ft = p.value)
+
+# Collect best GWAS p-value per gene across all sources (PH)
+gwas_pval_ph <- bind_rows(
+  atlas_ph_v5 %>% dplyr::select(gene = v5, p.value),
+  tibbs_ph_hits %>% dplyr::select(gene, p.value)
+) %>%
+  group_by(gene) %>%
+  arrange(p.value) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  dplyr::rename(gwas_pvalue_ph = p.value)
+```
+
+```{r pmid-mapping}
+# Map GWAS Atlas PMIDs to BibTeX citation keys
+pmid_to_cite <- c(
+  "24514905" = "peiffer2014",
+  "27012534" = "li2016",
+  "22660547" = "jiao2012",
+  "23840585" = "peiffer2013"
+)
+
+# Helper: resolve PMIDs to cite keys, adding liu2023 (the GWAS Atlas database)
+resolve_atlas_cites <- function(pmids) {
+  keys <- unique(na.omit(pmid_to_cite[as.character(pmids)]))
+  # Always include liu2023 as the database reference
+  sort(unique(c(keys, "liu2023")))
+}
+```
+
+```{r build-reference-tracking}
+# --- GWAS Atlas: track actual PMIDs per gene ---
+
+# FT atlas refs with PMIDs
+atlas_ft_with_pmid <- data.frame(
+  v4 = v4_genes_ext$gene_id[subjectHits(findOverlaps(atlas_ft_gr, v4_genes_ext))],
+  PUBMID = atlas_ft_gr$PUBMID[queryHits(findOverlaps(atlas_ft_gr, v4_genes_ext))],
+  stringsAsFactors = FALSE
+) %>%
+  inner_join(v4_v5, by = "v4", relationship = "many-to-many") %>%
+  dplyr::select(gene = v5, PUBMID) %>%
+  distinct()
+
+# PH atlas refs with PMIDs
+atlas_ph_with_pmid <- data.frame(
+  v4 = v4_genes_ext$gene_id[subjectHits(findOverlaps(atlas_ph_gr, v4_genes_ext))],
+  PUBMID = atlas_ph_gr$PUBMID[queryHits(findOverlaps(atlas_ph_gr, v4_genes_ext))],
+  stringsAsFactors = FALSE
+) %>%
+  inner_join(v4_v5, by = "v4", relationship = "many-to-many") %>%
+  dplyr::select(gene = v5, PUBMID) %>%
+  distinct()
+
+# Build per-gene citation lists for FT
+ft_cite_list <- list()
+
+# wang2021
+for (g in wang_v5) ft_cite_list[[g]] <- c(ft_cite_list[[g]], "wang2021")
+# li2022
+for (g in li2022_ft_v5) ft_cite_list[[g]] <- c(ft_cite_list[[g]], "li2022")
+# GWAS Atlas (with PMID resolution)
+for (i in seq_len(nrow(atlas_ft_with_pmid))) {
+  g <- atlas_ft_with_pmid$gene[i]
+  cites <- resolve_atlas_cites(atlas_ft_with_pmid$PUBMID[i])
+  ft_cite_list[[g]] <- c(ft_cite_list[[g]], cites)
+}
+# tibbs-cortes
+for (g in tibbs_ft_hits$gene) ft_cite_list[[g]] <- c(ft_cite_list[[g]], "tibbs-cortes2024")
+
+ft_refs <- data.frame(
+  gene = names(ft_cite_list),
+  ft_refs = sapply(ft_cite_list, function(x) paste(sort(unique(x)), collapse = ", ")),
+  stringsAsFactors = FALSE,
+  row.names = NULL
+)
+
+# Build per-gene citation lists for PH
+ph_cite_list <- list()
+
+# li2022
+for (g in li2022_ph_v5) ph_cite_list[[g]] <- c(ph_cite_list[[g]], "li2022")
+# GWAS Atlas (with PMID resolution)
+for (i in seq_len(nrow(atlas_ph_with_pmid))) {
+  g <- atlas_ph_with_pmid$gene[i]
+  cites <- resolve_atlas_cites(atlas_ph_with_pmid$PUBMID[i])
+  ph_cite_list[[g]] <- c(ph_cite_list[[g]], cites)
+}
+# tibbs-cortes
+for (g in tibbs_ph_hits$gene) ph_cite_list[[g]] <- c(ph_cite_list[[g]], "tibbs-cortes2024")
+
+ph_refs <- data.frame(
+  gene = names(ph_cite_list),
+  ph_refs = sapply(ph_cite_list, function(x) paste(sort(unique(x)), collapse = ", ")),
+  stringsAsFactors = FALSE,
+  row.names = NULL
+)
+```
+
+```{r build-tables}
+# Location label helper
+location_label <- function(in_inv4m, in_flank) {
+  case_when(
+    in_inv4m ~ "Inv4m",
+    in_flank ~ "flanking",
+    TRUE ~ "outside"
+  )
+}
+
+# All gene_symbol.tab aliases (for expanding multi-alias genes like jmj2/jmj6/jmj9)
+gene_symbol_aliases <- gene_symbols %>%
+  dplyr::filter(!is.na(locus_symbol) & locus_symbol != "")
+
+# Annotate and expand: use desc (PANNZER) as primary description,
+# expand genes with multiple aliases in gene_symbol.tab
+annotate_and_expand <- function(df) {
+  # First, supplement description: prefer desc (PANNZER functional) over desc_merged
+  df <- df %>%
+    mutate(
+      description = ifelse(!is.na(desc) & desc != "", desc, desc_merged),
+      description = ifelse(is.na(description) | description == "",
+                           "Uncharacterized protein", description)
+    )
+
+  # Split into genes with aliases and those without
+  genes_with_aliases <- df %>%
+    inner_join(
+      gene_symbol_aliases %>% dplyr::select(gene_model, alias = locus_symbol),
+      by = c("gene" = "gene_model"),
+      relationship = "many-to-many"
+    ) %>%
+    # Use alias as label, keep everything else
+    mutate(locus_symbol = alias) %>%
+    dplyr::select(-alias)
+
+  genes_without_aliases <- df %>%
+    dplyr::filter(!(gene %in% gene_symbol_aliases$gene_model)) %>%
+    mutate(locus_symbol = ifelse(is.na(locus_symbol) | locus_symbol == "",
+                                 "", locus_symbol))
+
+  bind_rows(genes_with_aliases, genes_without_aliases)
+}
+
+# FT top DEGs table
+FT_table <- effects %>%
+  dplyr::filter(is_topDEG & is_FT_candidate) %>%
+  left_join(gwas_pval_ft, by = "gene") %>%
+  left_join(ft_refs, by = "gene") %>%
+  mutate(location = location_label(in_Inv4m, in_flank)) %>%
+  dplyr::select(gene, locus_symbol, desc_merged, desc, logFC, neglogP,
+                location, gwas_pvalue_ft, ft_refs) %>%
+  annotate_and_expand() %>%
+  arrange(-neglogP, gene, locus_symbol)
+
+# PH top DEGs table
+PH_table <- effects %>%
+  dplyr::filter(is_topDEG & is_PH_candidate) %>%
+  left_join(gwas_pval_ph, by = "gene") %>%
+  left_join(ph_refs, by = "gene") %>%
+  mutate(location = location_label(in_Inv4m, in_flank)) %>%
+  dplyr::select(gene, locus_symbol, desc_merged, desc, logFC, neglogP,
+                location, gwas_pvalue_ph, ph_refs) %>%
+  annotate_and_expand() %>%
+  arrange(-neglogP, gene, locus_symbol)
+
+cat("FT top DEGs for table:", nrow(FT_table), "\n")
+cat("PH top DEGs for table:", nrow(PH_table), "\n")
+```
+
+```{r display-tables}
+knitr::kable(
+  FT_table %>% dplyr::select(gene, locus_symbol, description, logFC, neglogP,
+                              location, gwas_pvalue_ft, ft_refs),
+  digits = 2, caption = "Flowering Time candidate DEGs (|logFC| > 1.5)")
+knitr::kable(
+  PH_table %>% dplyr::select(gene, locus_symbol, description, logFC, neglogP,
+                              location, gwas_pvalue_ph, ph_refs),
+  digits = 2, caption = "Plant Height candidate DEGs (|logFC| > 1.5)")
+```
+
+# Fisher Enrichment Tests
+
+```{r fisher-ft}
+cat("=== Flowering Time Enrichment ===\n\n")
+
+# Top DEGs vs FT candidates
+ft_top <- table(effects$is_topDEG, effects$is_FT_candidate)
+dimnames(ft_top) <- list(TopDEG = c("No", "Yes"),
+                         FT_candidate = c("No", "Yes"))
+cat("Top DEGs (|logFC| >", LOGFC_THRESHOLD, ") × FT candidates:\n")
+print(ft_top)
+cat("\nFisher exact test (two-sided):\n")
+print(fisher.test(ft_top))
+cat("\nFisher exact test (greater):\n")
+print(fisher.test(ft_top, alternative = "greater"))
+
+# All significant DEGs vs FT candidates
+ft_sig <- table(effects$is_significant, effects$is_FT_candidate)
+dimnames(ft_sig) <- list(DEG = c("No", "Yes"),
+                         FT_candidate = c("No", "Yes"))
+cat("\nAll significant DEGs × FT candidates:\n")
+print(ft_sig)
+cat("\nFisher exact test (two-sided):\n")
+print(fisher.test(ft_sig))
+cat("\nFisher exact test (greater):\n")
+print(fisher.test(ft_sig, alternative = "greater"))
+```
+
+```{r fisher-ph}
+cat("=== Plant Height Enrichment ===\n\n")
+
+ph_top <- table(effects$is_topDEG, effects$is_PH_candidate)
+dimnames(ph_top) <- list(TopDEG = c("No", "Yes"),
+                         PH_candidate = c("No", "Yes"))
+cat("Top DEGs (|logFC| >", LOGFC_THRESHOLD, ") × PH candidates:\n")
+print(ph_top)
+cat("\nFisher exact test (two-sided):\n")
+print(fisher.test(ph_top))
+
+ph_sig <- table(effects$is_significant, effects$is_PH_candidate)
+dimnames(ph_sig) <- list(DEG = c("No", "Yes"),
+                         PH_candidate = c("No", "Yes"))
+cat("\nAll significant DEGs × PH candidates:\n")
+print(ph_sig)
+cat("\nFisher exact test (two-sided):\n")
+print(fisher.test(ph_sig))
+```
+
+# Output
+
+## CSV
+
+```{r write-csv}
+out_csv <- bind_rows(
+  FT_table %>% mutate(
+    pheno = "Flowering Time",
+    gwas_pvalue = gwas_pvalue_ft,
+    refs = ft_refs
+  ) %>% dplyr::select(-gwas_pvalue_ft, -ft_refs),
+  PH_table %>% mutate(
+    pheno = "Plant Height",
+    gwas_pvalue = gwas_pvalue_ph,
+    refs = ph_refs
+  ) %>% dplyr::select(-gwas_pvalue_ph, -ph_refs)
+) %>%
+  dplyr::select(pheno, gene, locus_symbol, description, logFC, neglogP,
+                location, gwas_pvalue, refs) %>%
+  arrange(pheno, -neglogP)
+
+write.csv(out_csv,
+  file.path(paths$intermediate, "inv4m_DEGs_by_phenotype_association.csv"),
+  row.names = FALSE
+)
+cat("Wrote:", file.path(paths$intermediate,
+    "inv4m_DEGs_by_phenotype_association.csv"), "\n")
+```
+
+## LaTeX Table
+
+```{r write-latex}
+# Format for LaTeX
+format_pval <- function(x) {
+  ifelse(is.na(x), "", formatC(x, format = "e", digits = 2))
+}
+
+tex_lines <- c(
+  "\\begin{table*}[!ht]",
+  "\\caption{\\textbf{Effect of \\invfour on Flowering Time and Plant Height Gene",
+  "Candidates}}",
+  "\\label{tab:FT_PH_candidates}",
+  "\\resizebox{\\textwidth}{!}{%",
+  "\\begin{tabular}{llllllll}",
+  "\\toprule",
+  "  \\textbf{Gene} &",
+  "  \\textbf{Label} &",
+  "  \\textbf{Description} &",
+  "  \\textbf{\\begin{tabular}[c]{@{}l@{}}$\\bf{log_2}$\\\\(FC)\\end{tabular}} &",
+  "  \\textbf{\\begin{tabular}[c]{@{}l@{}}$\\bf{-log_{10}}$\\\\",
+  "(\\textit{FDR})\\end{tabular}} &",
+  "  \\textbf{Location} &",
+  "  \\textbf{\\begin{tabular}[c]{@{}l@{}} GWAS \\\\",
+  "\\textit{p-value}\\end{tabular}} &",
+  "  \\textbf{ref} \\\\ \\midrule"
+)
+
+# Helper: format a single gene row
+format_row <- function(gene, symbol, desc, logfc, nlogp, loc, pval, refs_str) {
+  # Escape LaTeX special characters in description
+  desc_clean <- gsub("&", "\\\\&", desc)
+  desc_clean <- gsub("%", "\\\\%", desc_clean)
+  desc_clean <- gsub("_", "\\\\_", desc_clean)
+
+  # Format location: bold Inv4m
+  loc_fmt <- if (loc == "Inv4m") "\\textbf{\\invfour}" else loc
+
+  # Format GWAS p-value
+  pval_fmt <- format_pval(pval)
+
+  # Build citation string — refs_str already contains proper cite keys
+  cite_fmt <- ""
+  if (!is.na(refs_str) && refs_str != "") {
+    cite_keys <- trimws(unlist(strsplit(refs_str, ",")))
+    cite_fmt <- paste0("\\cite{", paste(unique(cite_keys), collapse = ", "), "}")
+  }
+
+  # Format symbol
+  sym_fmt <- if (is.na(symbol) || symbol == "") "" else paste0("\\textit{", symbol, "}")
+
+  paste0(
+    "  \\textit{", gene, "} &\n",
+    "  ", sym_fmt, " &\n",
+    "  ", desc_clean, " &\n",
+    "  ", sprintf("%.2f", logfc), " &\n",
+    "  ", sprintf("%.2f", nlogp), " &\n",
+    "  ", loc_fmt, " &\n",
+    "  ", pval_fmt, " &\n",
+    "  ", cite_fmt, " \\\\"
+  )
+}
+
+# FT section
+tex_lines <- c(tex_lines,
+  "\\multicolumn{8}{l}{\\textbf{Flowering Time}} \\\\ \\midrule")
+
+for (i in seq_len(nrow(FT_table))) {
+  r <- FT_table[i, ]
+  tex_lines <- c(tex_lines, format_row(
+    r$gene, r$locus_symbol, r$description,
+    r$logFC, r$neglogP, r$location,
+    r$gwas_pvalue_ft, r$ft_refs
+  ))
+}
+
+# PH section
+tex_lines <- c(tex_lines,
+  " \\midrule",
+  "\\multicolumn{8}{l}{\\textbf{Plant Height}} \\\\ \\midrule")
+
+for (i in seq_len(nrow(PH_table))) {
+  r <- PH_table[i, ]
+  tex_lines <- c(tex_lines, format_row(
+    r$gene, r$locus_symbol, r$description,
+    r$logFC, r$neglogP, r$location,
+    r$gwas_pvalue_ph, r$ph_refs
+  ))
+}
+
+tex_lines <- c(tex_lines,
+  " \\bottomrule",
+  "\\end{tabular}%",
+  "}",
+  "\\end{table*}"
+)
+
+writeLines(tex_lines,
+  file.path(paths$tables, "FT_PH_candidates.tex"))
+cat("Wrote:", file.path(paths$tables, "FT_PH_candidates.tex"), "\n")
+```
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
