@@ -1,6 +1,6 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-02-12
 **Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Complete ✅
 **Version:** v2.1.0
 
@@ -43,8 +43,14 @@ README.md  # Figure/table coverage
 - Standardized terminology (Supporting → Supplementary)
 
 **🟢 MANUSCRIPT READY FOR SUBMISSION**
-- Optional: Final proofreading
-- Optional: MaizeNetome validation for WGCNA (methods)
+
+**Remaining tasks:**
+- [ ] Add significance stars to internode boxplots (Supplementary Fig. S4)
+- [ ] Final proofreading (optional)
+
+**Completed (2026-02-12):**
+- [x] Clarified kWithin calculation in methods (consensus co-clustering frequency, not TOM)
+- [x] MaizeNetome validation for WGCNA - **DROPPED** (underpowered for n=13)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 
