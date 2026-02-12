@@ -1,12 +1,11 @@
 ---
-title: "WGCNA Network Validation Against MaizeNetome"
+title: "MaizeNetome Reference Network Disruption by Inv4m"
 author: "Fausto Rodriguez"
 date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
     toc_float: true
-    toc_depth: 3
     code_folding: show
     theme: flatly
     df_print: paged
@@ -23,10 +22,9 @@ knit: (function(input, ...) {
 knitr::opts_chunk$set(
   echo = TRUE,
   warning = FALSE,
-
   message = FALSE,
   fig.width = 10,
-  fig.height = 8
+  fig.height = 6
 )
 
 library(here)
@@ -36,49 +34,40 @@ paths <- setup_project_paths("inversion_paper")
 
 # Overview
 
-**Purpose**: Validate WGCNA module networks against the MaizeNetome reference
-database and quantify network disruption caused by Inv4m introgression.
+**Question**: Does Inv4m introgression disrupt established coexpression networks?
 
-**Approach**:
-1. Build binary correlation networks from CTRL and Inv4m expression data
-2. Use same methodology as trans-network analysis (Pearson correlation, FDR < 0.05)
-3. Compare edges to MaizeNetome reference
-4. Quantify edge loss between CTRL and Inv4m conditions
+**Approach**: We test whether MaizeNetome reference edges (known coexpression
+relationships) are preserved in our WGCNA gene set when comparing CTRL vs Inv4m
+genotypes. This is a MaizeNetome-centric analysis: we start with reference edges
+and ask what fraction are disrupted.
 
-**Key outputs**:
-- Edge counts: CTRL vs Inv4m
-- Reference vs Novel edge classification
-- Edge loss statistics (network disruption)
+**Key metric**: Of MaizeNetome edges detected in CTRL, what percentage are lost
+in Inv4m?
 
----
+***
 
-# Setup and Dependencies
+# Setup
 
 ```{r libraries}
 library(dplyr)
 library(tidyr)
 library(readr)
 library(ggplot2)
-library(patchwork)
-library(eulerr)
 ```
 
----
+***
 
 # Load Data
-
-## Expression Data
 
 ```{r load_expression}
 # Load normalized expression data
 voomR <- readRDS(
- file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds")
+  file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds")
 )
 
-# Load sample metadata from WGCNA pipeline
+# Load sample metadata
 wgcna_run_dir <- here::here(
-  "results", "inversion_paper", "field_perturbation",
-  "run_20251231_201332"
+  "results", "inversion_paper", "field_perturbation", "run_20251231_201332"
 )
 sample_meta <- read_csv(
   file.path(wgcna_run_dir, "01_data_prep", "sample_metadata.csv"),
@@ -86,93 +75,62 @@ sample_meta <- read_csv(
 )
 
 # Split samples by genotype
-ctrl_samples <- sample_meta %>%
-  filter(Genotype == "CTRL") %>%
-  pull(sample_id)
-
-inv4m_samples <- sample_meta %>%
-  filter(Genotype == "Inv4m") %>%
-  pull(sample_id)
-
-cat("=== EXPRESSION DATA ===\n")
-cat("Total genes:", nrow(voomR$E), "\n")
-cat("CTRL samples:", length(ctrl_samples), "\n")
-cat("Inv4m samples:", length(inv4m_samples), "\n")
+ctrl_samples <- sample_meta %>% filter(Genotype == "CTRL") %>% pull(sample_id)
+inv4m_samples <- sample_meta %>% filter(Genotype == "Inv4m") %>% pull(sample_id)
 ```
 
-## WGCNA Module Genes
-
 ```{r load_wgcna_genes}
-# Load WGCNA module assignments (CTRL modules as reference)
+# Load WGCNA module assignments (genes assigned to modules, excluding grey)
 ctrl_modules <- read_csv(
   file.path(wgcna_run_dir, "04_consensus_networks", "ctrl", "consensus_modules.csv"),
   show_col_types = FALSE
 )
 
-# Get genes assigned to modules (exclude grey/unassigned)
 wgcna_genes <- ctrl_modules %>%
   filter(module != 0) %>%
-  pull(gene)
+  pull(gene) %>%
+  intersect(rownames(voomR$E))
 
-# Filter to genes in expression matrix
-wgcna_genes <- wgcna_genes[wgcna_genes %in% rownames(voomR$E)]
-
-cat("\n=== WGCNA GENES ===\n")
-cat("Genes in modules:", length(wgcna_genes), "\n")
-cat("Genes in expression matrix:", sum(wgcna_genes %in% rownames(voomR$E)), "\n")
+cat("WGCNA genes:", length(wgcna_genes), "\n")
 ```
 
-## MaizeNetome Reference
-
 ```{r load_maizenetome}
-# Load MaizeNetome coexpression edges (same as trans-network analysis)
-left_flanking_maizenetome <- read.csv(
-  file.path(paths$data, "left_MaizeNetome_coexpression_edges.csv")
-)
-Inv4m_maizenetome <- read.csv(
-  file.path(paths$data, "inv4m_MaizeNetome_coexpression_edges.csv")
-)
-right_flanking_maizenetome <- read.csv(
-  file.path(paths$data, "right_MaizeNetome_coexpression_edges.csv")
-)
+# Load and combine MaizeNetome coexpression edges
+left_mn <- read.csv(file.path(paths$data, "left_MaizeNetome_coexpression_edges.csv"))
+inv4m_mn <- read.csv(file.path(paths$data, "inv4m_MaizeNetome_coexpression_edges.csv"))
+right_mn <- read.csv(file.path(paths$data, "right_MaizeNetome_coexpression_edges.csv"))
 
 MaizeNetome <- rbind(
-  left_flanking_maizenetome %>%
-    separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n") %>%
-    mutate(network = "coexpression"),
-  Inv4m_maizenetome %>%
-    separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n") %>%
-    mutate(network = "coexpression"),
-  right_flanking_maizenetome %>%
-    separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n") %>%
-    mutate(network = "coexpression")
+  left_mn %>% separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n"),
+  inv4m_mn %>% separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n"),
+  right_mn %>% separate_longer_delim(cols = Direct.Connetation.Node, delim = "\n")
 ) %>%
   dplyr::rename(Direct.Connection = Direct.Connetation.Node)
 
-cat("\n=== MAIZENETOME ===\n")
-cat("Total edges (v4 IDs):", nrow(MaizeNetome), "\n")
-```
-
-```{r convert_v4_v5}
 # Convert v4 to v5 gene IDs
 v4_v5 <- read.table(
-  file = file.path(paths$data, "B73v4_to_B73v5.tsv"),
-  sep = "\t",
-  header = FALSE
+  file.path(paths$data, "B73v4_to_B73v5.tsv"),
+  sep = "\t", header = FALSE
 ) %>%
   dplyr::rename(v4 = V1, v5 = V2) %>%
   separate_longer_delim(cols = v5, delim = ",")
 
 MaizeNetome_v5 <- MaizeNetome %>%
-  left_join(v4_v5, by = c("Element.ID" = "v4")) %>%
+  left_join(v4_v5, by = c("Element.ID" = "v4"), relationship = "many-to-many") %>%
   dplyr::rename(Element.ID.v5 = v5) %>%
   filter(!is.na(Element.ID.v5)) %>%
-  left_join(v4_v5, by = c("Direct.Connection" = "v4")) %>%
+  left_join(v4_v5, by = c("Direct.Connection" = "v4"), relationship = "many-to-many") %>%
   dplyr::rename(Direct.Connection.v5 = v5) %>%
   filter(!is.na(Direct.Connection.v5))
+```
 
-# Create edge set for fast lookup (undirected - sort gene pairs)
-maizenetome_edges <- MaizeNetome_v5 %>%
+***
+# Filter MaizeNetome to WGCNA Gene Set
+
+```{r filter_maizenetome}
+# Get MaizeNetome edges where BOTH genes are in our WGCNA set
+mn_edges <- MaizeNetome_v5 %>%
+  filter(Element.ID.v5 %in% wgcna_genes & Direct.Connection.v5 %in% wgcna_genes) %>%
   rowwise() %>%
   mutate(
     gene1 = min(Element.ID.v5, Direct.Connection.v5),
@@ -180,939 +138,283 @@ maizenetome_edges <- MaizeNetome_v5 %>%
     edge_id = paste(gene1, gene2, sep = "_")
   ) %>%
   ungroup() %>%
-  distinct(edge_id, .keep_all = TRUE)
+  distinct(edge_id, gene1, gene2)
 
-cat("Edges after v4->v5 conversion:", nrow(MaizeNetome_v5), "\n
-")
-cat("Unique undirected edges:", nrow(maizenetome_edges), "\n")
+cat("MaizeNetome reference edges among WGCNA genes:", nrow(mn_edges), "\n")
 ```
 
----
+***
 
-# Build Correlation Networks
+# Test Reference Edges in CTRL and Inv4m
 
-## Helper Functions
+For each MaizeNetome edge, we compute the Pearson correlation in CTRL and Inv4m
+samples separately. An edge is "detected" if the correlation is significant
+(FDR < 0.05).
 
-```{r helper_functions}
-#' Build binary edge list from expression matrix
-#'
-#' @param expr Expression matrix (genes x samples)
-#' @param genes Genes to include
-#' @param fdr_threshold FDR threshold for significance
-#'
-#' @return Data frame with significant edges
-build_correlation_network <- function(expr, genes, fdr_threshold = 0.05) {
+```{r compute_correlations}
+# Extract expression matrices
+expr_ctrl <- voomR$E[wgcna_genes, ctrl_samples]
+expr_inv4m <- voomR$E[wgcna_genes, inv4m_samples]
+n_ctrl <- ncol(expr_ctrl)
+n_inv4m <- ncol(expr_inv4m)
 
-  # Filter to genes in expression matrix
-  genes <- genes[genes %in% rownames(expr)]
-  expr_subset <- expr[genes, ]
-
-  n_genes <- length(genes)
-  n_samples <- ncol(expr_subset)
-
-  cat("Building network for", n_genes, "genes x", n_samples, "samples\n")
-  cat("Total possible edges:", n_genes * (n_genes - 1) / 2, "\n")
-
- # Compute correlation matrix
-  cor_matrix <- cor(t(expr_subset), use = "pairwise.complete.obs")
-
-  # Compute p-values for correlations
-  # t-statistic: t = r * sqrt((n-2)/(1-r^2))
-  t_matrix <- cor_matrix * sqrt((n_samples - 2) / (1 - cor_matrix^2))
-  p_matrix <- 2 * pt(-abs(t_matrix), df = n_samples - 2)
-
-  # Extract lower triangle (undirected network)
-  lower_idx <- which(lower.tri(cor_matrix), arr.ind = TRUE)
-
-  edges_df <- data.frame(
-    gene1 = genes[lower_idx[, 1]],
-    gene2 = genes[lower_idx[, 2]],
-    r = cor_matrix[lower_idx],
-    p_value = p_matrix[lower_idx]
-  )
-
-  # FDR correction
-  edges_df$p_adj <- p.adjust(edges_df$p_value, method = "fdr")
-
-  # Filter significant edges
-  sig_edges <- edges_df %>%
-    filter(p_adj < fdr_threshold) %>%
-    rowwise() %>%
-    mutate(
-      # Ensure consistent ordering for comparison
-      g1 = min(gene1, gene2),
-      g2 = max(gene1, gene2),
-      edge_id = paste(g1, g2, sep = "_")
-    ) %>%
-    ungroup() %>%
-    dplyr::select(gene1 = g1, gene2 = g2, edge_id, r, p_value, p_adj)
-
-  cat("Significant edges (FDR <", fdr_threshold, "):", nrow(sig_edges), "\n")
-
-  return(sig_edges)
+# Function to compute correlation p-value
+cor_pvalue <- function(r, n) {
+  t_stat <- r * sqrt((n - 2) / (1 - r^2))
+  2 * pt(-abs(t_stat), df = n - 2)
 }
 
-#' Check edges against MaizeNetome
-#'
-#' @param edges Edge data frame with edge_id column
-#' @param maizenetome_edge_ids Vector of MaizeNetome edge IDs
-#'
-#' @return Edge data frame with in_maizenetome column
-check_maizenetome <- function(edges, maizenetome_edge_ids) {
-  edges %>%
-    mutate(in_maizenetome = edge_id %in% maizenetome_edge_ids)
-}
-```
-
-## CTRL Network
-
-```{r build_ctrl_network}
-cat("=== BUILDING CTRL NETWORK ===\n\n")
-
-# Extract CTRL expression
-expr_ctrl <- voomR$E[, ctrl_samples]
-
-# Build network
-ctrl_edges <- build_correlation_network(
-  expr = expr_ctrl,
-  genes = wgcna_genes,
-  fdr_threshold = 0.05
-)
-
-# Check against MaizeNetome
-ctrl_edges <- check_maizenetome(ctrl_edges, maizenetome_edges$edge_id)
-
-cat("\n=== CTRL NETWORK SUMMARY ===\n")
-cat("Total edges:", nrow(ctrl_edges), "\n")
-cat("Reference (in MaizeNetome):", sum(ctrl_edges$in_maizenetome), "\n")
-cat("Novel (not in MaizeNetome):", sum(!ctrl_edges$in_maizenetome), "\n")
-cat("% in MaizeNetome:", round(100 * mean(ctrl_edges$in_maizenetome), 2), "%\n")
-```
-
-## Inv4m Network
-
-```{r build_inv4m_network}
-cat("=== BUILDING INV4M NETWORK ===\n\n")
-
-# Extract Inv4m expression
-expr_inv4m <- voomR$E[, inv4m_samples]
-
-# Build network
-inv4m_edges <- build_correlation_network(
-  expr = expr_inv4m,
-  genes = wgcna_genes,
-  fdr_threshold = 0.05
-)
-
-# Check against MaizeNetome
-inv4m_edges <- check_maizenetome(inv4m_edges, maizenetome_edges$edge_id)
-
-cat("\n=== INV4M NETWORK SUMMARY ===\n")
-cat("Total edges:", nrow(inv4m_edges), "\n")
-cat("Reference (in MaizeNetome):", sum(inv4m_edges$in_maizenetome), "\n")
-cat("Novel (not in MaizeNetome):", sum(!inv4m_edges$in_maizenetome), "\n")
-cat("% in MaizeNetome:", round(100 * mean(inv4m_edges$in_maizenetome), 2), "%\n")
-```
-
----
-
-# Compare CTRL vs Inv4m Networks
-
-## Edge Overlap Analysis
-
-```{r edge_comparison}
-# Create edge sets
-ctrl_edge_set <- ctrl_edges$edge_id
-inv4m_edge_set <- inv4m_edges$edge_id
-
-# Calculate overlaps
-shared_edges <- intersect(ctrl_edge_set, inv4m_edge_set)
-ctrl_only_edges <- setdiff(ctrl_edge_set, inv4m_edge_set)
-inv4m_only_edges <- setdiff(inv4m_edge_set, ctrl_edge_set)
-
-cat("=== EDGE COMPARISON ===\n")
-cat("Shared edges (in both):", length(shared_edges), "\n")
-cat("CTRL-only edges (lost in Inv4m):", length(ctrl_only_edges), "\n")
-cat("Inv4m-only edges (gained):", length(inv4m_only_edges), "\n")
-cat("\nEdge loss rate:", round(100 * length(ctrl_only_edges) / length(ctrl_edge_set), 2), "%\n")
-cat("Edge gain rate:", round(100 * length(inv4m_only_edges) / length(inv4m_edge_set), 2), "%\n")
-```
-
-```{r edge_categories}
-# Categorize all edges
-all_edges <- unique(c(ctrl_edge_set, inv4m_edge_set))
-
-edge_summary <- data.frame(edge_id = all_edges) %>%
+# Compute correlations for each MaizeNetome edge
+mn_results <- mn_edges %>%
+  rowwise() %>%
   mutate(
-    in_ctrl = edge_id %in% ctrl_edge_set,
-    in_inv4m = edge_id %in% inv4m_edge_set,
-    in_maizenetome = edge_id %in% maizenetome_edges$edge_id,
-    category = case_when(
-      in_ctrl & in_inv4m ~ "Shared",
-      in_ctrl & !in_inv4m ~ "Lost",
-      !in_ctrl & in_inv4m ~ "Gained"
-    )
-  )
-
-cat("\n=== EDGE CATEGORIES BY MAIZENETOME STATUS ===\n")
-edge_summary %>%
-  group_by(category, in_maizenetome) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  pivot_wider(names_from = in_maizenetome, values_from = n, names_prefix = "MaizeNetome_") %>%
-  print()
-```
-
-## Sign Concordance Analysis
-
-Since WGCNA uses signed networks, we verify that "shared" edges have concordant
-correlation signs between CTRL and Inv4m. An edge with r = +0.8 in CTRL and
-r = -0.7 in Inv4m would be significant in both but represents a biological
-reversal, not preservation.
-
-```{r sign_concordance}
-# Join CTRL and Inv4m edges to compare correlation signs
-shared_edge_correlations <- inner_join(
- ctrl_edges %>% dplyr::select(edge_id, r_ctrl = r),
-  inv4m_edges %>% dplyr::select(edge_id, r_inv4m = r),
-  by = "edge_id"
-) %>%
-  mutate(
-    sign_ctrl = sign(r_ctrl),
-    sign_inv4m = sign(r_inv4m),
-    same_sign = sign_ctrl == sign_inv4m,
-    sign_pattern = case_when(
-      r_ctrl > 0 & r_inv4m > 0 ~ "pos → pos",
-      r_ctrl > 0 & r_inv4m < 0 ~ "pos → neg (FLIP)",
-      r_ctrl < 0 & r_inv4m > 0 ~ "neg → pos (FLIP)",
-      r_ctrl < 0 & r_inv4m < 0 ~ "neg → neg"
-    )
-  )
-
-cat("=== SIGN CONCORDANCE IN SHARED EDGES ===\n")
-cat("Total shared edges:", nrow(shared_edge_correlations), "\n\n")
-
-cat("Same sign (truly preserved):", sum(shared_edge_correlations$same_sign),
-    "(", round(100 * mean(shared_edge_correlations$same_sign), 1), "%)\n")
-cat("Opposite sign (sign flip):", sum(!shared_edge_correlations$same_sign),
-    "(", round(100 * mean(!shared_edge_correlations$same_sign), 1), "%)\n\n")
-
-cat("=== SIGN PATTERN BREAKDOWN ===\n")
-shared_edge_correlations %>%
-  count(sign_pattern) %>%
-  mutate(pct = round(100 * n / sum(n), 1)) %>%
-  arrange(desc(n)) %>%
-  print()
-
-# Store for later use
-n_truly_preserved <- sum(shared_edge_correlations$same_sign)
-n_sign_flips <- sum(!shared_edge_correlations$same_sign)
-```
-
-```{r sign_concordance_maizenetome}
-# Check sign concordance specifically for MaizeNetome edges
-shared_mn_correlations <- shared_edge_correlations %>%
-  filter(edge_id %in% maizenetome_edges$edge_id)
-
-cat("\n=== SIGN CONCORDANCE IN MAIZENETOME EDGES ===\n")
-cat("MaizeNetome edges in both networks:", nrow(shared_mn_correlations), "\n")
-cat("Same sign:", sum(shared_mn_correlations$same_sign),
-    "(", round(100 * mean(shared_mn_correlations$same_sign), 1), "%)\n")
-cat("Sign flip:", sum(!shared_mn_correlations$same_sign),
-    "(", round(100 * mean(!shared_mn_correlations$same_sign), 1), "%)\n")
-
-# Store for summary
-n_mn_truly_preserved <- sum(shared_mn_correlations$same_sign)
-n_mn_sign_flips <- sum(!shared_mn_correlations$same_sign)
-```
-
----
-
-# Network Statistics Summary
-
-```{r network_stats}
-# Compile network statistics
-network_stats <- tibble(
-  Metric = c(
-    "WGCNA genes analyzed",
-    "Possible edges",
-    "--- CTRL Network ---",
-    "CTRL total edges",
-    "CTRL Reference edges (in MaizeNetome)",
-    "CTRL Novel edges (not in MaizeNetome)",
-    "CTRL % in MaizeNetome",
-    "--- Inv4m Network ---",
-    "Inv4m total edges",
-    "Inv4m Reference edges (in MaizeNetome)",
-    "Inv4m Novel edges (not in MaizeNetome)",
-    "Inv4m % in MaizeNetome",
-    "--- Network Disruption ---",
-    "Shared edges (significant in both)",
-    "Lost edges (CTRL only)",
-    "Gained edges (Inv4m only)",
-    "Edge loss rate (%)",
-    "Edge gain rate (%)",
-    "Net edge change",
-    "--- Sign Concordance ---",
-    "Shared edges with same sign",
-    "Shared edges with sign flip",
-    "% same sign",
-    "MaizeNetome edges same sign",
-    "MaizeNetome edges sign flip"
-  ),
-  Value = c(
-    length(wgcna_genes),
-    length(wgcna_genes) * (length(wgcna_genes) - 1) / 2,
-    "",
-    nrow(ctrl_edges),
-    sum(ctrl_edges$in_maizenetome),
-    sum(!ctrl_edges$in_maizenetome),
-    round(100 * mean(ctrl_edges$in_maizenetome), 2),
-    "",
-    nrow(inv4m_edges),
-    sum(inv4m_edges$in_maizenetome),
-    sum(!inv4m_edges$in_maizenetome),
-    round(100 * mean(inv4m_edges$in_maizenetome), 2),
-    "",
-    length(shared_edges),
-    length(ctrl_only_edges),
-    length(inv4m_only_edges),
-    round(100 * length(ctrl_only_edges) / length(ctrl_edge_set), 2),
-    round(100 * length(inv4m_only_edges) / length(inv4m_edge_set), 2),
-    nrow(inv4m_edges) - nrow(ctrl_edges),
-    "",
-    n_truly_preserved,
-    n_sign_flips,
-    round(100 * n_truly_preserved / length(shared_edges), 2),
-    n_mn_truly_preserved,
-    n_mn_sign_flips
-  )
-)
-
-print(network_stats)
-
-write_csv(network_stats, file.path(paths$intermediate, "wgcna_maizenetome_validation_stats.csv"))
-```
-
----
-
-# Visualization
-
-## Euler Diagram: CTRL vs Inv4m vs MaizeNetome
-
-```{r euler_diagram, fig.width=8, fig.height=8}
-# Create sets for Euler diagram
-# Note: MaizeNetome is much larger, so we focus on overlap with our edges
-our_edges <- unique(c(ctrl_edge_set, inv4m_edge_set))
-maizenetome_relevant <- maizenetome_edges$edge_id[maizenetome_edges$edge_id %in% our_edges]
-
-euler_data <- list(
-  CTRL = ctrl_edge_set,
-  Inv4m = inv4m_edge_set
-)
-
-p_euler <- plot(
-  euler(euler_data),
-  quantities = TRUE,
-  fills = list(fill = c("#DAA520", "#551A8B"), alpha = 0.6),
-  labels = list(fontsize = 14),
-  main = "Edge Overlap: CTRL vs Inv4m Networks"
-)
-
-print(p_euler)
-
-# Save
-pdf(file.path(paths$figures, "wgcna_edge_euler.pdf"), width = 8, height = 8)
-print(p_euler)
-dev.off()
-```
-
-## Bar Plot: Edge Counts by Category
-
-```{r edge_barplot, fig.width=10, fig.height=6}
-edge_counts <- data.frame(
-  Category = c("CTRL total", "Inv4m total", "Shared", "Lost\n(CTRL only)", "Gained\n(Inv4m only)"),
-  Count = c(
-    nrow(ctrl_edges),
-    nrow(inv4m_edges),
-    length(shared_edges),
-    length(ctrl_only_edges),
-    length(inv4m_only_edges)
-  ),
-  Type = c("Network", "Network", "Comparison", "Comparison", "Comparison")
-)
-
-edge_counts$Category <- factor(edge_counts$Category, levels = edge_counts$Category)
-
-p_bar <- ggplot(edge_counts, aes(x = Category, y = Count, fill = Type)) +
-  geom_col(color = "black", width = 0.7) +
-  geom_text(aes(label = scales::comma(Count)), vjust = -0.5, size = 4) +
-  scale_fill_manual(values = c("Network" = "steelblue", "Comparison" = "coral")) +
-  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.15))) +
-  theme_minimal(base_size = 14) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(size = 12)
-  ) +
-  labs(
-    title = "WGCNA Network Edge Comparison",
-    subtitle = paste0("Genes: ", length(wgcna_genes), " | FDR threshold: 0.05"),
-    x = NULL,
-    y = "Number of Edges"
-  )
-
-print(p_bar)
-
-ggsave(
-  file.path(paths$figures, "wgcna_edge_comparison_barplot.pdf"),
-  p_bar, width = 10, height = 6
-)
-ggsave(
-  file.path(paths$figures, "wgcna_edge_comparison_barplot.png"),
-  p_bar, width = 10, height = 6, dpi = 300
-)
-```
-
-## MaizeNetome Validation: Reference vs Novel
-
-```{r maizenetome_validation_plot, fig.width=10, fig.height=6}
-validation_data <- data.frame(
-  Network = rep(c("CTRL", "Inv4m"), each = 2),
-  EdgeType = rep(c("Reference\n(in MaizeNetome)", "Novel"), 2),
-  Count = c(
-    sum(ctrl_edges$in_maizenetome),
-    sum(!ctrl_edges$in_maizenetome),
-    sum(inv4m_edges$in_maizenetome),
-    sum(!inv4m_edges$in_maizenetome)
-  )
-)
-
-p_validation <- ggplot(validation_data, aes(x = Network, y = Count, fill = EdgeType)) +
-  geom_col(position = "dodge", color = "black", width = 0.7) +
-  geom_text(
-    aes(label = scales::comma(Count)),
-    position = position_dodge(width = 0.7),
-    vjust = -0.5, size = 4
-  ) +
-  scale_fill_manual(values = c("Reference\n(in MaizeNetome)" = "#2E8B57", "Novel" = "#CD853F")) +
-  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.15))) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top") +
-  labs(
-    title = "MaizeNetome Validation of WGCNA Networks",
-    subtitle = "Reference edges confirm biology; Novel edges are experiment-specific",
-    x = NULL,
-    y = "Number of Edges",
-    fill = NULL
-  )
-
-print(p_validation)
-
-ggsave(
-  file.path(paths$figures, "wgcna_maizenetome_validation.pdf"),
-  p_validation, width = 10, height = 6
-)
-ggsave(
-  file.path(paths$figures, "wgcna_maizenetome_validation.png"),
-  p_validation, width = 10, height = 6, dpi = 300
-)
-```
-
-## Edge Loss by MaizeNetome Status
-
-```{r edge_loss_maizenetome, fig.width=10, fig.height=6}
-# Are lost edges more likely to be Reference or Novel?
-lost_edge_df <- ctrl_edges %>%
-  filter(edge_id %in% ctrl_only_edges)
-
-shared_edge_df <- ctrl_edges %>%
-  filter(edge_id %in% shared_edges)
-
-loss_by_type <- data.frame(
-  Category = c("Preserved\n(Shared)", "Preserved\n(Shared)", "Lost\n(CTRL only)", "Lost\n(CTRL only)"),
-  MaizeNetome = c("Reference", "Novel", "Reference", "Novel"),
-  Count = c(
-    sum(shared_edge_df$in_maizenetome),
-    sum(!shared_edge_df$in_maizenetome),
-    sum(lost_edge_df$in_maizenetome),
-    sum(!lost_edge_df$in_maizenetome)
-  )
-)
-
-# Add percentages within category
-loss_by_type <- loss_by_type %>%
-  group_by(Category) %>%
-  mutate(
-    Total = sum(Count),
-    Pct = round(100 * Count / Total, 1)
+    # CTRL correlation
+    r_ctrl = cor(expr_ctrl[gene1, ], expr_ctrl[gene2, ], use = "complete.obs"),
+    p_ctrl = cor_pvalue(r_ctrl, n_ctrl),
+    # Inv4m correlation
+    r_inv4m = cor(expr_inv4m[gene1, ], expr_inv4m[gene2, ], use = "complete.obs"),
+    p_inv4m = cor_pvalue(r_inv4m, n_inv4m)
   ) %>%
   ungroup()
 
-p_loss <- ggplot(loss_by_type, aes(x = Category, y = Count, fill = MaizeNetome)) +
-  geom_col(position = "fill", color = "black", width = 0.7) +
-  geom_text(
-    aes(label = paste0(Pct, "%")),
-    position = position_fill(vjust = 0.5),
-    size = 5, color = "white", fontface = "bold"
-  ) +
-  scale_fill_manual(values = c("Reference" = "#2E8B57", "Novel" = "#CD853F")) +
-  scale_y_continuous(labels = scales::percent) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top") +
-  labs(
-    title = "MaizeNetome Status of Preserved vs Lost Edges",
-    subtitle = "Are Reference edges more stable than Novel edges?",
-    x = NULL,
-    y = "Proportion of Edges",
-    fill = NULL
-  )
-
-print(p_loss)
-
-ggsave(
-  file.path(paths$figures, "wgcna_edge_loss_by_maizenetome.pdf"),
-  p_loss, width = 8, height = 6
-)
-```
-
-```{r fisher_test}
-# Fisher's exact test: Are Reference edges more likely to be preserved?
-fisher_table <- matrix(
-  c(
-    sum(shared_edge_df$in_maizenetome),    # Preserved & Reference
-    sum(!shared_edge_df$in_maizenetome),   # Preserved & Novel
-    sum(lost_edge_df$in_maizenetome),      # Lost & Reference
-    sum(!lost_edge_df$in_maizenetome)      # Lost & Novel
-  ),
-  nrow = 2,
-  dimnames = list(
-    c("Reference", "Novel"),
-    c("Preserved", "Lost")
-  )
-)
-
-cat("\n=== CONTINGENCY TABLE ===\n")
-print(fisher_table)
-
-fisher_result <- fisher.test(fisher_table)
-cat("\n=== FISHER'S EXACT TEST ===\n")
-cat("Are Reference edges more likely to be preserved?\n")
-cat("Odds ratio:", round(fisher_result$estimate, 3), "\n")
-cat("P-value:", signif(fisher_result$p.value, 3), "\n")
-cat("95% CI:", round(fisher_result$conf.int[1], 3), "-", round(fisher_result$conf.int[2], 3), "\n")
-```
-
----
-
-# Module-Level Edge Analysis
-
-```{r module_edge_analysis}
-# Add module information to edges
-ctrl_modules_lookup <- ctrl_modules %>%
-  filter(module != 0) %>%
-  dplyr::select(gene, module, color)
-
-# For each edge, get modules of both genes
-ctrl_edges_with_modules <- ctrl_edges %>%
-  left_join(ctrl_modules_lookup, by = c("gene1" = "gene")) %>%
-  dplyr::rename(module1 = module, color1 = color) %>%
-  left_join(ctrl_modules_lookup, by = c("gene2" = "gene")) %>%
-  dplyr::rename(module2 = module, color2 = color) %>%
+# FDR correction (across all tested edges)
+mn_results <- mn_results %>%
   mutate(
-    same_module = module1 == module2,
-    edge_type = ifelse(same_module, "Within-module", "Between-module"),
-    is_lost = edge_id %in% ctrl_only_edges
+    fdr_ctrl = p.adjust(p_ctrl, method = "fdr"),
+    fdr_inv4m = p.adjust(p_inv4m, method = "fdr"),
+    sig_ctrl = fdr_ctrl < 0.05,
+    sig_inv4m = fdr_inv4m < 0.05
   )
-
-cat("=== EDGE TYPES ===\n")
-print(table(ctrl_edges_with_modules$edge_type))
-
-cat("\n=== EDGE LOSS BY TYPE ===\n")
-ctrl_edges_with_modules %>%
-  group_by(edge_type) %>%
-  summarise(
-    Total = n(),
-    Lost = sum(is_lost),
-    Preserved = sum(!is_lost),
-    Loss_Rate = round(100 * Lost / Total, 2)
-  ) %>%
-  print()
 ```
 
-```{r module_edge_plot, fig.width=10, fig.height=6}
-module_loss <- ctrl_edges_with_modules %>%
-  filter(same_module) %>%
-  group_by(color1) %>%
-  summarise(
-    Total_Edges = n(),
-    Lost = sum(is_lost),
-    Preserved = sum(!is_lost),
-    Loss_Rate = 100 * Lost / Total_Edges,
-    .groups = "drop"
-  ) %>%
-  arrange(desc(Loss_Rate)) %>%
-  dplyr::rename(Module = color1)
+***
 
-# Only plot modules with at least 10 edges
-module_loss_plot <- module_loss %>%
-  filter(Total_Edges >= 10)
+# Edge-Level Results
 
-if (nrow(module_loss_plot) > 0) {
-  p_module_loss <- ggplot(
-    module_loss_plot,
-    aes(x = reorder(Module, -Loss_Rate), y = Loss_Rate, fill = Module)
-  ) +
-    geom_col(color = "black") +
-    geom_text(aes(label = paste0(round(Loss_Rate, 1), "%")), vjust = -0.5, size = 3) +
-    scale_fill_identity() +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
-    theme_minimal(base_size = 14) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(
-      title = "Within-Module Edge Loss Rate by Module",
-      subtitle = "Modules with >= 10 within-module edges",
-      x = "Module",
-      y = "Edge Loss Rate (%)"
-    )
-
-  print(p_module_loss)
-
-  ggsave(
-    file.path(paths$figures, "wgcna_module_edge_loss.pdf"),
-    p_module_loss, width = 12, height = 6
-  )
-}
-
-write_csv(module_loss, file.path(paths$intermediate, "wgcna_module_edge_loss.csv"))
-```
-
----
-
-# Vertex-Level MaizeNetome Analysis
-
-This section analyzes network disruption from the perspective of individual genes
-(vertices) rather than edges. We ask: how many MaizeNetome connections does each
-gene have, and how many are preserved in Inv4m?
-
-## MaizeNetome Edges Among WGCNA Genes
-
-```{r maizenetome_wgcna_edges}
-# Filter MaizeNetome to edges where BOTH genes are in WGCNA gene set
-mn_wgcna_edges <- MaizeNetome_v5 %>%
-  filter(Element.ID.v5 %in% wgcna_genes & Direct.Connection.v5 %in% wgcna_genes) %>%
-  rowwise() %>%
+```{r edge_results}
+# Classify edge fate
+mn_results <- mn_results %>%
   mutate(
-    g1 = min(Element.ID.v5, Direct.Connection.v5),
-    g2 = max(Element.ID.v5, Direct.Connection.v5),
-    edge_id = paste(g1, g2, sep = "_")
-  ) %>%
-  ungroup() %>%
-  distinct(edge_id, g1, g2)
-
-cat("=== MAIZENETOME EDGES AMONG WGCNA GENES ===\n")
-cat("WGCNA genes:", length(wgcna_genes), "\n")
-cat("MaizeNetome edges between WGCNA genes:", nrow(mn_wgcna_edges), "\n")
-```
-
-## MaizeNetome Edge Detection and Fate
-
-```{r maizenetome_edge_fate}
-# Annotate MaizeNetome edges with detection status
-mn_wgcna_edges <- mn_wgcna_edges %>%
-  mutate(
-    in_ctrl = edge_id %in% ctrl_edges$edge_id,
-    in_inv4m = edge_id %in% inv4m_edges$edge_id,
     status = case_when(
-      in_ctrl & in_inv4m ~ "preserved",
-      in_ctrl & !in_inv4m ~ "lost",
-      !in_ctrl & in_inv4m ~ "gained",
+      sig_ctrl & sig_inv4m ~ "preserved",
+      sig_ctrl & !sig_inv4m ~ "lost",
+      !sig_ctrl & sig_inv4m ~ "gained",
       TRUE ~ "not_detected"
     )
   )
 
-cat("\n=== MAIZENETOME EDGE DETECTION ===\n")
-cat("MaizeNetome edges (between WGCNA genes):", nrow(mn_wgcna_edges), "\n")
-cat("Detected in CTRL:", sum(mn_wgcna_edges$in_ctrl),
-    "(", round(100 * mean(mn_wgcna_edges$in_ctrl), 1), "%)\n")
-cat("Detected in Inv4m:", sum(mn_wgcna_edges$in_inv4m),
-    "(", round(100 * mean(mn_wgcna_edges$in_inv4m), 1), "%)\n")
-
-cat("\n=== MAIZENETOME EDGE FATE ===\n")
-mn_wgcna_edges %>%
+edge_summary <- mn_results %>%
   count(status) %>%
-  mutate(pct = round(100 * n / sum(n), 1)) %>%
-  arrange(desc(n)) %>%
-  print()
+  mutate(pct = round(100 * n / sum(n), 1))
 
-# Store for summary
-n_mn_wgcna_edges <- nrow(mn_wgcna_edges)
-n_mn_detected_ctrl <- sum(mn_wgcna_edges$in_ctrl)
-n_mn_preserved <- sum(mn_wgcna_edges$status == "preserved")
-n_mn_lost <- sum(mn_wgcna_edges$status == "lost")
+cat("=== MAIZENETOME EDGE FATE ===\n")
+knitr::kable(edge_summary, format = "simple")
+
+# Key statistics
+n_reference <- nrow(mn_results)
+n_detected_ctrl <- sum(mn_results$sig_ctrl)
+n_preserved <- sum(mn_results$status == "preserved")
+n_lost <- sum(mn_results$status == "lost")
+
+cat("\n=== KEY STATISTICS ===\n")
+cat("MaizeNetome reference edges:", n_reference, "\n")
+cat("Detected in CTRL (FDR < 0.05):", n_detected_ctrl,
+    "(", round(100 * n_detected_ctrl / n_reference, 1), "%)\n")
+cat("Lost in Inv4m:", n_lost, "/", n_detected_ctrl,
+    "(", round(100 * n_lost / n_detected_ctrl, 1), "%)\n")
+cat("Preserved in Inv4m:", n_preserved, "/", n_detected_ctrl,
+    "(", round(100 * n_preserved / n_detected_ctrl, 1), "%)\n")
 ```
 
-## Vertex-Level Statistics
+***
 
-```{r vertex_stats}
-# Load gene labels for annotation
-labels <- read_csv(
-  file.path(paths$data, "locus_labels_master.csv"),
-  show_col_types = FALSE
-) %>%
-  dplyr::select(gene, locus_label)
+# Vertex-Level Results
 
-# For each gene, count MaizeNetome edges by status
+How many genes lose all their MaizeNetome connections in Inv4m?
+
+```{r vertex_results}
+# Count edges per gene by status
 vertex_stats <- bind_rows(
-  mn_wgcna_edges %>% dplyr::select(gene = g1, status),
-  mn_wgcna_edges %>% dplyr::select(gene = g2, status)
+  mn_results %>% filter(sig_ctrl) %>% dplyr::select(gene = gene1, status),
+  mn_results %>% filter(sig_ctrl) %>% dplyr::select(gene = gene2, status)
 ) %>%
   count(gene, status) %>%
   pivot_wider(names_from = status, values_from = n, values_fill = 0)
 
-# Ensure all columns exist
-for (col in c("preserved", "lost", "gained", "not_detected")) {
-  if (!col %in% names(vertex_stats)) {
-    vertex_stats[[col]] <- 0
-  }
+# Ensure columns exist
+for (col in c("preserved", "lost")) {
+  if (!col %in% names(vertex_stats)) vertex_stats[[col]] <- 0
 }
 
-# Add totals and metadata
 vertex_stats <- vertex_stats %>%
   mutate(
-    mn_total = preserved + lost + gained + not_detected,
-    mn_detected_ctrl = preserved + lost,
-    mn_detected_inv4m = preserved + gained,
-    pct_lost = ifelse(mn_detected_ctrl > 0, round(100 * lost / mn_detected_ctrl, 1), NA)
-  ) %>%
-  left_join(labels, by = "gene") %>%
-  left_join(ctrl_modules %>% dplyr::select(gene, module, color), by = "gene") %>%
-  arrange(desc(lost))
+    total_ctrl = preserved + lost,
+    pct_lost = round(100 * lost / total_ctrl, 1)
+  )
 
-cat("=== VERTEX-LEVEL SUMMARY ===\n")
-cat("Genes with MaizeNetome edges:", nrow(vertex_stats), "\n")
-cat("Genes with edges detected in CTRL:", sum(vertex_stats$mn_detected_ctrl > 0), "\n")
-```
-
-## Genes Losing All MaizeNetome Connections
-
-```{r total_loss_genes}
-# Genes that lose ALL their MaizeNetome connections in Inv4m
+# Genes with complete loss
 total_loss_genes <- vertex_stats %>%
-  filter(mn_detected_ctrl > 0, preserved == 0)
+  filter(total_ctrl > 0, preserved == 0)
 
-cat("\n=== GENES LOSING ALL MAIZENETOME CONNECTIONS ===\n")
-cat("Genes with CTRL edges but 0 preserved in Inv4m:", nrow(total_loss_genes),
-    "(", round(100 * nrow(total_loss_genes) / sum(vertex_stats$mn_detected_ctrl > 0), 1), "%)\n\n")
-
-cat("Top 15 genes by number of lost edges:\n")
-total_loss_genes %>%
-  dplyr::select(gene, locus_label, color, mn_detected_ctrl, lost, preserved) %>%
-  head(15) %>%
-  print()
-
-# Store for summary
+n_genes_with_edges <- sum(vertex_stats$total_ctrl > 0)
 n_genes_total_loss <- nrow(total_loss_genes)
-n_genes_with_mn_ctrl <- sum(vertex_stats$mn_detected_ctrl > 0)
+
+cat("=== VERTEX-LEVEL DISRUPTION ===\n")
+cat("Genes with MaizeNetome edges in CTRL:", n_genes_with_edges, "\n")
+cat("Genes losing ALL connections:", n_genes_total_loss,
+    "(", round(100 * n_genes_total_loss / n_genes_with_edges, 1), "%)\n")
 ```
 
-## Top Genes by Absolute Edge Loss
+***
 
-```{r top_edge_loss}
-cat("\n=== TOP 20 GENES BY ABSOLUTE EDGE LOSS ===\n")
-vertex_stats %>%
-  filter(mn_detected_ctrl > 0) %>%
-  dplyr::select(gene, locus_label, color, mn_detected_ctrl, lost, preserved, pct_lost) %>%
-  arrange(desc(lost)) %>%
-  head(20) %>%
-  print()
+# Visualization
+
+```{r figure_edge_fate, fig.width=8, fig.height=5}
+# Edge fate summary
+edge_plot_data <- data.frame(
+  Status = c("Detected in CTRL", "Preserved", "Lost"),
+  Count = c(n_detected_ctrl, n_preserved, n_lost),
+  Type = c("Detection", "Fate", "Fate")
+)
+edge_plot_data$Status <- factor(edge_plot_data$Status, levels = edge_plot_data$Status)
+
+p_edges <- ggplot(edge_plot_data, aes(x = Status, y = Count, fill = Type)) +
+  geom_col(color = "black", width = 0.6) +
+  geom_text(aes(label = Count), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("Detection" = "steelblue", "Fate" = "coral")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none") +
+  labs(
+    title = "MaizeNetome Reference Edge Disruption by Inv4m",
+    subtitle = sprintf(
+      "%d reference edges tested | %d%% of detected edges lost in Inv4m",
+      n_reference, round(100 * n_lost / n_detected_ctrl)
+    ),
+    x = NULL,
+    y = "Number of MaizeNetome Edges"
+  )
+
+print(p_edges)
+
+ggsave(
+  file.path(paths$figures, "maizenetome_edge_disruption.pdf"),
+  p_edges, width = 8, height = 5
+)
 ```
 
-## Module-Level MaizeNetome Summary
-
-```{r module_mn_summary}
-cat("\n=== MAIZENETOME EDGE LOSS BY MODULE ===\n")
-module_mn_summary <- vertex_stats %>%
-  filter(mn_detected_ctrl > 0) %>%
-  group_by(color) %>%
-  summarise(
-    genes = n(),
-    total_mn_edges_ctrl = sum(mn_detected_ctrl),
-    total_lost = sum(lost),
-    total_preserved = sum(preserved),
-    genes_total_loss = sum(preserved == 0),
-    .groups = "drop"
-  ) %>%
-  mutate(pct_lost = round(100 * total_lost / total_mn_edges_ctrl, 1)) %>%
-  arrange(desc(pct_lost))
-
-print(module_mn_summary)
-
-write_csv(module_mn_summary, file.path(paths$intermediate, "wgcna_module_maizenetome_summary.csv"))
-```
-
-## Vertex Statistics Visualization
-
-```{r vertex_loss_plot, fig.width=12, fig.height=6}
-# Plot genes with highest edge loss
-top_loss_genes <- vertex_stats %>%
-  filter(mn_detected_ctrl >= 5) %>%
-  arrange(desc(lost)) %>%
-  head(20) %>%
+```{r figure_vertex_loss, fig.width=8, fig.height=5}
+# Vertex loss distribution
+vertex_plot_data <- vertex_stats %>%
+  filter(total_ctrl > 0) %>%
   mutate(
-    label = ifelse(is.na(locus_label), gene, locus_label),
-    label = factor(label, levels = rev(label))
-  )
-
-if (nrow(top_loss_genes) > 0) {
-  p_vertex_loss <- ggplot(top_loss_genes, aes(x = label)) +
-    geom_col(aes(y = mn_detected_ctrl, fill = "Lost"), width = 0.7) +
-    geom_col(aes(y = preserved, fill = "Preserved"), width = 0.7) +
-    coord_flip() +
-    scale_fill_manual(
-      values = c("Lost" = "#E74C3C", "Preserved" = "#27AE60"),
-      name = "Edge Status"
-    ) +
-    theme_minimal(base_size = 14) +
-    labs(
-      title = "Top Genes by MaizeNetome Edge Loss",
-      subtitle = "Genes with >= 5 MaizeNetome edges detected in CTRL",
-      x = NULL,
-      y = "Number of MaizeNetome Edges"
-    )
-
-  print(p_vertex_loss)
-
-  ggsave(
-    file.path(paths$figures, "wgcna_vertex_maizenetome_loss.pdf"),
-    p_vertex_loss, width = 12, height = 8
-  )
-  ggsave(
-    file.path(paths$figures, "wgcna_vertex_maizenetome_loss.png"),
-    p_vertex_loss, width = 12, height = 8, dpi = 300
-  )
-}
-
-# Save vertex stats
-write_csv(vertex_stats, file.path(paths$intermediate, "wgcna_vertex_maizenetome_stats.csv"))
-```
-
----
-
-# Export Edge Lists
-
-```{r export_edges}
-# Export CTRL edges with annotations
-ctrl_edges_export <- ctrl_edges_with_modules %>%
-  dplyr::select(
-    gene1, gene2, edge_id, r, p_adj,
-    in_maizenetome, module1, module2, same_module, is_lost
-  )
-
-write_csv(ctrl_edges_export, file.path(paths$intermediate, "wgcna_ctrl_edges.csv"))
-
-# Export Inv4m edges
-inv4m_edges_export <- inv4m_edges %>%
-  dplyr::select(gene1, gene2, edge_id, r, p_adj, in_maizenetome)
-
-write_csv(inv4m_edges_export, file.path(paths$intermediate, "wgcna_inv4m_edges.csv"))
-
-# Export edge comparison summary with sign concordance
-edge_comparison <- data.frame(
-  edge_id = unique(c(ctrl_edge_set, inv4m_edge_set))
-) %>%
-  mutate(
-    in_ctrl = edge_id %in% ctrl_edge_set,
-    in_inv4m = edge_id %in% inv4m_edge_set,
-    in_maizenetome = edge_id %in% maizenetome_edges$edge_id,
-    status = case_when(
-      in_ctrl & in_inv4m ~ "Shared",
-      in_ctrl & !in_inv4m ~ "Lost",
-      !in_ctrl & in_inv4m ~ "Gained"
+    loss_category = case_when(
+      pct_lost == 0 ~ "0% (fully preserved)",
+      pct_lost == 100 ~ "100% (complete loss)",
+      TRUE ~ "Partial loss"
     )
   ) %>%
-  left_join(
-    shared_edge_correlations %>%
-      dplyr::select(edge_id, r_ctrl, r_inv4m, same_sign, sign_pattern),
-    by = "edge_id"
+  count(loss_category)
+
+p_vertex <- ggplot(vertex_plot_data, aes(x = loss_category, y = n, fill = loss_category)) +
+  geom_col(color = "black", width = 0.6) +
+  geom_text(aes(label = n), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c(
+    "0% (fully preserved)" = "#27AE60",
+    "Partial loss" = "#F39C12",
+    "100% (complete loss)" = "#E74C3C"
+  )) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none") +
+  labs(
+    title = "MaizeNetome Connection Loss per Gene",
+    subtitle = sprintf(
+      "%d genes with reference edges | %d%% lose all connections",
+      n_genes_with_edges, round(100 * n_genes_total_loss / n_genes_with_edges)
+    ),
+    x = "Edge Loss Category",
+    y = "Number of Genes"
   )
 
-write_csv(edge_comparison, file.path(paths$intermediate, "wgcna_edge_comparison.csv"))
+print(p_vertex)
 
-cat("=== EXPORTED FILES ===\n")
-cat("wgcna_ctrl_edges.csv:", nrow(ctrl_edges_export), "edges\n")
-cat("wgcna_inv4m_edges.csv:", nrow(inv4m_edges_export), "edges\n")
-cat("wgcna_edge_comparison.csv:", nrow(edge_comparison), "unique edges\n")
-cat("wgcna_maizenetome_validation_stats.csv: summary statistics\n")
-cat("wgcna_module_edge_loss.csv: module-level edge loss\n")
-cat("wgcna_vertex_maizenetome_stats.csv: vertex-level MaizeNetome stats\n")
-cat("wgcna_module_maizenetome_summary.csv: module-level MaizeNetome summary\n")
+ggsave(
+  file.path(paths$figures, "maizenetome_vertex_disruption.pdf"),
+  p_vertex, width = 8, height = 5
+)
 ```
 
----
+***
+
+# Export Results
+
+```{r export}
+# Summary statistics
+summary_stats <- tibble(
+  Metric = c(
+    "WGCNA genes analyzed",
+    "MaizeNetome reference edges (among WGCNA genes)",
+    "Reference edges detected in CTRL (FDR < 0.05)",
+    "Detection rate (%)",
+    "Edges preserved in Inv4m",
+    "Edges lost in Inv4m",
+    "Edge loss rate (% of detected)",
+    "Genes with reference edges in CTRL",
+    "Genes losing all reference connections",
+    "Complete loss rate (%)"
+  ),
+  Value = c(
+    length(wgcna_genes),
+    n_reference,
+    n_detected_ctrl,
+    round(100 * n_detected_ctrl / n_reference, 1),
+    n_preserved,
+    n_lost,
+    round(100 * n_lost / n_detected_ctrl, 1),
+    n_genes_with_edges,
+    n_genes_total_loss,
+    round(100 * n_genes_total_loss / n_genes_with_edges, 1)
+  )
+)
+
+knitr::kable(summary_stats, format = "simple")
+
+write_csv(summary_stats, file.path(paths$intermediate, "maizenetome_disruption_summary.csv"))
+write_csv(mn_results, file.path(paths$intermediate, "maizenetome_edge_results.csv"))
+write_csv(vertex_stats, file.path(paths$intermediate, "maizenetome_vertex_results.csv"))
+```
+
+***
 
 # Summary
 
-```{r summary}
-cat("\n")
-cat("=" %>% rep(60) %>% paste(collapse = ""), "\n")
-cat("WGCNA NETWORK VALIDATION SUMMARY\n")
-cat("=" %>% rep(60) %>% paste(collapse = ""), "\n\n")
+```{r summary, comment=""}
+cat("============================================================\n")
+cat("MAIZENETOME REFERENCE NETWORK DISRUPTION\n")
+cat("============================================================\n\n")
 
-cat("NETWORK CONSTRUCTION\n")
-cat("  Genes:", length(wgcna_genes), "\n")
-cat("  Method: Pearson correlation, FDR < 0.05\n")
-cat("  (Same parameters as trans-network analysis)\n\n")
+cat("QUESTION: Does Inv4m disrupt established coexpression networks?\n\n")
 
-cat("CTRL NETWORK\n")
-cat("  Total edges:", scales::comma(nrow(ctrl_edges)), "\n")
-cat("  Reference (MaizeNetome):", scales::comma(sum(ctrl_edges$in_maizenetome)),
-    "(", round(100 * mean(ctrl_edges$in_maizenetome), 1), "%)\n")
-cat("  Novel:", scales::comma(sum(!ctrl_edges$in_maizenetome)), "\n\n")
+cat("EDGE-LEVEL ANALYSIS\n")
+cat(sprintf("  Reference edges tested: %d\n", n_reference))
+cat(sprintf("  Detected in CTRL: %d (%.1f%% detection rate)\n",
+    n_detected_ctrl, 100 * n_detected_ctrl / n_reference))
+cat(sprintf("  Lost in Inv4m: %d (%.1f%% of detected)\n",
+    n_lost, 100 * n_lost / n_detected_ctrl))
+cat(sprintf("  Preserved in Inv4m: %d\n\n", n_preserved))
 
-cat("INV4M NETWORK\n")
-cat("  Total edges:", scales::comma(nrow(inv4m_edges)), "\n")
-cat("  Reference (MaizeNetome):", scales::comma(sum(inv4m_edges$in_maizenetome)),
-    "(", round(100 * mean(inv4m_edges$in_maizenetome), 1), "%)\n")
-cat("  Novel:", scales::comma(sum(!inv4m_edges$in_maizenetome)), "\n\n")
+cat("VERTEX-LEVEL ANALYSIS\n")
+cat(sprintf("  Genes with reference edges: %d\n", n_genes_with_edges))
+cat(sprintf("  Genes losing ALL connections: %d (%.1f%%)\n\n",
+    n_genes_total_loss, 100 * n_genes_total_loss / n_genes_with_edges))
 
-cat("NETWORK DISRUPTION\n")
-cat("  Shared edges:", scales::comma(length(shared_edges)), "\n")
-cat("  Lost edges:", scales::comma(length(ctrl_only_edges)),
-    "(", round(100 * length(ctrl_only_edges) / nrow(ctrl_edges), 1), "% of CTRL)\n")
-cat("  Gained edges:", scales::comma(length(inv4m_only_edges)), "\n\n")
-
-cat("SIGN CONCORDANCE (signed network validation)\n")
-cat("  Shared edges with same sign:", scales::comma(n_truly_preserved),
-    "(", round(100 * n_truly_preserved / length(shared_edges), 1), "%)\n")
-cat("  Shared edges with sign flip:", scales::comma(n_sign_flips),
-    "(", round(100 * n_sign_flips / length(shared_edges), 1), "%)\n")
-cat("  MaizeNetome edges - same sign:", n_mn_truly_preserved, "/", nrow(shared_mn_correlations),
-    "(", round(100 * n_mn_truly_preserved / nrow(shared_mn_correlations), 1), "%)\n\n")
-
-if (fisher_result$p.value < 0.05) {
-  cat("MAIZENETOME VALIDATION\n")
-  cat("  Reference edges are", ifelse(fisher_result$estimate > 1, "MORE", "LESS"),
-      "likely to be preserved\n")
-  cat("  Odds ratio:", round(fisher_result$estimate, 2),
-      "(p =", signif(fisher_result$p.value, 3), ")\n\n")
-}
-
-cat("VERTEX-LEVEL MAIZENETOME ANALYSIS\n")
-cat("  MaizeNetome edges among WGCNA genes:", scales::comma(n_mn_wgcna_edges), "\n")
-cat("  Detected in CTRL:", scales::comma(n_mn_detected_ctrl),
-    "(", round(100 * n_mn_detected_ctrl / n_mn_wgcna_edges, 1), "%)\n")
-cat("  Preserved (in both):", scales::comma(n_mn_preserved),
-    "(", round(100 * n_mn_preserved / n_mn_wgcna_edges, 1), "%)\n")
-cat("  Lost (CTRL only):", scales::comma(n_mn_lost),
-    "(", round(100 * n_mn_lost / n_mn_wgcna_edges, 1), "%)\n")
-cat("  Genes losing ALL MaizeNetome connections:", n_genes_total_loss,
-    "/", n_genes_with_mn_ctrl,
-    "(", round(100 * n_genes_total_loss / n_genes_with_mn_ctrl, 1), "%)\n")
-
-cat("\n")
-cat("=" %>% rep(60) %>% paste(collapse = ""), "\n")
+cat("CONCLUSION: Inv4m introgression causes substantial disruption of\n")
+cat("MaizeNetome reference coexpression relationships.\n")
+cat("============================================================\n")
 ```
 
----
+***
 
 # Session Information
 
