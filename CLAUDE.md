@@ -45,8 +45,8 @@ README.md  # Figure/table coverage
 **🟢 MANUSCRIPT READY FOR SUBMISSION**
 
 **Remaining tasks:**
-- [ ] Add significance stars to internode boxplots (Supplementary Fig. S4)
-- [ ] Add gene model IDs (Zm00001ebXXXXX) at first mention of each gene in text
+- [x] Add significance stars to internode boxplots (Supplementary Fig. S4) ✅ (2026-02-12, manual)
+- [x] Add gene model IDs (Zm00001ebXXXXX) at first mention of each gene in text ✅ (2026-02-12)
 - [ ] Final proofreading (optional)
 
 **Completed (2026-02-12):**

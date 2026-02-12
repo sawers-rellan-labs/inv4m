@@ -162,7 +162,7 @@ phosphorus-efficient TVs are common
 \cite{paz-pellat2018,galvan-tejada2014,bayuelo-jimenez2011,bayuelo-jimenez2014}. 
 \invfour may contribute to adaptation in the highlands by carrying alleles that 
 enhance the phosphorus starvation response (PSR). For example, the phosphate 
-transporter gene \textit{ZmPho1;2a}, located within \invfour, is a strong 
+transporter gene \textit{ZmPho1;2a} (\textit{phos2}, \textit{Zm00001eb191650}), located within \invfour, is a strong 
 candidate for adaptation to low phosphorus availability 
 \cite{salazar-vidal2016-rl}.
 
@@ -426,7 +426,7 @@ than increased phytomer number.
 \textbf{(A)} Leaf sampling strategy. Four developmental leaf stages (1 to 4) were sampled across four replicates for both \invfour and CTRL genotypes. 
 \textbf{(B)} Multidimensional Scaling Analysis of the leaf transcriptome. Samples are colored by genotype (CTRL: yellow; \invfour: purple) and shaped by leaf stage, showing clear separation along dimension 3. 
 \textbf{(C)} Volcano plot of \invfour-associated DEGs. Labeled genes highlight significant perturbations, including the downregulation of multiple JUMONJI methyltransferases within the inversion. 
-\textbf{(D)} Global Manhattan plot showing Differentially Expressed Genes (DEGs) associated with leaf stage across the ten maize chromosomes. The floral integrator \textit{zmm4} is a highly significant DEG. 
+\textbf{(D)} Global Manhattan plot showing Differentially Expressed Genes (DEGs) associated with leaf stage across the ten maize chromosomes. The floral integrator \textit{zmm4} (\textit{Zm00001eb057540}) is a highly significant DEG. 
 \textbf{(E)} Global Manhattan plot for DEGs associated with the \invfour genotype effect. A prominent peak of differential expression is localized to the introgressed region on chromosome 4, containing the \jmjii, \jmjvi, and \jmjix cluster. 
 \textbf{(G)} Haplotype map of the introgressed region on chromosome 4 for representative NIL lines. The blue triangle indicates the tagging SNP PZE04175660223 used for selection. 
 \textbf{(H)} Zoome into the 150-200 Mb region of chromosome 4, showing  the effect of \invfour introgression in gene expression. 
@@ -542,7 +542,7 @@ The spatial distribution of differentially expressed genes (DEGs) revealed a str
 
 To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}). DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$). This enrichment was even stronger among high-confidence DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 high-confidence DEGs in the shared introgression represented a 141-fold enrichment over genomic background. Notably, there was no significant difference in DEG density between \invfour proper and the flanking regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment.
 
-The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I). These genes showed the strongest downregulation in \invfour plants, with \jmjii exhibiting a $\log_2 \text{FC} = -3.49$ ($\textit{FDR} < 10^{-20}$; Supplementary Table~\ref{tab:gene_effects}).
+The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I). The NAM v5 annotation consolidates \jmjii, \jmjvi, and \jmjix as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}). These genes showed the strongest downregulation in \invfour plants, with \jmjii exhibiting a $\log_2 \text{FC} = -3.49$ ($\textit{FDR} < 10^{-20}$; Supplementary Table~\ref{tab:gene_effects}).
 
 
 
@@ -789,18 +789,18 @@ The greenyellow module, with the highest bootstrap support (LFP $= 0.80$),
 showed enrichment for developmental cell growth ($p = 8.5 \times 10^{-4}$),
 cell tip growth ($p = 6.0 \times 10^{-4}$), and regulation of DNA replication
 ($p = 0.019$). This module contains two genes with independent functional
-support: \textit{sec6} ($\log_2 \text{FC} = +2.87$), encoding an exocyst complex
+support: \textit{sec6} (\textit{Zm00001eb194380}; $\log_2 \text{FC} = +2.87$), encoding an exocyst complex
 component associated with plant height in GWAS \cite{peiffer2014}, and
-\textit{pcna2} ($\log_2 \text{FC} = +2.99$), encoding proliferating cell nuclear
+\textit{pcna2} (\textit{Zm00001eb192050}; $\log_2 \text{FC} = +2.99$), encoding proliferating cell nuclear
 antigen 2, a DNA replication factor and marker of cell proliferation
-(Table~\ref{tab::greenyellow_module}). The module also includes \textit{ropgef14}
+(Table~\ref{tab::greenyellow_module}). The module also includes \textit{ropgef14} (\textit{Zm00001eb188240})
 ($\log_2 \text{FC} = -2.98$), a Rho GTPase activator required for polarized cell
 growth. The co-expression of these functionally distinct genes--exocytosis,
 DNA replication, and cell polarity--in a highly stable module suggests
 coordinated regulation of cell division and growth in the B73 background.
 
 The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height
-GWAS candidate \textit{phi1}/\textit{exo} ($\log_2 \text{FC} = -2.39$;
+GWAS candidate \textit{phi1}/\textit{exo} (\textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$;
 Table~\ref{tab:FT_PH_candidates}), showed enrichment for brassinosteroid
 signaling regulation ($p = 0.022$) and negative regulation of chromatin
 silencing ($p = 0.016$), suggesting an indirect link to growth through
@@ -886,7 +886,7 @@ distributed across all ten maize chromosomes. We classified edges as
 The Reference network included known regulatory relationships involving
 \textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC =
 +2.99$), a DNA replication factor, and \textit{outer cell layer2}
-(\textit{ocl2}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor
+(\textit{ocl2}, \textit{Zm00001eb428740}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor
 involved in epidermal cell differentiation. Notably, the Reference network
 also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets,
 supporting a conserved regulatory role for this histone demethylase.
@@ -1886,8 +1886,8 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 \caption{\textbf{Internode length analysis in \invfour and control plants.}
 \textbf{(A)} Plant height comparison between CTRL and \invfour in the MI21 background (CLY2025 field experiment). Boxplots show plant height (cm) with individual data points. P-value from linear mixed model.
 \textbf{(B)} Representative dissected plant showing whole plant architecture including root system and stem with visible node demarcations.
-\textbf{(C)} Detail of tassel and upper stem region. Scale bar in cm.
-\textbf{(D)} Internode length profiles by position from top. Boxplots show internode length (cm) at each position for CTRL (gold, $n = 112$ plants) and \invfour (purple, $n = 116$ plants). Asterisk indicates internode 2, which shows the largest difference ($-4.12$ cm, $-18.5\%$; FDR $= 3.7 \times 10^{-18}$) and accounts for 93\% of the total height difference (Table~\ref{tab::internode_effects}). \textit{Inset}: Schematic illustration of maize plant architecture indicating internode numbering scheme from the tassel-bearing node (position 1) downward.}
+\textbf{(C)} Detail of tassel and upper stem region. Scale bar = 10 cm.
+\textbf{(D)} Internode length profiles by position from top. Scale bar = 10 cm. Boxplots show internode length (cm) at each position for CTRL (gold, $n = 112$ plants) and \invfour (purple, $n = 116$ plants). Asterisks indicate positions with significant differences (FDR $< 0.05$). Internode 2 shows the largest difference ($-4.12$ cm, $-18.5\%$; FDR $= 3.7 \times 10^{-18}$) and accounts for 93\% of the total height difference (Table~\ref{tab::internode_effects}). \textit{Inset}: Schematic illustration of maize plant architecture indicating internode numbering scheme from the tassel-bearing node (position 1) downward.}
 \label{fig::internode}
 \end{figure*}
 
