@@ -1375,7 +1375,15 @@ principal component of each module's expression matrix.
 
 Network perturbation was quantified by comparing intramodular connectivity
 ($k_{Within}$) between CTRL and \invfour networks for genes assigned to CTRL
-consensus modules. Connectivity change was calculated as $\Delta k_{Within} =
+consensus modules. Intramodular connectivity was calculated as the mean consensus
+adjacency of each gene to other genes within its module:
+\begin{equation}
+k_{Within}(i) = \frac{1}{|M_i| - 1} \sum_{j \in M_i, j \neq i} A_{ij}
+\end{equation}
+where $M_i$ is the set of genes in the same module as gene $i$. This metric
+quantifies how consistently a gene co-clusters with its module partners across
+bootstrap iterations, rather than raw correlation strength or topological overlap.
+Connectivity change was calculated as $\Delta k_{Within} =
 k_{Within}^{Inv4m} - k_{Within}^{CTRL}$, where negative values indicate connectivity
 loss in \invfour. Hub genes were identified as the top 5 genes per module ranked by
 $k_{Within}$ in the CTRL network.
