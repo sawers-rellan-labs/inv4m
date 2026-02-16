@@ -536,7 +536,7 @@ Flanking vs Outside &
 
 \subsection*{Leaf developmental stage drives global transcriptional changes while \invfour effects are predominantly local}
 
-To characterize the transcriptional landscape of \invfour introgression, we performed RNA-seq on leaves sampled across a developmental gradient from field-grown NILs. Multidimensional scaling (MDS) of gene expression revealed three major axes of variation (Fig~\ref{fig:transcriptome}A-B). The first two dimensions captured 38\% of total variance, corresponding to phosphorus treatment (26\%) and leaf developmental stage (12\%), as described in detail in our companion study \citep{rodriguez2026phosphorus}. The third dimension explained 8\% of variance and strongly correlated with genotype ($r = 0.92$, $\textit{FDR} = 2.06 \times 10^{-17}$), clearly separating \invfour from CTRL samples.
+To characterize the transcriptional landscape of \invfour introgression, we performed RNA-seq on leaves sampled across a developmental gradient from field-grown NILs. Multidimensional scaling (MDS) of gene expression revealed three major axes of variation (Fig~\ref{fig:transcriptome}A-B). The first two dimensions captured 38\% of total variance, corresponding to phosphorus treatment (26\%) and leaf developmental stage (12\%), as described in detail in our companion study~\cite{rodriguez2026phosphorus}. The third dimension explained 8\% of variance and strongly correlated with genotype ($r = 0.92$, $\textit{FDR} = 2.06 \times 10^{-17}$), clearly separating \invfour from CTRL samples.
 
 The spatial distribution of differentially expressed genes (DEGs) revealed a striking contrast between leaf stage and \invfour effects (Fig~\ref{fig:transcriptome}D-E). Leaf developmental stage produced a genome-wide transcriptional response, with significant DEGs distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D). In contrast, the \invfour effect was sharply localized: a prominent peak of differential expression on chromosome 4 corresponded precisely to the introgressed region (Fig~\ref{fig:transcriptome}E).
 
@@ -854,8 +854,8 @@ component associated with plant height in GWAS \cite{peiffer2014}, and
 antigen 2, a DNA replication factor and marker of cell proliferation
 (Table~\ref{tab::greenyellow_module}). The module also includes \textit{ropgef14} (\textit{Zm00001eb188240})
 ($\log_2 \text{FC} = -2.98$), a Rho GTPase activator required for polarized cell
-growth. The co-expression of these functionally distinct genes--exocytosis,
-DNA replication, and cell polarity--in a highly stable module suggests
+growth. The co-expression of these functionally distinct genes, including exocytosis,
+DNA replication, and cell polarity, in a highly stable module suggests
 coordinated regulation of cell division and growth in the B73 background.
 
 The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height
@@ -896,8 +896,8 @@ the coexpression relationships they normally coordinate.
 In contrast, the exocyst component \textit{sec6} ($\log_2 FC = +2.87$), located
 within \invfour, showed $k_{Within} = 0.81$ in CTRL but $< 0.001$ in \invfour,
 suggesting its upregulation decouples it from native coexpression partners. This
-bidirectional rewiring---connectivity loss for downregulated chromatin regulators
-and altered connectivity for upregulated genes---is consistent with the JMJ
+bidirectional rewiring, connectivity loss for downregulated chromatin regulators
+and altered connectivity for upregulated genes, is consistent with the JMJ
 cluster functioning as a regulatory hub whose perturbation propagates through
 the transcriptome.
 
@@ -1002,7 +1002,7 @@ expectation in field conditions (Fig~\ref{fig:jmj_cluster}A). WGCNA reveals
 that \invfour introgression disrupts 12 of 13 coexpression modules
 (Table~\ref{tab::preservation}), with JMJ genes losing hub status
 (Fig~\ref{fig:wgcna}C). The phosphorus starvation hypothesis was tested and
-rejected in our companion study \citep{rodriguez2026phosphorus}; here we focus
+rejected in our companion study~\cite{rodriguez2026phosphorus}; here we focus
 on identifying candidate genes underlying the observed adaptive phenotypes.
 
 \subsection*{Breakpoint characterization reveals knob repeat involvement in inversion structure}
@@ -1120,8 +1120,8 @@ WGCNA analysis showed that JMJ genes function as network hubs in CTRL
 ($k_{Within} = 3.17$--$3.33$) but become peripheral in \invfour
 ($k_{Within} = 0.59$--$0.61$; Fig~\ref{fig:wgcna}C). Twelve of 13 modules
 showed significant connectivity loss (one-sample $t$-test, $\textit{FDR} < 0.05$;
-Table~\ref{tab::preservation}), with the pink module---enriched for ribosome
-biogenesis and growth regulation (Table~\ref{tab::pink_module})---showing
+Table~\ref{tab::preservation}), with the pink module, enriched for ribosome
+biogenesis and growth regulation (Table~\ref{tab::pink_module}), showing
 significant connectivity reduction (mean $\Delta k_{Within} = -1.36$,
 $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation
 ($Z_{summary} = 5.8$). The
@@ -1133,7 +1133,7 @@ elongation $\rightarrow$ accelerated flowering and increased height.
 
 The greenyellow module provides complementary evidence for this model. With the
 highest bootstrap support among all modules (LFP $= 0.80$), it contains both
-\textit{sec6}--the plant height GWAS candidate \cite{peiffer2014}--and
+\textit{sec6}, the plant height GWAS candidate \cite{peiffer2014}, and
 \textit{pcna2}, a DNA replication factor marking actively dividing cells
 (Table~\ref{tab::greenyellow_module}). The upregulation of these genes in
 \invfour ($\log_2 \text{FC} = +2.87$ and $+2.99$, respectively), alongside
@@ -1439,7 +1439,7 @@ modules were identified by hierarchical clustering on $C$
 
 Module stability was assessed using 1000 independent bootstrap iterations (separate
 from the consensus iterations above), calculating the Largest Fragment Proportion
-(LFP)---the proportion of iterations in which each module was recovered with
+(LFP), the proportion of iterations in which each module was recovered with
 $\geq 80\%$ gene overlap (Jaccard index $\geq 0.8$). Module eigengenes were
 computed as the first principal component of each module's expression matrix.
 
