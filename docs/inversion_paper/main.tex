@@ -866,26 +866,32 @@ silencing ($p = 0.016$), suggesting an indirect link to growth through
 hormone and epigenetic pathways.
 
 Comparison of intramodular connectivity ($k_{Within}$) between genotypes revealed
-systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B). Module
-preservation analysis using \texttt{modulePreservation()} \cite{langfelder2011}
-with 1000 permutations showed that 12 of 13 modules had moderate preservation
-($Z_{summary}$ 2--10) and one module (salmon) was not preserved ($Z_{summary} < 2$;
-Table~\ref{tab::preservation}). To formally test whether modules lost
-connectivity, we performed one-sample $t$-tests for each module testing whether
-mean $\Delta k_{Within} \neq 0$. Twelve of 13 modules showed significant
-connectivity loss after FDR correction ($p_{adj} < 0.05$;
+systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B).
+\texttt{modulePreservation()} analysis \cite{langfelder2011}
+with 1000 permutations classified 12 of 13 modules as moderately preserved
+($Z_{summary}$ 2--10), meaning their internal connectivity patterns were
+partially maintained despite the introgression, while one module (salmon)
+was not preserved ($Z_{summary} < 2$; Table~\ref{tab::preservation}).
+However, formal testing of connectivity magnitude change revealed pervasive
+loss: one-sample $t$-tests on $\Delta k_{Within}$ showed that 12 of 13 modules
+had significant connectivity reduction after FDR correction ($p_{adj} < 0.05$;
 Table~\ref{tab::preservation}), with the blue module showing the strongest
 effect ($t = -8.4$, $p_{adj} = 4.9 \times 10^{-10}$). Only magenta
-($p_{adj} = 0.126$) did not reach significance.
+($p_{adj} = 0.126$) did not reach significance. Thus, although the relative
+hub structure within modules is partially retained, absolute connectivity is
+broadly diminished in \invfour.
 
-The pink module, despite its high bootstrap support in CTRL (LFP $= 0.72$), showed
-substantial connectivity loss ($Z_{summary} = 5.8$). Hub gene
-analysis revealed that \jmjiv, highly connected in CTRL ($k_{Within} = 3.17$),
-dropped to peripheral status in \invfour ($k_{Within} = 0.61$), an 81\% reduction
-(Fig~\ref{fig:wgcna}C). Similarly, \jmjii showed $k_{Within} = 3.33$ in CTRL
-versus $0.59$ in \invfour (82\% reduction). These JMJ genes transitioned from
-central network hubs to weakly connected nodes, consistent with their
-downregulation disrupting the coexpression relationships they normally coordinate.
+The pink module illustrates this pattern: despite high bootstrap support in CTRL
+(LFP $= 0.72$) and moderate structural preservation ($Z_{summary} = 5.8$),
+it showed significant connectivity loss (mean $\Delta k_{Within} = -1.36$,
+$p_{adj} = 2.6 \times 10^{-6}$), with 100\% of genes losing connectivity.
+Hub gene analysis revealed that \jmjiv, highly connected in CTRL
+($k_{Within} = 3.17$), dropped to peripheral status in \invfour
+($k_{Within} = 0.61$), an 81\% reduction (Fig~\ref{fig:wgcna}C). Similarly,
+\jmjii showed $k_{Within} = 3.33$ in CTRL versus $0.59$ in \invfour
+(82\% reduction). These JMJ genes transitioned from central network hubs
+to weakly connected nodes, consistent with their downregulation disrupting
+the coexpression relationships they normally coordinate.
 
 In contrast, the exocyst component \textit{sec6} ($\log_2 FC = +2.87$), located
 within \invfour, showed $k_{Within} = 0.81$ in CTRL but $< 0.001$ in \invfour,
@@ -900,7 +906,7 @@ the transcriptome.
 \includegraphics[width=\linewidth]{figs/WGCNA_module_perturbation.png}
 \caption{\textbf{WGCNA module perturbation analysis reveals widespread network disruption in \invfour plants.}
 \textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10--35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
-\textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes. Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Twelve of 13 modules show significant connectivity loss.
+\textbf{(B)} Change in standard intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes, computed from signed weighted adjacency matrices (shared soft power $\beta = 18$). Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Twelve of 13 modules show significant connectivity loss. Annotations above each module show the top reduced Gene Ontology Biological Process term.
 \textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis). Points represent top 5 hub genes per module, colored by module assignment. Point size indicates $|\log_2 FC|$. Points below the diagonal indicate hub genes that lost connectivity in \invfour. Labels show gene symbols where available.}
 \label{fig:wgcna}
 \end{figure*}
@@ -1114,9 +1120,11 @@ WGCNA analysis showed that JMJ genes function as network hubs in CTRL
 ($k_{Within} = 3.17$--$3.33$) but become peripheral in \invfour
 ($k_{Within} = 0.59$--$0.61$; Fig~\ref{fig:wgcna}C). Twelve of 13 modules
 showed significant connectivity loss (one-sample $t$-test, $\textit{FDR} < 0.05$;
-Table~\ref{tab::preservation}), with the pink module--enriched for ribosome
-biogenesis and growth regulation (Table~\ref{tab::pink_module})--showing
-substantial connectivity loss ($Z_{summary} = 5.8$). The
+Table~\ref{tab::preservation}), with the pink module---enriched for ribosome
+biogenesis and growth regulation (Table~\ref{tab::pink_module})---showing
+significant connectivity reduction (mean $\Delta k_{Within} = -1.36$,
+$p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation
+($Z_{summary} = 5.8$). The
 trans-regulatory network connects JMJ genes to cell proliferation factors
 including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A),
 suggesting a mechanistic chain: JMJ downregulation $\rightarrow$ altered
@@ -1406,38 +1414,40 @@ github repository}.
 
 To assess how \invfour disrupts gene coexpression structure, we performed weighted
 gene co-expression network analysis (WGCNA) \cite{langfelder2008} on the 465 DEGs
-(FDR $< 0.05$) separately for CTRL and \invfour genotypes using field expression
-data only. Networks were constructed using a signed adjacency with soft-thresholding
-power selected to achieve approximate scale-free topology ($R^2 > 0.8$).
+(FDR $< 0.05$) using field expression data only. Signed weighted networks were
+constructed using soft-thresholding power selected via \texttt{pickSoftThreshold()}
+to achieve approximate scale-free topology ($R^2 > 0.8$). Both CTRL and \invfour
+conditions independently converged on $\beta = 18$, which was used as a shared
+power for all downstream analyses to ensure comparability.
 
-To obtain robust module assignments, we adapted the consensus network approach of
-\cite{shahan2018}, which uses gene subsampling rather than sample bootstrapping to
-identify relationships that are stable across parameter choices. In each of 1000
-iterations, 80\% of genes were randomly subsampled without replacement and WGCNA
-clustering was performed with \textit{minModuleSize} uniformly sampled from 10--35
-to avoid parameterization bias. Following \cite{shahan2018}, the consensus adjacency
-matrix $A$ was computed as:
+Reference coexpression modules were defined from CTRL samples using the consensus
+network approach of \cite{shahan2018}, which uses gene subsampling to identify
+relationships that are stable across parameter choices. In each of 1000 iterations,
+80\% of genes were randomly subsampled without replacement and WGCNA clustering was
+performed with \textit{minModuleSize} uniformly sampled from 10--35 to avoid
+parameterization bias. Following \cite{shahan2018}, the consensus co-clustering
+matrix $C$ was computed as:
 \begin{equation}
-A_{ij} = \frac{\text{number of times gene } i \text{ clusters with gene } j}{\text{number of times gene } i \text{ is subsampled with gene } j}
+C_{ij} = \frac{\text{number of times gene } i \text{ clusters with gene } j}{\text{number of times gene } i \text{ is subsampled with gene } j}
 \end{equation}
-where $A_{ij} \in [0,1]$ represents the proportion of opportunities in which genes
+where $C_{ij} \in [0,1]$ represents the proportion of opportunities in which genes
 $i$ and $j$ were assigned to the same module. Unlike \cite{shahan2018} who randomized
-power transformation across iterations, we fixed soft power at the value fitted to
-our data's scale-free topology and varied only \textit{minModuleSize} given our
-smaller gene set. Final modules were identified by hierarchical clustering on the
-consensus adjacency matrix (\textit{deepSplit} = 4).
+power transformation across iterations, we fixed soft power at $\beta = 18$ and
+varied only \textit{minModuleSize} given our smaller gene set. Final CTRL reference
+modules were identified by hierarchical clustering on $C$
+(\textit{deepSplit} = 4).
 
-Module stability was assessed using 1000 bootstrap iterations, calculating the
-proportion of iterations in which each module was recovered with $\geq 80\%$ gene
-overlap (Jaccard index $\geq 0.8$). Module eigengenes were computed as the first
-principal component of each module's expression matrix.
+Module stability was assessed using 1000 independent bootstrap iterations (separate
+from the consensus iterations above), calculating the Largest Fragment Proportion
+(LFP)---the proportion of iterations in which each module was recovered with
+$\geq 80\%$ gene overlap (Jaccard index $\geq 0.8$). Module eigengenes were
+computed as the first principal component of each module's expression matrix.
 
 Network perturbation was quantified by comparing standard intramodular connectivity
 ($k_{Within}$) between CTRL and \invfour networks for genes assigned to CTRL
 consensus modules. For each genotype, signed weighted adjacency matrices were
-computed from the expression data using the shared empirical soft-thresholding
-power ($\beta = 18$, independently selected for both conditions via
-\texttt{pickSoftThreshold()}). Intramodular connectivity was calculated using
+computed from the expression data using the shared soft-thresholding power
+($\beta = 18$). Intramodular connectivity was calculated using
 \texttt{intramodularConnectivity()} \cite{langfelder2008}:
 \begin{equation}
 k_{Within}(i) = \sum_{j \in M_i, j \neq i} a_{ij}
