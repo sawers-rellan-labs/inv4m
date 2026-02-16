@@ -148,7 +148,7 @@ effects_df <- read_csv(
   if (nrow(disrupted_modules) > 0) {
     cat("Disrupted modules:\n")
     print(disrupted_modules %>%
-            dplyr::select(module, color, n_genes, adjacency_correlation,
+            dplyr::select(module, color, n_genes, Zsummary,
                           median_delta_k, ctrl_stability))
   } else {
     cat("All modules show high preservation.\n")
@@ -911,8 +911,8 @@ if (nrow(hub_genes) > 0) {
     scale_color_identity() +
     theme_minimal(base_size = 25) +
     theme(
-      legend.position = c(0.1, 0.9),
-      legend.justification = c(0, 1),
+      legend.position = c(0.9, 0.9),
+      legend.justification = c(1, 1),
       legend.background = element_rect(fill = "white", color = NA, linewidth = 0)
     ) +
     labs(
@@ -953,7 +953,7 @@ if (nrow(hub_genes) > 0) {
 # Create comprehensive summary for ALL modules using preservation_summary
 module_themes <- preservation_summary %>%
   dplyr::select(
-    module, color, n_genes, adjacency_correlation, median_delta_k,
+    module, color, n_genes, Zsummary, median_delta_k,
     pct_decreased, ctrl_lfp, ctrl_stability, jaccard
   )
 
@@ -1014,7 +1014,7 @@ write_csv(
   cat("\n=== MODULE BIOLOGICAL THEMES WITH SUPPORT ===\n")
   print(module_themes %>%
           dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
-                        adjacency_correlation, top_BP))
+                        Zsummary, top_BP))
 }
 ```
 
@@ -1119,18 +1119,22 @@ write_csv(
 
 {
   cat("\n=== COMPREHENSIVE MODULE SUMMARY ===\n")
-  cat("\nAdjacency correlation range:",
-      round(min(comprehensive_summary$adjacency_correlation), 2), "to",
-      round(max(comprehensive_summary$adjacency_correlation), 2), "\n")
-  cat("Modules with adj. correlation < 0.30:",
-      sum(comprehensive_summary$adjacency_correlation < 0.30), "\n")
+  cat("\nZsummary range:",
+      round(min(comprehensive_summary$Zsummary), 2), "to",
+      round(max(comprehensive_summary$Zsummary), 2), "\n")
+  cat("Modules not preserved (Zsummary < 2):",
+      sum(comprehensive_summary$Zsummary < 2), "\n")
+  cat("Modules moderately preserved (2 <= Zsummary < 10):",
+      sum(comprehensive_summary$Zsummary >= 2 & comprehensive_summary$Zsummary < 10), "\n")
+  cat("Modules strongly preserved (Zsummary >= 10):",
+      sum(comprehensive_summary$Zsummary >= 10), "\n")
 
-  cat("\nModules sorted by adjacency correlation:\n")
+  cat("\nModules sorted by Zsummary:\n")
   print(
     comprehensive_summary %>%
       dplyr::select(module, color, n_genes, ctrl_lfp, ctrl_stability,
-                    adjacency_correlation, pct_upregulated) %>%
-      arrange(adjacency_correlation)
+                    Zsummary, pct_upregulated) %>%
+      arrange(Zsummary)
   )
 }
 ```
@@ -1156,10 +1160,11 @@ summary_stats <- tibble(
     "Modules with MF enrichment",
     "Hub genes identified",
     "Hub genes with connectivity loss",
-    "Modules with adj. correlation < 0.30",
-    "Modules with adj. correlation 0.30-0.50",
-    "Min adjacency correlation",
-    "Max adjacency correlation"
+    "Modules not preserved (Zsummary < 2)",
+    "Modules moderately preserved (Zsummary 2-10)",
+    "Modules strongly preserved (Zsummary >= 10)",
+    "Min Zsummary",
+    "Max Zsummary"
   ),
   value = c(
     n_modules_analyzed,
@@ -1171,10 +1176,11 @@ summary_stats <- tibble(
     n_modules_with_mf,
     nrow(hub_genes),
     sum(hub_genes$hub_disrupted, na.rm = TRUE),
-    sum(comprehensive_summary$adjacency_correlation < 0.30),
-    sum(comprehensive_summary$adjacency_correlation >= 0.30 & comprehensive_summary$adjacency_correlation < 0.50),
-    round(min(comprehensive_summary$adjacency_correlation), 3),
-    round(max(comprehensive_summary$adjacency_correlation), 3)
+    sum(comprehensive_summary$Zsummary < 2),
+    sum(comprehensive_summary$Zsummary >= 2 & comprehensive_summary$Zsummary < 10),
+    sum(comprehensive_summary$Zsummary >= 10),
+    round(min(comprehensive_summary$Zsummary), 3),
+    round(max(comprehensive_summary$Zsummary), 3)
   )
 )
 

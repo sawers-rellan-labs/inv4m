@@ -866,29 +866,29 @@ silencing ($p = 0.016$), suggesting an indirect link to growth through
 hormone and epigenetic pathways.
 
 Comparison of intramodular connectivity ($k_{Within}$) between genotypes revealed
-systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B). Adjacency
-correlation between CTRL and \invfour networks ranged from $-0.14$ to $0.42$
-across modules, with 10 of 13 modules showing correlation $< 0.30$
-(Table~\ref{tab::preservation}). To formally test whether modules lost
+systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B). Module
+preservation analysis using \texttt{modulePreservation()} \cite{langfelder2011}
+with 1000 permutations showed that 12 of 13 modules had moderate preservation
+($Z_{summary}$ 2--10) and one module (salmon) was not preserved ($Z_{summary} < 2$;
+Table~\ref{tab::preservation}). To formally test whether modules lost
 connectivity, we performed one-sample $t$-tests for each module testing whether
-mean $\Delta k_{Within} \neq 0$. Eleven of 13 modules showed significant
+mean $\Delta k_{Within} \neq 0$. Twelve of 13 modules showed significant
 connectivity loss after FDR correction ($p_{adj} < 0.05$;
 Table~\ref{tab::preservation}), with the blue module showing the strongest
-effect ($t = -19.7$, $p_{adj} = 4.6 \times 10^{-24}$). Only magenta
-($p_{adj} = 0.051$) and salmon ($p_{adj} = 0.63$) modules did not reach
-significance.
+effect ($t = -8.4$, $p_{adj} = 4.9 \times 10^{-10}$). Only magenta
+($p_{adj} = 0.126$) did not reach significance.
 
 The pink module, despite its high bootstrap support in CTRL (LFP $= 0.72$), showed
-near-complete structural collapse (adjacency correlation $= 0.020$). Hub gene
-analysis revealed that \jmjiv, highly connected in CTRL ($k_{Within} = 0.90$),
-dropped to peripheral status in \invfour ($k_{Within} = 0.36$), a 60\% reduction
-(Fig~\ref{fig:wgcna}C). Similarly, \jmjii showed $k_{Within} = 0.89$ in CTRL
-versus $0.44$ in \invfour (50\% reduction). These JMJ genes transitioned from
+substantial connectivity loss ($Z_{summary} = 5.8$). Hub gene
+analysis revealed that \jmjiv, highly connected in CTRL ($k_{Within} = 3.17$),
+dropped to peripheral status in \invfour ($k_{Within} = 0.61$), an 81\% reduction
+(Fig~\ref{fig:wgcna}C). Similarly, \jmjii showed $k_{Within} = 3.33$ in CTRL
+versus $0.59$ in \invfour (82\% reduction). These JMJ genes transitioned from
 central network hubs to weakly connected nodes, consistent with their
 downregulation disrupting the coexpression relationships they normally coordinate.
 
 In contrast, the exocyst component \textit{sec6} ($\log_2 FC = +2.87$), located
-within \invfour, showed $k_{Within} = 0.83$ in CTRL but $0.008$ in \invfour,
+within \invfour, showed $k_{Within} = 0.81$ in CTRL but $< 0.001$ in \invfour,
 suggesting its upregulation decouples it from native coexpression partners. This
 bidirectional rewiring---connectivity loss for downregulated chromatin regulators
 and altered connectivity for upregulated genes---is consistent with the JMJ
@@ -900,7 +900,7 @@ the transcriptome.
 \includegraphics[width=\linewidth]{figs/WGCNA_module_perturbation.png}
 \caption{\textbf{WGCNA module perturbation analysis reveals widespread network disruption in \invfour plants.}
 \textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10--35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
-\textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes. Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Eleven of 13 modules show significant connectivity loss.
+\textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes. Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Twelve of 13 modules show significant connectivity loss.
 \textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis). Points represent top 5 hub genes per module, colored by module assignment. Point size indicates $|\log_2 FC|$. Points below the diagonal indicate hub genes that lost connectivity in \invfour. Labels show gene symbols where available.}
 \label{fig:wgcna}
 \end{figure*}
@@ -993,7 +993,7 @@ the JUMONJI histone demethylase cluster as the strongest candidate, showing
 both copy number variation between highland and lowland genomes
 (Fig~\ref{fig:jmj_cluster}B) and expression levels below copy number
 expectation in field conditions (Fig~\ref{fig:jmj_cluster}A). WGCNA reveals
-that \invfour introgression disrupts 11 of 13 coexpression modules
+that \invfour introgression disrupts 12 of 13 coexpression modules
 (Table~\ref{tab::preservation}), with JMJ genes losing hub status
 (Fig~\ref{fig:wgcna}C). The phosphorus starvation hypothesis was tested and
 rejected in our companion study \citep{rodriguez2026phosphorus}; here we focus
@@ -1111,12 +1111,12 @@ This early developmental change may underlie the subsequent height and
 flowering differences observed in field-grown plants.
 
 WGCNA analysis showed that JMJ genes function as network hubs in CTRL
-($k_{Within} = 0.89$--$0.90$) but become peripheral in \invfour
-($k_{Within} = 0.36$--$0.44$; Fig~\ref{fig:wgcna}C). Eleven of 13 modules
+($k_{Within} = 3.17$--$3.33$) but become peripheral in \invfour
+($k_{Within} = 0.59$--$0.61$; Fig~\ref{fig:wgcna}C). Twelve of 13 modules
 showed significant connectivity loss (one-sample $t$-test, $\textit{FDR} < 0.05$;
 Table~\ref{tab::preservation}), with the pink module--enriched for ribosome
 biogenesis and growth regulation (Table~\ref{tab::pink_module})--showing
-near-complete structural collapse (adjacency correlation $= 0.020$). The
+substantial connectivity loss ($Z_{summary} = 5.8$). The
 trans-regulatory network connects JMJ genes to cell proliferation factors
 including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A),
 suggesting a mechanistic chain: JMJ downregulation $\rightarrow$ altered
@@ -1432,20 +1432,25 @@ proportion of iterations in which each module was recovered with $\geq 80\%$ gen
 overlap (Jaccard index $\geq 0.8$). Module eigengenes were computed as the first
 principal component of each module's expression matrix.
 
-Network perturbation was quantified by comparing intramodular connectivity
+Network perturbation was quantified by comparing standard intramodular connectivity
 ($k_{Within}$) between CTRL and \invfour networks for genes assigned to CTRL
-consensus modules. Intramodular connectivity was calculated as the mean consensus
-adjacency of each gene to other genes within its module:
+consensus modules. For each genotype, signed weighted adjacency matrices were
+computed from the expression data using the shared empirical soft-thresholding
+power ($\beta = 18$, independently selected for both conditions via
+\texttt{pickSoftThreshold()}). Intramodular connectivity was calculated using
+\texttt{intramodularConnectivity()} \cite{langfelder2008}:
 \begin{equation}
-k_{Within}(i) = \frac{1}{|M_i| - 1} \sum_{j \in M_i, j \neq i} A_{ij}
+k_{Within}(i) = \sum_{j \in M_i, j \neq i} a_{ij}
 \end{equation}
-where $M_i$ is the set of genes in the same module as gene $i$. This metric
-quantifies how consistently a gene co-clusters with its module partners across
-bootstrap iterations, rather than raw correlation strength or topological overlap.
+where $a_{ij}$ is the signed adjacency between genes $i$ and $j$, and $M_i$ is
+the set of genes in the same module as gene $i$.
 Connectivity change was calculated as $\Delta k_{Within} =
 k_{Within}^{Inv4m} - k_{Within}^{CTRL}$, where negative values indicate connectivity
-loss in \invfour. Hub genes were identified as the top 5 genes per module ranked by
-$k_{Within}$ in the CTRL network.
+loss in \invfour. Module preservation was assessed using
+\texttt{modulePreservation()} \cite{langfelder2011} with 1000 label permutations,
+yielding $Z_{summary}$ statistics (thresholds: $< 2$ = not preserved, $2$--$10$ =
+moderate, $> 10$ = strong). Hub genes were identified as the top 5 genes per
+module ranked by $k_{Within}$ in the CTRL network.
 
 Gene Ontology enrichment analysis was performed for each module using
 \textit{clusterProfiler} \cite{yu2012}. Semantic redundancy was reduced using
@@ -1991,27 +1996,27 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 
 \begin{table}[!ht]
-\caption{\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected p-value from one-sample t-test of $\Delta k_{Within} \neq 0$. Adj.\ Corr.\ = adjacency correlation between CTRL and \invfour networks. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
+\caption{\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected $p$-value from one-sample $t$-test of $\Delta k_{Within} \neq 0$. $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $< 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
 \label{tab::preservation}
 \centering
 \small
-\begin{tabular}{@{}lrrrrr@{}}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-\textbf{Module} & \textbf{Genes} & \textbf{Adj. Corr.} & \textbf{$\Delta k_{Within}$} & \textbf{FDR} & \textbf{LFP} \\
+\textbf{Module} & \textbf{Genes} & \textbf{$Z_{summary}$} & \textbf{$\Delta k_{Within}$} & \textbf{FDR} & \textbf{LFP} \\
 \midrule
-blue & 51 & 0.01 & -0.71 & $4.6 \times 10^{-24}$ & 0.79 \\
-brown & 46 & 0.19 & -0.59 & $2.2 \times 10^{-22}$ & 0.68 \\
-yellow & 36 & 0.06 & -0.59 & $1.1 \times 10^{-17}$ & 0.68 \\
-black & 32 & 0.33 & -0.47 & $1.1 \times 10^{-15}$ & 0.69 \\
-green & 36 & 0.14 & -0.39 & $1.4 \times 10^{-15}$ & 0.69 \\
-pink & 30 & 0.02 & -0.54 & $4.5 \times 10^{-14}$ & 0.72 \\
-greenyellow & 16 & 0.28 & -0.51 & $3.8 \times 10^{-10}$ & 0.80 \\
-turquoise & 55 & 0.42 & -0.19 & $1.3 \times 10^{-9}$ & 0.54 \\
-red & 34 & 0.16 & -0.32 & $1.7 \times 10^{-9}$ & 0.63 \\
-purple & 22 & -0.14 & -0.43 & $3.8 \times 10^{-8}$ & 0.74 \\
-tan & 12 & 0.41 & -0.54 & $7.1 \times 10^{-7}$ & 0.68 \\
-magenta & 24 & 0.07 & -0.08 & 0.051 & 0.71 \\
-salmon & 11 & -0.03 & 0.01 & 0.630 & 0.52 \\
+blue & 51 & 3.1 & -1.27 & $4.9 \times 10^{-10}$ & 0.79 \\
+brown & 46 & 3.8 & -2.22 & $4.3 \times 10^{-9}$ & 0.68 \\
+yellow & 36 & 3.5 & -1.29 & $1.5 \times 10^{-8}$ & 0.68 \\
+purple & 22 & 3.8 & -1.04 & $2.6 \times 10^{-6}$ & 0.74 \\
+black & 32 & 4.5 & -0.66 & $2.6 \times 10^{-6}$ & 0.69 \\
+pink & 30 & 5.8 & -0.83 & $2.6 \times 10^{-6}$ & 0.72 \\
+red & 34 & 3.3 & -0.34 & $8.5 \times 10^{-5}$ & 0.63 \\
+greenyellow & 16 & 3.0 & -0.65 & $4.5 \times 10^{-4}$ & 0.80 \\
+green & 36 & 5.0 & -0.38 & 0.002 & 0.69 \\
+tan & 12 & 2.2 & -4.13 & 0.003 & 0.68 \\
+turquoise & 55 & 6.1 & -0.33 & 0.005 & 0.54 \\
+salmon & 11 & 1.2 & -0.15 & 0.025 & 0.52 \\
+magenta & 24 & 5.3 & -0.18 & 0.126 & 0.71 \\
 \bottomrule
 \end{tabular}
 \end{table}
