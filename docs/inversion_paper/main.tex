@@ -1042,6 +1042,36 @@ prediction that \invfour accelerates flowering at high elevations, where
 limited growing degree days favor rapid development
 \cite{romero_navarro2017-cn}.
 
+Our results show strong concordance with the growth chamber study of Crow et
+al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73
+near-isogenic lines. Of the 29 genes they reported as consistently
+differentially expressed, correlated in trans, or encoding transcription
+factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs
+in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
+The shared genes
+span several functional categories. Among chromatin regulators, both studies
+identified the JMJ histone demethylase cluster (listed as ``Putative
+lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii
+($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain
+transcription factor (\textit{jmj21}, $+2.28$). In cell growth and
+proliferation, \textit{sec6} ($+2.87$), classified as ``Consistent DE'' by
+Crow et al., and \textit{pcna2} ($+2.99$), which they identified as
+``Correlated Trans,'' were both upregulated. Additional shared DEGs include
+the transcription factors \textit{gata4} ($-1.02$) and \textit{ereb14}
+($-0.46$), the signaling kinases \textit{vps15} ($-0.60$) and a PBL19-like
+receptor ($-1.39$), and the nitrite reductase \textit{nii2} ($-2.06$). Of
+the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped
+within the \invfour interval. Our field study, using a plant blocking model
+to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and
+extends this shared candidate set by providing a mechanistic explanation: the
+JMJ signal reflects copy number variation between highland and lowland
+genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression
+in field conditions (Fig~\ref{fig:jmj_cluster}A). Both studies converge on
+the finding that gene expression changes are not confined to
+breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus
+flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with
+trans-regulatory effects rather than simple position effects.
+
 \subsection*{Gene-by-environment interactions support local adaptation}
 
 Analysis across three location-year combinations revealed significant GxE
@@ -1104,8 +1134,15 @@ GWAS support links the JMJ cluster to flowering time variation
 \cite{tibbs-cortes2024}. JUMONJI domain proteins function as histone
 demethylases that remove methyl groups from H3K4, a mark associated with
 active transcription \cite{klose2007}. In Arabidopsis, JMJ homologs regulate flowering time through chromatin
-modification of floral pathway genes \cite{gan2014}. The \textit{sec6} gene, encoding an exocyst complex component involved in
-cytokinesis, also emerged as a plant height candidate with GWAS support
+modification of floral pathway genes \cite{gan2014}. Crow et al.\
+\cite{crow2020} listed JMJ demethylases among their consistently
+differentially expressed genes, though the underlying copy number variation
+was not characterized. Our microsynteny analysis (Fig~\ref{fig:jmj_cluster}B)
+provides a structural explanation for this shared signal and, combined with
+independent GWAS support, strengthens JMJ candidacy beyond differential
+expression alone. The \textit{sec6} gene, also identified by Crow et al.\ as
+consistently DE and encoding an exocyst complex component involved in
+cytokinesis, emerged as a plant height candidate with GWAS support
 \cite{peiffer2014} (Table~\ref{tab:FT_PH_candidates}).
 
 \subsection*{Network disruption links chromatin regulators to growth phenotypes}
@@ -1144,20 +1181,69 @@ gene expression consistent with altered cell proliferation dynamics.
 \subsection*{Chromosomal inversions maintain coadapted allele complexes}
 
 \invfour exemplifies how chromosomal inversions can facilitate local
-adaptation by maintaining coadapted allele combinations \cite{kirkpatrick2006b}.
-The 15.2 Mb inversion contains 432 annotated genes (Table~\ref{tab:breakpoints})
-and shows suppressed recombination \cite{gonzalez-segovia2019-jy}, ensuring
-that highland-adapted alleles are inherited as a unit. The presence of copy
-number variation within the inversion (JMJ cluster expansion in B73) adds
-structural complexity beyond simple haplotype differences.
+adaptation by maintaining coadapted allele combinations
+\cite{kirkpatrick2006b}. The 15.2~Mb inversion contains 432 annotated genes
+(Table~\ref{tab:breakpoints}) and shows suppressed recombination
+\cite{gonzalez-segovia2019-jy}, ensuring that highland-adapted alleles are
+inherited as a unit. Genome-wide analysis of adaptive introgression identified
+\invfour as the strongest signal for clinal ancestry variation across Mexican
+elevation gradients, with introgression dating to over 1000 generations
+ago---consistent with ancient adaptive introgression from \mex rather than
+contemporary gene flow \cite{calfee2021-mr}.
+
+Megabase-scale inversions that modulate gene expression and contribute to
+adaptation have now been characterized across diverse taxa. The 1.5~Mb
+inversion at human 17q21.31 acts simultaneously as an eQTL, mQTL, and sQTL
+for genes within the rearranged region, altering expression, methylation, and
+splicing patterns that associate with cortical surface area, intracranial
+volume, and subcortical brain morphology \cite{wang2023inversions}. This
+demonstrates that balanced rearrangements can modulate regulatory architecture
+rather than gene dosage, paralleling our finding that \invfour disrupts
+coexpression networks rather than simply altering transcript levels of
+breakpoint-proximal genes. In \textit{Mimulus guttatus}, a 6.7~Mb inversion
+on chromosome 8 modulates \textit{GA20ox2} expression in the floral shoot
+apex, affecting flowering time and growth architecture in a tissue-specific
+manner \cite{kollar2025}; this inversion remains the only case definitively
+linked to local adaptation via field reciprocal transplant experiments
+\cite{lowry2010}. The parallel between \textit{Mimulus} and our results is
+striking: both inversions modulate expression of growth-regulatory genes in
+meristematic tissue, producing flowering time and stature phenotypes. In
+sunflower, inversions contribute disproportionately to parallel dune ecotype
+divergence across independent populations, with seed size QTLs clustering
+within inversions more often than expected by chance \cite{huang2025},
+demonstrating that inversions serve as vehicles for repeated adaptation to
+novel environments.
+
+The mechanisms by which inversions modulate gene expression extend beyond
+simple breakpoint disruption. In yeast, engineered inversions cause expression
+changes in up to 13\% of genes through indirect mechanisms, including
+upregulation of a chromatin remodeling gene near one breakpoint that cascades
+into genome-wide transcriptional perturbation \cite{naseeb2016}. Yet yeast
+phenotypes remain largely buffered, suggesting that network robustness
+compensates for transcriptional disruption. In \invfour, expression changes
+correlate with quantitative phenotypes (flowering, height, meristem shape),
+indicating that the network perturbation exceeds the buffering
+capacity---or that the coordinated expression changes are themselves the
+adaptive target of selection. In \textit{Mimulus}, expression divergence
+within the chromosome 8 inversion evolved gradually through accumulated
+mutations rather than breakpoint effects \cite{kollar2025}. Similarly, our
+DEGs are not enriched inside versus outside \invfour (OR $= 1.02$,
+Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects from
+hub genes rather than position effects. Across taxa, the average adaptive
+inversion spans 8.4~Mb \cite{wellenreuther2018}; \invfour at 15.2~Mb exceeds
+this average, consistent with the prediction that larger inversions are
+favored when they protect more coadapted loci from recombination.
 
 Highland-associated inversions including \invfour and \textit{Inv9f} are
 prevalent in \mex populations \cite{pyhajarvi2013} and Mexican traditional
-varieties \cite{crow2020} but rare in temperate maize, suggesting that
-multiple structural variants may act in concert for highland adaptation.
-The introgression of \invfour from \mex \cite{calfee2021-mr,hufford2013-gs}
-represents one source of adaptive variation that enabled maize colonization
-of highland environments.
+varieties \cite{crow2020} but rare in temperate maize. The identification of
+\textit{Inv9f} as a second highland-adaptive inversion with independent
+clinal introgression \cite{calfee2021-mr} suggests that multiple structural
+variants act in concert for highland adaptation. The presence of copy number
+variation within \invfour (JMJ cluster expansion in B73) adds structural
+complexity beyond simple haplotype differences, as the introgressed \mex
+haplotype carries a single JMJ ortholog while the B73 haplotype contains five
+tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
 
 \subsection*{Limitations and future directions}
 
@@ -2105,5 +2191,60 @@ Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0
 \end{tabular}
 \end{table}
 
+
+% === NEW BIBTEX ENTRIES (copy to Overleaf .bib file) ===
+%
+% @article{kollar2025,
+%   author = {Kollar, Leslie M. and Stanley, Lauren E. and Raju, Sunil K. Kenchanmane and Lowry, David B. and Niederhuth, Chad E.},
+%   title = {The Evolution of Locally Adaptive Chromosome Inversions in {Mimulus guttatus}},
+%   journal = {Molecular Ecology},
+%   volume = {34},
+%   number = {22},
+%   year = {2025},
+%   doi = {10.1111/mec.17708}
+% }
+%
+% @article{huang2025,
+%   author = {Huang, Kaichi and Ostevik, Kate L. and Jovovic, Milo\v{s} and Todesco, Marco and Baute, Nadia and Owens, Gregory L. and Andrew, Rose L. and Rieseberg, Loren H.},
+%   title = {Inversions contribute disproportionately to parallel genomic divergence in dune sunflowers},
+%   journal = {Nature Ecology \& Evolution},
+%   volume = {9},
+%   pages = {325--335},
+%   year = {2025},
+%   doi = {10.1038/s41559-024-02593-4}
+% }
+%
+% @article{naseeb2016,
+%   author = {Naseeb, Samina and Carter, Zara and Minnis, Daniela and Donaldson, Ian and Zeef, Leo and Delneri, Daniela},
+%   title = {Widespread Impact of Chromosomal Inversions on Gene Expression Uncovers Robustness via Phenotypic Buffering},
+%   journal = {Molecular Biology and Evolution},
+%   volume = {33},
+%   number = {7},
+%   pages = {1679--1696},
+%   year = {2016},
+%   doi = {10.1093/molbev/msw045}
+% }
+%
+% @article{wang2023inversions,
+%   author = {Wang, Hao and Makowski, Carolina and Zhang, Yanxiao and Qi, Anna and Kaufmann, Tobias and Smeland, Olav B. and Fiecas, Mark and Yang, Jian and Visscher, Peter M. and Chen, Chi-Hua},
+%   title = {Chromosomal inversion polymorphisms shape human brain morphology},
+%   journal = {Cell Reports},
+%   volume = {42},
+%   pages = {112896},
+%   year = {2023},
+%   doi = {10.1016/j.celrep.2023.112896}
+% }
+%
+% @article{lowry2010,
+%   author = {Lowry, David B. and Willis, John H.},
+%   title = {A widespread chromosomal inversion polymorphism contributes to a major life-history transition, local adaptation, and reproductive isolation},
+%   journal = {PLoS Biology},
+%   volume = {8},
+%   pages = {e1000500},
+%   year = {2010},
+%   doi = {10.1371/journal.pbio.1000500}
+% }
+%
+% === END NEW BIBTEX ENTRIES ===
 
 \end{document}
