@@ -537,7 +537,7 @@ Flanking vs Outside &
 
 \subsection*{Leaf developmental stage drives global transcriptional changes while \invfour effects are predominantly local}
 
-To characterize the transcriptional landscape of \invfour introgression, we performed RNA-seq on leaves sampled across a developmental gradient from field-grown NILs. Multidimensional scaling (MDS) of gene expression revealed three major axes of variation (Fig~\ref{fig:transcriptome}A-B). The first two dimensions captured 38\% of total variance, corresponding to phosphorus treatment (26\%) and leaf developmental stage (12\%), as described in detail in our companion study~\cite{rodriguez2026phosphorus}. The third dimension explained 8\% of variance and strongly correlated with genotype ($r = 0.92$, $\textit{FDR} = 2.06 \times 10^{-17}$), clearly separating \invfour from CTRL samples.
+To characterize the transcriptional landscape of \invfour introgression, we performed RNA-seq on leaves sampled across a developmental gradient from field-grown NILs. Multidimensional scaling (MDS) of gene expression revealed three major axes of variation (Fig~\ref{fig:transcriptome}A-B). The first two dimensions captured 39\% of total variance, corresponding to phosphorus treatment (27\%) and leaf developmental stage (12\%), as described in detail in our companion study~\cite{rodriguez2026phosphorus}. The third dimension explained 8\% of variance and strongly correlated with genotype ($r = 0.92$, $\textit{FDR} = 2.06 \times 10^{-17}$), clearly separating \invfour from CTRL samples.
 
 The spatial distribution of differentially expressed genes (DEGs) revealed a striking contrast between leaf stage and \invfour effects (Fig~\ref{fig:transcriptome}D-E). Leaf developmental stage produced a genome-wide transcriptional response, with significant DEGs distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D). In contrast, the \invfour effect was sharply localized: a prominent peak of differential expression on chromosome 4 corresponded precisely to the introgressed region (Fig~\ref{fig:transcriptome}E).
 
@@ -967,9 +967,9 @@ post-translational mechanisms beyond chromatin modification.
 
 Gene Ontology enrichment analysis of genes within \invfour proper
 (Fig~\ref{fig::transnetwork}B) revealed significant over-representation of
-negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.97
-\times 10^{-4}$, fold enrichment = 77.5) and positive regulation of growth
-(GO:0045927; $p = 1.73 \times 10^{-3}$, fold enrichment = 32.3). Both terms
+negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.2
+\times 10^{-4}$, fold enrichment = 90.4) and positive regulation of growth
+(GO:0045927; $p = 1.3 \times 10^{-3}$, fold enrichment = 37.7). Both terms
 were driven by the \jmjii/\jmjiv cluster, which encodes JmjC domain-containing
 histone demethylases. The enrichment of growth regulation terms among
 \invfour-downregulated genes is consistent with the altered SAM geometry
@@ -1029,11 +1029,19 @@ repeat turnover indicates strong selection maintaining the inverted haplotype.
 \subsection*{\invfour effects on flowering and growth replicate previous highland adaptation studies}
 
 Plants carrying \invfour flowered $1.30 \pm 0.27$ days earlier to anthesis
-($p = 7.6 \times 10^{-6}$) and grew $6.48 \pm 1.11$ cm taller
-($p = 2.2 \times 10^{-7}$) than controls (Fig~\ref{fig:phenotypes}A). These
+($p = 7.9 \times 10^{-6}$) and grew $6.48 \pm 1.11$ cm taller
+($p = 2.3 \times 10^{-7}$) than controls (Fig~\ref{fig:phenotypes}A). These
 effects were consistent across phosphorus treatments. The harvest index
 increase ($0.11 \pm 0.04$, $p = 0.01$) suggests altered vegetative-reproductive
 resource allocation rather than simple growth promotion.
+Internode measurements in the CLY2025 field trial localized the height
+effect: the largest difference was concentrated at internode position 2,
+just below the tassel ($-4.1$~cm, $p < 10^{-19}$;
+Supplementary Fig.~\ref{fig::internode}), while total node count did not
+differ between genotypes. This indicates that \invfour promotes internode
+elongation at specific developmental positions rather than increasing
+phytomer number, consistent with altered growth dynamics during the
+transition from vegetative to reproductive development.
 
 These results are consistent with previous studies showing \invfour association
 with flowering time variation across elevation gradients \cite{romero_navarro2017-cn}
@@ -1165,7 +1173,15 @@ downregulation of the cell polarity regulator \textit{ropgef14}
 ($\log_2 \text{FC} = -2.98$), suggests coordinated rewiring of growth-related
 gene expression consistent with altered cell proliferation dynamics.
 
-
+The purple module (LFP $= 0.74$, $n = 22$) provides additional support
+through a distinct pathway. This module contains \textit{phi1}/\textit{exo}
+(\textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$), a plant height GWAS
+candidate \cite{liu2023,peiffer2014}, and shows enrichment for
+brassinosteroid signaling regulation ($p = 0.022$) and negative regulation
+of chromatin silencing ($p = 0.016$). The convergence of epigenetic and
+hormone signaling within a single coexpression module suggests that
+\invfour effects on growth may be mediated through multiple regulatory
+layers, not solely through JMJ-dependent chromatin modification.
 
 \begin{figure*}[!ht]
 \centering
@@ -1855,7 +1871,7 @@ assistance with field work and laboratory analyses.
   180271106 &
   180292951 &
   21845 &
-  19\% &
+  23\% &
   \multicolumn{1}{r}{35\%} \\ \midrule
  &
    &

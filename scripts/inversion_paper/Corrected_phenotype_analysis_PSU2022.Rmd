@@ -530,6 +530,48 @@ if (length(sig_traits) == 0) {
 }
 ```
 
+## 8b. Save effect sizes for reproducibility
+
+```{r save-effect-sizes}
+# Compute mean differences (Inv4m - CTRL) with SE for manuscript reporting
+effect_sizes <- NIL_corrected %>%
+  pivot_longer(
+    cols = all_of(usable_phenotypes),
+    names_to = "trait",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)) %>%
+  group_by(trait, genotype) %>%
+  summarise(
+    mean = mean(value),
+    sd = sd(value),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = genotype,
+    values_from = c(mean, sd, n)
+  ) %>%
+  mutate(
+    effect = mean_Inv4m - mean_CTRL,
+    se_diff = sqrt(sd_CTRL^2 / n_CTRL + sd_Inv4m^2 / n_Inv4m)
+  ) %>%
+  left_join(
+    htest %>% select(trait, statistic, df, p, p.adj, p.adj.signif),
+    by = "trait"
+  ) %>%
+  arrange(p.adj)
+
+print(effect_sizes)
+
+write_csv(
+  effect_sizes,
+  file.path(paths$intermediate, paste0(environment_name, "_inv4m_effect_sizes.csv"))
+)
+cat("Effect sizes saved to:",
+    file.path(paths$intermediate, paste0(environment_name, "_inv4m_effect_sizes.csv")), "\n")
+```
+
 ## 9. Summary and export
 
 ```{r summary-export}
