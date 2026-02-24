@@ -77,21 +77,28 @@
 
 %%% Abstract %%%%%%%%%%%%%%%%%%
 \begin{abstract}
-Maize adaptation to temperate zones may have been facilitated by introgression 
-from highland wild relatives. We investigated the effects of \invfour, a 15 Mb 
-chromosomal inversion from \textit{Zea mays ssp. mexicana}, by introgressing 
-it into temperate maize (B73) through eight generations of backcrossing. Field 
-trials under contrasting phosphorus treatments revealed that \invfour 
-significantly accelerates flowering time and increases plant height, 
-independent of phosphorus availability. Transcriptomic analysis identified 
-perturbations in a cell proliferation gene expression network, including 
-downregulation of JUMONJI histone demethylases that show higher copy numbers in
-modern maize compared to highland teosinte. Phenotypic measurements confirmed 
-that \invfour plants exhibit elongated shoot apical meristems. While classical 
-phosphorus starvation response genes were detected within the inversion, 
-\invfour showed no detectable effect on phosphorus starvation responses. These 
-findings illuminate the genetic mechanisms underlying \invfour's contribution 
-to local adaptation and identify candidate genes driving its phenotypic effects.
+Chromosomal inversions can facilitate local adaptation by protecting
+coadapted allele complexes from recombination. \invfour is a 15 Mb
+inversion from the highland teosinte \textit{Zea mays} ssp. \mex that
+is nearly fixed above 2500 m in Mexico but rare in temperate maize. We
+introgressed \invfour into the B73 background through eight generations
+of backcrossing and characterized its effects on phenotype, transcriptome,
+and gene coexpression networks. Genome alignment to three \textit{Zea}
+references delimited \invfour breakpoints within chromosomal knob repeat
+arrays. Field trials showed that \invfour accelerates flowering by
+1.3 days and increases plant height by 6.5 cm, with effects varying
+across three environments consistent with local adaptation. Shoot apical
+meristems were 9\% more elongated in \invfour seedlings. RNA-seq
+identified 465 differentially expressed genes, with the strongest signal
+from a JUMONJI histone demethylase cluster that shows copy number
+expansion in B73 relative to highland genomes. Weighted gene coexpression
+network analysis revealed that \invfour disrupts 12 of 13 coexpression
+modules, with JMJ genes losing hub connectivity. A trans-regulatory
+network links JMJ regulators to cell proliferation genes including
+\textit{pcna2} and \textit{sec6}, suggesting a mechanistic chain from
+chromatin modification to growth phenotypes. These results identify
+candidate genes and regulatory networks underlying \invfour's
+contribution to highland adaptation in maize.
 \end{abstract}
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -141,51 +148,41 @@ from \textit{Zea mays ssp. mexicana}
 \cite{pyhajarvi2013,calfee2021-mr,hufford2013-gs}, a wild maize relative 
 native to the Mexican highlands.
 
-Despite strong evidence linking \invfour to local adaptation, the physiological 
-processes and environmental factors underlying its adaptive role remain unclear. 
-Furthermore, the specific genes within \invfour that drive local adaptation are 
-largely unidentified. Previous research has shown that \invfour-highland 
-upregulates photosynthesis genes in response to cold at the seedling stage 
-\cite{crow2020} and is associated with earlier flowering in the Mexican 
-highlands, which likely enhances fitness in environments with limited 
-growth-degree accumulation throughout the year \cite{romero_navarro2017-cn}. 
-However, cold is not the only limiting factor for plant growth in the highlands.
+Despite strong evidence linking \invfour to local adaptation, key aspects
+of its biology remain unresolved. At the structural level, the inversion
+breakpoints have not been characterized at sequence resolution.
+Functionally, the specific genes within \invfour that drive phenotypic
+effects are largely unidentified: \cite{crow2020} identified differentially
+expressed genes in growth chamber conditions, including JUMONJI histone
+demethylases and cell cycle regulators, but the network-level
+consequences of these expression changes and their relationship to
+field phenotypes have not been established. More broadly, whether
+\invfour effects are robust across field environments or reflect
+condition-specific responses remains untested.
 
-Volcanic soils (Andosols), which dominate the Mexican highlands, present an 
-additional constraint. Approximately 95\% of natural Andosol profiles in Mexico 
-are found above 2000 m.a.s.l. \cite{paz-pellat2018,inegi2013}. These soils are 
-characterized by high phosphorus retention \cite{krasilnikov2013}, which leads 
-to low phosphorus availability for plant uptake \cite{galvan-tejada2014}. 
-MICH21, one of the Mexican highland maize accessions analyzed by 
-\cite{crow2020}, originates from the Purépecha Plateau, where Andosols and 
-phosphorus-efficient TVs are common 
-\cite{paz-pellat2018,galvan-tejada2014,bayuelo-jimenez2011,bayuelo-jimenez2014}. 
-\invfour may contribute to adaptation in the highlands by carrying alleles that 
-enhance the phosphorus starvation response (PSR). For example, the phosphate 
-transporter gene \textit{ZmPho1;2a} (\textit{phos2}, \textit{Zm00001eb191650}), located within \invfour, is a strong 
-candidate for adaptation to low phosphorus availability 
-\cite{salazar-vidal2016-rl}.
+Here, we characterize \invfour at multiple levels of organization.
+We introgressed the highland haplotype from the Mexican traditional
+variety Mi21 into B73 through eight generations of backcrossing,
+generating Near Isogenic Lines (NILs). These NILs were phenotyped across
+three field environments in Pennsylvania and North Carolina, with shoot
+apical meristem morphology measured in controlled conditions. We used
+RNA-seq from field-grown leaves to identify differentially expressed genes
+and applied weighted gene coexpression network analysis (WGCNA) and
+trans-regulatory network reconstruction to characterize the regulatory
+architecture of the \invfour effect. The phosphorus starvation response
+was evaluated as a companion study~\cite{rodriguez2026phosphorus}.
 
-In this study, we aimed to understand the physiological and molecular effects 
-of \invfour and to identify candidate genes within the inversion that could 
-elucidate its adaptive role. Specifically, we tested whether \invfour-highland 
-contributes to adaptation to low phosphorus availability. To achieve this, we 
-backcrossed MICH21, a Mexican highland TV carrying \invfour, into the B73 
-genetic background for eight generations, generating Near Isogenic Lines (NILs) 
-\cite{crow2020}. These NILs were grown under temperate field conditions with 
-two phosphorus treatments to evaluate flowering time, height, and 
-transcriptomic responses.
-
-We observed that \invfour significantly reduces flowering time and increases 
-plant height, independent of phosphorus levels. We identified a cluster of 
-JUMONJI histone demethylases, which have higher copy numbers in modern maize
-compared to highland teosinte and TVs, as potential contributors to flowering 
-time differences. Additionally, we found a group of cell cycle-related genes 
-that may underlie height differences. While classical PSR genes were identified 
-within the inversion, \invfour had no detectable effect on the phosphorus 
-starvation response. These findings provide insights into the genetic 
-mechanisms underlying \invfour's contribution to local adaptation and highlight 
-potential candidate genes driving its effects.
+We show that \invfour breakpoints overlap chromosomal knob repeat arrays,
+consistent with an ectopic recombination origin. \invfour accelerates
+flowering and increases plant height across environments, with
+genotype-by-environment interactions characteristic of local adaptation.
+Transcriptomic analysis identifies a JUMONJI histone demethylase cluster
+with copy number variation between highland and lowland genomes as the
+strongest candidate. WGCNA reveals widespread coexpression module
+disruption, with JMJ genes losing hub connectivity, and a trans-regulatory
+network connects chromatin regulators to cell proliferation genes. These
+findings provide a mechanistic model linking \invfour to growth regulation
+through chromatin-mediated gene network rewiring.
 
 \section{Results}
 
