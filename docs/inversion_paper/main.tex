@@ -413,7 +413,7 @@ background, we measured 1,556 internodes from 112 control plants and 1,607
 internodes from 116 \invfour plants. Mean internode length was similar between
 genotypes (CTRL: $13.1 \pm 5.5$ cm; \invfour: $12.9 \pm 5.2$ cm). Internode
 profiles revealed that the largest \invfour effects were concentrated at
-positions 2--4 from the top, with position 2 (just below the tassel)
+positions 2 to 4 from the top, with position 2 (just below the tassel)
 accounting for the majority of the height difference ($-4.1$ cm, $p < 10^{-19}$)
 (Supplementary Fig.~\ref{fig::internode}). Total node count did not differ
 significantly between genotypes within the MI21 background, suggesting that
@@ -663,7 +663,7 @@ Candidates}}
   \cite{li2016, liu2023} \\
   \textit{Zm00001eb191000} &
   \textit{4cll5} &
-  4-coumarate--CoA ligase-like 5 &
+  4-coumarate:CoA ligase-like 5 &
   -3.35 &
   2.76 &
   \textbf{\invfour} &
@@ -827,7 +827,7 @@ To assess whether the \invfour introgression causes network-level perturbations
 beyond individual DEGs, we performed weighted gene coexpression network analysis
 (WGCNA) using a consensus approach. We constructed reference networks from CTRL
 samples using 1000 bootstrap iterations with 80\% gene subsampling and variable
-\textit{minModuleSize} (10--35), identifying modules robust to analytical choices
+\textit{minModuleSize} (10 to 35), identifying modules robust to analytical choices
 (Fig~\ref{fig:wgcna}A).
 
 The consensus network assigned 465 DEGs (FDR $< 0.05$) into 13 coexpression modules
@@ -870,7 +870,7 @@ Comparison of intramodular connectivity ($k_{Within}$) between genotypes reveale
 systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B).
 \texttt{modulePreservation()} analysis \cite{langfelder2011}
 with 1000 permutations classified 12 of 13 modules as moderately preserved
-($Z_{summary}$ 2--10), meaning their internal connectivity patterns were
+($Z_{summary}$ 2 to 10), meaning their internal connectivity patterns were
 partially maintained despite the introgression, while one module (salmon)
 was not preserved ($Z_{summary} < 2$; Table~\ref{tab::preservation}).
 However, formal testing of connectivity magnitude change revealed pervasive
@@ -906,7 +906,7 @@ the transcriptome.
 \centering
 \includegraphics[width=\linewidth]{figs/WGCNA_module_perturbation.png}
 \caption{\textbf{WGCNA module perturbation analysis reveals widespread network disruption in \invfour plants.}
-\textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10--35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
+\textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules. Module assignments were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35). Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
 \textbf{(B)} Change in standard intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes, computed from signed weighted adjacency matrices (shared soft power $\beta = 18$). Each box represents a module, colored by module assignment. Negative values indicate connectivity loss in \invfour. Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$. Twelve of 13 modules show significant connectivity loss. Annotations above each module show the top reduced Gene Ontology Biological Process term.
 \textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis). Points represent top 5 hub genes per module, colored by module assignment. Point size indicates $|\log_2 FC|$. Points below the diagonal indicate hub genes that lost connectivity in \invfour. Labels show gene symbols where available.}
 \label{fig:wgcna}
@@ -986,7 +986,7 @@ The \jmjii/\jmjiv cluster exhibited the strongest transcriptional response to \i
 
 However, microsynteny analysis across five \textit{Zea} genomes revealed that the B73 reference contains a tandem expansion of five JMJ paralogs (\jmjix, a putative pseudogene, \jmjvi, \jmjii, and \jmjiv), whereas highland teosinte TIL18, the landrace Palomero Toluque\~{n}o, and the tropical inbreds CML457 and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B). The high sequence identity among paralogs ($>$97\% cDNA similarity; Fig~\ref{fig:jmj_cluster}C) suggests recent duplication and complicates individual paralog quantification.
 
-To test whether the observed expression differences could be explained by copy number alone, we compared total cluster expression in \invfour plants against the expectation under simple dosage scaling (CTRL/5). In field samples, \invfour expression was consistently and significantly below this expectation: Leaf 1 achieved 61.5\% of expected levels ($t = 2.94$, \textit{FDR} $= 0.031$), while Leaves 2--4 showed only 49--53\% of expected expression (\textit{FDR} $< 0.015$ for all). This pattern suggests that beyond copy number reduction, additional regulatory mechanisms suppress JMJ cluster transcription in the field.
+To test whether the observed expression differences could be explained by copy number alone, we compared total cluster expression in \invfour plants against the expectation under simple dosage scaling (CTRL/5). In field samples, \invfour expression was consistently and significantly below this expectation: Leaf 1 achieved 61.5\% of expected levels ($t = 2.94$, \textit{FDR} $= 0.031$), while Leaves 2 to 4 showed only 49 to 53\% of expected expression (\textit{FDR} $< 0.015$ for all). This pattern suggests that beyond copy number reduction, additional regulatory mechanisms suppress JMJ cluster transcription in the field.
 
 In contrast, growth chamber data showed a less consistent pattern. Only 4 of 9 tissues exhibited significant deviation from copy number expectation after FDR correction, with expression levels ranging from 48\% (V1 root) to 83\% (V1 leaf) of expected values. Notably, the shoot apical meristem showed no significant deviation (81.8\% of expected, \textit{FDR} $= 0.57$). This environment-dependent pattern may reflect condition-specific regulatory mechanisms acting on the JMJ cluster beyond the baseline copy number effect.
 
@@ -1087,7 +1087,7 @@ Analysis across three location-year combinations revealed significant GxE
 interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}).
 Plant height showed the strongest interaction ($\eta^2_p = 0.29$,
 $p < 8.7 \times 10^{-10}$), with effect direction reversing between
-Pennsylvania (Cohen's $d = 1.45$--$2.23$) and North Carolina ($d = -1.28$;
+Pennsylvania (Cohen's $d = 1.45$ to $2.23$) and North Carolina ($d = -1.28$;
 Supplementary Fig.~\ref{fig::gxe_forest}).
 
 This pattern is characteristic of local adaptation, where alleles beneficial
@@ -1116,9 +1116,9 @@ highland teosinte TIL18 and the landraces PT, CML457, and CML459 each retain
 only a single ortholog (Fig~\ref{fig:jmj_cluster}B). The high sequence
 identity among B73 paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) indicates
 recent tandem duplication. Under simple dosage scaling, \invfour expression
-should equal CTRL/5; however, field samples showed only 49--61\% of this
+should equal CTRL/5; however, field samples showed only 49 to 61\% of this
 expectation (linear contrast $t$-test, $\textit{FDR} < 0.05$ for all four
-tissues). Growth chamber data were less consistent (48--83\% of expectation,
+tissues). Growth chamber data were less consistent (48 to 83\% of expectation,
 4/9 tissues significant), suggesting environment-specific regulatory
 mechanisms beyond baseline copy number effects.
 
@@ -1149,8 +1149,8 @@ This early developmental change may underlie the subsequent height and
 flowering differences observed in field-grown plants.
 
 WGCNA analysis showed that JMJ genes function as network hubs in CTRL
-($k_{Within} = 3.17$--$3.33$) but become peripheral in \invfour
-($k_{Within} = 0.59$--$0.61$; Fig~\ref{fig:wgcna}C). Twelve of 13 modules
+($k_{Within} = 3.17$ to $3.33$) but become peripheral in \invfour
+($k_{Within} = 0.59$ to $0.61$; Fig~\ref{fig:wgcna}C). Twelve of 13 modules
 showed significant connectivity loss (one-sample $t$-test, $\textit{FDR} < 0.05$;
 Table~\ref{tab::preservation}), with the pink module, enriched for ribosome
 biogenesis and growth regulation (Table~\ref{tab::pink_module}), showing
@@ -1194,7 +1194,7 @@ Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray r
 \textbf{(C)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
 The NAM v5 annotation consolidates \jmjii, \textit{jmj6}, and \textit{jmj9} as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}).
 The putative pseudogene ($\psi$?) retains only a v4 identifier (\textit{Zm00001d051961}).
-Heatmap intensity indicates cDNA sequence identity (97--100\%). Bottom track shows genomic positions of individual cluster members.}
+Heatmap intensity indicates cDNA sequence identity (97 to 100\%). Bottom track shows genomic positions of individual cluster members.}
 \label{fig:jmj_cluster}
 \end{figure*}
 
@@ -1210,7 +1210,7 @@ adaptation by maintaining coadapted allele combinations
 inherited as a unit. Genome-wide analysis of adaptive introgression identified
 \invfour as the strongest signal for clinal ancestry variation across Mexican
 elevation gradients, with introgression dating to over 1000 generations
-ago---consistent with ancient adaptive introgression from \mex rather than
+ago, consistent with ancient adaptive introgression from \mex rather than
 contemporary gene flow \cite{calfee2021-mr}.
 
 Megabase-scale inversions that modulate gene expression and contribute to
@@ -1245,7 +1245,7 @@ phenotypes remain largely buffered, suggesting that network robustness
 compensates for transcriptional disruption. In \invfour, expression changes
 correlate with quantitative phenotypes (flowering, height, meristem shape),
 indicating that the network perturbation exceeds the buffering
-capacity---or that the coordinated expression changes are themselves the
+capacity, or that the coordinated expression changes are themselves the
 adaptive target of selection. In \textit{Mimulus}, expression divergence
 within the chromosome 8 inversion evolved gradually through accumulated
 mutations rather than breakpoint effects \cite{kollar2025}. Similarly, our
@@ -1271,14 +1271,9 @@ tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
 
 Several limitations constrain interpretation of our results. First, 24 Mb of
 flanking introgression persists after eight backcross generations
-(Fig~\ref{fig::design}F--G), and DEG enrichment does not differ between
+(Fig~\ref{fig::design}F, G), and DEG enrichment does not differ between
 \invfour proper and flanking regions (OR $= 1.02$, $p = 0.95$;
-Table~\ref{tab:DEGs_distro}). Additionally, markers fixed for the alternate allele across all
-individuals are concentrated on chromosomes 1, 5, and 6 rather than
-chromosome 4, consistent with B73 seed stock divergence from the v5
-reference genome \cite{liang2016} rather than true Mi21 introgression;
-accordingly, the ``fixed highland introgression'' category likely
-overestimates residual donor genome content.
+Table~\ref{tab:DEGs_distro}).
 Second, only B73 was tested as the recurrent
 parent; effects may differ in other genetic backgrounds. Third, the high
 sequence identity among JMJ paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C)
@@ -1518,7 +1513,7 @@ deemed differentially expressed. For phosphorus treatment ($\beta_2$) and
 \invfour genotype ($\beta_3$), genes with
 $|\log_2(\text{FC})| > 1.5$ were considered high-confidence DEGs. For the
 leaf stage effect ($\beta_1$) and interaction terms, a threshold of
-$|\log_2(\text{FC})| > 0.5$ was applied, corresponding to $>2.1$-fold
+$|\log_2(\text{FC})| > 0.5$ was applied, corresponding to $>2.8$-fold
 total change across the leaf gradient. R scripts and expression data are
 available at the
 \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour
@@ -1538,7 +1533,7 @@ Reference coexpression modules were defined from CTRL samples using the consensu
 network approach of \cite{shahan2018}, which uses gene subsampling to identify
 relationships that are stable across parameter choices. In each of 1000 iterations,
 80\% of genes were randomly subsampled without replacement and WGCNA clustering was
-performed with \textit{minModuleSize} uniformly sampled from 10--35 to avoid
+performed with \textit{minModuleSize} uniformly sampled from 10 to 35 to avoid
 parameterization bias. Following \cite{shahan2018}, the consensus co-clustering
 matrix $C$ was computed as:
 \begin{equation}
@@ -1553,8 +1548,8 @@ modules were identified by hierarchical clustering on $C$
 
 Module stability was assessed using 1000 independent bootstrap iterations (separate
 from the consensus iterations above), calculating the Largest Fragment Proportion
-(LFP), the proportion of iterations in which each module was recovered with
-$\geq 80\%$ gene overlap (Jaccard index $\geq 0.8$). Module eigengenes were
+(LFP), the proportion of each module's genes captured by the largest
+bootstrap fragment. Module eigengenes were
 computed as the first principal component of each module's expression matrix.
 
 Network perturbation was quantified by comparing standard intramodular connectivity
@@ -1572,7 +1567,7 @@ Connectivity change was calculated as $\Delta k_{Within} =
 k_{Within}^{Inv4m} - k_{Within}^{CTRL}$, where negative values indicate connectivity
 loss in \invfour. Module preservation was assessed using
 \texttt{modulePreservation()} \cite{langfelder2011} with 1000 label permutations,
-yielding $Z_{summary}$ statistics (thresholds: $< 2$ = not preserved, $2$--$10$ =
+yielding $Z_{summary}$ statistics (thresholds: $< 2$ = not preserved, $2$ to $10$ =
 moderate, $> 10$ = strong). Hub genes were identified as the top 5 genes per
 module ranked by $k_{Within}$ in the CTRL network.
 
@@ -1589,8 +1584,8 @@ bipartite co-expression network linking DEGs within the introgressed region
 (\textit{cis} regulators) to DEGs located elsewhere in the genome (\textit{trans}
 targets). Pearson correlation coefficients were calculated between all
 \textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized
-expression values. Edges were retained if $|r| > 0.5$ and the correlation was
-significant (\textit{p} $< 0.005$).
+expression values. Edges were retained if the correlation was
+significant after FDR correction ($q < 0.05$).
 
 To distinguish \invfour-specific effects from flanking introgression effects, we
 applied a strongest-regulator criterion: for each \textit{trans} target, we
@@ -1991,7 +1986,7 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 \begin{tabular}{@{}lrrl@{}}
 \toprule
 \textbf{Locus} & \textbf{$-\log_{10}$(\textit{FDR})} & \textbf{$\log_2$FC} & \textbf{Name} \\ \midrule
-\multicolumn{4}{l}{\textbf{\invfour -- Downregulated}} \\ \midrule
+\multicolumn{4}{l}{\textbf{\invfour: Downregulated}} \\ \midrule
 jmj2      & 21.9 & $-3.49$ & JUMONJI-transcription factor 2              \\
 jmj4      & 19.7 & $-2.84$ & JUMONJI-transcription factor 4              \\
 metrs1    & 17.5 & $-2.86$ & Methionyl-tRNA synthetase                   \\
@@ -2003,7 +1998,7 @@ Zm00001eb190240  & 14.2 & $-9.16$ &                                             
 ropgef14  & 13.6 & $-2.98$ & Rop guanine nucleotide exchange factor 14   \\
 trxl2     & 13.2 & $-6.10$ & Thioredoxin-like 3-1, chloroplastic         \\
 ank       & 13.0 & $-1.83$ & Ankyrin repeat-containing protein           \\ \midrule
-\multicolumn{4}{l}{\textbf{\invfour -- Upregulated}} \\ \midrule
+\multicolumn{4}{l}{\textbf{\invfour: Upregulated}} \\ \midrule
 sec6      & 16.5 & $+2.87$  & Exocyst complex component Sec6             \\
 zfrvt     & 15.6 & $+1.97$  &                                            \\
 pig3      & 15.0 & $+1.97$  & Quinone oxidoreductase PIG3                \\
@@ -2120,7 +2115,7 @@ GDDS & $6.1 \times 10^{-3}$  & 0.08 & $1.9 \times 10^{-5}$ & $1.7 \times 10^{-13
 
 
 \begin{table}[!ht]
-\caption{\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected $p$-value from one-sample $t$-test of $\Delta k_{Within} \neq 0$. $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $< 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
+\caption{\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected $p$-value from one-sample $t$-test of $\Delta k_{Within} \neq 0$. $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $< 2$ = not preserved, $2$ to $10$ = moderate, $> 10$ = strong. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
 \label{tab::preservation}
 \centering
 \small
