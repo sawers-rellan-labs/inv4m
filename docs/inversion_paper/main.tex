@@ -1570,7 +1570,12 @@ bipartite co-expression network linking DEGs within the introgressed region
 targets). Pearson correlation coefficients were calculated between all
 \textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized
 expression values. Edges were retained if the correlation was
-significant after FDR correction ($q < 0.05$).
+significant after FDR correction ($q < 0.05$). Prior to network
+construction, we excluded \textit{trans} targets carrying SNPs in linkage
+disequilibrium with the \invfour tagging marker (Pearson correlation FDR
+$< 0.005$; see Section~3.1), which removed 2 of 39 \textit{trans} DEGs
+(\textit{Zm00001eb070810} on chromosome~2 and \textit{tip4c} on
+chromosome~3).
 
 To distinguish \invfour-specific effects from flanking introgression effects, we
 applied a strongest-regulator criterion: for each \textit{trans} target, we

@@ -30,8 +30,8 @@ README.md  # Figure/table coverage
 | 6 | Discussion: Novelty pass | pending | #2, #3 |
 | 7 | Discussion: Results-Discussion alignment | pending | #4, #5, #6 |
 | 8 | Proofread Methods | pending | - |
-| 9 | Proofread Introduction | pending | #7, #8 |
-| 10 | Proofread Abstract | pending | #9 |
+| 9 | Proofread Introduction | ✅ done | #7, #8 |
+| 10 | Proofread Abstract | ✅ done | #9 |
 | 11 | Read aloud: Abstract + Discussion | pending | #10 |
 
 ### Section 3.2 corrections applied (2026-02-24):
