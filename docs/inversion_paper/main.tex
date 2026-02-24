@@ -314,7 +314,7 @@ divergent highland introgression consisting of markers significantly correlated
 with the \invfour tagging SNP PZE04175660223. And third, sections with random 
 introgressions uncorrelated with \invfour.
 
-The fixed highland introgression sections are made up of 126 SNPs marking 51 Mb 
+The fixed highland introgression sections are made up of 1394 SNPs marking 51 Mb 
 (2.4\% of the genome) in genotype run length (average per plant). By manual 
 inspection we defined a region of divergent highland introgression between 
 positions 157012149 and 195900523 in B73 v5 coordinates, bounding 39 Mb of 
@@ -325,12 +325,12 @@ linkage drag (Fig~\ref{fig::design}F and G). Conversely, we have produced
 inversion-free lines in the CTRL group by selecting for the B73 allele.
 
 In more detail, there are 7683 SNPs significantly correlated with \invfour 
-(Pearson correlation \textit{t-test}, \fdrls) constituting divergent highland 
+(Pearson correlation \textit{t-test}, $\textit{FDR} < 0.005$) constituting divergent highland 
 introgressions throughout the genome but mostly in \invfour and flanking regions 
 (Supplementary Fig.~\ref{fig::SNPdistro}A). From these 7683, 7322 SNPs ($95.3\%$) 
-cover 35 Mb and 271 expressed genes inside the 39 Mb shared introgressed region 
+cover 34 Mb and 512 expressed genes inside the 39 Mb shared introgressed region 
 that includes \invfour. The remaining 361 divergently introgressed SNPs in the 
-genomic background were dispersed throughout 10.4 Mb of sequence covering 52 
+genomic background were dispersed throughout 17 Mb of sequence covering 52 
 expressed genes.
 
 Notably, the majority of these markers, 207 SNPs from 14 expressed genes, are 
@@ -342,8 +342,8 @@ are homozygous for the B73 allele at all positions, while individuals selected
 for the standard karyotype are frequently heterozygous.
 
 In summary, each plant has an average of 117 Mb of homozygous Mi21 genome per 
-line, 51 Mb of fixed highland introgression, 35 Mb of divergent highland 
-introgression colocalized and matching the selection of \invfour, and 10 Mb of 
+line, 51 Mb of fixed highland introgression, 34 Mb of divergent highland
+introgression colocalized and matching the selection of \invfour, and 17 Mb of 
 other dispersed divergent highland introgressions.
 
 
@@ -1256,7 +1256,13 @@ Several limitations constrain interpretation of our results. First, 24 Mb of
 flanking introgression persists after eight backcross generations
 (Fig~\ref{fig::design}F--G), and DEG enrichment does not differ between
 \invfour proper and flanking regions (OR $= 1.02$, $p = 0.95$;
-Table~\ref{tab:DEGs_distro}). Second, only B73 was tested as the recurrent
+Table~\ref{tab:DEGs_distro}). Additionally, markers fixed for the alternate allele across all
+individuals are concentrated on chromosomes 1, 5, and 6 rather than
+chromosome 4, consistent with B73 seed stock divergence from the v5
+reference genome \cite{liang2016} rather than true Mi21 introgression;
+accordingly, the ``fixed highland introgression'' category likely
+overestimates residual donor genome content.
+Second, only B73 was tested as the recurrent
 parent; effects may differ in other genetic backgrounds. Third, the high
 sequence identity among JMJ paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C)
 complicates individual gene attribution. Fourth, our evidence is correlative;
@@ -1954,7 +1960,7 @@ their correlation with \invfour, and genotype run length as percentage of the
 genome.} 
 \textbf{(A)} Chromosome 4 contains 44\% of all genotyped SNPs and 98\% 
 of \invfour correlated SNPs (n=13).
-\textbf{(B)} Manhattan plot for the significance (\textit{t-test}) of the Pearson correlation of 19861 genotyped SNPs with PZE04175660223. Red line: \textit{FDR} $=0.05$ threshold. 
+\textbf{(B)} Manhattan plot for the significance (\textit{t-test}) of the Pearson correlation of 19861 genotyped SNPs with PZE04175660223. Red line: \textit{FDR} $= 0.005$ threshold.
 \textbf{(C)} Pearson correlation ($r$) of each SNP with the \invfour tagging SNP PZE04175660223, open circles: non-significant SNPs.
 SNPs with significant correlation with \invfour (full circles) are divergent highland introgressions.
 \textbf{(D)} NIL genotype run length as percentage of the genome. Each point represents a NIL, \invfour plants are tagged by the highland allele of PZE04175660223, CTRL plants by the reference (B73) allele, dashed line is the overall mean for the 13 NILs.}

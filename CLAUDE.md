@@ -1,14 +1,14 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-02-12
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Complete ✅
+**Last Updated:** 2026-02-24
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Proofreading 🔶
 **Version:** v2.1.0
 
 ---
 
-## START HERE: Inversion Paper Revision
+## START HERE: Inversion Paper Final Proofreading
 
-**Current State:** Manuscript text COMPLETE. Figure review COMPLETE. Now filling placeholder references.
+**Current State:** Manuscript proofreading IN PROGRESS. Verifying all statistics against reproducible code.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -18,40 +18,29 @@ scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
 ```
 
-**✅ FIGURE REVIEW COMPLETE (all 9 tasks done 2026-02-03)**
+### Proofreading Task List (2026-02-24)
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | Review layout of fig:phenotypes | ✅ |
-| 2 | Review layout of fig:wgcna | ✅ |
-| 3 | Review layout of fig::transnetwork | ✅ |
-| 4 | Review font size/labels of fig:jmj_cluster | ✅ |
-| 5 | Review font size/labels of fig::gxe_interaction | ✅ |
-| 6 | Fix gxe_forest: add CI or remove | ✅ |
-| 7 | Make fig::internode single row panel | ✅ |
-| 8 | Increase font size in fig::module_support | ✅ |
-| 9 | Increase font size in fig::module_go | ✅ |
+| # | Task | Status | Blocked by |
+|---|------|--------|------------|
+| 1 | Proofread Results 3.1-3.2: Breakpoints + Phenotypes | 🔶 in progress | - |
+| 2 | Proofread Results 3.3-3.4: SAM + DEGs + GxE + Internodes | pending | - |
+| 3 | Proofread Results 3.5-3.7: WGCNA + Trans-network + JMJ | pending | - |
+| 4 | Discussion: Overclaiming pass | pending | #2, #3 |
+| 5 | Discussion: Underclaiming pass | pending | #2, #3 |
+| 6 | Discussion: Novelty pass | pending | #2, #3 |
+| 7 | Discussion: Results-Discussion alignment | pending | #4, #5, #6 |
+| 8 | Proofread Methods | pending | - |
+| 9 | Proofread Introduction | pending | #7, #8 |
+| 10 | Proofread Abstract | pending | #9 |
+| 11 | Read aloud: Abstract + Discussion | pending | #10 |
 
-**✅ PLACEHOLDER REFERENCES FILLED (2026-02-03)**
-1. `\cite{wellenreuther2018}` - ectopic recombination
-2. `\cite{klose2007}` - JMJ biochemistry
-3. `\cite{gan2014}` - Arabidopsis JMJ flowering
-4. `\cite{iohannes2023}` - paralog compensation
-
-**✅ INTERNAL CONSISTENCY CHECK COMPLETE (2026-02-03)**
-- Added missing references (fig::gxe_interaction, tab:knob_repeats, tab:gene_effects)
-- Standardized terminology (Supporting → Supplementary)
-
-**🟢 MANUSCRIPT READY FOR SUBMISSION**
-
-**Remaining tasks:**
-- [x] Add significance stars to internode boxplots (Supplementary Fig. S4) ✅ (2026-02-12, manual)
-- [x] Add gene model IDs (Zm00001ebXXXXX) at first mention of each gene in text ✅ (2026-02-12)
-- [ ] Final proofreading (optional)
-
-**Completed (2026-02-12):**
-- [x] Clarified kWithin calculation in methods (consensus co-clustering frequency, not TOM)
-- [x] MaizeNetome validation for WGCNA - **DROPPED** (underpowered for n=13)
+### Section 3.2 corrections applied (2026-02-24):
+- 126 → 1394 fixed alternate allele markers
+- 271 → 512 expressed genes (39 Mb shared introgression)
+- 35 → 34 Mb inside run-length, 10.4 → 17 Mb outside run-length
+- FDR threshold standardized to 0.005, correlation confirmed Pearson
+- B73 seed stock divergence caveat added to Discussion (Liang & Schnable 2016)
+- Notebook updated: `plot_genotype_get_correlated_loci.Rmd` (fixed_alternate_alleles, compute_sig_runlength)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
 

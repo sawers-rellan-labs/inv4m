@@ -499,12 +499,87 @@ p_genotype <- by_length %>%
 p_genotype
 ```
 
+# Fixed Alternate Allele Analysis
+
+**Purpose**: Quantify markers where the Mi21 (alternate) allele is fixed across
+all individuals, regardless of Inv4m genotype group. These markers cannot
+represent Inv4m-linked introgression because they are shared between CTRL and
+Inv4m carriers.
+
+**Context**: Liang & Schnable (2016) showed that 2.3% of the B73 gene space
+carries divergent haplotypes across seed stocks, concentrated on chromosomes
+2, 4, 5, and 6. Fixed alternate alleles in our NILs may reflect B73 seed stock
+divergence from the v5 reference rather than true Mi21 introgression.
+
+```{r fixed_alternate_alleles}
+# Markers where all 13 individuals are homozygous for the alternate (Mi21) allele
+# ngt is samples (rows) x markers (cols), coded 0/1/2
+fixed_mi21 <- colSums(ngt, na.rm = FALSE) == (2 * nrow(ngt))
+fixed_mi21[is.na(fixed_mi21)] <- FALSE
+
+cat("Fixed alternate allele markers:", sum(fixed_mi21),
+    "out of", ncol(ngt), "total\n\n")
+
+# Compute run-length span per chromosome
+# A "consensus fixed" vector: 2 where all individuals are Mi21, 0 elsewhere
+consensus <- ifelse(fixed_mi21, 2, 0)
+names(consensus) <- colnames(ngt)
+
+fixed_runlength <- data.frame()
+for (chr_idx in 1:10) {
+  chr_prefix <- paste0("S", chr_idx, "_")
+  chr_mask <- grepl(chr_prefix, names(consensus))
+  chr_vals <- consensus[chr_mask]
+  positions <- as.numeric(gsub(chr_prefix, "", names(chr_vals)))
+
+  runs <- rle(chr_vals)
+  run_starts <- cumsum(c(1, runs$lengths[-length(runs$lengths)]))
+
+  chr_mb <- 0
+  chr_markers <- 0
+  for (i in seq_along(runs$values)) {
+    if (runs$values[i] == 2) {
+      start_pos <- positions[run_starts[i]]
+      end_idx <- run_starts[i] + runs$lengths[i] - 1
+      if (end_idx < length(positions)) {
+        end_pos <- positions[end_idx + 1]
+      } else {
+        end_pos <- positions[end_idx]
+      }
+      chr_mb <- chr_mb + (end_pos - start_pos) / 1e6
+      chr_markers <- chr_markers + runs$lengths[i]
+    }
+  }
+  fixed_runlength <- rbind(fixed_runlength, data.frame(
+    CHR = chr_idx, n_snps = chr_markers, runlength_Mb = round(chr_mb, 1)
+  ))
+}
+
+fixed_runlength <- fixed_runlength %>%
+  mutate(CHR = factor(CHR, levels = 1:10)) %>%
+  arrange(desc(n_snps))
+
+knitr::kable(fixed_runlength,
+             caption = "Fixed alternate allele markers and genotype run-length by chromosome")
+
+cat("\nTotal:", sum(fixed_runlength$n_snps), "markers,",
+    sum(fixed_runlength$runlength_Mb), "Mb\n")
+
+# How many are on chromosome 4?
+n_fixed_chr4 <- fixed_runlength$n_snps[fixed_runlength$CHR == "4"]
+pct_fixed_chr4 <- round(100 * n_fixed_chr4 / sum(fixed_mi21), 1)
+cat("\nChromosome 4:", n_fixed_chr4, "markers (", pct_fixed_chr4, "% )\n")
+cat("Outside chromosome 4:", sum(fixed_mi21) - n_fixed_chr4, "markers (",
+    round(100 - pct_fixed_chr4, 1), "% )\n")
+```
+
 # Calculate Linkage Disequilibrium
 
 **Purpose**: Quantify correlation between tagging SNP and all genome-wide 
 markers.
 
-**Approach**: Spearman correlation with S4_181558683 (within Inv4m). FDR 
+**Approach**: Pearson correlation with S4_181558683 (within Inv4m). Pearson r²
+is the standard LD statistic for biallelic markers (Ardlie et al. 2002). FDR
 correction for multiple testing.
 
 ```{r ld_calculation}
@@ -518,11 +593,11 @@ cor_matrix <- cor(
 
 # Statistical testing
 cor_pvalues <- apply(ngt, 2, function(x) {
-  cor.test(x, y = ngt[, tagging_snp], method = "spearman")$p.value
+  cor.test(x, y = ngt[, tagging_snp], method = "pearson")$p.value
 })
 
 # Combine results
-significance_threshold <- 0.01
+significance_threshold <- 0.005
 inv4m_cor <- data.frame(
   marker = rownames(cor_matrix),
   r = cor_matrix[, 1]
@@ -583,19 +658,68 @@ anticorrelated_end <- 156985577
 anticorrelated <- correlated_SNP %>%
   subset(seqnames == 4 & start >= anticorrelated_start & end <= anticorrelated_end)
 
-# Inside Inv4m
+# Inside shared introgression (39 Mb region, not just Inv4m proper)
 inside_correlated <- correlated_SNP %>%
-  subset(seqnames == 4 & start >= introgression_start & end <= inv4m_end)
+  subset(seqnames == 4 & start >= introgression_start & end <= introgression_end)
 
 cat("Correlated SNPs by location:\n")
 cat("  Total significant:", length(correlated_SNP), "\n")
-cat("  Inside shared introgression (35 Mb):", length(inside_correlated), 
-    sprintf("(%.1f%%)", 100 * length(inside_correlated) / length(correlated_SNP)), 
+cat("  Inside shared introgression (39 Mb):", length(inside_correlated),
+    sprintf("(%.1f%%)", 100 * length(inside_correlated) / length(correlated_SNP)),
     "\n")
-cat("  Outside shared introgression:", nrow(outside_correlated), 
-    sprintf("(%.1f%%)", 100 * nrow(outside_correlated) / length(correlated_SNP)), 
+cat("  Outside shared introgression:", nrow(outside_correlated),
+    sprintf("(%.1f%%)", 100 * nrow(outside_correlated) / length(correlated_SNP)),
     "\n")
 cat("  Anti-correlated upstream (2.7 Mb):", length(anticorrelated), "\n")
+cat("  Arithmetic check: inside + outside =",
+    length(inside_correlated) + nrow(outside_correlated), "\n")
+
+# Run-length of correlated SNPs using proper genotype run-length encoding
+# Same methodology as get_genotype_runs: rle on classification, span = distance to next run start
+compute_sig_runlength <- function(all_markers_df, is_sig_vector) {
+  total_mb <- 0
+  for (chr_idx in 1:10) {
+    chr_mask <- as.numeric(as.character(all_markers_df$CHR)) == chr_idx
+    chr_data <- all_markers_df[chr_mask, ]
+    chr_sig <- is_sig_vector[chr_mask]
+    if (sum(chr_sig, na.rm = TRUE) == 0) next
+
+    positions <- chr_data$BP
+    runs <- rle(chr_sig)
+    run_starts <- cumsum(c(1, runs$lengths[-length(runs$lengths)]))
+
+    for (i in seq_along(runs$values)) {
+      if (isTRUE(runs$values[i])) {
+        start_pos <- positions[run_starts[i]]
+        end_idx <- run_starts[i] + runs$lengths[i] - 1
+        if (end_idx < length(positions)) {
+          end_pos <- positions[end_idx + 1]
+        } else {
+          end_pos <- positions[end_idx]
+        }
+        total_mb <- total_mb + (end_pos - start_pos) / 1e6
+      }
+    }
+  }
+  total_mb
+}
+
+# Classify each marker
+all_markers <- inv4m_cor %>% arrange(as.numeric(as.character(CHR)), BP)
+is_inside_sig <- all_markers$is_significant &
+  as.character(all_markers$CHR) == "4" &
+  all_markers$BP >= introgression_start & all_markers$BP <= introgression_end
+is_inside_sig[is.na(is_inside_sig)] <- FALSE
+
+is_outside_sig <- all_markers$is_significant & !is_inside_sig
+is_outside_sig[is.na(is_outside_sig)] <- FALSE
+
+inside_runlength <- compute_sig_runlength(all_markers, is_inside_sig)
+outside_runlength <- compute_sig_runlength(all_markers, is_outside_sig)
+
+cat("\nGenotype run-length of correlated SNPs:\n")
+cat("  Inside shared introgression:", round(inside_runlength, 1), "Mb\n")
+cat("  Outside dispersed:", round(outside_runlength, 1), "Mb\n")
 
 # Chromosome distribution of significant markers
 cat("\nSignificant markers by chromosome:\n")
@@ -667,7 +791,21 @@ inside_correlated_genes <- transcripts$gene_id[subjectHits(olap_inside)] %>%
 cat("\nInside shared introgression (157.0-195.9 Mb):\n")
 cat("  SNPs:", length(inside_correlated), "\n")
 cat("  Unique SNP positions:", length(unique(queryHits(olap_inside))), "\n")
-cat("  Genes overlapped:", length(inside_correlated_genes), "\n")
+cat("  Gene models overlapped:", length(inside_correlated_genes), "\n")
+
+# Filter to expressed genes only (genes present in expression matrix)
+expr_matrix <- read.csv(file.path(paths$intermediate, "PSU2022_gene_expression_matrix.csv"),
+                        row.names = 1, check.names = FALSE)
+expressed_genes <- rownames(expr_matrix)
+
+inside_expressed <- inside_correlated_genes[inside_correlated_genes %in% expressed_genes]
+outside_expressed <- outside_correlated_genes[outside_correlated_genes %in% expressed_genes]
+anti_expressed <- anticorrelated_genes[anticorrelated_genes %in% expressed_genes]
+
+cat("\nExpressed gene counts (genes in RNA-seq expression matrix):\n")
+cat("  Inside shared introgression:", length(inside_expressed), "expressed genes\n")
+cat("  Outside dispersed:", length(outside_expressed), "expressed genes\n")
+cat("  Anti-correlated upstream:", length(anti_expressed), "expressed genes\n")
 
 # 4. Create filter list and classification table
 # Only filter genes OUTSIDE the introgression that are correlated
@@ -734,6 +872,50 @@ cat("    - inv4m_linked_genes_to_filter.txt\n")
 cat("  Classification table (all correlated genes):\n")
 cat("    - inv4m_correlated_genes_classification.txt\n")
 cat("    - inv4m_correlated_genes_classification.rds\n")
+```
+
+## Gene Overlap of Fixed Alternate Allele Markers
+
+**Purpose**: Quantify how many fixed alternate allele markers (computed in the
+Fixed Alternate Allele Analysis section above) overlap expressed gene models.
+This is the gene-level count corresponding to the "fixed highland introgression"
+category in the manuscript.
+
+```{r fixed_gene_overlap}
+# Build GRanges for fixed markers
+fixed_markers <- data.frame(
+  marker = colnames(ngt)[fixed_mi21],
+  stringsAsFactors = FALSE
+) %>%
+  mutate(
+    CHR = gsub("^S(\\d+)_.*", "\\1", marker),
+    BP = as.numeric(gsub("^S\\d+_", "", marker))
+  )
+
+fixed_gr <- GRanges(
+  seqnames = fixed_markers$CHR,
+  ranges = IRanges(start = fixed_markers$BP, end = fixed_markers$BP)
+)
+
+# Overlap with gene models (transcripts_gff loaded in gene_overlap chunk)
+olap_fixed <- findOverlaps(fixed_gr, transcripts_gff, ignore.strand = TRUE)
+fixed_snps_in_genes <- length(unique(queryHits(olap_fixed)))
+fixed_genes <- transcripts$gene_id[subjectHits(olap_fixed)] %>%
+  sort() %>% unique()
+
+cat("Fixed alternate allele markers overlapping gene models:\n")
+cat("  Total fixed markers:", sum(fixed_mi21), "\n")
+cat("  Markers in genes:", fixed_snps_in_genes, "\n")
+cat("  Unique genes:", length(fixed_genes), "\n")
+
+# Breakdown by chromosome
+fixed_gene_markers <- fixed_markers[queryHits(olap_fixed), ] %>% distinct()
+fixed_gene_by_chr <- fixed_gene_markers %>%
+  group_by(CHR) %>%
+  summarise(n_snps_in_genes = n(), .groups = "drop")
+
+cat("\nFixed markers in genes by chromosome:\n")
+print(as.data.frame(fixed_gene_by_chr))
 ```
 
 ## Example: Applying Filter to DE Results
@@ -942,8 +1124,13 @@ knitr::kable(geno_summary, caption = "Mean genotype composition")
    `r length(outside_correlated_genes) + length(anticorrelated_genes)` genes 
    (dispersed + anti-correlated regions)
 
-4. **Introgression extent**: Shared segment spans 
+4. **Introgression extent**: Shared segment spans
    `r introgression_size` Mb vs. `r inv4m_size` Mb for Inv4m core
+
+5. **Fixed alternate alleles**: `r sum(fixed_mi21)` markers are homozygous for
+   the alternate allele across all individuals. Only `r pct_fixed_chr4`% are on
+   chromosome 4. The majority map to chromosomes 1, 5, and 6, consistent with
+   B73 seed stock divergence from the reference genome (Liang & Schnable 2016)
 
 # Session Info
 
