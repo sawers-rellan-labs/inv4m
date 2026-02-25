@@ -8,7 +8,7 @@
 
 ## START HERE: Inversion Paper Final Proofreading
 
-**Current State:** Manuscript proofreading IN PROGRESS. Verifying all statistics against reproducible code.
+**Current State:** Peer review response edits APPLIED (2026-02-24). Manuscript proofreading ongoing.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -22,17 +22,18 @@ README.md  # Figure/table coverage
 
 | # | Task | Status | Blocked by |
 |---|------|--------|------------|
-| 1 | Proofread Results 3.1-3.2: Breakpoints + Phenotypes | 🔶 in progress | - |
-| 2 | Proofread Results 3.3-3.4: SAM + DEGs + GxE + Internodes | pending | - |
-| 3 | Proofread Results 3.5-3.7: WGCNA + Trans-network + JMJ | pending | - |
-| 4 | Discussion: Overclaiming pass | pending | #2, #3 |
-| 5 | Discussion: Underclaiming pass | pending | #2, #3 |
-| 6 | Discussion: Novelty pass | pending | #2, #3 |
-| 7 | Discussion: Results-Discussion alignment | pending | #4, #5, #6 |
-| 8 | Proofread Methods | pending | - |
+| 1 | Proofread Results 3.1-3.2: Breakpoints + Phenotypes | ✅ done | - |
+| 2 | Proofread Results 3.3-3.4: SAM + DEGs + GxE + Internodes | ✅ done | - |
+| 3 | Proofread Results 3.5-3.7: WGCNA + Trans-network + JMJ | ✅ done | - |
+| 4 | Discussion: Overclaiming pass | ✅ done | #2, #3 |
+| 5 | Discussion: Underclaiming pass | ✅ done | #2, #3 |
+| 6 | Discussion: Novelty pass | ✅ done | #2, #3 |
+| 7 | Discussion: Results-Discussion alignment | ✅ done | #4, #5, #6 |
+| 8 | Proofread Methods | ✅ done | - |
 | 9 | Proofread Introduction | ✅ done | #7, #8 |
 | 10 | Proofread Abstract | ✅ done | #9 |
 | 11 | Read aloud: Abstract + Discussion | pending | #10 |
+| 12 | Internal peer review: address 18 edits | ✅ done (2026-02-24) | #10 |
 
 ### Section 3.2 corrections applied (2026-02-24):
 - 126 → 1394 fixed alternate allele markers
@@ -43,6 +44,14 @@ README.md  # Figure/table coverage
 - Notebook updated: `plot_genotype_get_correlated_loci.Rmd` (fixed_alternate_alleles, compute_sig_runlength)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
+
+### Peer review edits applied (2026-02-24):
+- Abstract: soften attribution ("Inv4m introgression"), add GxE reversal, reframe JMJ as CNV + regulatory suppression, "working model" not "mechanistic chain"
+- Results: note Crow 2020 drag reduction (57→24 Mb), reframe OR=1.02, environment-dependent subsection title, internode data within GxE, soften SAM causal language, fix nm→um
+- WGCNA: add DEG-input caveat, cite magenta as non-significant counterexample
+- Trans-network: "Novel" → "Dataset-specific", explain MaizeNetome overlap as tissue difference
+- Discussion: lead JMJ with CNV + ancestral single-copy, "consistent with" not "characteristic of" local adaptation, reciprocal transplant caveat, expanded 4-point limitations
+- See: `scripts/00_agent_work/peer_review_inversion_paper.md` and `review_response_edits.md`
 
 ---
 

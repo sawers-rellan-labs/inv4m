@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript proofreading in progress (2026-02-24).
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Peer review response edits applied (2026-02-24).
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
@@ -51,6 +51,24 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Spatial correction | Pre-processing for phenotypes | [`spatial_correction_for_INV4MXP.Rmd`](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/spatial_correction_for_INV4MXP.html) | ✅ |
 | LION enrichment | Lipid ontology analysis | [`LION_Lipid_Enrichment_Analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/LION_Lipid_Enrichment_Analysis.html) | ✅ |
 | Annotation assembly | GO/KEGG/LION enrichment panels | [`Annotation_assembly.Rmd`](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/Annotation_assembly.html) | ✅ |
+
+## Inversion Paper: Revision Status
+
+### Peer review edits applied (2026-02-24)
+
+18 text edits addressing internal peer review (see `scripts/00_agent_work/peer_review_inversion_paper.md` and `review_response_edits.md`):
+
+| Category | Key changes |
+|----------|------------|
+| **Attribution** | Soften Inv4m → "Inv4m introgression"; note reduction from Crow 2020 linkage drag (57→24 Mb); reframe OR=1.02 as evidence against position effects |
+| **GxE context** | Lead with environment-dependent framing; qualify PSU2022 effects as site-specific; reframe internode data within GxE reversal |
+| **JMJ cluster** | Lead Discussion with CNV (5:1 copy number) as baseline; foreground field-specific regulatory suppression (49-61% of expected) as novel finding; clarify single-copy state is ancestral |
+| **Mechanistic claims** | "Mechanistic chain" → "working model"; soften SAM-to-field causal language; note ChIP-seq/H3K4me3 needed |
+| **WGCNA** | Add caveat about DEG input set; cite magenta (non-significant) as counterexample |
+| **Trans-network** | "Novel" → "Dataset-specific" throughout; explain low MaizeNetome overlap as tissue/context difference |
+| **Local adaptation** | "Characteristic of" → "consistent with"; add reciprocal transplant caveat |
+| **Limitations** | Expand to 4 structured points: flanking drag, B73 background, sample size, SAM/RNA-seq stage gap |
+| **Minor** | Fix units nm⁻¹ → μm⁻¹; clarify CML457/CML459 as CIMMYT tropical lines |
 
 ## Inversion Paper: Figure/Table Coverage
 
