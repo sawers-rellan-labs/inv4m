@@ -82,22 +82,27 @@ coadapted allele complexes from recombination. \invfour is a 15 Mb
 inversion from the highland teosinte \textit{Zea mays} ssp. \mex that
 is nearly fixed above 2500 m in Mexico but rare in temperate maize. We
 introgressed \invfour into the B73 background through eight generations
-of backcrossing and characterized its effects on phenotype, transcriptome,
-and gene coexpression networks. Genome alignment to three \textit{Zea}
-references delimited \invfour breakpoints within chromosomal knob repeat
-arrays. Field trials showed that \invfour accelerates flowering by
-1.3 days and increases plant height by 6.5 cm, with effects varying
-across three environments consistent with local adaptation. Shoot apical
+of backcrossing and characterized the effects of the introgression on
+phenotype, transcriptome, and gene coexpression networks. Genome
+alignment to three \textit{Zea} references delimited \invfour breakpoints
+within chromosomal knob repeat arrays. In Pennsylvania field trials, the
+\invfour introgression accelerated flowering by 1.3 days and increased
+plant height by 6.5 cm; however, genotype-by-environment interactions
+across three environments reversed the height effect in North Carolina,
+consistent with environment-dependent fitness contributions. Shoot apical
 meristems were 9\% more elongated in \invfour seedlings. RNA-seq
 identified 465 differentially expressed genes, with the strongest signal
-from a JUMONJI histone demethylase cluster that shows copy number
-expansion in B73 relative to highland genomes. Weighted gene coexpression
-network analysis revealed that \invfour disrupts 12 of 13 coexpression
-modules, with JMJ genes losing hub connectivity. A trans-regulatory
-network links JMJ regulators to cell proliferation genes including
-\textit{pcna2} and \textit{sec6}, suggesting a mechanistic chain from
-chromatin modification to growth phenotypes. These results identify
-candidate genes and regulatory networks underlying \invfour's
+from a JUMONJI histone demethylase cluster that shows a lineage-specific
+tandem expansion in B73 (five paralogs) relative to highland genomes
+(single ortholog). Field expression of the cluster fell significantly
+below copy number expectation, indicating additional regulatory
+suppression. Weighted gene coexpression network analysis revealed that
+the introgression disrupts 12 of 13 coexpression modules, with JMJ genes
+losing hub connectivity. A trans coexpression network links JMJ genes to
+cell proliferation genes including \textit{pcna2} and \textit{sec6},
+suggesting a working model in which chromatin modification changes
+propagate to growth-related gene networks. These results identify
+candidate genes and regulatory networks that may underlie \invfour's
 contribution to highland adaptation in maize.
 \end{abstract}
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -320,6 +325,9 @@ highland allele of PZE04175660223 we have produced plants with the introgression
 of the target \invfour inversion surrounded by 24 Mb of lingering unintended 
 linkage drag (Fig~\ref{fig::design}F and G). Conversely, we have produced 
 inversion-free lines in the CTRL group by selecting for the B73 allele.
+This represents a substantial reduction in flanking introgression
+compared to the BC$_5$ populations of \cite{crow2020}, where residual
+donor alleles extended over 57 Mb (PT family) and 18 Mb (Mi21 family).
 
 In more detail, there are 7683 SNPs significantly correlated with \invfour 
 (Pearson correlation \textit{t-test}, $\textit{FDR} < 0.005$) constituting divergent highland 
@@ -355,22 +363,24 @@ other dispersed divergent highland introgressions.
   \label{fig:phenotypes}
   \end{figure*}
 
-\subsection{\invfour modulates flowering and promotes growth}
+\subsection{The \invfour introgression modulates flowering and growth in an environment-dependent manner}
 
-Field trials demonstrated that \invfour significantly affects both flowering
-time and plant architecture (Fig~\ref{fig:phenotypes}A). Spatially-corrected
-phenotype analysis revealed that plants carrying the highland inversion allele
-flowered $1.30 \pm 0.27$ days earlier to anthesis ($p = 7.9 \times 10^{-6}$) and
-$1.05 \pm 0.22$ days earlier to silking ($p = 1.4 \times 10^{-5}$) compared to
-control lines. \invfour plants were also significantly taller, with a
-$6.48 \pm 1.11$ cm increase in plant height ($p = 2.3 \times 10^{-7}$). Harvest
-index showed a modest but significant increase of $0.11 \pm 0.04$
-($p = 0.01$), indicating that the enhanced vegetative growth did not come at
-the expense of reproductive allocation. Stover dry weight at harvest and collar
-diameter were also significantly affected by \invfour (FDR $< 0.05$), consistent
-with the overall growth promotion phenotype. These effects were consistent across
-phosphorus treatments, which were modeled as a covariate in the spatial
-correction.
+The \invfour introgression significantly affected both flowering time and
+plant architecture, with effect sizes and direction varying across
+environments. In the PSU2022 Pennsylvania field trial, spatially-corrected
+phenotype analysis revealed that plants carrying the highland inversion
+allele flowered $1.30 \pm 0.27$ days earlier to anthesis
+($p = 7.9 \times 10^{-6}$) and $1.05 \pm 0.22$ days earlier to silking
+($p = 1.4 \times 10^{-5}$) compared to control lines. \invfour plants
+were also significantly taller, with a $6.48 \pm 1.11$ cm increase in
+plant height ($p = 2.3 \times 10^{-7}$). Harvest index showed a modest
+but significant increase of $0.11 \pm 0.04$ ($p = 0.01$), indicating
+that the enhanced vegetative growth did not come at the expense of
+reproductive allocation. Stover dry weight at harvest and collar diameter
+were also significantly affected by \invfour (FDR $< 0.05$), consistent
+with the overall growth promotion phenotype. These effects were consistent
+across phosphorus treatments, which were modeled as a covariate in the
+spatial correction.
 
 To investigate whether these macroscopic phenotypes were associated with
 changes in meristem organization, we examined shoot apical meristems (SAMs)
@@ -380,10 +390,12 @@ increase ($9.65 \pm 5.50$ $\mu$m, $p = 0.088$), the SAM radius was unchanged
 ($0.03 \pm 1.12$ $\mu$m, $p = 0.98$). Importantly, the shape metrics capturing
 SAM elongation were significantly altered: the height-to-radius ratio increased
 by $0.158 \pm 0.074$ ($p = 0.038$) and the shape factor ($h/r^2$) increased by
-$2.49 \pm 1.14$ nm$^{-1}$ ($p = 0.035$), representing a 9\% elongation of the
-meristem dome. These findings suggest that the accelerated flowering and
-increased plant height in \invfour lines may originate from altered meristem
-geometry established early in development.
+$2.49 \pm 1.14$ $\mu$m$^{-1}$ ($p = 0.035$), representing a 9\% elongation of the
+meristem dome. These findings establish that developmental differences in meristem
+geometry are present early in \invfour seedlings. Whether this early
+architectural change contributes causally to the subsequent flowering
+and height phenotypes observed in field-grown plants remains to be
+determined.
 
 To test whether \invfour effects are consistent across environments, we
 analyzed phenotypes from three location-year combinations using the MI21 donor
@@ -405,7 +417,8 @@ magnitude and direction of \invfour effects on growth depend on environmental
 conditions.
 
 To characterize the architectural basis of \invfour effects on plant height,
-we measured internode lengths in the CLY2025 field experiment. In the MI21
+we measured internode lengths in the CLY2025 field experiment, where
+\invfour plants were shorter than controls ($d = -1.28$). In the MI21
 background, we measured 1,556 internodes from 112 control plants and 1,607
 internodes from 116 \invfour plants. Mean internode length was similar between
 genotypes (CTRL: $13.1 \pm 5.5$ cm; \invfour: $12.9 \pm 5.2$ cm). Internode
@@ -413,9 +426,13 @@ profiles revealed that the largest \invfour effects were concentrated at
 positions 2 to 4 from the top, with position 2 (just below the tassel)
 accounting for the majority of the height difference ($-4.1$ cm, $p < 10^{-19}$)
 (Supplementary Fig.~\ref{fig::internode}). Total node count did not differ
-significantly between genotypes within the MI21 background, suggesting that
-\invfour effects on plant height are mediated by internode elongation rather
-than increased phytomer number.
+significantly between genotypes within the MI21 background, indicating that
+\invfour effects on plant height are mediated by differential internode
+elongation at specific developmental positions rather than increased phytomer
+number. Notably, the direction of internode effects in North Carolina
+(shortening at positions 2 to 5) is consistent with the overall height
+reversal observed in the GxE analysis, confirming that the same architectural
+mechanism operates in both directions depending on the environment.
 
 \begin{figure*}[!ht]
 \centering
@@ -538,7 +555,13 @@ To characterize the transcriptional landscape of \invfour introgression, we perf
 
 The spatial distribution of differentially expressed genes (DEGs) revealed a striking contrast between leaf stage and \invfour effects (Fig~\ref{fig:transcriptome}D-E). Leaf developmental stage produced a genome-wide transcriptional response, with significant DEGs distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D). In contrast, the \invfour effect was sharply localized: a prominent peak of differential expression on chromosome 4 corresponded precisely to the introgressed region (Fig~\ref{fig:transcriptome}E).
 
-To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}). DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$). This enrichment was even stronger among high-confidence DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 high-confidence DEGs in the shared introgression represented a 141-fold enrichment over genomic background. Notably, there was no significant difference in DEG density between \invfour proper and the flanking regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment.
+To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}). DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$). This enrichment was even stronger among high-confidence DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 high-confidence DEGs in the shared introgression represented a 141-fold enrichment over genomic background. Notably, there was no significant difference in DEG density between
+\invfour proper and the flanking regions (odds ratio = 1.02, $p = 0.95$).
+This uniform distribution indicates that the transcriptional perturbation
+is not a breakpoint-position effect confined to inversion boundaries
+but extends throughout the introgressed segment, consistent with
+trans-regulatory effects from hub genes rather than simple cis
+positional disruption.
 
 The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I). The NAM v5 annotation consolidates \jmjii, \jmjvi, and \jmjix as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}). These genes showed the strongest downregulation in \invfour plants, with \jmjii exhibiting a $\log_2 \text{FC} = -3.49$ ($\textit{FDR} < 10^{-20}$; Supplementary Table~\ref{tab:gene_effects}).
 
@@ -825,7 +848,15 @@ beyond individual DEGs, we performed weighted gene coexpression network analysis
 (WGCNA) using a consensus approach. We constructed reference networks from CTRL
 samples using 1000 bootstrap iterations with 80\% gene subsampling and variable
 \textit{minModuleSize} (10 to 35), identifying modules robust to analytical choices
-(Fig~\ref{fig:wgcna}A).
+(Fig~\ref{fig:wgcna}A). Because the input gene set comprises DEGs, some
+degree of connectivity change between genotypes is expected; the
+informative comparisons are therefore the relative magnitude of
+disruption across modules, the identity of genes showing the largest
+hub-to-peripheral transitions, and the biological coherence of the most
+affected modules. We note that one module (magenta) showed no significant
+connectivity change ($p_{adj} = 0.126$; Table~\ref{tab::preservation}),
+demonstrating that the connectivity loss is not a uniform artifact of the
+input gene set.
 
 The consensus network assigned 465 DEGs (FDR $< 0.05$) into 13 coexpression modules
 (FDR $< 0.05$). Bootstrap support, quantified as the Largest Fragment Proportion
@@ -916,7 +947,7 @@ the transcriptome.
 \caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
 \textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow). Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants. Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
 \textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships. The network includes \textit{proliferating cell nuclear antigen2} (\textit{pcna2}), \textit{outer cell layer2} (\textit{ocl2}), and \jmjii.
-\textit{Right:} Novel edges specific to the \invfour network, showing the \jmjiv neighborhood subgraph that includes \textit{Exocyst complex component SEC6} (\textit{sec6}).
+\textit{Right:} Dataset-specific edges detected in the \invfour network but absent from MaizeNetome, showing the \jmjiv neighborhood subgraph that includes \textit{Exocyst complex component SEC6} (\textit{sec6}).
 \textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction. Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$). Gene labels identify representative members of enriched terms. Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.}
 \label{fig::transnetwork}
 \end{figure*}
@@ -941,9 +972,17 @@ The trans-regulatory network comprised 135 genes connected by 552 coexpression
 edges. Of the 103 regulator genes within or flanking the introgression, 33
 were located within the \invfour proper and 70 in the flanking regions. These
 regulators showed coexpression relationships with 32 trans target genes
-distributed across all ten maize chromosomes. We classified edges as
-``Reference'' if present in the MaizeNetome database (16 edges, 2.9\%) or
-``Novel'' if specific to our \invfour network (536 edges, 97.1\%).
+distributed across all ten maize chromosomes. We classified edges as ``Reference'' if present in the MaizeNetome
+database (16 edges, 2.9\%) or ``Dataset-specific'' if absent from
+MaizeNetome (536 edges, 97.1\%). The low overlap likely reflects
+differences in tissue representation and developmental context:
+MaizeNetome aggregates expression from 7,603 RNA-seq samples spanning
+diverse tissues and genotypes \cite{feng2023}, whereas our network
+captures coexpression relationships specific to field-grown V10--V12
+leaves. The dataset-specific edges are statistically well-supported in
+our experiment (FDR-corrected Pearson correlation $q < 0.05$) and their
+absence from MaizeNetome indicates condition-specificity rather than
+lack of biological support.
 
 
 The Reference network included known regulatory relationships involving
@@ -954,13 +993,13 @@ involved in epidermal cell differentiation. Notably, the Reference network
 also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets,
 supporting a conserved regulatory role for this histone demethylase.
 
-The Novel network revealed a previously uncharacterized \jmjiv neighborhood
+The dataset-specific network revealed a previously uncharacterized \jmjiv neighborhood
 subgraph (Fig~\ref{fig::transnetwork}A, right panel). \jmjiv ($\log_2 FC =
 -2.84$) showed strong coexpression with \textit{Exocyst complex component
 SEC6} (\textit{sec6}; $\log_2 FC = +2.87$), which functions in vesicle
 trafficking and cell plate formation during cytokinesis. This connection
 suggests that the JMJ cluster may influence cell division through
-post-translational mechanisms beyond chromatin modification.
+pathways beyond direct chromatin modification of target gene promoters.
 
 Gene Ontology enrichment analysis of genes within \invfour proper
 (Fig~\ref{fig::transnetwork}B) revealed significant over-representation of
@@ -981,7 +1020,7 @@ regulators may underlie the developmental phenotypes.
 
 The \jmjii/\jmjiv cluster exhibited the strongest transcriptional response to \invfour introgression, with \jmjii showing $\log_2 \text{FC} = -3.49$ (\textit{FDR} $< 10^{-20}$), the largest effect size among all DEGs. This apparent downregulation was consistent across all 13 tissue-experiment combinations examined, including both PSU2022 field samples (V13 adult leaves) and Crow et al. (2020) growth chamber samples spanning roots, leaves, and shoot apical meristems (Fig~\ref{fig:jmj_cluster}A).
 
-However, microsynteny analysis across five \textit{Zea} genomes revealed that the B73 reference contains a tandem expansion of five JMJ paralogs (\jmjix, a putative pseudogene, \jmjvi, \jmjii, and \jmjiv), whereas highland teosinte TIL18, the landrace Palomero Toluque\~{n}o, and the tropical inbreds CML457 and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B). The high sequence identity among paralogs ($>$97\% cDNA similarity; Fig~\ref{fig:jmj_cluster}C) suggests recent duplication and complicates individual paralog quantification.
+However, microsynteny analysis across five \textit{Zea} genomes revealed that the B73 reference contains a tandem expansion of five JMJ paralogs (\jmjix, a putative pseudogene, \jmjvi, \jmjii, and \jmjiv), whereas highland teosinte TIL18, the highland landrace Palomero Toluque\~{n}o, and the CIMMYT tropical inbred lines CML457 and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B). The single-copy state is shared across highland and tropical backgrounds, suggesting it represents the ancestral configuration. The high sequence identity among B73 paralogs ($>$97\% cDNA similarity; Fig~\ref{fig:jmj_cluster}C) suggests recent duplication and complicates individual paralog quantification.
 
 To test whether the observed expression differences could be explained by copy number alone, we compared total cluster expression in \invfour plants against the expectation under simple dosage scaling (CTRL/5). In field samples, \invfour expression was consistently and significantly below this expectation: Leaf 1 achieved 61.5\% of expected levels ($t = 2.94$, \textit{FDR} $= 0.031$), while Leaves 2 to 4 showed only 49 to 53\% of expected expression (\textit{FDR} $< 0.015$ for all). This pattern suggests that beyond copy number reduction, additional regulatory mechanisms suppress JMJ cluster transcription in the field.
 
@@ -991,17 +1030,22 @@ In contrast, growth chamber data showed a less consistent pattern. Only 4 of 9 t
 \section{Discussion}
 
 Introgression of \invfour from Mexican highland maize into B73 produces
-consistent effects on flowering time and plant height, independent of phosphorus
-availability (Fig~\ref{fig:phenotypes}). Transcriptomic analysis identifies
-the JUMONJI histone demethylase cluster as the strongest candidate, showing
-both copy number variation between highland and lowland genomes
-(Fig~\ref{fig:jmj_cluster}B) and expression levels below copy number
-expectation in field conditions (Fig~\ref{fig:jmj_cluster}A). WGCNA reveals
-that \invfour introgression disrupts 12 of 13 coexpression modules
+significant effects on flowering time and plant height whose magnitude
+and direction vary across environments (Fig~\ref{fig:phenotypes},
+Supplementary Table~\ref{tab::gxe}), independent of phosphorus
+availability. Transcriptomic analysis identifies the JUMONJI histone
+demethylase cluster as the strongest candidate: the apparent
+downregulation largely reflects a lineage-specific tandem expansion in
+B73 (five paralogs versus a single ortholog in highland genomes;
+Fig~\ref{fig:jmj_cluster}B), but field expression falls significantly
+below the copy number expectation, indicating additional regulatory
+suppression (Fig~\ref{fig:jmj_cluster}A). WGCNA reveals that the
+\invfour introgression disrupts 12 of 13 coexpression modules
 (Table~\ref{tab::preservation}), with JMJ genes losing hub status
-(Fig~\ref{fig:wgcna}C). The phosphorus starvation hypothesis was tested and
-rejected in our companion study~\cite{rodriguez2026phosphorus}; here we focus
-on identifying candidate genes underlying the observed adaptive phenotypes.
+(Fig~\ref{fig:wgcna}C). The phosphorus starvation hypothesis was tested
+and rejected in our companion study~\cite{rodriguez2026phosphorus}; here
+we focus on identifying candidate genes underlying the observed
+phenotypes.
 
 \subsection*{Breakpoint characterization reveals knob repeat involvement in inversion structure}
 
@@ -1078,7 +1122,7 @@ breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus
 flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with
 trans-regulatory effects rather than simple position effects.
 
-\subsection*{Gene-by-environment interactions support local adaptation}
+\subsection*{Gene-by-environment interactions are consistent with local adaptation}
 
 Analysis across three location-year combinations revealed significant GxE
 interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}).
@@ -1087,37 +1131,50 @@ $p < 8.7 \times 10^{-10}$), with effect direction reversing between
 Pennsylvania (Cohen's $d = 1.45$ to $2.23$) and North Carolina ($d = -1.28$;
 Supplementary Fig.~\ref{fig::gxe_forest}).
 
-This pattern is characteristic of local adaptation, where alleles beneficial
+This pattern is consistent with local adaptation, where alleles beneficial
 in one environment may be neutral or deleterious in others
-\cite{kirkpatrick2006b}. The rarity of \invfour in temperate maize, despite
+\cite{kirkpatrick2006b}, and parallels the elevation-dependent fitness
+trade-offs reported for \invfour in Mexican landrace field trials
+\cite{crow2020}. The rarity of \invfour in temperate maize, despite
 introgression opportunities during northward expansion \cite{hufford2013-gs},
 may reflect selection against the inversion in environments with long growing
 seasons where earlier flowering provides no advantage. The 432 genes within
 \invfour (Table~\ref{tab:DEGs_distro}) are maintained as a coadapted unit by
 suppressed recombination \cite{gonzalez-segovia2019-jy}, preserving
-highland-adapted allele combinations.
+highland-adapted allele combinations. We note that a formal test of local
+adaptation would require reciprocal transplant experiments including highland
+environments where \invfour is nearly fixed.
 
 
 
-\subsection*{JMJ histone demethylases as flowering time / plant height candidates}
+\subsection*{JMJ copy number variation and environment-dependent regulatory suppression}
 
-The \jmjii/\jmjiv cluster exhibited the largest expression difference among
-all DEGs, with $\log_2 \text{FC} = -3.49$ ($\textit{FDR} < 10^{-20}$;
-Table~\ref{tab:FT_PH_candidates}). This downregulation was consistent across
-all 13 tissue-experiment combinations examined, including field and growth
-chamber samples spanning roots, leaves, and shoot apical meristems
-(Fig~\ref{fig:jmj_cluster}A).
+Microsynteny analysis revealed that the B73 reference carries a
+lineage-specific tandem expansion of five JMJ paralogs, while highland
+teosinte TIL18, the highland landrace PT, and the CIMMYT tropical inbred
+lines CML457 and CML459 each retain only a single \textit{jmj6} ortholog
+(Fig~\ref{fig:jmj_cluster}B). The single-copy state is shared across
+both highland and tropical lines, indicating it is likely the ancestral
+configuration, with the five-copy expansion specific to the B73 lineage.
+The high sequence identity among B73 paralogs ($>$97\%;
+Fig~\ref{fig:jmj_cluster}C) indicates recent tandem duplication.
 
-Microsynteny analysis revealed that B73 contains five JMJ paralogs while
-highland teosinte TIL18 and the landraces PT, CML457, and CML459 each retain
-only a single ortholog (Fig~\ref{fig:jmj_cluster}B). The high sequence
-identity among B73 paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) indicates
-recent tandem duplication. Under simple dosage scaling, \invfour expression
-should equal CTRL/5; however, field samples showed only 49 to 61\% of this
-expectation (linear contrast $t$-test, $\textit{FDR} < 0.05$ for all four
-tissues). Growth chamber data were less consistent (48 to 83\% of expectation,
-4/9 tissues significant), suggesting environment-specific regulatory
-mechanisms beyond baseline copy number effects.
+The \jmjii/\jmjiv cluster exhibited the largest apparent expression
+difference among all DEGs ($\log_2 \text{FC} = -3.49$,
+$\textit{FDR} < 10^{-20}$; Table~\ref{tab:FT_PH_candidates}),
+consistent across all 13 tissue-experiment combinations
+(Fig~\ref{fig:jmj_cluster}A). However, this fold-change is substantially
+explained by the 5:1 copy number difference. The more informative
+comparison is whether \invfour expression deviates from the copy number
+expectation (CTRL/5). In field samples, expression was consistently and
+significantly below this expectation: 49 to 61\% of predicted levels
+(linear contrast $t$-test, $\textit{FDR} < 0.05$ for all four leaf
+stages). Growth chamber data were less consistent (48 to 83\% of
+expectation, 4/9 tissues significant), suggesting environment-specific
+regulatory suppression beyond baseline copy number effects. This
+additional suppression in field conditions, rather than copy number
+alone, makes the JMJ cluster a candidate for environment-dependent
+regulation of flowering and growth.
 
 GWAS support links the JMJ cluster to flowering time variation
 \cite{tibbs-cortes2024}. JUMONJI domain proteins function as histone
@@ -1137,13 +1194,14 @@ cytokinesis, emerged as a plant height candidate with GWAS support
 
 
 
-\subsection*{Network disruption links chromatin regulators to growth phenotypes}
+\subsection*{Coexpression network disruption suggests a link between chromatin regulators and growth phenotypes}
 
 SAM measurements from two-week-old seedlings revealed that \invfour plants
 have elongated meristems, with a 9\% increase in the shape factor
-($h/r^2 = +2.49 \pm 1.14$ nm$^{-1}$, $p = 0.035$; Fig~\ref{fig:phenotypes}C).
-This early developmental change may underlie the subsequent height and
-flowering differences observed in field-grown plants.
+($h/r^2 = +2.49 \pm 1.14$ $\mu$m$^{-1}$, $p = 0.035$; Fig~\ref{fig:phenotypes}C).
+This early developmental change in controlled conditions is consistent with,
+though not proof of, a connection to the subsequent height and flowering
+differences observed in field-grown plants.
 
 WGCNA analysis showed that JMJ genes function as network hubs in CTRL
 ($k_{Within} = 3.17$ to $3.33$) but become peripheral in \invfour
@@ -1153,12 +1211,15 @@ Table~\ref{tab::preservation}), with the pink module, enriched for ribosome
 biogenesis and growth regulation (Table~\ref{tab::pink_module}), showing
 significant connectivity reduction (mean $\Delta k_{Within} = -1.36$,
 $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation
-($Z_{summary} = 5.8$). The
-trans-regulatory network connects JMJ genes to cell proliferation factors
-including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A),
-suggesting a mechanistic chain: JMJ downregulation $\rightarrow$ altered
-H3K4 methylation $\rightarrow$ growth gene misexpression $\rightarrow$ SAM
-elongation $\rightarrow$ accelerated flowering and increased height.
+($Z_{summary} = 5.8$). The trans coexpression network connects JMJ genes
+to cell proliferation factors including \textit{pcna2} and \textit{sec6}
+(Fig~\ref{fig::transnetwork}A). Together, these observations suggest a
+working model in which reduced JMJ expression alters H3K4 methylation
+patterns, leading to misexpression of growth-related genes and
+contributing to the observed meristem and whole-plant phenotypes. Direct
+evidence for the chromatin modification step (e.g., ChIP-seq for H3K4me3)
+and for a causal link between SAM geometry and field phenotypes remains
+to be established.
 
 The greenyellow module provides complementary evidence for this model. With the
 highest bootstrap support among all modules (LFP $= 0.80$), it contains both
@@ -1264,13 +1325,32 @@ complexity beyond simple haplotype differences, as the introgressed \mex
 haplotype carries a single JMJ ortholog while the B73 haplotype contains five
 tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
 
-Our results remain correlative: 24 Mb of flanking introgression persists
-after eight backcross generations (Fig~\ref{fig::design}F, G), only B73 was
-tested as the recurrent parent, and the high sequence identity among JMJ
-paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) complicates individual gene
-attribution. Functional validation through heterologous overexpression of JMJ
-genes in Arabidopsis, ChIP-seq for H3K4me3, and Hi-C analysis of 3D chromatin
-organization on chromosome 4 would strengthen the mechanistic model proposed
+Several limitations constrain interpretation of our results. First, 24 Mb
+of flanking introgression persists after eight backcross generations
+(Fig~\ref{fig::design}F, G), a challenge inherent to inversions that
+suppress recombination. We reduced this drag from the 57 Mb observed in
+the BC$_5$ populations of \cite{crow2020}, and we addressed the
+attribution problem by applying a strongest-regulator criterion in the
+trans coexpression network, assigning trans targets only when their
+strongest correlated regulator lies within the 15 Mb inversion proper
+(see Methods). Nevertheless, phenotypic effects cannot be unambiguously
+attributed to \invfour versus the flanking introgression. Second, only
+B73 was tested as the recurrent parent; effects may differ in other
+genetic backgrounds, and divergence among B73 seed stocks
+\cite{liang2016} could introduce subtle confounds. Third, the effective
+sample size of four biological replicates per genotype-treatment
+combination limits statistical power for detecting small-effect DEGs,
+although the convergence of 20 out of 27 candidate genes with the
+independent Crow et al.\ \cite{crow2020} dataset provides external
+validation. Fourth, the high sequence identity among JMJ paralogs
+($>$97\%; Fig~\ref{fig:jmj_cluster}C) complicates individual gene
+attribution, and the SAM morphology and transcriptomic data were
+collected from different developmental stages and environments (growth
+chamber seedlings versus field-grown V10--V12 leaves), so the connection
+between meristem geometry and gene expression changes, while consistent,
+remains indirect. Functional validation through ChIP-seq for H3K4me3,
+heterologous expression of JMJ genes, and Hi-C analysis of 3D chromatin
+organization on chromosome 4 would strengthen the working model proposed
 here.
 
 \section{Materials and Methods}
@@ -1595,11 +1675,13 @@ three batches using B73 NAM v4 gene identifiers: (1) left flanking region
 converted from B73 NAM v4 to v5 using published correspondence tables
 \cite{hufford2021}. Edges present in MaizeNetome were classified as
 ``Reference'' (representing conserved co-expression relationships detected
-across diverse maize tissues and genotypes), while edges absent from
-MaizeNetome were classified as ``Novel'' (\invfour-specific). Of the 552 edges
-in the \invfour trans-regulatory network, 16 (2.9\%) were Reference edges and
-536 (97.1\%) were Novel edges, indicating that \invfour creates largely novel
-co-expression relationships not observed in the broader maize transcriptome.
+across diverse maize tissues and genotypes), while edges absent from MaizeNetome were classified as
+``Dataset-specific'' (condition-specific to our field leaf samples). Of
+the 552 edges in the \invfour trans-regulatory network, 16 (2.9\%) were
+Reference edges and 536 (97.1\%) were dataset-specific edges, indicating
+that the coexpression relationships detected in field-grown V10--V12
+leaves largely differ from those captured across the diverse tissue and
+genotype sampling of MaizeNetome.
 
 Networks were visualized as minimum spanning trees (MST) constructed on
 standardized Euclidean distance derived from mutual information:
