@@ -1,0 +1,183 @@
+---
+title: "Chromosomal Knob Repeat Analysis — Figure 1 Panel A"
+author: "inv4m"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+BLAST+ megablast hits of chromosomal knob repeats (knob180 M32524.1 and TR-1
+AY083942.1) plotted along chromosome 4 of four *Zea* genomes. Vertical lines
+mark inversion breakpoint boundaries from AnchorWave genome alignments.
+
+This generates **Figure 1 Panel A** of the inversion paper.
+
+BLAST searches were run with `scripts/02_genomics_foundation/run_repeat_annotation_4genomes.sh`.
+
+# Load BLAST results
+
+```{r load-data}
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+blastcols <- c("qseqid", "sseqid", "pident", "length", "mismatch",
+               "gapopen", "qstart", "qend", "sstart", "send",
+               "evalue", "bitscore")
+
+# Genome order for facets (top to bottom)
+genomes <- c("TIL18", "PT", "Mi21", "B73")
+
+# BLAST result files in intermediate/
+knob_files <- setNames(
+  file.path(paths$intermediate, paste0("knob180_", genomes, ".blast")),
+  genomes
+)
+
+tr1_files <- setNames(
+  file.path(paths$intermediate, paste0("TR-1_", genomes, ".blast")),
+  genomes
+)
+```
+
+```{r read-blast}
+read_blast <- function(files, genomes, rep_label) {
+  lapply(genomes, function(g) {
+    blast <- read.table(
+      files[g], sep = "\t", header = FALSE,
+      col.names = blastcols,
+      colClasses = c(qseqid = "character", sseqid = "character")
+    )
+    blast$genome <- g
+    blast
+  }) %>%
+    bind_rows() %>%
+    mutate(
+      bitscaled = rescale(bitscore, to = c(0, 100)),
+      rep = rep_label
+    )
+}
+
+knob <- read_blast(knob_files, genomes, "knob180")
+tr1  <- read_blast(tr1_files, genomes, "TR-1")
+
+to_plot <- bind_rows(knob, tr1) %>%
+  mutate(
+    genome = factor(genome, levels = genomes),
+    rep = factor(rep)
+  )
+```
+
+```{r hit-summary}
+to_plot %>%
+  group_by(genome, rep) %>%
+  summarise(n_hits = n(), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = rep, values_from = n_hits)
+```
+
+# Breakpoint annotations
+
+```{r breakpoints}
+# Breakpoint coordinates per genome (from AnchorWave alignments / Table 1)
+# Each genome has two vertical lines: upstream and downstream of Inv4m
+annotations <- data.frame(
+  genome = factor(
+    c("TIL18", "TIL18", "PT", "PT", "B73", "B73", "Mi21", "Mi21"),
+    levels = genomes
+  ),
+  xpos = c(
+    # TIL18 (inverted karyotype)
+    180365316, 193570651,
+    # PT (inverted karyotype)
+    173486186, 186925483,
+    # B73 (standard karyotype)
+    172882309, 188131461,
+    # Mi21 NIL (inverted karyotype, from AnchorWave anchors 2026-03-07)
+    # Upstream boundary gene Zm00001eb190470 → Mi21:167621035
+    # Downstream boundary gene Zm00001eb194800 → Mi21:156752504
+    156752504, 167621035
+  )
+)
+```
+
+# Figure 1 Panel A
+
+```{r panel-a, fig.width=10, fig.height=10}
+p <- to_plot %>%
+  ggplot(aes(x = sstart, y = bitscaled, color = rep)) +
+  ylab("Normalized Repeat Match Score") +
+  geom_vline(
+    data = annotations,
+    mapping = aes(xintercept = xpos),
+    color = "#3232a0",
+    linewidth = 1.2
+  ) +
+  geom_point(size = 0.8) +
+  facet_wrap(~ genome, nrow = 4, ncol = 1, scales = "free_x") +
+  scale_color_manual(values = c("knob180" = "#1d7f7a", "TR-1" = "gold")) +
+  scale_x_continuous(
+    labels = unit_format(unit = "", scale = 1e-6),
+    breaks = seq(150e6, 275e6, by = 25e6)
+  ) +
+  annotate("segment", x = -Inf, xend = Inf, y = -Inf, yend = -Inf) +
+  annotate("segment", x = -Inf, xend = -Inf, y = -Inf, yend = Inf) +
+  theme_minimal(base_size = 16) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(hjust = 0.8),
+    plot.title = element_text(hjust = 0.5),
+    strip.background = element_blank(),
+    legend.position = "none"
+  )
+
+p
+```
+
+# Save figure
+
+```{r save}
+ggsave(
+  file.path(paths$figures, "fig1_panel_A_repeat_annotation.pdf"),
+  plot = p,
+  width = 10, height = 10
+)
+
+ggsave(
+  file.path(paths$figures, "fig1_panel_A_repeat_annotation.png"),
+  plot = p,
+  width = 10, height = 10, dpi = 300
+)
+```
+
+# Session info
+
+```{r session-info}
+sessionInfo()
+```
