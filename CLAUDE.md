@@ -469,6 +469,10 @@ Then suggest next actions based on the handover document.
 
 3. **Agent sandbox:** `scripts/00_agent_work/` - Temporary work, git-ignored
 
+### Terminal Commands Rule
+
+When giving multiline terminal commands or instructions to run on HPC/local shell, **always write them to a markdown file in `scripts/00_agent_work/`** with proper code blocks. Never rely on the user copy-pasting commands from the Claude Code chat window — the formatting breaks and corrupts the commands.
+
 ### What to Avoid
 
 - ❌ Don't put CSV files in `tables/` (LaTeX only)

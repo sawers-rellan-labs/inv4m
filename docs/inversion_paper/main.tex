@@ -1489,6 +1489,29 @@ compared the sum of measured internode lengths with directly measured plant
 height (PH) from field records using linear regression. Agreement between
 methods was assessed by $R^2$ and slope deviation from unity.
 
+\subsection{Chromosomal knob repeat annotation}
+
+To characterize the repeat content of the \invfour breakpoint segments across
+genomes, we performed BLAST+ \cite{camacho2009} similarity searches of
+chromosome~4 in B73 (NAM5), PT (HiLo-1.0), and TIL18 (PanAnd-1.0) using
+representative sequences of two classes of chromosomal knob repeats as queries.
+For the 180~bp knob repeat we used accession M32524.1
+\cite{dennis1984knob180}, and for the \textit{TR-1} repeat we used accession
+AY083942.1 \cite{hsu2003}. Searches were run with the \texttt{megablast} task
+(\texttt{blastn -task megablast}), which uses a word size of 28 and is
+optimized for highly similar sequences. Hits were plotted along chromosome~4
+with normalized bitscore on the $y$-axis (Fig~\ref{fig::design}A).
+Breakpoint annotation coordinates were defined by the AnchorWave
+\cite{song2022anchorwave} genome alignment endpoints where reference-orientation
+synteny was lost (Table~\ref{tab:breakpoints}).
+
+For breakpoint self-similarity analysis, we extracted the unaligned segments
+flanking each breakpoint and performed local self-alignment with LAST
+\cite{kielbasa2011}. The resulting dotplots
+(Fig~\ref{fig::design}B) reveal tandem repeat arrays as diagonal and
+off-diagonal patterns, with forward matches shown in red and reverse
+(inverted) matches in blue.
+
 \subsection{Tissue sampling, RNA extraction, and sequencing}
 
 We sampled the plants at 63 DAP when we estimated them to be between v10 to v12 
