@@ -143,3 +143,11 @@ Use `gridtext::richtext_grob` with markdown: `"plain *italic*"`. Set `box_gp = g
 
 **Linewidth conversion:**
 ggplot `linewidth = 1.2` renders as `stroke-width ≈ 2.56` in SVG (at 648×432 canvas). Convert to NPC for consistent spacing: `lw_npc = stroke_width / canvas_height`.
+
+**Always use `fix_text_size = TRUE` when saving SVGs:**
+Without this, `ggsave` writes `textLength` and `lengthAdjust='spacingAndGlyphs'` attributes that distort text when the SVG is scaled or edited in Inkscape. Always pass `fix_text_size = TRUE` to `ggsave()` for SVG output.
+
+```r
+ggsave("figure.svg", plot = p, width = 9, height = 6,
+       device = "svg", fix_text_size = TRUE)
+```
