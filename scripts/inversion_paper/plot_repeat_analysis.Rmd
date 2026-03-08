@@ -22,8 +22,8 @@ knitr::opts_chunk$set(
   echo = TRUE,
   warning = FALSE,
   message = FALSE,
-  fig.width = 10,
-  fig.height = 8
+  fig.width = 9,
+  fig.height = 6
 )
 
 library(here)
@@ -37,7 +37,10 @@ BLAST+ megablast hits of chromosomal knob repeats (knob180 M32524.1 and TR-1
 AY083942.1) plotted along chromosome 4 of four *Zea* genomes. Vertical lines
 mark inversion breakpoint boundaries from AnchorWave genome alignments.
 
-This generates **Figure 1 Panel A** of the inversion paper.
+This generates **Figure 1 Panel A** of the inversion paper in two variants:
+
+- **Plot 2** (PT): TIL18 / PT / B73 — three-genome cowplot with crossing lines
+- **Plot 3** (Mi21): TIL18 / Mi21 / B73 — same architecture, Mi21 NIL assembly
 
 BLAST searches were run with `scripts/02_genomics_foundation/run_repeat_annotation_4genomes.sh`.
 
@@ -47,52 +50,32 @@ BLAST searches were run with `scripts/02_genomics_foundation/run_repeat_annotati
 library(dplyr)
 library(ggplot2)
 library(scales)
+library(cowplot)
 
 blastcols <- c("qseqid", "sseqid", "pident", "length", "mismatch",
                "gapopen", "qstart", "qend", "sstart", "send",
                "evalue", "bitscore")
 
-# Genome order for facets (top to bottom)
 genomes <- c("TIL18", "PT", "Mi21", "B73")
 
-# BLAST result files in intermediate/
-knob_files <- setNames(
-  file.path(paths$intermediate, paste0("knob180_", genomes, ".blast")),
-  genomes
-)
-
-tr1_files <- setNames(
-  file.path(paths$intermediate, paste0("TR-1_", genomes, ".blast")),
-  genomes
-)
-```
-
-```{r read-blast}
-read_blast <- function(files, genomes, rep_label) {
+read_blast <- function(rep_label, prefix) {
+  files <- setNames(
+    file.path(paths$intermediate, paste0(prefix, "_", genomes, ".blast")),
+    genomes)
   lapply(genomes, function(g) {
-    blast <- read.table(
-      files[g], sep = "\t", header = FALSE,
+    blast <- read.table(files[g], sep = "\t", header = FALSE,
       col.names = blastcols,
-      colClasses = c(qseqid = "character", sseqid = "character")
-    )
+      colClasses = c(qseqid = "character", sseqid = "character"))
     blast$genome <- g
     blast
-  }) %>%
-    bind_rows() %>%
-    mutate(
-      bitscaled = rescale(bitscore, to = c(0, 100)),
-      rep = rep_label
-    )
+  }) %>% bind_rows() %>%
+    mutate(bitscaled = rescale(bitscore, to = c(0, 100)), rep = rep_label)
 }
 
-knob <- read_blast(knob_files, genomes, "knob180")
-tr1  <- read_blast(tr1_files, genomes, "TR-1")
-
-to_plot <- bind_rows(knob, tr1) %>%
-  mutate(
-    genome = factor(genome, levels = genomes),
-    rep = factor(rep)
-  )
+to_plot <- bind_rows(
+  read_blast("knob180", "knob180"),
+  read_blast("TR-1", "TR-1")
+) %>% mutate(genome = factor(genome, levels = genomes), rep = factor(rep))
 ```
 
 ```{r hit-summary}
@@ -102,78 +85,343 @@ to_plot %>%
   tidyr::pivot_wider(names_from = rep, values_from = n_hits)
 ```
 
-# Breakpoint annotations
+# Breakpoint alignment
+
+All genomes are aligned so that the upstream breakpoint maps to the B73
+upstream coordinate (172,882,309). This allows visual comparison of inversion
+extent across genomes.
 
 ```{r breakpoints}
-# Breakpoint coordinates per genome (from AnchorWave alignments / Table 1)
-# Each genome has two vertical lines: upstream and downstream of Inv4m
-annotations <- data.frame(
-  genome = factor(
-    c("TIL18", "TIL18", "PT", "PT", "B73", "B73", "Mi21", "Mi21"),
-    levels = genomes
-  ),
-  xpos = c(
-    # TIL18 (inverted karyotype)
-    180365316, 193570651,
-    # PT (inverted karyotype)
-    173486186, 186925483,
-    # B73 (standard karyotype)
-    172882309, 188131461,
-    # Mi21 NIL (inverted karyotype, from AnchorWave anchors 2026-03-07)
-    # Upstream boundary gene Zm00001eb190470 → Mi21:167621035
-    # Downstream boundary gene Zm00001eb194800 → Mi21:156752504
-    156752504, 167621035
-  )
-)
+bp_all <- data.frame(
+  genome = c("TIL18","TIL18","PT","PT","B73","B73","Mi21","Mi21"),
+  side   = rep(c("upstream","downstream"), 4),
+  xpos   = c(180365316, 193570651, 173486186, 186925483,
+             172882309, 188131461, 156752504, 167621035),
+  stringsAsFactors = FALSE)
+
+b73_upstream <- 172882309
+offsets <- bp_all %>% filter(side == "upstream") %>%
+  mutate(offset = b73_upstream - xpos) %>% select(genome, offset)
+bp_aligned <- bp_all %>% left_join(offsets, by = "genome") %>%
+  mutate(xpos_aligned = xpos + offset)
+to_plot <- to_plot %>% left_join(offsets, by = "genome") %>%
+  mutate(sstart_aligned = sstart + offset)
+
+# Midlines: mean repeat position between breakpoints per genome
+midlines <- lapply(unique(bp_all$genome), function(g) {
+  bps <- bp_all$xpos[bp_all$genome == g]
+  hits <- to_plot %>% filter(genome == g,
+    sstart >= min(bps) + 1e6, sstart <= max(bps) - 1e6)
+  if (nrow(hits) == 0) return(NULL)
+  data.frame(genome = g,
+    xmid_aligned = mean(hits$sstart) + offsets$offset[offsets$genome == g])
+}) %>% bind_rows()
 ```
 
-# Figure 1 Panel A
+```{r aligned-breakpoints}
+bp_aligned %>% select(genome, side, xpos, xpos_aligned) %>%
+  tidyr::pivot_wider(names_from = side, values_from = c(xpos, xpos_aligned))
+```
 
-```{r panel-a, fig.width=10, fig.height=10}
-p <- to_plot %>%
+# Plot 1: Four-genome faceted overview
+
+Simple faceted plot of all four genomes at native coordinates (no alignment).
+
+```{r plot1-faceted, fig.width=10, fig.height=10}
+annotations <- bp_all %>%
+  mutate(genome = factor(genome, levels = genomes))
+
+p_faceted <- to_plot %>%
   ggplot(aes(x = sstart, y = bitscaled, color = rep)) +
   ylab("Normalized Repeat Match Score") +
-  geom_vline(
-    data = annotations,
-    mapping = aes(xintercept = xpos),
-    color = "#3232a0",
-    linewidth = 1.2
-  ) +
+  geom_vline(data = annotations, aes(xintercept = xpos),
+             color = "#3232a0", linewidth = 1.2) +
   geom_point(size = 0.8) +
   facet_wrap(~ genome, nrow = 4, ncol = 1, scales = "free_x") +
   scale_color_manual(values = c("knob180" = "#1d7f7a", "TR-1" = "gold")) +
-  scale_x_continuous(
-    labels = unit_format(unit = "", scale = 1e-6),
-    breaks = seq(150e6, 275e6, by = 25e6)
-  ) +
+  scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
+                     breaks = seq(150e6, 275e6, by = 25e6)) +
   annotate("segment", x = -Inf, xend = Inf, y = -Inf, yend = -Inf) +
   annotate("segment", x = -Inf, xend = -Inf, y = -Inf, yend = Inf) +
   theme_minimal(base_size = 16) +
-  theme(
-    axis.title.x = element_blank(),
-    axis.text.x = element_text(hjust = 0.8),
-    plot.title = element_text(hjust = 0.5),
-    strip.background = element_blank(),
-    legend.position = "none"
-  )
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(hjust = 0.8),
+        strip.background = element_blank(),
+        legend.position = "none")
 
-p
+p_faceted
 ```
 
-# Save figure
+# Cowplot assembly helpers
 
-```{r save}
-ggsave(
-  file.path(paths$figures, "fig1_panel_A_repeat_annotation.pdf"),
-  plot = p,
-  width = 10, height = 10
-)
+Shared infrastructure for the three-genome cowplot figures (Plots 2 and 3).
 
-ggsave(
-  file.path(paths$figures, "fig1_panel_A_repeat_annotation.png"),
-  plot = p,
-  width = 10, height = 10, dpi = 300
-)
+```{r cowplot-shared}
+col_inv4m <- "purple4"
+col_knob  <- "#1d7f7a"
+col_gold  <- "gold"
+col_gray  <- "gray50"
+lw        <- 1.2
+
+cfg <- list(
+  xlim    = c(163e6, 250e6),
+  xbreaks = seq(175e6, 250e6, by = 25e6))
+
+# SVG canvas dimensions (9x6 inch at 72 dpi)
+svg <- list(W = 648, H = 432, lw = 2.56)
+
+# Shared x-axis tick positions (same for all variants)
+xtick_x <- c("175" = 183.17, "200" = 314.23, "225" = 445.29, "250" = 576.35)
+
+# Arrow geometry (svg units)
+a_h <- 4; a_gap <- 1; a_pt <- 8
+
+# --- Panel builder ---
+make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
+  gbp  <- bp_aligned %>% filter(genome == genome_id)
+  gmid <- midlines %>% filter(genome == genome_id)
+  gdat <- to_plot %>% filter(genome == genome_id)
+
+  p <- ggplot() +
+    geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
+    { if (nrow(gmid) > 0)
+        geom_vline(xintercept = gmid$xmid_aligned,
+                   color = "gray55", linewidth = lw) } +
+    geom_vline(data = gbp, aes(xintercept = xpos_aligned),
+               color = col_inv4m, linewidth = lw) +
+    { if (show_points)
+        geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
+                   size = 1.2, alpha = 0.7) } +
+    { if (show_points)
+        scale_color_manual(values = c("knob180" = col_knob, "TR-1" = col_gold),
+                           guide = "none") } +
+    scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
+                       breaks = cfg$xbreaks) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-5, 105)) +
+    coord_cartesian(xlim = cfg$xlim) +
+    theme_minimal(base_size = 20) +
+    theme(panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 15, r = 10, b = bot_margin, l = 10),
+          axis.title = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_text(color = "white"))
+
+  if (genome_id != "B73")
+    p <- p + theme(axis.text.x = element_blank())
+  p
+}
+
+# --- Arrow polygon builder ---
+make_arrow_grob <- function(vlines_cfg, panel, direction) {
+  v <- vlines_cfg[[panel]]
+  if (direction == "left") {
+    cy <- v$top_y - a_gap - a_h - svg$lw
+    xs <- c(v$up_x, v$up_x + a_pt, v$dn_x, v$dn_x, v$up_x + a_pt)
+    ys <- c(cy,     cy + a_h, cy + a_h, cy - a_h, cy - a_h)
+  } else {
+    cy <- v$bot_y + a_gap + a_h + svg$lw
+    xs <- c(v$up_x, v$dn_x - a_pt, v$dn_x, v$dn_x - a_pt, v$up_x)
+    ys <- c(cy + a_h, cy + a_h, cy, cy - a_h, cy - a_h)
+  }
+  draw_grob(grid::polygonGrob(
+    x = unit(xs / svg$W, "npc"), y = unit(1 - ys / svg$H, "npc"),
+    gp = grid::gpar(fill = col_inv4m, col = col_inv4m)))
+}
+
+# --- Sigmoid + connection line helpers ---
+sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
+  t <- seq(-6, 6, length.out = n)
+  s <- 1 / (1 + exp(-t))
+  data.frame(x = x1 + (x2 - x1) * s,
+             y = y1 + (y2 - y1) * seq(0, 1, length.out = n))
+}
+
+draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = lw) {
+  pts <- sigmoid_path(x1, y1, x2, y2)
+  draw_plot(
+    ggplot(pts, aes(x, y)) +
+      geom_path(color = color, linewidth = lwd) +
+      scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      theme_void(),
+    x = 0, y = 0, width = 1, height = 1)
+}
+
+# --- Connection line builder ---
+build_crossing_lines <- function(vlines_cfg, mid_x_cfg, pairs) {
+  unlist(lapply(pairs, function(pr) {
+    tv <- vlines_cfg[[pr$top]]; bv <- vlines_cfg[[pr$bot]]
+    tm <- mid_x_cfg[[pr$top]]; bm <- mid_x_cfg[[pr$bot]]
+    y1 <- 1 - tv$bot_y / svg$H
+    y2 <- 1 - bv$top_y / svg$H
+    t_up <- tv$up_x / svg$W; t_dn <- tv$dn_x / svg$W
+    b_up <- bv$up_x / svg$W; b_dn <- bv$dn_x / svg$W
+
+    if (pr$inverted) {
+      # Sigmoid crossing: upstream↔downstream swap
+      list(
+        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
+        draw_sigmoid(t_up, y1, b_dn, y2, color = col_inv4m),
+        draw_sigmoid(t_dn, y1, b_up, y2, color = col_inv4m))
+    } else {
+      # Sigmoid parallel: same-side connections
+      list(
+        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
+        draw_sigmoid(t_up, y1, b_up, y2, color = col_inv4m),
+        draw_sigmoid(t_dn, y1, b_dn, y2, color = col_inv4m))
+    }
+  }), recursive = FALSE)
+}
+
+# --- Overlay annotation builder ---
+legend_dot <- function(col, x, y) {
+  draw_plot(
+    ggplot() + annotate("point", x = 0, y = 0, color = col, size = 4) + theme_void(),
+    x = x, y = y, width = 0.02, height = 0.02)
+}
+
+build_overlay <- function(genome_labels) {
+  sz_name    <- 20
+  sz_species <- 16
+  y_header   <- 0.955
+  y_bump     <- 0.02
+  x_gname    <- 0.54
+  x_species  <- 0.90
+  y_xtick    <- 1 - 375 / svg$H
+
+  genome_annots <- unlist(lapply(genome_labels, function(g) {
+    out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
+                           size = sz_name, fontface = "bold"))
+    if (!is.null(g$desc_html))
+      out <- c(out, list(draw_grob(gridtext::richtext_grob(
+        g$desc_html,
+        x = unit(x_species, "npc"), y = unit(g$y + y_bump, "npc"),
+        hjust = 1, gp = grid::gpar(fontsize = sz_species, col = col_gray),
+        box_gp = grid::gpar(col = NA, fill = NA)))))
+    if (!is.null(g$desc))
+      out <- c(out, list(draw_label(g$desc, x = x_species, y = g$y + y_bump,
+        size = sz_species, fontface = "plain", color = col_gray, hjust = 1)))
+    out
+  }), recursive = FALSE)
+
+  xtick_annots <- lapply(names(xtick_x), function(lab) {
+    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
+               size = 16, color = "#4D4D4D")
+  })
+
+  c(list(
+    draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
+               angle = 90, size = 20),
+    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 20),
+    draw_label("A", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
+    draw_label("Inv4m", x = 0.32, y = 0.917, size = sz_name,
+               fontface = "bold.italic", color = col_inv4m),
+    legend_dot(col_knob, 0.55, y_header - 0.012),
+    draw_label("knob 180", x = 0.58, y = y_header, size = sz_name,
+               fontface = "bold.italic", color = col_knob, hjust = 0),
+    legend_dot(col_gold, 0.73, y_header - 0.012),
+    draw_label("TR-1", x = 0.761, y = y_header - 0.002, size = sz_name,
+               fontface = "bold.italic", color = "gray30", hjust = 0),
+    draw_label("TR-1", x = 0.76, y = y_header, size = sz_name,
+               fontface = "bold.italic", color = col_gold, hjust = 0)),
+    genome_annots,
+    xtick_annots)
+}
+
+# --- Full figure assembler ---
+spacer <- ggplot() + theme_void() + theme(plot.margin = margin(0, 10, 0, 10))
+
+build_panel_a <- function(variant) {
+  vl    <- variant$vlines
+  mx    <- variant$mid_x
+  pairs <- variant$pairs
+  gl    <- variant$genome_labels
+  gnames <- variant$genomes
+
+  crossing <- build_crossing_lines(vl, mx, pairs)
+  overlay  <- build_overlay(gl)
+  arrow_top <- make_arrow_grob(vl, gnames[1], "left")
+  arrow_bot <- make_arrow_grob(vl, gnames[3], "right")
+
+  function(show_points) {
+    stk <- plot_grid(
+      spacer,
+      make_panel(gnames[1], show_points = show_points),
+      make_panel(gnames[2], show_points = show_points),
+      make_panel(gnames[3], show_points = show_points, bot_margin = 2),
+      spacer,
+      ncol = 1, align = "v", axis = "lr",
+      rel_heights = c(0.15, 1, 1, 1, 0.15))
+    p <- ggdraw() + draw_plot(stk, x = 0.08, y = 0.08, width = 0.86, height = 0.86)
+    for (a in overlay)  p <- p + a
+    for (a in crossing) p <- p + a
+    p + arrow_top + arrow_bot
+  }
+}
+```
+
+# Plot 2: TIL18 / PT / B73
+
+```{r plot2-pt-config}
+variant_pt <- list(
+  genomes = c("TIL18", "PT", "B73"),
+  vlines = list(
+    TIL18 = list(up_x = 172.07, dn_x = 241.30, top_y = 57.75,  bot_y = 140.45),
+    PT    = list(up_x = 172.07, dn_x = 242.52, top_y = 170.33, bot_y = 253.03),
+    B73   = list(up_x = 172.07, dn_x = 252.01, top_y = 282.91, bot_y = 354.59)),
+  mid_x = list(TIL18 = 190.90, PT = 192.58, B73 = 231.98),
+  pairs = list(
+    list(top = "TIL18", bot = "PT",  inverted = FALSE),
+    list(top = "PT",    bot = "B73", inverted = TRUE)),
+  genome_labels = list(
+    list(name = "TIL18", y = 0.875,  desc_html = "teosinte *mexicana*"),
+    list(name = "PT",    y = 0.6144, desc = "highland maize"),
+    list(name = "B73",   y = 0.3539, desc = NULL)))
+```
+
+```{r plot2-pt-render, fig.width=9, fig.height=6}
+make_pt <- build_panel_a(variant_pt)
+make_pt(TRUE)
+```
+
+```{r plot2-pt-save}
+ggsave(file.path(paths$figures, "fig1_panel_A_skeleton.svg"),
+       plot = make_pt(FALSE), width = 9, height = 6, device = "svg",
+       fix_text_size = TRUE)
+ggsave(file.path(paths$figures, "fig1_panel_A_skeleton.png"),
+       plot = make_pt(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
+```
+
+# Plot 3: TIL18 / Mi21 / B73
+
+```{r plot3-mi21-config}
+variant_mi21 <- list(
+  genomes = c("TIL18", "Mi21", "B73"),
+  vlines = list(
+    TIL18 = list(up_x = 172.07, dn_x = 241.30, top_y = 57.75,  bot_y = 140.45),
+    Mi21  = list(up_x = 172.07, dn_x = 229.05, top_y = 170.33, bot_y = 253.03),
+    B73   = list(up_x = 172.07, dn_x = 252.01, top_y = 282.91, bot_y = 354.59)),
+  mid_x = list(TIL18 = 190.90, Mi21 = 192.47, B73 = 231.98),
+  pairs = list(
+    list(top = "TIL18", bot = "Mi21", inverted = FALSE),
+    list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
+  genome_labels = list(
+    list(name = "TIL18", y = 0.875,  desc_html = "teosinte *mexicana*"),
+    list(name = "Mi21 NIL", y = 0.6144, desc = "highland maize"),
+    list(name = "B73",   y = 0.3539, desc = NULL)))
+```
+
+```{r plot3-mi21-render, fig.width=9, fig.height=6}
+make_mi21 <- build_panel_a(variant_mi21)
+make_mi21(TRUE)
+```
+
+```{r plot3-mi21-save}
+ggsave(file.path(paths$figures, "fig1_panel_A_mi21_skeleton.svg"),
+       plot = make_mi21(FALSE), width = 9, height = 6, device = "svg",
+       fix_text_size = TRUE)
+ggsave(file.path(paths$figures, "fig1_panel_A_mi21_skeleton.png"),
+       plot = make_mi21(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
 ```
 
 # Session info

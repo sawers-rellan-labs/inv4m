@@ -209,14 +209,11 @@ crossing_lines <- unlist(lapply(pairs, function(pr) {
       draw_sigmoid(t_up, y1, b_dn, y2, color = col_inv4m),
       draw_sigmoid(t_dn, y1, b_up, y2, color = col_inv4m))
   } else {
-    # Straight parallel lines
+    # Sigmoid parallel: same-side connections
     list(
-      draw_line(x = c(tm / svg$W, bm / svg$W), y = c(y1, y2),
-                color = "gray55", size = lw),
-      draw_line(x = c(t_up, b_up), y = c(y1, y2),
-                color = col_inv4m, size = lw),
-      draw_line(x = c(t_dn, b_dn), y = c(y1, y2),
-                color = col_inv4m, size = lw))
+      draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
+      draw_sigmoid(t_up, y1, b_up, y2, color = col_inv4m),
+      draw_sigmoid(t_dn, y1, b_dn, y2, color = col_inv4m))
   }
 }), recursive = FALSE)
 
@@ -233,23 +230,23 @@ x_species  <- 0.90
 # Genome names + species (data-driven)
 genome_labels <- list(
   list(name = "TIL18", y = 0.875 + y_bump,
-       species_html = "teosinte *mexicana*"),
-  list(name = "Mi21",  y = 0.6144 + y_bump,
-       species_html = "BC<sub>2</sub>S<sub>4</sub> NIL"),
+       desc_html = "teosinte *mexicana*"),
+  list(name = "Mi21 NIL", y = 0.6144 + y_bump,
+       desc = "highland maize"),
   list(name = "B73",   y = 0.3539 + y_bump,
-       species_text = NULL))
+       desc = NULL))
 
 genome_annots <- unlist(lapply(genome_labels, function(g) {
   out <- list(draw_label(g$name, x = x_gname, y = g$y,
                          size = sz_name, fontface = "bold"))
-  if (!is.null(g$species_html))
+  if (!is.null(g$desc_html))
     out <- c(out, list(draw_grob(gridtext::richtext_grob(
-      g$species_html,
+      g$desc_html,
       x = unit(x_species, "npc"), y = unit(g$y, "npc"),
       hjust = 1, gp = grid::gpar(fontsize = sz_species, col = col_gray),
       box_gp = grid::gpar(col = NA, fill = NA)))))
-  if (!is.null(g$species_text))
-    out <- c(out, list(draw_label(g$species_text, x = x_species, y = g$y,
+  if (!is.null(g$desc))
+    out <- c(out, list(draw_label(g$desc, x = x_species, y = g$y,
       size = sz_species, fontface = "plain", color = col_gray, hjust = 1)))
   out
 }), recursive = FALSE)
@@ -314,7 +311,8 @@ make_final <- function(show_points) {
 # Save
 # =============================================================================
 outpath_svg <- file.path(paths$figures, "fig1_panel_A_mi21_skeleton.svg")
-ggsave(outpath_svg, plot = make_final(FALSE), width = 9, height = 6, device = "svg")
+ggsave(outpath_svg, plot = make_final(FALSE), width = 9, height = 6, device = "svg",
+       fix_text_size = TRUE)
 
 outpath_png <- file.path(paths$figures, "fig1_panel_A_mi21_skeleton.png")
 ggsave(outpath_png, plot = make_final(TRUE), width = 9, height = 6, dpi = 300, bg = "white")

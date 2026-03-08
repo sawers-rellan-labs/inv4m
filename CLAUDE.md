@@ -128,7 +128,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ## Inversion Paper - Phase 4 Results Writing 🔶
 
-### Scripts (12 Rmd files in `scripts/inversion_paper/`)
+### Scripts (in `scripts/inversion_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -147,6 +147,9 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
 | `make_jmj_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
 | `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
+| `plot_repeat_analysis.Rmd` | Fig 1 Panel A repeat annotation (PT + Mi21 variants) | ✅ |
+| `make_editable_svg.R` | Standalone skeleton SVG generator (PT) | ✅ |
+| `make_editable_svg_mi21.R` | Standalone skeleton SVG generator (Mi21) | ✅ |
 | `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
 
 ### Generated Outputs
