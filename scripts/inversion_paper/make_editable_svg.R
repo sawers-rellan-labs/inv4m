@@ -133,30 +133,29 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
 }
 
 
-# --- Arrow strip: flush against panels ---
-make_arrow_strip <- function(bp_left, bp_right, direction) {
-  adf <- make_arrow_df(bp_left, bp_right, 0, 0.8, arrow_point, direction)
+# --- Arrow polygons as overlay grobs (flush against vline endpoints) ---
+# SVG coordinates (648x432 canvas): NPC x = svg_x/648, y = 1 - svg_y/432
+# TIL18 vlines: x=172.07 (up), x=241.30 (dn); top at svg_y=57.75
+# B73   vlines: x=172.07 (up), x=252.01 (dn); bot at svg_y=354.59
+a_h   <- 4    # arrow half-height in svg units
+a_gap <- 1    # gap from vline endpoint
+a_pt  <- 8    # pentagon point size in svg units
 
-  p <- ggplot() +
-    annotate("polygon", x = adf$x, y = adf$y,
-             fill = col_inv4m, color = col_inv4m) +
-    scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
-                       breaks = cfg$xbreaks) +
-    coord_cartesian(xlim = cfg$xlim, ylim = c(-1, 1)) +
-    theme_void() +
-    theme(plot.margin = margin(t = 0, r = 10, b = 0, l = 10))
+# Top arrow (left-pointing): just above TIL18 vline tops
+top_cy <- 57.75 - a_gap - a_h
+arrow_top_grob <- draw_grob(grid::polygonGrob(
+  x = unit(c(172.07, 172.07 + a_pt, 241.30, 241.30, 172.07 + a_pt) / 648, "npc"),
+  y = unit(1 - c(top_cy, top_cy + a_h, top_cy + a_h, top_cy - a_h, top_cy - a_h) / 432, "npc"),
+  gp = grid::gpar(fill = col_inv4m, col = col_inv4m)
+))
 
-  p
-}
-
-# --- Assemble: arrow_top, TIL18, PT, B73 (ticks only), arrow_bot ---
-bp_top <- bp_aligned %>% filter(genome == "TIL18")
-bp_bot <- bp_aligned %>% filter(genome == "B73")
-
-arrow_top <- make_arrow_strip(min(bp_top$xpos_aligned), max(bp_top$xpos_aligned),
-                              "left")
-arrow_bot <- make_arrow_strip(min(bp_bot$xpos_aligned), max(bp_bot$xpos_aligned),
-                              "right")
+# Bottom arrow (right-pointing): just below B73 vline bottoms
+bot_cy <- 354.59 + a_gap + a_h
+arrow_bot_grob <- draw_grob(grid::polygonGrob(
+  x = unit(c(172.07, 252.01 - a_pt, 252.01, 252.01 - a_pt, 172.07) / 648, "npc"),
+  y = unit(1 - c(bot_cy + a_h, bot_cy + a_h, bot_cy, bot_cy - a_h, bot_cy - a_h) / 432, "npc"),
+  gp = grid::gpar(fill = col_inv4m, col = col_inv4m)
+))
 
 # --- Overlay text configuration ---
 
@@ -285,18 +284,22 @@ crossing_lines <- list(
                color = col_inv4m)
 )
 
+# Invisible spacer strips (preserve layout from original arrow strips)
+spacer <- ggplot() + theme_void() + theme(plot.margin = margin(0, 10, 0, 10))
+
 make_final <- function(show_points) {
   stk <- plot_grid(
-    arrow_top,
+    spacer,
     make_panel("TIL18", show_points = show_points),
     make_panel("PT",    show_points = show_points),
     make_panel("B73",   show_points = show_points, bot_margin = 2),
-    arrow_bot,
+    spacer,
     ncol = 1, align = "v", axis = "lr",
     rel_heights = c(0.15, 1, 1, 1, 0.15))
   p <- ggdraw() + draw_plot(stk, x = 0.08, y = 0.08, width = 0.86, height = 0.86)
   for (a in overlay_annotations) p <- p + a
   for (a in crossing_lines) p <- p + a
+  p <- p + arrow_top_grob + arrow_bot_grob
   p
 }
 
