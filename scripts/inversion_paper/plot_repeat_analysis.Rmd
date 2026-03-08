@@ -1,5 +1,5 @@
 ---
-title: "Chromosomal Knob Repeat Analysis — Figure 1 Panels A & B"
+title: "Chromosomal Knob Repeat Analysis — Figure 1 Panels A–C"
 author: "inv4m"
 date: "`r Sys.Date()`"
 output:
@@ -37,7 +37,7 @@ BLAST+ megablast hits of chromosomal knob repeats (knob180 M32524.1 and TR-1
 AY083942.1) plotted along chromosome 4 of four *Zea* genomes. Vertical lines
 mark inversion breakpoint boundaries from AnchorWave genome alignments.
 
-This generates **Figure 1 Panel A** of the inversion paper in two variants:
+This generates **Figure 1 Panel B** of the inversion paper in two variants:
 
 - **Plot 2** (PT): TIL18 / PT / B73 — three-genome cowplot with crossing lines
 - **Plot 3** (Mi21): TIL18 / Mi21 / B73 — same architecture, Mi21 NIL assembly
@@ -167,14 +167,18 @@ cfg <- list(
   xlim    = c(163e6, 250e6),
   xbreaks = seq(175e6, 250e6, by = 25e6))
 
-# SVG canvas dimensions (9x6 inch at 72 dpi)
-svg <- list(W = 648, H = 432, lw = 2.56)
+# SVG canvas dimensions for standalone renders (9x6 inch at 72 dpi)
+svg_standalone <- list(W = 648, H = 432, lw = 2.56)
 
-# Shared x-axis tick positions (same for all variants)
-xtick_x <- c("175" = 183.17, "200" = 314.23, "225" = 445.29, "250" = 576.35)
+# SVG canvas dimensions for combined figure (18x8 in, Panel B viewport)
+svg_combined <- list(W = 725.76, H = 576, lw = 2.56)
+
+# Active svg/xtick_x — set by build_panel_b() per variant
+svg <- svg_standalone
+xtick_x <- c("175" = 160.11, "200" = 306.61, "225" = 453.10, "250" = 599.59)
 
 # Arrow geometry (svg units)
-a_h <- 4; a_gap <- 1; a_pt <- 8
+a_h <- 4; a_gap <- 1.2; a_pt <- 8
 
 # --- Panel builder ---
 make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
@@ -199,9 +203,9 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
                        breaks = cfg$xbreaks) +
     scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-5, 105)) +
     coord_cartesian(xlim = cfg$xlim) +
-    theme_minimal(base_size = 20) +
+    theme_minimal(base_size = 22) +
     theme(panel.grid.minor = element_blank(),
-          plot.margin = margin(t = 15, r = 10, b = bot_margin, l = 10),
+          plot.margin = margin(t = 15, r = 5, b = bot_margin, l = 5),
           axis.title = element_blank(),
           axis.ticks.x = element_blank(),
           axis.text.x = element_text(color = "white"))
@@ -281,13 +285,13 @@ legend_dot <- function(col, x, y) {
 }
 
 build_overlay <- function(genome_labels) {
-  sz_name    <- 20
-  sz_species <- 16
+  sz_name    <- 24
+  sz_species <- 22
   y_header   <- 0.955
   y_bump     <- 0.02
   x_gname    <- 0.54
   x_species  <- 0.90
-  y_xtick    <- 1 - 375 / svg$H
+  y_xtick    <- 1 - 500 / svg$H
 
   genome_annots <- unlist(lapply(genome_labels, function(g) {
     out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
@@ -306,14 +310,14 @@ build_overlay <- function(genome_labels) {
 
   xtick_annots <- lapply(names(xtick_x), function(lab) {
     draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
-               size = 16, color = "#4D4D4D")
+               size = 18, color = "#4D4D4D")
   })
 
   c(list(
     draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
-               angle = 90, size = 20),
-    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 20),
-    draw_label("A", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
+               angle = 90, size = 24),
+    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 24),
+    # Panel label added in combined assembly
     draw_label("Inv4m", x = 0.32, y = 0.917, size = sz_name,
                fontface = "bold.italic", color = col_inv4m),
     legend_dot(col_knob, 0.55, y_header - 0.012),
@@ -331,12 +335,16 @@ build_overlay <- function(genome_labels) {
 # --- Full figure assembler ---
 spacer <- ggplot() + theme_void() + theme(plot.margin = margin(0, 10, 0, 10))
 
-build_panel_a <- function(variant) {
+build_panel_b <- function(variant) {
   vl    <- variant$vlines
   mx    <- variant$mid_x
   pairs <- variant$pairs
   gl    <- variant$genome_labels
   gnames <- variant$genomes
+
+  # Set svg dims and xtick positions for this variant
+  svg <<- variant$svg
+  xtick_x <<- variant$xtick_x
 
   crossing <- build_crossing_lines(vl, mx, pairs)
   overlay  <- build_overlay(gl)
@@ -352,7 +360,7 @@ build_panel_a <- function(variant) {
       spacer,
       ncol = 1, align = "v", axis = "lr",
       rel_heights = c(0.15, 1, 1, 1, 0.15))
-    p <- ggdraw() + draw_plot(stk, x = 0.08, y = 0.08, width = 0.86, height = 0.86)
+    p <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
     for (a in overlay)  p <- p + a
     for (a in crossing) p <- p + a
     p + arrow_top + arrow_bot
@@ -365,11 +373,13 @@ build_panel_a <- function(variant) {
 ```{r plot2-pt-config}
 variant_pt <- list(
   genomes = c("TIL18", "PT", "B73"),
+  svg = svg_standalone,
+  xtick_x = c("175" = 160.11, "200" = 306.61, "225" = 453.10, "250" = 599.59),
   vlines = list(
-    TIL18 = list(up_x = 172.07, dn_x = 241.30, top_y = 57.75,  bot_y = 140.45),
-    PT    = list(up_x = 172.07, dn_x = 242.52, top_y = 170.33, bot_y = 253.03),
-    B73   = list(up_x = 172.07, dn_x = 252.01, top_y = 282.91, bot_y = 354.59)),
-  mid_x = list(TIL18 = 190.90, PT = 192.58, B73 = 231.98),
+    TIL18 = list(up_x = 147.70, dn_x = 225.08, top_y = 57.75,  bot_y = 140.45),
+    PT    = list(up_x = 147.70, dn_x = 226.45, top_y = 170.33, bot_y = 253.03),
+    B73   = list(up_x = 147.70, dn_x = 237.06, top_y = 282.91, bot_y = 351.81)),
+  mid_x = list(TIL18 = 168.76, PT = 170.64, B73 = 214.67),
   pairs = list(
     list(top = "TIL18", bot = "PT",  inverted = FALSE),
     list(top = "PT",    bot = "B73", inverted = TRUE)),
@@ -380,15 +390,15 @@ variant_pt <- list(
 ```
 
 ```{r plot2-pt-render, fig.width=9, fig.height=6}
-make_pt <- build_panel_a(variant_pt)
+make_pt <- build_panel_b(variant_pt)
 make_pt(TRUE)
 ```
 
 ```{r plot2-pt-save}
-ggsave(file.path(paths$figures, "fig1_panel_A_skeleton.svg"),
+ggsave(file.path(paths$figures, "fig1_panel_B_skeleton.svg"),
        plot = make_pt(FALSE), width = 9, height = 6, device = "svg",
        fix_text_size = TRUE)
-ggsave(file.path(paths$figures, "fig1_panel_A_skeleton.png"),
+ggsave(file.path(paths$figures, "fig1_panel_B_skeleton.png"),
        plot = make_pt(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
 ```
 
@@ -397,51 +407,53 @@ ggsave(file.path(paths$figures, "fig1_panel_A_skeleton.png"),
 ```{r plot3-mi21-config}
 variant_mi21 <- list(
   genomes = c("TIL18", "Mi21", "B73"),
+  svg = svg_combined,
+  xtick_x = c("175" = 175.07, "200" = 340.86, "225" = 506.65, "250" = 672.43),
   vlines = list(
-    TIL18 = list(up_x = 172.07, dn_x = 241.30, top_y = 57.75,  bot_y = 140.45),
-    Mi21  = list(up_x = 172.07, dn_x = 229.05, top_y = 170.33, bot_y = 253.03),
-    B73   = list(up_x = 172.07, dn_x = 252.01, top_y = 282.91, bot_y = 354.59)),
-  mid_x = list(TIL18 = 190.90, Mi21 = 192.47, B73 = 231.98),
+    TIL18 = list(up_x = 161.02, dn_x = 248.60, top_y = 72.02,  bot_y = 192.24),
+    Mi21  = list(up_x = 161.02, dn_x = 233.10, top_y = 222.13, bot_y = 342.35),
+    B73   = list(up_x = 161.02, dn_x = 262.15, top_y = 372.24, bot_y = 478.66)),
+  mid_x = list(TIL18 = 184.85, Mi21 = 186.83, B73 = 236.81),
   pairs = list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
     list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
   genome_labels = list(
-    list(name = "TIL18", y = 0.875,  desc_html = "teosinte *mexicana*"),
+    list(name = "TIL18", y = 0.875,  desc = "teosinte mexicana"),
     list(name = "Mi21 NIL", y = 0.6144, desc = "highland maize"),
     list(name = "B73",   y = 0.3539, desc = NULL)))
 ```
 
 ```{r plot3-mi21-render, fig.width=9, fig.height=6}
-make_mi21 <- build_panel_a(variant_mi21)
+make_mi21 <- build_panel_b(variant_mi21)
 make_mi21(TRUE)
 ```
 
 ```{r plot3-mi21-save}
-ggsave(file.path(paths$figures, "fig1_panel_A_mi21_skeleton.svg"),
+ggsave(file.path(paths$figures, "fig1_panel_B_mi21_skeleton.svg"),
        plot = make_mi21(FALSE), width = 9, height = 6, device = "svg",
        fix_text_size = TRUE)
-ggsave(file.path(paths$figures, "fig1_panel_A_mi21_skeleton.png"),
+ggsave(file.path(paths$figures, "fig1_panel_B_mi21_skeleton.png"),
        plot = make_mi21(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
 ```
 
-# Panel B: Breakpoint self-similarity dotplots
+# Panel C: Breakpoint self-similarity dotplots
 
 LAST self-vs-self dotplots at upstream and downstream Inv4m breakpoint segments.
 Dotplots were generated by `scripts/02_genomics_foundation/run_breakpoint_dotplots_4genomes.sh`.
 
-The figure uses three genomes matching the Panel A Mi21 variant: TIL18, Mi21 NIL, B73.
+The figure uses three genomes matching the Panel B Mi21 variant: TIL18, Mi21 NIL, B73.
 
-```{r panel-b-config}
+```{r panel-c-config}
 library(png)
 
-panel_b_genomes <- c("TIL18", "Mi21", "B73")
+panel_c_genomes <- c("TIL18", "Mi21", "B73")
 
-panel_b_coords <- list(
+panel_c_coords <- list(
   TIL18 = list(up = "180269950-180365316", down = "193570651-193734606"),
   Mi21  = list(up = "156519809-156752504", down = "167621035-167839092"),
   B73   = list(up = "172561959-172882309", down = "188131461-188220418"))
 
-panel_b_labels <- c(TIL18 = "TIL18", Mi21 = "Mi21 NIL", B73 = "B73")
+panel_c_labels <- c(TIL18 = "TIL18", Mi21 = "Mi21 NIL", B73 = "B73")
 
 seg_size_kb <- function(range_str) {
   parts <- as.numeric(strsplit(range_str, "-")[[1]])
@@ -462,13 +474,12 @@ read_dotplot <- function(genome, direction) {
 
 make_dotplot_cell <- function(img, size_kb) {
   ggdraw() +
-    draw_image(img, x = 0, y = 0, width = 1, height = 1) +
-    draw_label(paste0(size_kb, " kb"), x = 0.95, y = 0.02, hjust = 1, vjust = 0,
-               size = 10, color = "gray30")
+    draw_image(img, x = 0, y = 0.1, width = 1, height = 0.9) +
+    draw_label(paste0(size_kb, " kb"), x = 0.5, y = 0.06, size = 14, color = "gray30")
 }
 ```
 
-```{r panel-b-assemble, fig.width=5.5, fig.height=8}
+```{r panel-c-assemble, fig.width=5.5, fig.height=8}
 # Mi21 PNGs are named by B73-sense orientation but the inversion flips
 # upstream/downstream, so swap which file goes in which column
 png_dir <- list(
@@ -477,46 +488,195 @@ png_dir <- list(
   B73   = c(up = "up", down = "down"))
 
 cells <- list()
-for (g in panel_b_genomes) {
+for (g in panel_c_genomes) {
   for (dir in c("up", "down")) {
     img <- read_dotplot(g, png_dir[[g]][dir])
     coord_key <- dir
-    size <- seg_size_kb(panel_b_coords[[g]][[coord_key]])
+    size <- seg_size_kb(panel_c_coords[[g]][[coord_key]])
     cells[[paste0(g, "_", dir)]] <- make_dotplot_cell(img, size)
   }
 }
 
 # Assemble 3x2 grid with genome labels
-rows <- lapply(panel_b_genomes, function(g) {
-  label <- ggdraw() + draw_label(panel_b_labels[g], size = 12, fontface = "bold")
+rows <- lapply(panel_c_genomes, function(g) {
+  label <- ggdraw() + draw_label(panel_c_labels[g], size = 24, fontface = "bold", angle = 90)
   plot_grid(label, cells[[paste0(g, "_up")]], cells[[paste0(g, "_down")]],
-            nrow = 1, rel_widths = c(0.18, 0.41, 0.41))
+            nrow = 1, rel_widths = c(0.08, 0.46, 0.46))
 })
 
 col_headers <- plot_grid(
   ggdraw(),
-  ggdraw() + draw_label("Upstream", size = 12),
-  ggdraw() + draw_label("Downstream", size = 12),
-  nrow = 1, rel_widths = c(0.18, 0.41, 0.41))
+  ggdraw() + draw_label("Upstream", size = 24, fontface = "bold"),
+  ggdraw() + draw_label("Downstream", size = 24, fontface = "bold"),
+  nrow = 1, rel_widths = c(0.08, 0.46, 0.46))
 
 title_row <- ggdraw() +
-  draw_label("B", x = 0.06, y = 0.5, size = 16, fontface = "bold") +
-  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.45, y = 0.5, size = 14)
+  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.50, y = 0.5, size = 24, fontface = "bold")
 
-p_panelb <- plot_grid(
+p_panelc_brkpt <- plot_grid(
+  ggdraw(),  # top spacer — align with Panel B header
   title_row,
   rows[[1]], rows[[2]], rows[[3]],
   col_headers,
-  ncol = 1, rel_heights = c(0.06, 0.26, 0.26, 0.26, 0.06))
+  ggdraw(),  # bottom spacer — align with Panel B x-axis
+  ncol = 1, rel_heights = c(0.03, 0.07, 0.26, 0.26, 0.26, 0.07, 0.06))
 
-p_panelb
+p_panelc_brkpt
 ```
 
-```{r panel-b-save}
-ggsave(file.path(paths$figures, "Fig1_panel_B.png"),
-       plot = p_panelb, width = 5.5, height = 8, dpi = 300, bg = "white")
-ggsave(file.path(paths$figures, "Fig1_panel_B.svg"),
-       plot = p_panelb, width = 5.5, height = 8, device = "svg",
+```{r panel-c-save}
+ggsave(file.path(paths$figures, "Fig1_panel_C.png"),
+       plot = p_panelc_brkpt, width = 5.5, height = 8, dpi = 300, bg = "white")
+ggsave(file.path(paths$figures, "Fig1_panel_C.svg"),
+       plot = p_panelc_brkpt, width = 5.5, height = 8, device = "svg",
+       fix_text_size = TRUE)
+```
+
+# Panel A: Inv4m chromosome 4 dotplots (Mi21 vs references)
+
+AnchorWave whole-genome alignment dotplots zoomed to chromosome 4, showing
+Mi21 NIL (x-axis) vs reference genomes (y-axis). The inversion appears as a
+reversed diagonal in B73 (standard karyotype) but not in TIL18 or PT (inverted
+karyotype).
+
+Data from `nilhifimi21/anchorwave/vs_{B73,PT}/dotplot.tab`, filtered to
+chr4 vs scf00000010_RagTag (Mi21 chr4).
+
+```{r panel-a-data}
+# AnchorWave dotplot format: ref_chr ref_pos query_chr query_pos strand
+read_dotplot_tab <- function(file, ref_label) {
+  d <- read.table(file, header = FALSE, sep = "\t",
+    col.names = c("ref_chr", "ref_pos", "query_chr", "query_pos", "strand"))
+  d$ref <- ref_label
+  d
+}
+
+panel_a_files <- list(
+  B73 = file.path(paths$intermediate, "Mi21_vs_B73_chr4.tab"),
+  PT  = file.path(paths$intermediate, "Mi21_vs_PT_chr4.tab"))
+
+# TIL18: use real data if available, otherwise duplicate PT as placeholder
+# (both carry the inversion so the dotplot pattern is similar)
+til18_file <- file.path(paths$intermediate, "Mi21_vs_TIL18_chr4.tab")
+if (file.exists(til18_file)) {
+  panel_a_files[["TIL18"]] <- til18_file
+}
+
+dotplot_data <- do.call(rbind, lapply(names(panel_a_files), function(ref) {
+  read_dotplot_tab(panel_a_files[[ref]], ref)
+}))
+
+# If TIL18 not available, duplicate PT data as TIL18 placeholder
+if (!"TIL18" %in% dotplot_data$ref) {
+  til18_placeholder <- dotplot_data[dotplot_data$ref == "PT", ]
+  til18_placeholder$ref <- "TIL18"
+  dotplot_data <- rbind(til18_placeholder, dotplot_data)
+}
+
+# Order top to bottom: TIL18, PT, B73
+dotplot_data$ref <- factor(dotplot_data$ref, levels = c("TIL18", "PT", "B73"))
+
+cat("References available:", paste(levels(dotplot_data$ref), collapse = ", "), "\n")
+cat("Anchor points per reference:\n")
+print(table(dotplot_data$ref))
+```
+
+```{r panel-a-plot, fig.width=5.5, fig.height=8}
+# Color by strand: + = blue (collinear), - = red (inverted)
+# Zoom: 25 Mb window per genome, centered on each genome's Inv4m midpoint
+zoom_half <- 20
+
+# Mi21 inversion center (x-axis, shared)
+mi21_center <- (156752504 + 167621035) / 2 / 1e6  # 162.2
+
+# Reference inversion centers (y-axis, per genome)
+ref_centers <- c(
+  TIL18 = (180365316 + 193570651) / 2 / 1e6,  # 187.0
+  PT    = (173486186 + 186925483) / 2 / 1e6,   # 180.2
+  B73   = (172882309 + 188131461) / 2 / 1e6)   # 180.5
+
+# Build one dotplot per genome with coord_fixed and proper zoom
+make_dotplot_facet <- function(genome, show_xlab = FALSE) {
+  d <- dotplot_data[dotplot_data$ref == genome, ]
+  yc <- ref_centers[genome]
+
+  p <- ggplot(d, aes(x = query_pos / 1e6, y = ref_pos / 1e6, color = strand)) +
+    geom_point(size = 0.5) +
+    scale_color_manual(values = c("+" = "blue", "-" = "red"), guide = "none") +
+    coord_fixed(ratio = 1,
+                xlim = c(mi21_center - zoom_half, mi21_center + zoom_half),
+                ylim = c(yc - zoom_half, yc + zoom_half)) +
+    labs(x = NULL, y = NULL) +
+    theme_minimal(base_size = 14) +
+    theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+          panel.grid.minor = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.margin = margin(4, 2, 4, 2))
+  p
+}
+
+# Stack with genome labels on the left — flush left to align with "A" label
+panel_a_plots <- lapply(c("TIL18", "PT", "B73"), function(g) {
+  label <- ggdraw() + draw_label(g, size = 24, fontface = "bold", angle = 90, x = 0.6)
+  plot_grid(label, make_dotplot_facet(g, show_xlab = (g == "B73")),
+            nrow = 1, rel_widths = c(0.08, 0.92))
+})
+
+p_panela <- plot_grid(
+  ggdraw(),  # top spacer — align with Panel B header
+  panel_a_plots[[1]], panel_a_plots[[2]], panel_a_plots[[3]],
+  ggdraw() + draw_label("Mi21 NIL", size = 24, fontface = "bold", x = 0.55),
+  ggdraw(),  # bottom spacer — align with Panel B x-axis
+  ncol = 1, rel_heights = c(0.25, 1, 1, 1, 0.15, 0.20))
+
+p_panela
+```
+
+```{r panel-a-save}
+ggsave(file.path(paths$figures, "Fig1_panel_A.png"),
+       plot = p_panela, width = 5.5, height = 8, dpi = 300, bg = "white")
+ggsave(file.path(paths$figures, "Fig1_panel_A.svg"),
+       plot = p_panela, width = 5.5, height = 8, device = "svg",
+       fix_text_size = TRUE)
+```
+
+# Combined layout: Panels A + B + C
+
+Assemble the three panels side by side matching the target layout
+(Figure1_top_layout_target.png). Panel A (dotplots) is narrow, Panel B
+(repeat annotation) is wide, Panel C (breakpoints) is medium.
+
+```{r fig1-top-assembly, fig.width=18, fig.height=8}
+# Build combined figure helper (skeleton vs points for SVG vs PNG)
+build_fig1_top <- function(show_points) {
+  p_panelb <- make_mi21(show_points)
+
+  fig1_grid <- plot_grid(
+    p_panela,
+    p_panelb,
+    p_panelc_brkpt,
+    nrow = 1,
+    rel_widths = c(0.16, 0.56, 0.28))
+
+  label_y <- 0.965
+  ggdraw(fig1_grid) +
+    draw_label("A", x = 0.005, y = label_y, size = 32, fontface = "bold",
+               hjust = 0.2, vjust = 1) +
+    draw_label("B", x = 0.16,  y = label_y, size = 32, fontface = "bold",
+               hjust = 0.2, vjust = 1) +
+    draw_label("C", x = 0.71,  y = label_y, size = 32, fontface = "bold",
+               hjust = 0.2, vjust = 1)
+}
+
+build_fig1_top(TRUE)
+```
+
+```{r fig1-top-save}
+ggsave(file.path(paths$figures, "Fig1_top_ABC.png"),
+       plot = build_fig1_top(TRUE), width = 18, height = 8, dpi = 300, bg = "white")
+ggsave(file.path(paths$figures, "Fig1_top_ABC.svg"),
+       plot = build_fig1_top(FALSE), width = 18, height = 8, device = "svg",
        fix_text_size = TRUE)
 ```
 

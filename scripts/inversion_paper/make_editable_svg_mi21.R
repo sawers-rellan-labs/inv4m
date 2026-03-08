@@ -270,7 +270,7 @@ overlay_annotations <- c(
     draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
                angle = 90, size = 20),
     draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 20),
-    draw_label("A", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
+    draw_label("B", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
     # Inv4m label flush above top arrow
     draw_label("Inv4m", x = 0.32, y = 0.917, size = sz_name,
                fontface = "bold.italic", color = col_inv4m),
@@ -310,11 +310,11 @@ make_final <- function(show_points) {
 # =============================================================================
 # Save
 # =============================================================================
-outpath_svg <- file.path(paths$figures, "fig1_panel_A_mi21_skeleton.svg")
+outpath_svg <- file.path(paths$figures, "fig1_panel_B_mi21_skeleton.svg")
 ggsave(outpath_svg, plot = make_final(FALSE), width = 9, height = 6, device = "svg",
        fix_text_size = TRUE)
 
-outpath_png <- file.path(paths$figures, "fig1_panel_A_mi21_skeleton.png")
+outpath_png <- file.path(paths$figures, "fig1_panel_B_mi21_skeleton.png")
 ggsave(outpath_png, plot = make_final(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
 
 cat("Saved SVG:", outpath_svg, "\n")
