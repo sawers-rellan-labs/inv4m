@@ -219,14 +219,14 @@ upstream breakpoint segment of B73. To explore the nature of the sequences
 spanning the \invfour breakpoints, we made a local similarity search using LAST 
 \cite{kielbasa2011} inside these \invfour bounding unaligned segments. We 
 detected typical tandem array patterns in the dotplots (blue and red rectangles 
-in Fig~\ref{fig::design}B) and we took a closer look at the available repeat 
+in Fig~\ref{fig::design}C) and we took a closer look at the available repeat 
 annotation of B73.
 
 The MaizeGDB annotation of B73 shows that the upstream \invfour breakpoint 
 segment contained 438 \textit{knob180} and 29 \textit{TR-1} repeats making up 
 $69\%$ and $5\%$ of the 636 annotated repeats in this 323 kb section. These 
 chromosomal knob 180 bp and TR-1 repeat annotations matched the observed tandem 
-array patterns observed in the dotplots Fig~\ref{fig::design}B. Then we 
+array patterns observed in the dotplots Fig~\ref{fig::design}C. Then we 
 searched the two classes of knob repeats in TIL18 and PT, which have no public 
 repetitive element annotation to date. For comparison purposes, we did a BLAST+ 
 \cite{camacho2009} similarity search of the three chromosomes 4 using a 
@@ -237,7 +237,7 @@ segments but also inside the inversion and the rest of the chromosome. We found
 in the long arm of chromosome 4 repeat arrays corresponding to previously 
 reported heterochromatic knobs, the ones interspersed in the \invfour 
 breakpoints, and an internal knob repeat array inside \invfour 
-Fig~\ref{fig::design}A. Chromosomal knob repeats were the most abundant kind of
+Fig~\ref{fig::design}B. Chromosomal knob repeats were the most abundant kind of
 repeats within the \invfour breakpoint sections (Table~\ref{tab:breakpoints}, Supplementary Table~\ref{tab:knob_repeats}) and
 the \invfour proper.
 
@@ -246,21 +246,21 @@ arms of the analyzed chromosomes. TIL18 has a 30 Mb region of mixed repeats
 likely corresponding to the 4L knob reported in \mex 
 \cite{bilinski2018,albert2010}, PT is knobless, and B73 carries a 4L knob 
 consisting of \textit{TR-1} repeats \cite{ghaffari2013,albert2010} 
-(Fig~\ref{fig::design}A).
+(Fig~\ref{fig::design}B).
 
 Although the downstream breakpoint had a lower content of knob repeats with 37 
 \textit{knob180} and no annotated \textit{TR-1}'s, those made up $46\%$ out of 
 the 81 annotated repeats in 89 kb. In each genome, the breakpoint segments on 
 each side of the inversion showed asymmetries in size, knob repeat number, 
 presence of knob inverted repeat arrays, and closeness of the knob repeats to 
-the \invfour anchor gene (Fig~\ref{fig::design}B).
+the \invfour anchor gene (Fig~\ref{fig::design}C).
 
 In particular, in B73 the upstream breakpoint segment is larger (323 kb vs 89 
 kb), has a greater number of repeats (352 vs 26), presence of inverted knob 
-repeat arrays (blue and red rectangles in Fig~\ref{fig::design} B Upstream), 
+repeat arrays (blue and red rectangles in Fig~\ref{fig::design}C Upstream), 
 and some knob repeats close to the inversion, while the downstream breakpoint 
 segment is smaller, has a lower number of repeats, no inverted repeats of knob 
-sequences (just red rectangles in Fig~\ref{fig::design}B, Downstream), and the 
+sequences (just red rectangles in Fig~\ref{fig::design}C, Downstream), and the 
 few knob repeats present are closer to the downstream external anchor gene 
 rather than to \invfour. We can observe these four patterns in the opposite 
 orientation in PT and TIL18 relative to B73.
@@ -272,16 +272,12 @@ orientation in PT and TIL18 relative to B73.
 \includegraphics[width=0.9\linewidth]{figs/design.png}
 \caption[\textit{\invfour} Delimitation, Introgression Breeding Design and Population Genotypes.]{
 \textbf{Chromosomal Inversion \invfour: Delimitation, Introgression Breeding Design, Field Experimental Setup and Population Genotype}.
-% \textbf{(A)} Chromosome 4 macrosynteny among highland and lowland \textit{Zea} genomes illustrating \invfour. The highland Mexican traditional variety Palomero Toluqueño (PT) shows the same gene order as the teosinte \mex inbred TIL18. This highland karyotype (purple) has the \invfour inversion relative to the reference genome inbred B73 (\textit{spp. mays}, yellow). Synteny plot created with MCscan\cite{tang2024}, genes from the ortholog groups defining the endpoints of the inversion are depicted below each ideogram.
-\textbf{(A)} \invfour breakpoints overlap clusters of full 180 bp knob repeats with interspersed partial \textit{TR-1}s (normalized match score $<50$). Each point represents a BLAST+ \cite{camacho2009} hit with a selected sequence of 180 bp knob or \textit{TR-1} repeats. 
- Around the 230 Mb mark regions corresponding to reported 4L cytogenetic knobs can be observed in \mex and B73 while absent in PT.
-\textbf{(B)} Sequence self-similarity dotplots, using LAST \cite{kielbasa2011}, for the inversion breakpoint segments as defined in Table~\ref{tab:breakpoints}.
-Breakpoints are upstream and downstream of \invfour in each genome coordinate system as depicted in (A).
-Forward matches in red, reverse in blue. 
-Rectangles indicate tandem repeats. 
-\textbf{(C)} Near Isogenic Line population breeding scheme. The \invfour from Mi21, a highland traditional variety closely related to PT, was introgressed into a temperate lowland genetic background using B73 as recurrent parent.
-\textbf{(F)} NIL genotypes at BC$_6$S$_2$, of plants used in RNA and lipid extractions, $n=13$, B73 NAM5 coordinates. 
-\textbf{(G)} Zoom into \invfour introgression. Plants are sorted by genotype at the \invfour tagging SNP PZE04175660223 (181.6 Mb, downwards pointing triangle) then by field row number. 
+\textbf{(A)} AnchorWave \cite{song2022} whole-genome alignment dotplots of Mi21 NIL chromosome~4 versus TIL18 (teosinte \mex), PT (highland maize), and B73 (reference). Collinear anchors in blue, inverted in red. The dashed rectangle on the B73 panel marks the estimated introgression extent ($\sim$141--170~Mb in Mi21; $\sim$158--191~Mb in B73 coordinates), determined from positional offset analysis of the alignment.
+\textbf{(B)} Distribution of 180~bp knob repeats and \textit{TR-1} elements across the \invfour region. Each point represents a BLAST+ \cite{camacho2009} hit (normalized match score). Solid purple lines mark inversion breakpoints; dashed black lines mark the estimated \mex introgression boundaries in Mi21~NIL and B73, connected by sigmoid curves reflecting the coordinate transformation between genomes. Around the 225~Mb mark, regions corresponding to reported 4L cytogenetic knobs can be observed in \mex and B73 while absent in PT.
+\textbf{(C)} Sequence self-similarity dotplots, using LAST \cite{kielbasa2011}, for the inversion breakpoint segments as defined in Table~\ref{tab:breakpoints}. Forward matches in red, reverse in blue. Rectangles indicate tandem repeats.
+\textbf{(D)} Near Isogenic Line population breeding scheme. The \invfour from Mi21, a highland traditional variety closely related to PT, was introgressed into a temperate lowland genetic background using B73 as recurrent parent.
+\textbf{(E)} NIL genotypes at BC$_6$S$_2$, of plants used in RNA and lipid extractions, $n=13$, B73 NAM5 coordinates.
+\textbf{(F)} Zoom into \invfour introgression. Plants are sorted by genotype at the \invfour tagging SNP PZE04175660223 (181.6 Mb, downwards pointing triangle) then by field row number.
 }
 \label{fig::design}
 \end{figure*}
@@ -303,7 +299,7 @@ The genotypes in the matrix of 19861 SNPs $\times$ 13 individuals are 63.5\%
 homozygous for B73, 8.96\% heterozygous, and 27.3\% homozygous for Mi21, with 
 0.16\% missing data. We converted this genotype matrix to identical genotype 
 run \cite{layer2016} length in base pairs to estimate the proportion of the 
-plant genome introgressed from Mi21 (Fig~\ref{fig::design}F and G).
+plant genome introgressed from Mi21 (Fig~\ref{fig::design}E and F).
 
 By genotype run length, the plants are, on average, 85.6\% homozygous for B73 
 (1821 Mb), 8.61\% heterozygous (183 Mb), and 5.5\% homozygous for Mi21 (117 
@@ -323,7 +319,7 @@ positions 157012149 and 195900523 in B73 v5 coordinates, bounding 39 Mb of
 shared introgression among \invfour carrying lines. With our selection for the 
 highland allele of PZE04175660223 we have produced plants with the introgression 
 of the target \invfour inversion surrounded by 24 Mb of lingering unintended 
-linkage drag (Fig~\ref{fig::design}F and G). Conversely, we have produced 
+linkage drag (Fig~\ref{fig::design}E and F). Conversely, we have produced 
 inversion-free lines in the CTRL group by selecting for the B73 allele.
 This represents a substantial reduction in flanking introgression
 compared to the BC$_5$ populations of \cite{crow2020}, where residual
@@ -341,7 +337,7 @@ expressed genes.
 Notably, the majority of these markers, 207 SNPs from 14 expressed genes, are 
 negatively correlated with PZE04175660223 and are located just upstream of the 
 shared introgression near \invfour over a 2.7 Mb stretch, from position 
-154283637 to 156985577 (Fig~\ref{fig::design}G and Supplementary
+154283637 to 156985577 (Fig~\ref{fig::design}F and Supplementary
 Fig.~\ref{fig::SNPdistro}C). In this segment, individuals selected for \invfour 
 are homozygous for the B73 allele at all positions, while individuals selected 
 for the standard karyotype are frequently heterozygous.
@@ -1053,13 +1049,13 @@ Genome alignments delimited \invfour to 15.2 Mb containing 432 annotated genes
 in B73 (Table~\ref{tab:breakpoints}). The breakpoint segments are enriched for
 chromosomal knob repeats: the upstream breakpoint contains 438 \textit{knob180}
 and 29 \textit{TR-1} repeats (74\% of annotated repeats), while the downstream
-breakpoint contains 37 \textit{knob180} repeats (46\%; Fig~\ref{fig::design}B).
+breakpoint contains 37 \textit{knob180} repeats (46\%; Fig~\ref{fig::design}C).
 This association between inversion breakpoints and repetitive sequences is
 consistent with models proposing that ectopic recombination between dispersed
 repeats can generate chromosomal inversions \cite{wellenreuther2018}.
 
 The asymmetric structure of the breakpoints, with inverted repeat arrays
-present only at the upstream boundary (Fig~\ref{fig::design}B), and the
+present only at the upstream boundary (Fig~\ref{fig::design}C), and the
 variation in heterochromatic knob content across genomes (TIL18 carries the
 4L knob \cite{bilinski2018,albert2010}, PT is knobless, and B73 has a TR-1
 knob, \cite{ghaffari2013}, suggest that knob dynamics have continued to shape
@@ -1327,7 +1323,7 @@ tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
 
 Several limitations constrain interpretation of our results. First, 24 Mb
 of flanking introgression persists after eight backcross generations
-(Fig~\ref{fig::design}F, G), a challenge inherent to inversions that
+(Fig~\ref{fig::design}E, F), a challenge inherent to inversions that
 suppress recombination. We reduced this drag from the 57 Mb observed in
 the BC$_5$ populations of \cite{crow2020}, and we addressed the
 attribution problem by applying a strongest-regulator criterion in the
@@ -1500,7 +1496,7 @@ For the 180~bp knob repeat we used accession M32524.1
 AY083942.1 \cite{hsu2003}. Searches were run with the \texttt{megablast} task
 (\texttt{blastn -task megablast}), which uses a word size of 28 and is
 optimized for highly similar sequences. Hits were plotted along chromosome~4
-with normalized bitscore on the $y$-axis (Fig~\ref{fig::design}A).
+with normalized bitscore on the $y$-axis (Fig~\ref{fig::design}B).
 Breakpoint annotation coordinates were defined by the AnchorWave
 \cite{song2022anchorwave} genome alignment endpoints where reference-orientation
 synteny was lost (Table~\ref{tab:breakpoints}).
@@ -1508,7 +1504,7 @@ synteny was lost (Table~\ref{tab:breakpoints}).
 For breakpoint self-similarity analysis, we extracted the unaligned segments
 flanking each breakpoint and performed local self-alignment with LAST
 \cite{kielbasa2011}. The resulting dotplots
-(Fig~\ref{fig::design}B) reveal tandem repeat arrays as diagonal and
+(Fig~\ref{fig::design}C) reveal tandem repeat arrays as diagonal and
 off-diagonal patterns, with forward matches shown in red and reverse
 (inverted) matches in blue.
 

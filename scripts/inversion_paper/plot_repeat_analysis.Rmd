@@ -158,8 +158,8 @@ Shared infrastructure for the three-genome cowplot figures (Plots 2 and 3).
 
 ```{r cowplot-shared}
 col_inv4m <- "purple4"
-col_knob  <- "#1d7f7a"
-col_gold  <- "gold"
+col_knob  <- "#00954A"   # Spanish Green
+col_gold  <- "#FF9A1F"   # Bright Orange
 col_gray  <- "gray50"
 lw        <- 1.2
 
@@ -180,11 +180,35 @@ xtick_x <- c("175" = 160.11, "200" = 306.61, "225" = 453.10, "250" = 599.59)
 # Arrow geometry (svg units)
 a_h <- 4; a_gap <- 1.2; a_pt <- 8
 
+# --- Ancestry bar + arrow geometry ---
+# Bar sits just above y=100 gridline; arrow (pentagon) overlays the inversion
+bar_y0 <- 100; bar_h <- 5  # bar from y=100 to y=105
+arrow_pt <- 2e6            # arrow point width in bp
+
+make_arrow_polygon <- function(up_bp, dn_bp, direction) {
+  # Pentagon: left-pointing (inverted) or right-pointing (standard)
+  if (direction == "left") {
+    xs <- c(up_bp - arrow_pt, up_bp, dn_bp, dn_bp, up_bp)
+    ys <- c(bar_y0 + bar_h/2, bar_y0 + bar_h, bar_y0 + bar_h,
+            bar_y0, bar_y0)
+  } else {
+    xs <- c(up_bp, dn_bp, dn_bp + arrow_pt, dn_bp, up_bp)
+    ys <- c(bar_y0 + bar_h, bar_y0 + bar_h, bar_y0 + bar_h/2,
+            bar_y0, bar_y0)
+  }
+  annotate("polygon", x = xs, y = ys, fill = col_inv4m, color = col_inv4m)
+}
+
 # --- Panel builder ---
-make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
+make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15,
+                       ancestry = NULL) {
   gbp  <- bp_aligned %>% filter(genome == genome_id)
   gmid <- midlines %>% filter(genome == genome_id)
   gdat <- to_plot %>% filter(genome == genome_id)
+
+  # Breakpoint positions (aligned)
+  up_bp <- gbp$xpos_aligned[gbp$side == "upstream"]
+  dn_bp <- gbp$xpos_aligned[gbp$side == "downstream"]
 
   p <- ggplot() +
     geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
@@ -194,11 +218,34 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
     geom_vline(data = gbp, aes(xintercept = xpos_aligned),
                color = col_inv4m, linewidth = lw) +
     { if (genome_id == "B73")
-        geom_vline(xintercept = c(158e6, 191e6),
+        geom_vline(xintercept = c(157.01e6, 195.90e6),
                    color = "black", linewidth = lw, linetype = "dashed") } +
     { if (genome_id == "Mi21")
-        geom_vline(xintercept = c(156.93e6, 186.33e6),
+        geom_vline(xintercept = c(155.45e6, 190.79e6),
                    color = "black", linewidth = lw, linetype = "dashed") } +
+    # Ancestry background bars
+    { if (!is.null(ancestry) && ancestry == "mexicana")
+        annotate("rect", xmin = cfg$xlim[1], xmax = cfg$xlim[2],
+                 ymin = bar_y0, ymax = bar_y0 + bar_h,
+                 fill = col_inv4m, alpha = 0.4) } +
+    { if (!is.null(ancestry) && ancestry == "b73")
+        annotate("rect", xmin = cfg$xlim[1], xmax = cfg$xlim[2],
+                 ymin = bar_y0, ymax = bar_y0 + bar_h,
+                 fill = col_gold, alpha = 0.4) } +
+    { if (!is.null(ancestry) && ancestry == "nil") list(
+        # Left flank: gold (B73)
+        annotate("rect", xmin = cfg$xlim[1], xmax = up_bp,
+                 ymin = bar_y0, ymax = bar_y0 + bar_h,
+                 fill = col_gold, alpha = 0.4),
+        # Right flank: gold (B73)
+        annotate("rect", xmin = dn_bp, xmax = cfg$xlim[2],
+                 ymin = bar_y0, ymax = bar_y0 + bar_h,
+                 fill = col_gold, alpha = 0.4)) } +
+    # Arrow (pentagon) over the inversion region
+    { if (!is.null(ancestry)) {
+        direction <- if (ancestry == "b73") "right" else "left"
+        make_arrow_polygon(up_bp, dn_bp, direction)
+    } } +
     { if (show_points)
         geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
                    size = 1.2, alpha = 0.7) } +
@@ -207,7 +254,7 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
                            guide = "none") } +
     scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
                        breaks = cfg$xbreaks) +
-    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-5, 105)) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-5, 108)) +
     coord_cartesian(xlim = cfg$xlim) +
     theme_minimal(base_size = 22) +
     theme(panel.grid.minor = element_blank(),
@@ -354,8 +401,7 @@ build_panel_b <- function(variant) {
 
   crossing <- build_crossing_lines(vl, mx, pairs)
   overlay  <- build_overlay(gl)
-  arrow_top <- make_arrow_grob(vl, gnames[1], "left")
-  arrow_bot <- make_arrow_grob(vl, gnames[3], "right")
+  anc <- variant$ancestry  # e.g., c("mexicana", "nil", "b73")
 
   introg <- variant$introgression
 
@@ -384,9 +430,9 @@ build_panel_b <- function(variant) {
   function(show_points) {
     stk <- plot_grid(
       spacer,
-      make_panel(gnames[1], show_points = show_points),
-      make_panel(gnames[2], show_points = show_points),
-      make_panel(gnames[3], show_points = show_points, bot_margin = 2),
+      make_panel(gnames[1], show_points = show_points, ancestry = anc[1]),
+      make_panel(gnames[2], show_points = show_points, ancestry = anc[2]),
+      make_panel(gnames[3], show_points = show_points, bot_margin = 2, ancestry = anc[3]),
       spacer,
       ncol = 1, align = "v", axis = "lr",
       rel_heights = c(0.15, 1, 1, 1, 0.15))
@@ -394,7 +440,7 @@ build_panel_b <- function(variant) {
     for (a in overlay)  p <- p + a
     for (a in crossing) p <- p + a
     for (a in introg_sigmoids) p <- p + a
-    p + arrow_top + arrow_bot
+    p
   }
 }
 ```
@@ -417,7 +463,8 @@ variant_pt <- list(
   genome_labels = list(
     list(name = "TIL18", y = 0.875,  desc_html = "teosinte *mexicana*"),
     list(name = "PT",    y = 0.6144, desc = "highland maize"),
-    list(name = "B73",   y = 0.3539, desc = NULL)))
+    list(name = "B73",   y = 0.3539, desc = NULL)),
+  ancestry = c("mexicana", "mexicana", "b73"))
 ```
 
 ```{r plot2-pt-render, fig.width=9, fig.height=6}
@@ -452,8 +499,9 @@ variant_mi21 <- list(
     list(name = "TIL18", y = 0.875,  desc = "teosinte mexicana"),
     list(name = "Mi21 NIL", y = 0.6144, desc = "highland maize"),
     list(name = "B73",   y = 0.3539, desc = NULL)),
-  introgression = list(mi21_left = 156.93, mi21_right = 186.33,
-                       b73_left  = 158.0,  b73_right  = 191.0))
+  introgression = list(mi21_left = 155.45, mi21_right = 190.79,
+                       b73_left  = 157.01, b73_right  = 195.90),
+  ancestry = c("mexicana", "nil", "b73"))
 ```
 
 ```{r plot3-mi21-render, fig.width=9, fig.height=6}
@@ -620,8 +668,8 @@ print(table(dotplot_data$ref))
 zoom_half <- 20
 
 # Introgression boundaries (from AnchorWave offset analysis)
-introg_mi21 <- c(140.8, 170.2)  # Mi21 Mb (x-axis)
-introg_b73  <- c(158.0, 191.0)  # B73 Mb  (y-axis)
+introg_mi21 <- c(139.32, 174.66)  # Mi21 native Mb (x-axis)
+introg_b73  <- c(157.01, 195.90)  # B73 Mb  (y-axis)
 
 # Mi21 introgression center (x-axis, shared)
 mi21_center <- mean(introg_mi21)  # ~155.5
