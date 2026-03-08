@@ -526,13 +526,13 @@ ggsave(file.path(paths$figures, "fig1_panel_B_skeleton.png"),
 ```{r plot3-mi21-config}
 variant_mi21 <- list(
   genomes = c("TIL18", "Mi21", "B73"),
-  svg = svg_standalone,
-  xtick_x = c("150" = 89.80, "175" = 239.73, "200" = 389.67, "225" = 539.61),
+  svg = svg_combined,
+  xtick_x = c("150" = 95.49, "175" = 265.18, "200" = 434.87, "225" = 604.56),
   vlines = list(
-    TIL18 = list(up_x = 227.04, dn_x = 306.23, top_y = 74.99,  bot_y = 145.96),
-    Mi21  = list(up_x = 227.04, dn_x = 292.22, top_y = 187.57, bot_y = 258.55),
-    B73   = list(up_x = 227.04, dn_x = 318.49, top_y = 300.16, bot_y = 371.13)),
-  mid_x = list(TIL18 = 248.58, Mi21 = 250.38, B73 = 295.57),
+    TIL18 = list(up_x = 250.80, dn_x = 340.44, top_y = 103.13, bot_y = 194.99),
+    Mi21  = list(up_x = 250.80, dn_x = 324.58, top_y = 253.24, bot_y = 345.09),
+    B73   = list(up_x = 250.80, dn_x = 354.31, top_y = 403.35, bot_y = 495.20)),
+  mid_x = list(TIL18 = 275.19, Mi21 = 277.22, B73 = 328.37),
   pairs = list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
     list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
