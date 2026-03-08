@@ -392,16 +392,30 @@ High-level summaries and multi-panel figures combining multiple analyses.
 - `scripts/00_agent_work/` (agent sandbox, git-ignored)
 - Binary files (`.RDS`, `.RData`, `.csv`, `.pdf`, `.png`)
 
+### Sandbox-aware git commands
+
+The working directory is inside a sandbox that restricts `cd`. Always use `git -C <repo-path>` instead of `cd <repo-path> && git ...` for all git operations.
+
+```bash
+# CORRECT — use -C flag
+git -C "/path/to/inv4m" status
+git -C "/path/to/inv4m" add scripts/file.R
+git -C "/path/to/inv4m" commit -m "message"
+
+# WRONG — cd is blocked by sandbox
+cd /path/to/inv4m && git status
+```
+
 ### Typical Workflow
 
 ```bash
 # After refactoring Rmd files
-git add scripts/phosphorus_paper/*.Rmd
-git add scripts/utils/setup_paths.R
-git commit -m "refactor: standardize paths in phosphorus_paper notebooks"
+git -C "/path/to/inv4m" add scripts/phosphorus_paper/*.Rmd
+git -C "/path/to/inv4m" add scripts/utils/setup_paths.R
+git -C "/path/to/inv4m" commit -m "refactor: standardize paths in phosphorus_paper notebooks"
 
 # Push changes
-git push origin main
+git -C "/path/to/inv4m" push origin main
 ```
 
 ---
