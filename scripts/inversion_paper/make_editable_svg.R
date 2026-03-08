@@ -124,7 +124,8 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
     theme(panel.grid.minor = element_blank(),
           plot.margin = margin(t = 15, r = 10, b = bot_margin, l = 10),
           axis.title = element_blank(),
-          axis.ticks.x = element_blank())
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_text(color = "white"))
 
   if (genome_id != "B73")
     p <- p + theme(axis.text.x = element_blank())
@@ -141,16 +142,17 @@ a_h   <- 4    # arrow half-height in svg units
 a_gap <- 1    # gap from vline endpoint
 a_pt  <- 8    # pentagon point size in svg units
 
-# Top arrow (left-pointing): just above TIL18 vline tops
-top_cy <- 57.75 - a_gap - a_h
+# Top arrow (left-pointing): just above TIL18 vline tops + 1 linewidth up
+lw_svg <- 2.56  # linewidth 1.2 in svg units
+top_cy <- 57.75 - a_gap - a_h - lw_svg
 arrow_top_grob <- draw_grob(grid::polygonGrob(
   x = unit(c(172.07, 172.07 + a_pt, 241.30, 241.30, 172.07 + a_pt) / 648, "npc"),
   y = unit(1 - c(top_cy, top_cy + a_h, top_cy + a_h, top_cy - a_h, top_cy - a_h) / 432, "npc"),
   gp = grid::gpar(fill = col_inv4m, col = col_inv4m)
 ))
 
-# Bottom arrow (right-pointing): just below B73 vline bottoms
-bot_cy <- 354.59 + a_gap + a_h
+# Bottom arrow (right-pointing): just below B73 vline bottoms + 1 linewidth down
+bot_cy <- 354.59 + a_gap + a_h + lw_svg
 arrow_bot_grob <- draw_grob(grid::polygonGrob(
   x = unit(c(172.07, 252.01 - a_pt, 252.01, 252.01 - a_pt, 172.07) / 648, "npc"),
   y = unit(1 - c(bot_cy + a_h, bot_cy + a_h, bot_cy, bot_cy - a_h, bot_cy - a_h) / 432, "npc"),
@@ -193,18 +195,21 @@ overlay_annotations <- list(
              angle = 90, size = 20),
   draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 20),
   draw_label("A", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
-  draw_label("Inv4m", x = 0.32, y = y_header, size = sz_name,
+  draw_label("Inv4m", x = 0.32, y = 0.917, size = sz_name,
              fontface = "bold.italic", color = col_inv4m),
   draw_plot(
     ggplot() + annotate("point", x = 0, y = 0, color = col_knob, size = 4) + theme_void(),
     x = 0.55, y = y_header - 0.012, width = 0.02, height = 0.02),
   draw_label("knob 180", x = 0.58, y = y_header, size = sz_name,
-             fontface = "italic", color = col_knob, hjust = 0),
+             fontface = "bold.italic", color = col_knob, hjust = 0),
   draw_plot(
     ggplot() + annotate("point", x = 0, y = 0, color = col_gold, size = 4) + theme_void(),
     x = 0.73, y = y_header - 0.012, width = 0.02, height = 0.02),
+  # TR-1 text: dark shadow layer then gold on top for outline effect
+  draw_label("TR-1", x = 0.761, y = y_header - 0.002, size = sz_name,
+             fontface = "bold.italic", color = "gray30", hjust = 0),
   draw_label("TR-1", x = 0.76, y = y_header, size = sz_name,
-             fontface = "italic", color = col_gold, hjust = 0),
+             fontface = "bold.italic", color = col_gold, hjust = 0),
   draw_label("TIL18", x = x_gname, y = y_name1, size = sz_name, fontface = "bold"),
   draw_grob(gridtext::richtext_grob(
     "teosinte *mexicana*",
@@ -214,7 +219,14 @@ overlay_annotations <- list(
   draw_label("PT", x = x_gname, y = y_name2, size = sz_name, fontface = "bold"),
   draw_label("highland maize", x = x_species, y = y_sp2,
              size = sz_species, fontface = "plain", color = col_gray, hjust = 1),
-  draw_label("B73", x = x_gname, y = y_name3, size = sz_name, fontface = "bold")
+  draw_label("B73", x = x_gname, y = y_name3, size = sz_name, fontface = "bold"),
+  # X-axis tick labels: one linewidth below bottom arrow
+  # Bottom arrow bottom edge svg_y = 363.59, +2.56 linewidth → svg_y ≈ 366
+  # Tick x positions from SVG: 183.17, 314.23, 445.29, 576.35
+  draw_label("175", x = 183.17/648, y = 1 - 375/432, size = 16, color = "#4D4D4D"),
+  draw_label("200", x = 314.23/648, y = 1 - 375/432, size = 16, color = "#4D4D4D"),
+  draw_label("225", x = 445.29/648, y = 1 - 375/432, size = 16, color = "#4D4D4D"),
+  draw_label("250", x = 576.35/648, y = 1 - 375/432, size = 16, color = "#4D4D4D")
 )
 
 # --- Crossing lines between PT and B73 (inversion indicator) ---
