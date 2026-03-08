@@ -182,26 +182,27 @@ a_h <- 4; a_gap <- 1.2; a_pt <- 8
 
 # --- Ancestry bar + arrow geometry ---
 # Bar sits just above y=100 gridline; arrow (pentagon) overlays the inversion
-bar_y0 <- 100; bar_h <- 5  # bar from y=100 to y=105
-arrow_pt <- 2e6            # arrow point width in bp
+bar_y0 <- 100; bar_h <- 10  # bar from y=100 to y=110
+arrow_pt <- 2e6            # arrow point taper width in bp
+col_ancestry <- "gold"     # B73 ancestry color
 
-make_arrow_polygon <- function(up_bp, dn_bp, direction) {
-  # Pentagon: left-pointing (inverted) or right-pointing (standard)
+make_arrow_polygon <- function(up_bp, dn_bp, direction, fill_col = col_inv4m) {
+  # Pentagon: point touches the breakpoint vline, taper is inside the inversion
   if (direction == "left") {
-    xs <- c(up_bp - arrow_pt, up_bp, dn_bp, dn_bp, up_bp)
+    xs <- c(up_bp, up_bp + arrow_pt, dn_bp, dn_bp, up_bp + arrow_pt)
     ys <- c(bar_y0 + bar_h/2, bar_y0 + bar_h, bar_y0 + bar_h,
             bar_y0, bar_y0)
   } else {
-    xs <- c(up_bp, dn_bp, dn_bp + arrow_pt, dn_bp, up_bp)
+    xs <- c(up_bp, dn_bp - arrow_pt, dn_bp, dn_bp - arrow_pt, up_bp)
     ys <- c(bar_y0 + bar_h, bar_y0 + bar_h, bar_y0 + bar_h/2,
             bar_y0, bar_y0)
   }
-  annotate("polygon", x = xs, y = ys, fill = col_inv4m, color = col_inv4m)
+  annotate("polygon", x = xs, y = ys, fill = fill_col, color = fill_col)
 }
 
 # --- Panel builder ---
-make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15,
-                       ancestry = NULL) {
+make_panel <- function(genome_id, show_points = FALSE, bot_margin = 5,
+                       ancestry = NULL, introg_bounds = NULL) {
   gbp  <- bp_aligned %>% filter(genome == genome_id)
   gmid <- midlines %>% filter(genome == genome_id)
   gdat <- to_plot %>% filter(genome == genome_id)
@@ -223,48 +224,66 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15,
     { if (genome_id == "Mi21")
         geom_vline(xintercept = c(155.45e6, 190.79e6),
                    color = "black", linewidth = lw, linetype = "dashed") } +
-    # Ancestry background bars
-    { if (!is.null(ancestry) && ancestry == "mexicana")
-        annotate("rect", xmin = cfg$xlim[1], xmax = cfg$xlim[2],
-                 ymin = bar_y0, ymax = bar_y0 + bar_h,
-                 fill = col_inv4m, alpha = 0.4) } +
-    { if (!is.null(ancestry) && ancestry == "b73")
-        annotate("rect", xmin = cfg$xlim[1], xmax = cfg$xlim[2],
-                 ymin = bar_y0, ymax = bar_y0 + bar_h,
-                 fill = col_gold, alpha = 0.4) } +
-    { if (!is.null(ancestry) && ancestry == "nil") list(
-        # Left flank: gold (B73)
-        annotate("rect", xmin = cfg$xlim[1], xmax = up_bp,
-                 ymin = bar_y0, ymax = bar_y0 + bar_h,
-                 fill = col_gold, alpha = 0.4),
-        # Right flank: gold (B73)
-        annotate("rect", xmin = dn_bp, xmax = cfg$xlim[2],
-                 ymin = bar_y0, ymax = bar_y0 + bar_h,
-                 fill = col_gold, alpha = 0.4)) } +
-    # Arrow (pentagon) over the inversion region
-    { if (!is.null(ancestry)) {
-        direction <- if (ancestry == "b73") "right" else "left"
-        make_arrow_polygon(up_bp, dn_bp, direction)
-    } } +
     { if (show_points)
         geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
-                   size = 1.2, alpha = 0.7) } +
+                   size = 0.6) } +
     { if (show_points)
-        scale_color_manual(values = c("knob180" = col_knob, "TR-1" = col_gold),
+        scale_color_manual(values = c("knob180" = "gray50", "TR-1" = "gray80"),
                            guide = "none") } +
+    # Ancestry background bars + arrow (on top of all other layers)
+    { if (!is.null(ancestry) && ancestry == "b73") {
+        list(
+          annotate("rect", xmin = -Inf, xmax = up_bp,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
+          annotate("rect", xmin = dn_bp, xmax = Inf,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
+          make_arrow_polygon(up_bp, dn_bp, "right", fill_col = col_ancestry))
+    } } +
+    { if (!is.null(ancestry) && ancestry == "mexicana") {
+        list(
+          annotate("rect", xmin = -Inf, xmax = up_bp,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
+          annotate("rect", xmin = dn_bp, xmax = Inf,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
+          make_arrow_polygon(up_bp, dn_bp, "left"))
+    } } +
+    # NIL ancestry: gold flanks, transparent purple introgression, opaque purple inversion
+    { if (!is.null(ancestry) && ancestry == "nil" && !is.null(introg_bounds)) {
+        il <- introg_bounds[1] * 1e6; ir <- introg_bounds[2] * 1e6
+        list(
+          # 1. Gold: left edge → left introgression dashed line
+          annotate("rect", xmin = -Inf, xmax = il,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
+          # 2. Transparent purple: left dashed → upstream breakpoint
+          annotate("rect", xmin = il, xmax = up_bp,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
+          # 3. Opaque purple arrow: inversion
+          make_arrow_polygon(up_bp, dn_bp, "left"),
+          # 4. Transparent purple: downstream breakpoint → right dashed
+          annotate("rect", xmin = dn_bp, xmax = ir,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
+          # 5. Gold: right introgression dashed line → right edge
+          annotate("rect", xmin = ir, xmax = Inf,
+                   ymin = bar_y0, ymax = bar_y0 + bar_h,
+                   fill = col_ancestry, color = col_ancestry, alpha = 0.3))
+    } } +
     scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
                        breaks = cfg$xbreaks) +
-    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-5, 108)) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-13, 113)) +
     coord_cartesian(xlim = cfg$xlim) +
     theme_minimal(base_size = 22) +
     theme(panel.grid.minor = element_blank(),
           plot.margin = margin(t = 15, r = 5, b = bot_margin, l = 5),
           axis.title = element_blank(),
           axis.ticks.x = element_blank(),
-          axis.text.x = element_text(color = "white"))
-
-  if (genome_id != "B73")
-    p <- p + theme(axis.text.x = element_blank())
+          axis.text.x = element_blank())
   p
 }
 
@@ -362,25 +381,23 @@ build_overlay <- function(genome_labels) {
   }), recursive = FALSE)
 
   xtick_annots <- lapply(names(xtick_x), function(lab) {
-    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
-               size = 18, color = "#4D4D4D")
+    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick - 0.02,
+               size = 18, color = "#4D4D4D", hjust = 0.5)
   })
 
   c(list(
     draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
                angle = 90, size = 24),
-    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.076, size = 24),
+    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.056, size = 24),
     # Panel label added in combined assembly
-    draw_label("Inv4m", x = 0.339, y = 0.917, size = sz_name,
+    draw_label("Inv4m", x = 0.339, y = 0.895, size = sz_name,
                fontface = "bold.italic", color = col_inv4m),
-    legend_dot(col_knob, 0.55, y_header - 0.012),
-    draw_label("knob 180", x = 0.58, y = y_header, size = sz_name,
-               fontface = "bold.italic", color = col_knob, hjust = 0),
-    legend_dot(col_gold, 0.73, y_header - 0.012),
-    draw_label("TR-1", x = 0.761, y = y_header - 0.002, size = sz_name,
-               fontface = "bold.italic", color = "gray30", hjust = 0),
-    draw_label("TR-1", x = 0.76, y = y_header, size = sz_name,
-               fontface = "bold.italic", color = col_gold, hjust = 0)),
+    legend_dot("gray50", 0.55, y_header - 0.012),
+    draw_label("knob 180", x = 0.58, y = y_header, size = sz_species,
+               fontface = "bold.italic", color = "gray50", hjust = 0),
+    legend_dot("gray80", 0.73, y_header - 0.012),
+    draw_label("TR-1", x = 0.76, y = y_header, size = sz_species,
+               fontface = "bold.italic", color = "gray80", hjust = 0)),
     genome_annots,
     xtick_annots)
 }
@@ -427,11 +444,15 @@ build_panel_b <- function(variant) {
                    color = "black", lty = "dashed"))
   } else list()
 
+  # Mi21 introgression bounds in aligned Mb (for nil ancestry bar)
+  ib <- if (!is.null(introg)) c(introg$mi21_left, introg$mi21_right) else NULL
+
   function(show_points) {
     stk <- plot_grid(
       spacer,
       make_panel(gnames[1], show_points = show_points, ancestry = anc[1]),
-      make_panel(gnames[2], show_points = show_points, ancestry = anc[2]),
+      make_panel(gnames[2], show_points = show_points, ancestry = anc[2],
+                 introg_bounds = ib),
       make_panel(gnames[3], show_points = show_points, bot_margin = 2, ancestry = anc[3]),
       spacer,
       ncol = 1, align = "v", axis = "lr",
@@ -488,9 +509,9 @@ variant_mi21 <- list(
   svg = svg_combined,
   xtick_x = c("175" = 215.10, "200" = 390.99, "225" = 566.90),
   vlines = list(
-    TIL18 = list(up_x = 200.20, dn_x = 293.11, top_y = 72.02,  bot_y = 192.24),
-    Mi21  = list(up_x = 200.20, dn_x = 276.67, top_y = 222.13, bot_y = 342.35),
-    B73   = list(up_x = 200.20, dn_x = 307.49, top_y = 372.24, bot_y = 478.66)),
+    TIL18 = list(up_x = 200.20, dn_x = 293.11, top_y = 72.02,  bot_y = 202.20),
+    Mi21  = list(up_x = 200.20, dn_x = 276.67, top_y = 222.13, bot_y = 352.31),
+    B73   = list(up_x = 200.20, dn_x = 307.49, top_y = 372.24, bot_y = 505.41)),
   mid_x = list(TIL18 = 225.48, Mi21 = 227.58, B73 = 280.60),
   pairs = list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
