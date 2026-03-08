@@ -107,9 +107,9 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
     geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
     { if (nrow(gmid) > 0)
         geom_vline(xintercept = gmid$xmid_aligned,
-                   color = "gray55", linewidth = 1.0) } +
+                   color = "gray55", linewidth = 1.2) } +
     geom_vline(data = gbp, aes(xintercept = xpos_aligned),
-               color = col_inv4m, linewidth = 1.0) +
+               color = col_inv4m, linewidth = 1.2) +
     { if (show_points)
         geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
                    size = 1.2, alpha = 0.7) } +
@@ -161,7 +161,7 @@ arrow_bot <- make_arrow_strip(min(bp_bot$xpos_aligned), max(bp_bot$xpos_aligned)
 # --- Overlay text configuration ---
 
 sz_name    <- 20   # genome names, Inv4m, legend — match base_size=20
-sz_species <- 14   # species descriptions
+sz_species <- 16   # species descriptions — match axis text (base_size * 0.8)
 
 # NPC positions derived from user SVG edits (canvas 648x432, y_npc = 1 - svg_y/432)
 # Single header row: Inv4m (left) + legend (right), above top arrow
@@ -172,13 +172,14 @@ y_header   <- 0.955
 x_gname    <- 0.54   # genome name, centered
 x_species  <- 0.90   # species description, right-aligned
 
-# y positions: genome name 3.77pt above 100-line in each panel
-# species text: same baseline (bottom-aligned with genome name)
-y_name1    <- 0.875  # TIL18 (3.77pt above 100-line, confirmed)
-y_sp1      <- 0.875  # teosinte mexicana — middle-aligned with TIL18
-y_name2    <- 0.6144 # PT (3.77pt above 100-line at svg y=177.51)
-y_sp2      <- 0.6144 # highland maize — middle-aligned with PT
-y_name3    <- 0.3539 # B73 (3.77pt above 100-line at svg y=290.09)
+# y positions: half a major gridline spacing above 100-line (~0.02 NPC)
+# gridline spacing = 17.08 svg units → half = 8.54 → 8.54/432 ≈ 0.02 NPC
+y_bump     <- 0.02
+y_name1    <- 0.875  + y_bump  # TIL18
+y_sp1      <- 0.875  + y_bump  # teosinte mexicana
+y_name2    <- 0.6144 + y_bump  # PT
+y_sp2      <- 0.6144 + y_bump  # highland maize
+y_name3    <- 0.3539 + y_bump  # B73
 
 # x-axis npc positions: derived from tick mark SVG coordinates (ground truth)
 # In a 648pt canvas, ticks render at: 175Mb=163.28, 250Mb=575.26
@@ -191,7 +192,7 @@ x_npc <- function(val) (-734.25 + 5.2424e-6 * val) / 648
 overlay_annotations <- list(
   draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
              angle = 90, size = 20),
-  draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.03, size = 20),
+  draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 20),
   draw_label("A", x = 0.02, y = 0.98, size = 24, fontface = "bold"),
   draw_label("Inv4m", x = 0.32, y = y_header, size = sz_name,
              fontface = "bold.italic", color = col_inv4m),
@@ -206,12 +207,82 @@ overlay_annotations <- list(
   draw_label("TR-1", x = 0.76, y = y_header, size = sz_name,
              fontface = "italic", color = col_gold, hjust = 0),
   draw_label("TIL18", x = x_gname, y = y_name1, size = sz_name, fontface = "bold"),
-  draw_label("teosinte mexicana", x = x_species, y = y_sp1,
-             size = sz_species, fontface = "italic", color = col_gray, hjust = 1),
+  draw_grob(gridtext::richtext_grob(
+    "teosinte *mexicana*",
+    x = unit(x_species, "npc"), y = unit(y_sp1, "npc"),
+    hjust = 1, gp = grid::gpar(fontsize = sz_species, col = col_gray),
+    box_gp = grid::gpar(col = NA, fill = NA))),
   draw_label("PT", x = x_gname, y = y_name2, size = sz_name, fontface = "bold"),
   draw_label("highland maize", x = x_species, y = y_sp2,
-             size = sz_species, fontface = "italic", color = col_gray, hjust = 1),
+             size = sz_species, fontface = "plain", color = col_gray, hjust = 1),
   draw_label("B73", x = x_gname, y = y_name3, size = sz_name, fontface = "bold")
+)
+
+# --- Crossing lines between PT and B73 (inversion indicator) ---
+# Coordinates extracted from SVG (648x432 canvas).  NPC: x = svg_x/648, y = 1 - svg_y/432
+# PT  purple vlines: x=172.07 (up), x=242.52 (dn); bottom at svg_y=253.03
+# B73 purple vlines: x=172.07 (up), x=252.01 (dn); top    at svg_y=282.91
+x_pt_up_svg  <- 172.07 / 648
+x_pt_dn_svg  <- 242.52 / 648
+x_b73_up_svg <- 172.07 / 648
+x_b73_dn_svg <- 252.01 / 648
+y_pt_bot     <- 1 - 253.03 / 432
+y_b73_top    <- 1 - 282.91 / 432
+
+# Gray midlines: x=192.58 (PT), x=231.98 (B73)
+x_pt_mid_svg  <- 192.58 / 648
+x_b73_mid_svg <- 231.98 / 648
+
+# Sigmoid curve between two NPC points: x shifts with sigmoid, y is linear
+sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
+  t <- seq(-6, 6, length.out = n)
+  s <- 1 / (1 + exp(-t))  # 0→1 smooth transition
+  data.frame(
+    x = x1 + (x2 - x1) * s,
+    y = y1 + (y2 - y1) * seq(0, 1, length.out = n)
+  )
+}
+
+# Helper: draw a sigmoid as a geom_path on a [0,1]x[0,1] ggdraw canvas
+draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = 1.2) {
+  pts <- sigmoid_path(x1, y1, x2, y2)
+  draw_plot(
+    ggplot(pts, aes(x, y)) +
+      geom_path(color = color, linewidth = lwd) +
+      scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      theme_void(),
+    x = 0, y = 0, width = 1, height = 1
+  )
+}
+
+# --- TIL18 to PT connection ---
+# TIL18 vlines: x=172.07 (up), x=241.30 (dn); bottom at svg_y=140.45
+# PT    vlines: x=172.07 (up), x=242.52 (dn); top    at svg_y=170.33
+x_til_up_svg  <- 172.07 / 648
+x_til_dn_svg  <- 241.30 / 648
+y_til_bot     <- 1 - 140.45 / 432
+y_pt_top      <- 1 - 170.33 / 432
+
+# TIL18 midline: x=190.90, PT midline: x=192.58
+x_til_mid_svg <- 190.90 / 648
+
+crossing_lines <- list(
+  # Gray lines first (drawn behind purple)
+  draw_line(x = c(x_til_mid_svg, x_pt_mid_svg), y = c(y_til_bot, y_pt_top),
+            color = "gray55", size = 1.2),
+  draw_sigmoid(x_pt_mid_svg, y_pt_bot, x_b73_mid_svg, y_b73_top,
+               color = "gray55", lwd = 1.2),
+  # TIL18 → PT: straight lines (both inverted karyotype, no crossing)
+  draw_line(x = c(x_til_up_svg, x_pt_up_svg), y = c(y_til_bot, y_pt_top),
+            color = col_inv4m, size = 1.2),
+  draw_line(x = c(x_til_dn_svg, x_pt_dn_svg), y = c(y_til_bot, y_pt_top),
+            color = col_inv4m, size = 1.2),
+  # PT → B73: purple sigmoid X
+  draw_sigmoid(x_pt_up_svg, y_pt_bot, x_b73_dn_svg, y_b73_top,
+               color = col_inv4m),
+  draw_sigmoid(x_pt_dn_svg, y_pt_bot, x_b73_up_svg, y_b73_top,
+               color = col_inv4m)
 )
 
 make_final <- function(show_points) {
@@ -225,6 +296,7 @@ make_final <- function(show_points) {
     rel_heights = c(0.15, 1, 1, 1, 0.15))
   p <- ggdraw() + draw_plot(stk, x = 0.08, y = 0.08, width = 0.86, height = 0.86)
   for (a in overlay_annotations) p <- p + a
+  for (a in crossing_lines) p <- p + a
   p
 }
 
@@ -233,7 +305,7 @@ outpath_svg <- file.path(paths$figures, "fig1_panel_A_skeleton.svg")
 ggsave(outpath_svg, plot = make_final(FALSE), width = 9, height = 6, device = "svg")
 
 outpath_png <- file.path(paths$figures, "fig1_panel_A_skeleton.png")
-ggsave(outpath_png, plot = make_final(TRUE), width = 9, height = 6, dpi = 300)
+ggsave(outpath_png, plot = make_final(TRUE), width = 9, height = 6, dpi = 300, bg = "white")
 
 cat("Saved SVG:", outpath_svg, "\n")
 cat("Saved PNG:", outpath_png, "\n")
