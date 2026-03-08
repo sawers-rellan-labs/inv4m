@@ -164,8 +164,11 @@ col_gray  <- "gray50"
 lw        <- 1.2
 
 cfg <- list(
-  xlim    = c(158e6, 240e6),
-  xbreaks = seq(175e6, 225e6, by = 25e6))
+  xlim    = c(150e6, 235e6),
+  xbreaks = seq(150e6, 225e6, by = 25e6))
+
+# Toggle: set FALSE to disable connectors during recalibration
+ENABLE_CONNECTORS <- FALSE
 
 # SVG canvas dimensions for standalone renders (9x6 inch at 72 dpi)
 svg_standalone <- list(W = 648, H = 432, lw = 2.56)
@@ -182,7 +185,7 @@ a_h <- 4; a_gap <- 1.2; a_pt <- 8
 
 # --- Ancestry bar + arrow geometry ---
 # Bar sits just above y=100 gridline; arrow (pentagon) overlays the inversion
-bar_y0 <- 100; bar_h <- 10  # bar from y=100 to y=110
+bar_y0 <- 103; bar_h <- 20  # bar from y=103 to y=123
 arrow_pt <- 2e6            # arrow point taper width in bp
 col_ancestry <- "gold"     # B73 ancestry color
 
@@ -211,19 +214,25 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 5,
   up_bp <- gbp$xpos_aligned[gbp$side == "upstream"]
   dn_bp <- gbp$xpos_aligned[gbp$side == "downstream"]
 
+  seg_ymin <- -3; seg_ymax <- 125  # cap vertical lines within data region
+
   p <- ggplot() +
     geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
     { if (nrow(gmid) > 0)
-        geom_vline(xintercept = gmid$xmid_aligned,
-                   color = "gray55", linewidth = lw) } +
-    geom_vline(data = gbp, aes(xintercept = xpos_aligned),
-               color = col_inv4m, linewidth = lw) +
+        geom_segment(data = gmid, aes(x = xmid_aligned, xend = xmid_aligned,
+                     y = seg_ymin, yend = seg_ymax),
+                     color = "gray55", linewidth = lw) } +
+    geom_segment(data = gbp, aes(x = xpos_aligned, xend = xpos_aligned,
+                 y = seg_ymin, yend = seg_ymax),
+                 color = col_inv4m, linewidth = lw) +
     { if (genome_id == "B73")
-        geom_vline(xintercept = c(157.01e6, 195.90e6),
-                   color = "black", linewidth = lw, linetype = "dashed") } +
+        annotate("segment", x = c(157.01e6, 195.90e6), xend = c(157.01e6, 195.90e6),
+                 y = seg_ymin, yend = seg_ymax,
+                 color = "black", linewidth = lw, linetype = "dashed") } +
     { if (genome_id == "Mi21")
-        geom_vline(xintercept = c(155.45e6, 190.79e6),
-                   color = "black", linewidth = lw, linetype = "dashed") } +
+        annotate("segment", x = c(155.45e6, 190.79e6), xend = c(155.45e6, 190.79e6),
+                 y = seg_ymin, yend = seg_ymax,
+                 color = "black", linewidth = lw, linetype = "dashed") } +
     { if (show_points)
         geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
                    size = 0.6) } +
@@ -276,11 +285,11 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 5,
     } } +
     scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
                        breaks = cfg$xbreaks) +
-    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-13, 113)) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-10, 160), expand = expansion(add = c(10, 50))) +
     coord_cartesian(xlim = cfg$xlim) +
     theme_minimal(base_size = 22) +
     theme(panel.grid.minor = element_blank(),
-          plot.margin = margin(t = 15, r = 5, b = bot_margin, l = 5),
+          plot.margin = margin(t = -15, r = 5, b = 0, l = 5),
           axis.title = element_blank(),
           axis.ticks.x = element_blank(),
           axis.text.x = element_blank())
@@ -359,15 +368,15 @@ legend_dot <- function(col, x, y) {
 build_overlay <- function(genome_labels) {
   sz_name    <- 24
   sz_species <- 22
-  y_header   <- 0.955
+  y_header   <- 0.92
   y_bump     <- 0.02
-  x_gname    <- 0.54
-  x_species  <- 0.90
-  y_xtick    <- 1 - 500 / svg$H
+  x_gname    <- 0.97
+  x_species  <- 0.78
+  y_xtick    <- 0.108  # NPC position for x-axis tick labels
 
   genome_annots <- unlist(lapply(genome_labels, function(g) {
     out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
-                           size = sz_name, fontface = "bold"))
+                           size = sz_name, fontface = "bold", hjust = 1))
     if (!is.null(g$desc_html))
       out <- c(out, list(draw_grob(gridtext::richtext_grob(
         g$desc_html,
@@ -381,22 +390,29 @@ build_overlay <- function(genome_labels) {
   }), recursive = FALSE)
 
   xtick_annots <- lapply(names(xtick_x), function(lab) {
-    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick - 0.02,
+    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
                size = 18, color = "#4D4D4D", hjust = 0.5)
   })
 
+  # White rectangle covering grid behind top labels
+  white_bg <- draw_grob(grid::rectGrob(
+    x = unit(0.5, "npc"), y = unit(y_header, "npc"),
+    width = unit(1, "npc"), height = unit(0.06, "npc"),
+    gp = grid::gpar(fill = "white", col = NA)))
+
   c(list(
+    white_bg,
     draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
                angle = 90, size = 24),
     draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.056, size = 24),
     # Panel label added in combined assembly
-    draw_label("Inv4m", x = 0.339, y = 0.895, size = sz_name,
-               fontface = "bold.italic", color = col_inv4m),
-    legend_dot("gray50", 0.55, y_header - 0.012),
-    draw_label("knob 180", x = 0.58, y = y_header, size = sz_species,
-               fontface = "bold.italic", color = "gray50", hjust = 0),
-    legend_dot("gray80", 0.73, y_header - 0.012),
-    draw_label("TR-1", x = 0.76, y = y_header, size = sz_species,
+    draw_label("Inv4m", x = 0.4248, y = 0.855, size = sz_name,
+               fontface = "bold.italic", color = col_inv4m, hjust = 0.5),
+    legend_dot("gray50", 0.7863, y_header - 0.006),
+    draw_label("knob 180", x = 0.9655, y = y_header, size = sz_species,
+               fontface = "bold.italic", color = "gray50", hjust = 1),
+    legend_dot("gray80", 0.6580, y_header - 0.006),
+    draw_label("TR-1", x = 0.6849, y = y_header, size = sz_species,
                fontface = "bold.italic", color = "gray80", hjust = 0)),
     genome_annots,
     xtick_annots)
@@ -416,14 +432,14 @@ build_panel_b <- function(variant) {
   svg <<- variant$svg
   xtick_x <<- variant$xtick_x
 
-  crossing <- build_crossing_lines(vl, mx, pairs)
+  crossing <- if (ENABLE_CONNECTORS) build_crossing_lines(vl, mx, pairs) else list()
   overlay  <- build_overlay(gl)
   anc <- variant$ancestry  # e.g., c("mexicana", "nil", "b73")
 
   introg <- variant$introgression
 
   # Introgression sigmoid connections between middle and bottom panels
-  introg_sigmoids <- if (!is.null(introg)) {
+  introg_sigmoids <- if (ENABLE_CONNECTORS && !is.null(introg)) {
     # Convert aligned Mb coords to SVG x using tick position scale
     tx <- variant$xtick_x
     mb_per_px <- 25 / (tx[2] - tx[1])  # 25 Mb between first two ticks
@@ -482,9 +498,9 @@ variant_pt <- list(
     list(top = "TIL18", bot = "PT",  inverted = FALSE),
     list(top = "PT",    bot = "B73", inverted = TRUE)),
   genome_labels = list(
-    list(name = "TIL18", y = 0.875,  desc_html = "teosinte *mexicana*"),
-    list(name = "PT",    y = 0.6144, desc = "highland maize"),
-    list(name = "B73",   y = 0.3539, desc = NULL)),
+    list(name = "TIL18", y = 0.835,  desc_html = "teosinte *mexicana*"),
+    list(name = "PT",    y = 0.574, desc = "highland maize"),
+    list(name = "B73",   y = 0.314, desc = NULL)),
   ancestry = c("mexicana", "mexicana", "b73"))
 ```
 
@@ -506,20 +522,20 @@ ggsave(file.path(paths$figures, "fig1_panel_B_skeleton.png"),
 ```{r plot3-mi21-config}
 variant_mi21 <- list(
   genomes = c("TIL18", "Mi21", "B73"),
-  svg = svg_combined,
-  xtick_x = c("175" = 215.10, "200" = 390.99, "225" = 566.90),
+  svg = svg_standalone,
+  xtick_x = c("150" = 89.80, "175" = 239.73, "200" = 389.67, "225" = 539.61),
   vlines = list(
-    TIL18 = list(up_x = 200.20, dn_x = 293.11, top_y = 72.02,  bot_y = 202.20),
-    Mi21  = list(up_x = 200.20, dn_x = 276.67, top_y = 222.13, bot_y = 352.31),
-    B73   = list(up_x = 200.20, dn_x = 307.49, top_y = 372.24, bot_y = 505.41)),
-  mid_x = list(TIL18 = 225.48, Mi21 = 227.58, B73 = 280.60),
+    TIL18 = list(up_x = 227.04, dn_x = 306.23, top_y = 74.99,  bot_y = 145.96),
+    Mi21  = list(up_x = 227.04, dn_x = 292.22, top_y = 187.57, bot_y = 258.55),
+    B73   = list(up_x = 227.04, dn_x = 318.49, top_y = 300.16, bot_y = 371.13)),
+  mid_x = list(TIL18 = 248.58, Mi21 = 250.38, B73 = 295.57),
   pairs = list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
     list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
   genome_labels = list(
-    list(name = "TIL18", y = 0.875,  desc = "teosinte mexicana"),
-    list(name = "Mi21 NIL", y = 0.6144, desc = "highland maize"),
-    list(name = "B73",   y = 0.3539, desc = NULL)),
+    list(name = "TIL18", y = 0.835,  desc = "teosinte mexicana"),
+    list(name = "Mi21 NIL", y = 0.574, desc = "highland maize"),
+    list(name = "B73",   y = 0.314, desc = NULL)),
   introgression = list(mi21_left = 155.45, mi21_right = 190.79,
                        b73_left  = 157.01, b73_right  = 195.90),
   ancestry = c("mexicana", "nil", "b73"))

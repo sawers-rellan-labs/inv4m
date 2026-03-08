@@ -73,8 +73,8 @@ lw        <- 1.2          # universal linewidth for vlines + connections
 
 cfg <- list(
   genomes = c("TIL18", "Mi21", "B73"),
-  xlim    = c(163e6, 250e6),
-  xbreaks = seq(175e6, 250e6, by = 25e6))
+  xlim    = c(150e6, 235e6),
+  xbreaks = seq(160e6, 230e6, by = 20e6))
 
 # =============================================================================
 # SVG coordinate table (648x432 canvas, ground truth from rendered output)
