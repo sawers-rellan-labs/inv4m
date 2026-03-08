@@ -164,8 +164,8 @@ col_gray  <- "gray50"
 lw        <- 1.2
 
 cfg <- list(
-  xlim    = c(163e6, 250e6),
-  xbreaks = seq(175e6, 250e6, by = 25e6))
+  xlim    = c(158e6, 240e6),
+  xbreaks = seq(175e6, 225e6, by = 25e6))
 
 # SVG canvas dimensions for standalone renders (9x6 inch at 72 dpi)
 svg_standalone <- list(W = 648, H = 432, lw = 2.56)
@@ -193,6 +193,12 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 15) {
                    color = "gray55", linewidth = lw) } +
     geom_vline(data = gbp, aes(xintercept = xpos_aligned),
                color = col_inv4m, linewidth = lw) +
+    { if (genome_id == "B73")
+        geom_vline(xintercept = c(158e6, 191e6),
+                   color = "black", linewidth = lw, linetype = "dashed") } +
+    { if (genome_id == "Mi21")
+        geom_vline(xintercept = c(156.93e6, 186.33e6),
+                   color = "black", linewidth = lw, linetype = "dashed") } +
     { if (show_points)
         geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
                    size = 1.2, alpha = 0.7) } +
@@ -240,11 +246,11 @@ sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
              y = y1 + (y2 - y1) * seq(0, 1, length.out = n))
 }
 
-draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = lw) {
+draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = lw, lty = "solid") {
   pts <- sigmoid_path(x1, y1, x2, y2)
   draw_plot(
     ggplot(pts, aes(x, y)) +
-      geom_path(color = color, linewidth = lwd) +
+      geom_path(color = color, linewidth = lwd, linetype = lty) +
       scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
       scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
       theme_void(),
@@ -316,9 +322,9 @@ build_overlay <- function(genome_labels) {
   c(list(
     draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
                angle = 90, size = 24),
-    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.055, size = 24),
+    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.076, size = 24),
     # Panel label added in combined assembly
-    draw_label("Inv4m", x = 0.32, y = 0.917, size = sz_name,
+    draw_label("Inv4m", x = 0.339, y = 0.917, size = sz_name,
                fontface = "bold.italic", color = col_inv4m),
     legend_dot(col_knob, 0.55, y_header - 0.012),
     draw_label("knob 180", x = 0.58, y = y_header, size = sz_name,
@@ -351,6 +357,30 @@ build_panel_b <- function(variant) {
   arrow_top <- make_arrow_grob(vl, gnames[1], "left")
   arrow_bot <- make_arrow_grob(vl, gnames[3], "right")
 
+  introg <- variant$introgression
+
+  # Introgression sigmoid connections between middle and bottom panels
+  introg_sigmoids <- if (!is.null(introg)) {
+    # Convert aligned Mb coords to SVG x using tick position scale
+    tx <- variant$xtick_x
+    mb_per_px <- 25 / (tx[2] - tx[1])  # 25 Mb between first two ticks
+    mb_to_svg <- function(mb) tx[1] + (mb - 175) / mb_per_px
+    # Mi21 (middle panel, gnames[2]) introgression x-coords
+    mi_left  <- mb_to_svg(introg$mi21_left)
+    mi_right <- mb_to_svg(introg$mi21_right)
+    # B73 (bottom panel, gnames[3]) introgression x-coords
+    b_left   <- mb_to_svg(introg$b73_left)
+    b_right  <- mb_to_svg(introg$b73_right)
+    # Y coords: bottom of middle panel to top of bottom panel
+    y1 <- 1 - vl[[gnames[2]]]$bot_y / svg$H
+    y2 <- 1 - vl[[gnames[3]]]$top_y / svg$H
+    list(
+      draw_sigmoid(mi_left / svg$W,  y1, b_left / svg$W,  y2,
+                   color = "black", lty = "dashed"),
+      draw_sigmoid(mi_right / svg$W, y1, b_right / svg$W, y2,
+                   color = "black", lty = "dashed"))
+  } else list()
+
   function(show_points) {
     stk <- plot_grid(
       spacer,
@@ -363,6 +393,7 @@ build_panel_b <- function(variant) {
     p <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
     for (a in overlay)  p <- p + a
     for (a in crossing) p <- p + a
+    for (a in introg_sigmoids) p <- p + a
     p + arrow_top + arrow_bot
   }
 }
@@ -408,19 +439,21 @@ ggsave(file.path(paths$figures, "fig1_panel_B_skeleton.png"),
 variant_mi21 <- list(
   genomes = c("TIL18", "Mi21", "B73"),
   svg = svg_combined,
-  xtick_x = c("175" = 175.07, "200" = 340.86, "225" = 506.65, "250" = 672.43),
+  xtick_x = c("175" = 215.10, "200" = 390.99, "225" = 566.90),
   vlines = list(
-    TIL18 = list(up_x = 161.02, dn_x = 248.60, top_y = 72.02,  bot_y = 192.24),
-    Mi21  = list(up_x = 161.02, dn_x = 233.10, top_y = 222.13, bot_y = 342.35),
-    B73   = list(up_x = 161.02, dn_x = 262.15, top_y = 372.24, bot_y = 478.66)),
-  mid_x = list(TIL18 = 184.85, Mi21 = 186.83, B73 = 236.81),
+    TIL18 = list(up_x = 200.20, dn_x = 293.11, top_y = 72.02,  bot_y = 192.24),
+    Mi21  = list(up_x = 200.20, dn_x = 276.67, top_y = 222.13, bot_y = 342.35),
+    B73   = list(up_x = 200.20, dn_x = 307.49, top_y = 372.24, bot_y = 478.66)),
+  mid_x = list(TIL18 = 225.48, Mi21 = 227.58, B73 = 280.60),
   pairs = list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
     list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
   genome_labels = list(
     list(name = "TIL18", y = 0.875,  desc = "teosinte mexicana"),
     list(name = "Mi21 NIL", y = 0.6144, desc = "highland maize"),
-    list(name = "B73",   y = 0.3539, desc = NULL)))
+    list(name = "B73",   y = 0.3539, desc = NULL)),
+  introgression = list(mi21_left = 156.93, mi21_right = 186.33,
+                       b73_left  = 158.0,  b73_right  = 191.0))
 ```
 
 ```{r plot3-mi21-render, fig.width=9, fig.height=6}
@@ -506,8 +539,8 @@ rows <- lapply(panel_c_genomes, function(g) {
 
 col_headers <- plot_grid(
   ggdraw(),
-  ggdraw() + draw_label("Upstream", size = 24, fontface = "bold"),
-  ggdraw() + draw_label("Downstream", size = 24, fontface = "bold"),
+  ggdraw() + draw_label("Upstream", size = 24, fontface = "bold", y = 0.24),
+  ggdraw() + draw_label("Downstream", size = 24, fontface = "bold", y = 0.24),
   nrow = 1, rel_widths = c(0.08, 0.46, 0.46))
 
 title_row <- ggdraw() +
@@ -586,14 +619,19 @@ print(table(dotplot_data$ref))
 # Zoom: 25 Mb window per genome, centered on each genome's Inv4m midpoint
 zoom_half <- 20
 
-# Mi21 inversion center (x-axis, shared)
-mi21_center <- (156752504 + 167621035) / 2 / 1e6  # 162.2
+# Introgression boundaries (from AnchorWave offset analysis)
+introg_mi21 <- c(140.8, 170.2)  # Mi21 Mb (x-axis)
+introg_b73  <- c(158.0, 191.0)  # B73 Mb  (y-axis)
 
-# Reference inversion centers (y-axis, per genome)
+# Mi21 introgression center (x-axis, shared)
+mi21_center <- mean(introg_mi21)  # ~155.5
+
+# Reference centers (y-axis, per genome)
+# B73: center on introgression; TIL18/PT: center on inversion
 ref_centers <- c(
   TIL18 = (180365316 + 193570651) / 2 / 1e6,  # 187.0
   PT    = (173486186 + 186925483) / 2 / 1e6,   # 180.2
-  B73   = (172882309 + 188131461) / 2 / 1e6)   # 180.5
+  B73   = mean(introg_b73))                     # 174.5
 
 # Build one dotplot per genome with coord_fixed and proper zoom
 make_dotplot_facet <- function(genome, show_xlab = FALSE) {
@@ -601,6 +639,11 @@ make_dotplot_facet <- function(genome, show_xlab = FALSE) {
   yc <- ref_centers[genome]
 
   p <- ggplot(d, aes(x = query_pos / 1e6, y = ref_pos / 1e6, color = strand)) +
+    { if (genome == "B73")
+        annotate("rect",
+                 xmin = introg_mi21[1], xmax = introg_mi21[2],
+                 ymin = introg_b73[1],  ymax = introg_b73[2],
+                 fill = NA, color = "black", linewidth = 0.8, linetype = "dashed") } +
     geom_point(size = 0.5) +
     scale_color_manual(values = c("+" = "blue", "-" = "red"), guide = "none") +
     coord_fixed(ratio = 1,

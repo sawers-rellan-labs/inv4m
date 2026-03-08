@@ -1,80 +1,177 @@
----
-name: svg-layout
-description: SVG-first figure layout iteration. Use when aligning ggplot/cowplot labels, margins, font sizes, or multi-panel elements.
-argument-hint: [figure-name]
----
+# SVG Layout — Figure 1 Specific Notes
 
-# SVG-First Figure Layout Iteration
+**Updated:** 2026-03-08
 
-When iterating on ggplot/cowplot figure layout (label positions, margins, font sizes, element alignment):
+## SVG coordinate extraction — use Grep, not Python
 
-## Core workflow
+Always use the Grep tool directly on SVG files. Do NOT use Python XML/ElementTree parsing — SVG is plain text. Grep is faster and simpler.
 
-1. **Check data size for choosing the SVG to be saved**: If `nrow(ggplot_input_df) > 500`, work on a skeleton version — exclude `geom_point()` layers. If ≤ 500, iterate on the full plot directly.
-2. **Save SVGs from R code.** Read the SVG as text to extract exact element coordinates — this is cheap (text grep, no image tokens). Save PNG only for final visual verification or when the user needs to review. Avoid reading PNGs as images during alignment iteration.
-3. **Read SVG programmatically** — grep for element positions (`x`, `y` attributes on `<text>`, `<polyline>`, `<polygon>`, `<line>` elements). Compare coordinates numerically against target positions or reference elements (grid lines, tick marks, clip regions).
-4. **Derive coordinate mappings from the saved SVG**, not from guessing. For overlay positioning (e.g., cowplot `ggdraw`), save once, extract tick mark or grid line positions from the SVG, then compute the linear mapping between data coordinates and NPC/SVG coordinates.
-5. **Adjust R code** using SVG coordinate math (e.g., `y_npc = 1 - svg_y / canvas_height`). Make targeted edits — change one set of related positions at a time.
-6. **Repeat steps 2-5** until SVG element positions match the design reference numerically.
-7. **Only after skeleton alignment is confirmed**, save the full figure with data points as PNG to verify legibility and check for text/data overlap.
+### Grep patterns for Figure 1 Panel B
 
-## SVG coordinate table pattern
+```bash
+# Purple breakpoint vlines (#551A8B = purple4)
+Grep pattern="#551A8B" path="Fig1_top_ABC.svg"
+# Returns: <line x1='368.38' ... x2='368.38' ... stroke: #551A8B>
 
-Store all SVG-derived positions in a centralized data structure instead of scattered variables. This makes recalibration easy if the layout changes.
+# Gray midlines (#8C8C8C = gray55)
+Grep pattern="#8C8C8C" path="Fig1_top_ABC.svg"
 
-```r
-svg <- list(W = 648, H = 432, lw = 2.56)  # canvas dims + linewidth in svg units
+# Gridlines (for true x-axis tick positions)
+Grep pattern="EBEBEB" path="Fig1_top_ABC.svg"
+# Returns vertical polylines at 175/200/225/250 Mb positions
 
-# Per-panel positions extracted from SVG
-vlines <- list(
-  Panel1 = list(up_x = 172.07, dn_x = 241.30, top_y = 57.75, bot_y = 140.45),
-  Panel2 = list(up_x = 172.07, dn_x = 242.52, top_y = 170.33, bot_y = 253.03))
+# Arrow polygons
+Grep pattern="polygon.*#551A8B" path="Fig1_top_ABC.svg"
+# Returns polygon points — verify left/right edges match vline x values
 
-# NPC conversion helper
-to_npc <- function(sx, sy) list(x = sx / svg$W, y = 1 - sy / svg$H)
+# Overlay tick labels (custom #4D4D4D text)
+Grep pattern=">175<" path="Fig1_top_ABC.svg"
+
+# Hidden ggplot axis text (white, for position reference)
+Grep pattern="fill: #FFFFFF.*175" path="Fig1_top_ABC.svg"
+
+# Clip regions (Panel viewport boundaries)
+grep -A2 'clipPath' Fig1_top_ABC.svg | grep 'rect'
+# Panel B viewport: x=207.36, w=725.76 in combined SVG
 ```
 
-**Key grep patterns for extracting coordinates:**
-- Purple vlines: `grep "#551A8B" svg_file` (or whatever the stroke color hex is)
-- Gray midlines: `grep "#8C8C8C" svg_file`
-- Gridlines: `grep "EBEBEB" svg_file`
-- Text/ticks: `grep "text.*175\\|text.*200" svg_file`
-- Polygons (arrows): `grep "polygon" svg_file`
+### Verification pattern
 
-## Overlay element placement with polygonGrob
+After recalibration, verify alignment by checking that:
+1. Arrow polygon x-coords match vline x-coords exactly
+2. Sigmoid path endpoints match vline x-coords
+3. Overlay tick labels match gridline x-coords
 
-When panel-strip elements (arrows, brackets) need precise positioning independent of the panel stack, use `grid::polygonGrob` on the `ggdraw` overlay instead of embedding them in the `plot_grid` stack. This avoids layout coupling — moving an arrow doesn't shift all panels.
+## Standalone vs combined SVG calibration
+
+**Critical lesson:** Overlay coordinates calibrated from a standalone SVG (9×6 inch, 648×432) will NOT align in a combined figure (18×8 inch) because ggplot re-renders at different canvas sizes, producing different pixel positions.
+
+### Why this happens
+
+- Panel B is a ggdraw containing `draw_plot(stk, x=0.03, width=0.95)` + overlays
+- The ggplot panels inside `stk` are laid out by ggplot's engine at render time
+- At standalone size (648×432), a breakpoint vline lands at x=147.70
+- At combined size (725.76×576 viewport), the same vline lands at x=161.02
+- Overlay elements use `svg_x / svg$W` as NPC — if svg$W doesn't match, they misalign
+
+### Per-variant coordinate system
+
+Each variant carries its own `svg` dims and `xtick_x`, set by `build_panel_b()`:
 
 ```r
-# Define vertices in SVG coordinates, convert to NPC
-draw_grob(grid::polygonGrob(
-  x = unit(c(x1, x2, x3) / svg$W, "npc"),
-  y = unit(1 - c(y1, y2, y3) / svg$H, "npc"),
-  gp = grid::gpar(fill = color, col = color)))
+svg_standalone <- list(W = 648, H = 432, lw = 2.56)   # 9x6 inch
+svg_combined   <- list(W = 725.76, H = 576, lw = 2.56) # Panel B viewport in 18x8
+
+variant_pt <- list(
+  svg = svg_standalone,
+  xtick_x = c("175" = 160.11, "200" = 306.61, "225" = 453.10, "250" = 599.59),
+  vlines = list(...), ...)
+
+variant_mi21 <- list(
+  svg = svg_combined,
+  xtick_x = c("175" = 175.07, "200" = 340.86, "225" = 506.65, "250" = 672.43),
+  vlines = list(...), ...)
+
+build_panel_b <- function(variant) {
+  svg <<- variant$svg       # set active coordinate system
+  xtick_x <<- variant$xtick_x
+  # ... build overlays using svg$W, svg$H
+}
 ```
 
-**Critical rule:** If you remove elements from the `plot_grid` stack (e.g., arrow strips → overlay grobs), use invisible spacers with the same `rel_heights` to preserve panel geometry. Otherwise all SVG-calibrated coordinates become invalid.
+### Combined SVG viewport discovery
+
+```bash
+# Find Panel B viewport from clip rects
+grep -A2 'clipPath' Fig1_top_ABC.svg | grep 'rect'
+# Look for: <rect x='207.36' y='0.00' width='725.76' height='576.00' />
+# Panel B local coord = combined_x - 207.36
+```
+
+## Recalibration procedure
+
+When layout changes (margins, rel_heights, draw_plot offset, combined figure dimensions):
+
+1. Render the target SVG (standalone or combined skeleton — no geom_point)
+2. `Grep pattern="#551A8B"` → purple vline x/y positions
+3. `Grep pattern="#8C8C8C"` → gray midline x positions
+4. `Grep pattern="EBEBEB"` → gridline x positions (= true tick positions)
+5. For combined SVG: find viewport with `grep -A2 'clipPath' | grep 'rect'`, subtract Panel B start x
+6. Update variant config with new values
+7. Re-render and verify: `Grep pattern="polygon.*#551A8B"` → arrow edges should match vlines
+
+## Current Figure 1 architecture
+
+### Combined figure: Fig1_top_ABC (18×8 inch)
+
+```
+plot_grid(Panel_A, Panel_B, Panel_C, rel_widths = c(0.16, 0.56, 0.28))
+```
+
+- **Panel A**: AnchorWave dotplots (Mi21 vs TIL18/PT/B73), coord_fixed, 40 Mb window, framed with grid
+- **Panel B**: Repeat annotation (knob180 + TR-1), Mi21 variant with overlays
+- **Panel C**: LAST breakpoint self-similarity dotplots
+
+SVG saves skeleton (no geom_point, ~1 MB). PNG saves full figure with data points.
 
 ```r
-spacer <- ggplot() + theme_void() + theme(plot.margin = margin(0, 10, 0, 10))
-plot_grid(spacer, panel1, panel2, panel3, spacer,
-          ncol = 1, rel_heights = c(0.15, 1, 1, 1, 0.15))
+build_fig1_top <- function(show_points) {
+  p_panelb <- make_mi21(show_points)
+  fig1_grid <- plot_grid(p_panela, p_panelb, p_panelc_brkpt, ...)
+  ggdraw(fig1_grid) + draw_label("A", ...) + draw_label("B", ...) + draw_label("C", ...)
+}
+
+ggsave("Fig1_top_ABC.svg", plot = build_fig1_top(FALSE), ...)  # skeleton
+ggsave("Fig1_top_ABC.png", plot = build_fig1_top(TRUE), ...)   # full
 ```
 
-## Hiding native axis text + overlay replacement
+### Panel B overlay elements
 
-To reposition axis labels freely (e.g., below an arrow instead of at panel edge):
+| Element | Positioning | Color |
+|---------|------------|-------|
+| Breakpoint vlines | ggplot `geom_vline` (data-driven) | purple4 (#551A8B) |
+| Midline vlines | ggplot `geom_vline` (data-driven) | gray55 (#8C8C8C) |
+| Pentagonal arrows | `grid::polygonGrob` overlay, vertices from SVG table | purple4 |
+| Sigmoid connectors | `draw_plot` overlay with `geom_path` | purple4 or gray55 |
+| X-axis tick labels | `draw_label` overlay at gridline positions | #4D4D4D |
+| Genome names | `draw_label` overlay | black |
+| Species descriptions | `draw_label` or `richtext_grob` overlay | gray50 |
+| Legend (knob 180, TR-1) | `draw_label` + legend dots | teal, gold |
+| "Inv4m" label | `draw_label` centered between breakpoints | purple4 |
 
-1. Set native axis text to white: `axis.text.x = element_text(color = "white")` — keeps spacing intact
-2. Add overlay labels at SVG-derived positions using `draw_label()`
-3. Match the original color (e.g., `#4D4D4D` for ggplot default gray axis text)
+### Current SVG coordinate tables
 
-## Inter-panel connection lines
+**Mi21 variant** (combined 725.76×576):
+```
+up_x=161.02  TIL18_dn=248.60  Mi21_dn=233.10  B73_dn=262.15
+TIL18: y=72.02-192.24   Mi21: y=222.13-342.35   B73: y=372.24-478.66
+mid: TIL18=184.85  Mi21=186.83  B73=236.81
+ticks: 175=175.07  200=340.86  225=506.65  250=672.43
+```
 
-For lines connecting elements between panels (synteny, inversions, etc.):
+**PT variant** (standalone 648×432):
+```
+up_x=147.70  TIL18_dn=225.08  PT_dn=226.45  B73_dn=237.06
+TIL18: y=57.75-140.45   PT: y=170.33-253.03   B73: y=282.91-351.81
+mid: TIL18=168.76  PT=170.64  B73=214.67
+ticks: 175=160.11  200=306.61  225=453.10  250=599.59
+```
 
-- **Straight lines** (same orientation): `draw_line()` with SVG-derived NPC endpoints
-- **Sigmoid curves** (crossing/inversion): Generate logistic interpolation points, render as `geom_path` in a `[0,1]×[0,1]` `draw_plot` overlay
+### Key parameters
+| Parameter | Value |
+|-----------|-------|
+| Colors | `col_inv4m="purple4"`, `col_knob="#1d7f7a"`, `col_gold="gold"` |
+| x-axis range | `c(163e6, 250e6)` |
+| x-axis breaks | `seq(175e6, 250e6, by=25e6)` |
+| Font sizes | `sz_name=24`, `sz_species=22`, base_size=22 |
+| Linewidth | `lw=1.2` (all vlines, connections) |
+| Arrow geometry | `a_h=4, a_gap=1.2, a_pt=8` (svg units) |
+| draw_plot inset | `x=0.03, y=0.08, width=0.95, height=0.86` |
+| Inv4m label | `x=0.32` (NPC, centered between breakpoints) |
+
+## Useful techniques
+
+### Sigmoid curves for inversion crossing lines
 
 ```r
 sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
@@ -85,36 +182,19 @@ sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
 }
 ```
 
-Drive connection generation from a panel-pair list to avoid duplicated code:
-```r
-pairs <- list(
-  list(top = "Panel1", bot = "Panel2", inverted = FALSE),
-  list(top = "Panel2", bot = "Panel3", inverted = TRUE))
-```
-
-## Mixed-format text
-
-Use `gridtext::richtext_grob` with markdown for mixed italic/plain in a single label (e.g., "teosinte *mexicana*"):
-
-```r
-draw_grob(gridtext::richtext_grob(
-  "plain *italic*",
-  x = unit(x_npc, "npc"), y = unit(y_npc, "npc"),
-  hjust = 1, gp = grid::gpar(fontsize = 16, col = "gray50"),
-  box_gp = grid::gpar(col = NA, fill = NA)))
-```
-
-Note: CSS properties like `-webkit-text-stroke` do NOT render in R graphics devices.
-
-## Text shadow for low-contrast colors
-
-For light-colored text (e.g., gold on white), draw two labels: dark shadow offset underneath, then the colored text on top:
+### Text shadow for gold-on-white
 
 ```r
 draw_label("TR-1", x = 0.761, y = 0.953, color = "gray30", ...)
 draw_label("TR-1", x = 0.76,  y = 0.955, color = "gold", ...)
 ```
 
-## Linewidth reference
+### Mixed italic/plain text
 
-ggplot `linewidth = 1.2` renders as `stroke-width: 2.56` in SVG (648×432 canvas). Use this for consistent spacing: `lw_npc = 2.56 / 432 ≈ 0.006` NPC.
+```r
+draw_grob(gridtext::richtext_grob(
+  "teosinte *mexicana*",
+  box_gp = grid::gpar(col = NA, fill = NA)))
+```
+
+Note: `gridtext::richtext_grob` can double-render in some contexts. If italic text appears twice, switch to plain `draw_label` with `fontface = "italic"`.
