@@ -168,7 +168,7 @@ cfg <- list(
   xbreaks = seq(150e6, 225e6, by = 25e6))
 
 # Toggle: set FALSE to disable connectors during recalibration
-ENABLE_CONNECTORS <- FALSE
+ENABLE_CONNECTORS <- TRUE
 
 # SVG canvas dimensions for standalone renders (9x6 inch at 72 dpi)
 svg_standalone <- list(W = 648, H = 432, lw = 2.56)
@@ -342,7 +342,10 @@ build_crossing_lines <- function(vlines_cfg, mid_x_cfg, pairs) {
     t_up <- tv$up_x / svg$W; t_dn <- tv$dn_x / svg$W
     b_up <- bv$up_x / svg$W; b_dn <- bv$dn_x / svg$W
 
-    if (pr$inverted) {
+    if (isTRUE(pr$midline_only)) {
+      # Gray midline sigmoid only
+      list(draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"))
+    } else if (pr$inverted) {
       # Sigmoid crossing: upstream↔downstream swap
       list(
         draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
@@ -442,8 +445,9 @@ build_panel_b <- function(variant) {
   introg_sigmoids <- if (ENABLE_CONNECTORS && !is.null(introg)) {
     # Convert aligned Mb coords to SVG x using tick position scale
     tx <- variant$xtick_x
-    mb_per_px <- 25 / (tx[2] - tx[1])  # 25 Mb between first two ticks
-    mb_to_svg <- function(mb) tx[1] + (mb - 175) / mb_per_px
+    tick_mbs <- as.numeric(names(tx))
+    px_per_mb <- (tx[2] - tx[1]) / (tick_mbs[2] - tick_mbs[1])
+    mb_to_svg <- function(mb) tx[1] + (mb - tick_mbs[1]) * px_per_mb
     # Mi21 (middle panel, gnames[2]) introgression x-coords
     mi_left  <- mb_to_svg(introg$mi21_left)
     mi_right <- mb_to_svg(introg$mi21_right)
