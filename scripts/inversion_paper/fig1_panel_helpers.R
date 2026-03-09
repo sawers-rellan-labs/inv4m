@@ -181,13 +181,16 @@ build_overlay <- function(genome_labels) {
   sz_species <- 22
   y_header   <- 0.92
   y_bump     <- 0.02
-  x_gname    <- 0.97
-  x_species  <- 0.78
   y_xtick    <- 0.108
+
+  # Anchor genome names to left plot edge, descriptions to right plot edge
+  # Plot area boundaries (from SVG gridline endpoints, not tick marks)
+  x_gname   <- 0.092   # left edge of data area
+  x_species <- 0.966   # right edge of data area
 
   genome_annots <- unlist(lapply(genome_labels, function(g) {
     out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
-                           size = sz_name, fontface = "bold", hjust = 1))
+                           size = sz_name, fontface = "bold", hjust = 0))
     if (!is.null(g$desc_html))
       out <- c(out, list(draw_grob(gridtext::richtext_grob(
         g$desc_html,
@@ -217,11 +220,11 @@ build_overlay <- function(genome_labels) {
     draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.056, size = 24),
     draw_label("Inv4m", x = 0.4248, y = 0.855, size = sz_name,
                fontface = "bold.italic", color = col_inv4m, hjust = 0.5),
-    legend_dot("gray50", 0.7863, y_header - 0.006),
-    draw_label("knob 180", x = 0.9655, y = y_header, size = sz_species,
+    legend_dot("gray50", 0.811, y_header - 0.006),
+    draw_label("knob 180", x = 0.966, y = y_header, size = sz_species,
                fontface = "bold.italic", color = "gray50", hjust = 1),
-    legend_dot("gray80", 0.6580, y_header - 0.006),
-    draw_label("TR-1", x = 0.6849, y = y_header, size = sz_species,
+    legend_dot("gray80", 0.704, y_header - 0.006),
+    draw_label("TR-1", x = 0.726, y = y_header, size = sz_species,
                fontface = "bold.italic", color = "gray80", hjust = 0)),
     genome_annots,
     xtick_annots)

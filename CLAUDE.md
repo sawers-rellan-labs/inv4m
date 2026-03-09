@@ -147,7 +147,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
 | `make_jmj_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
 | `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
-| `plot_repeat_analysis.Rmd` | Fig 1 Panels A–C: dotplots, repeat annotation, breakpoints | ✅ |
+| `fig1_synteny_and_repeats.Rmd` | Fig 1 Panels B–D: repeat annotation, dotplots, breakpoints | ✅ |
 | `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
 
 ### Generated Outputs
