@@ -152,338 +152,36 @@ p_faceted <- to_plot %>%
 p_faceted
 ```
 
-# Cowplot assembly helpers
+# Repeat annotation panel config
 
-Shared infrastructure for the three-genome cowplot figures (Plots 2 and 3).
+Color palette, axis config, and SVG canvas dimensions. Layout helper functions
+are in `fig1_panel_helpers.R`.
 
 ```{r cowplot-shared}
-col_inv4m <- "purple4"
-col_knob  <- "#00954A"   # Spanish Green
-col_gold  <- "#FF9A1F"   # Bright Orange
-col_gray  <- "gray50"
-lw        <- 1.2
+# --- Color palette ---
+col_inv4m    <- "purple4"
+col_knob     <- "#00954A"
+col_gold     <- "gold"
+col_gray     <- "gray50"
+col_ancestry <- "gold"
+lw           <- 1.2
 
 cfg <- list(
   xlim    = c(150e6, 235e6),
   xbreaks = seq(150e6, 225e6, by = 25e6))
 
-# Toggle: set FALSE to disable connectors during recalibration
 ENABLE_CONNECTORS <- TRUE
 
-# SVG canvas dimensions for standalone renders (9x6 inch at 72 dpi)
-svg_standalone <- list(W = 648, H = 432, lw = 2.56)
+# --- SVG canvas dimensions ---
+svg_standalone <- list(W = 648, H = 432, lw = 2.56)   # 9x6 inch standalone
+svg_combined   <- list(W = 725.76, H = 576, lw = 2.56) # Panel A viewport in 18x8
 
-# SVG canvas dimensions for combined figure (18x8 in, Panel B viewport)
-svg_combined <- list(W = 725.76, H = 576, lw = 2.56)
-
-# Active svg/xtick_x — set by build_panel_b() per variant
+# Active svg/xtick_x — set by build_repeat_panel() per variant
 svg <- svg_standalone
 xtick_x <- c("175" = 160.11, "200" = 306.61, "225" = 453.10, "250" = 599.59)
 
-# Arrow geometry (svg units)
-a_h <- 4; a_gap <- 1.2; a_pt <- 8
-
-# --- Ancestry bar + arrow geometry ---
-# Bar sits just above y=100 gridline; arrow (pentagon) overlays the inversion
-bar_y0 <- 103; bar_h <- 20  # bar from y=103 to y=123
-arrow_pt <- 2e6            # arrow point taper width in bp
-col_ancestry <- "gold"     # B73 ancestry color
-
-make_arrow_polygon <- function(up_bp, dn_bp, direction, fill_col = col_inv4m) {
-  # Pentagon: point touches the breakpoint vline, taper is inside the inversion
-  if (direction == "left") {
-    xs <- c(up_bp, up_bp + arrow_pt, dn_bp, dn_bp, up_bp + arrow_pt)
-    ys <- c(bar_y0 + bar_h/2, bar_y0 + bar_h, bar_y0 + bar_h,
-            bar_y0, bar_y0)
-  } else {
-    xs <- c(up_bp, dn_bp - arrow_pt, dn_bp, dn_bp - arrow_pt, up_bp)
-    ys <- c(bar_y0 + bar_h, bar_y0 + bar_h, bar_y0 + bar_h/2,
-            bar_y0, bar_y0)
-  }
-  annotate("polygon", x = xs, y = ys, fill = fill_col, color = fill_col)
-}
-
-# --- Panel builder ---
-make_panel <- function(genome_id, show_points = FALSE, bot_margin = 5,
-                       ancestry = NULL, introg_bounds = NULL) {
-  gbp  <- bp_aligned %>% filter(genome == genome_id)
-  gmid <- midlines %>% filter(genome == genome_id)
-  gdat <- to_plot %>% filter(genome == genome_id)
-
-  # Breakpoint positions (aligned)
-  up_bp <- gbp$xpos_aligned[gbp$side == "upstream"]
-  dn_bp <- gbp$xpos_aligned[gbp$side == "downstream"]
-
-  seg_ymin <- -3; seg_ymax <- 125  # cap vertical lines within data region
-
-  p <- ggplot() +
-    geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
-    { if (nrow(gmid) > 0)
-        geom_segment(data = gmid, aes(x = xmid_aligned, xend = xmid_aligned,
-                     y = seg_ymin, yend = seg_ymax),
-                     color = "gray55", linewidth = lw) } +
-    geom_segment(data = gbp, aes(x = xpos_aligned, xend = xpos_aligned,
-                 y = seg_ymin, yend = seg_ymax),
-                 color = col_inv4m, linewidth = lw) +
-    { if (genome_id == "B73")
-        annotate("segment", x = c(157.01e6, 195.90e6), xend = c(157.01e6, 195.90e6),
-                 y = seg_ymin, yend = seg_ymax,
-                 color = "black", linewidth = lw, linetype = "dashed") } +
-    { if (genome_id == "Mi21")
-        annotate("segment", x = c(155.45e6, 190.79e6), xend = c(155.45e6, 190.79e6),
-                 y = seg_ymin, yend = seg_ymax,
-                 color = "black", linewidth = lw, linetype = "dashed") } +
-    { if (show_points)
-        geom_point(data = gdat, aes(x = sstart_aligned, y = bitscaled, color = rep),
-                   size = 0.6) } +
-    { if (show_points)
-        scale_color_manual(values = c("knob180" = "gray50", "TR-1" = "gray80"),
-                           guide = "none") } +
-    # Ancestry background bars + arrow (on top of all other layers)
-    { if (!is.null(ancestry) && ancestry == "b73") {
-        list(
-          annotate("rect", xmin = -Inf, xmax = up_bp,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
-          annotate("rect", xmin = dn_bp, xmax = Inf,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
-          make_arrow_polygon(up_bp, dn_bp, "right", fill_col = col_ancestry))
-    } } +
-    { if (!is.null(ancestry) && ancestry == "mexicana") {
-        list(
-          annotate("rect", xmin = -Inf, xmax = up_bp,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
-          annotate("rect", xmin = dn_bp, xmax = Inf,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
-          make_arrow_polygon(up_bp, dn_bp, "left"))
-    } } +
-    # NIL ancestry: gold flanks, transparent purple introgression, opaque purple inversion
-    { if (!is.null(ancestry) && ancestry == "nil" && !is.null(introg_bounds)) {
-        il <- introg_bounds[1] * 1e6; ir <- introg_bounds[2] * 1e6
-        list(
-          # 1. Gold: left edge → left introgression dashed line
-          annotate("rect", xmin = -Inf, xmax = il,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_ancestry, color = col_ancestry, alpha = 0.3),
-          # 2. Transparent purple: left dashed → upstream breakpoint
-          annotate("rect", xmin = il, xmax = up_bp,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
-          # 3. Opaque purple arrow: inversion
-          make_arrow_polygon(up_bp, dn_bp, "left"),
-          # 4. Transparent purple: downstream breakpoint → right dashed
-          annotate("rect", xmin = dn_bp, xmax = ir,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_inv4m, color = col_inv4m, alpha = 0.3),
-          # 5. Gold: right introgression dashed line → right edge
-          annotate("rect", xmin = ir, xmax = Inf,
-                   ymin = bar_y0, ymax = bar_y0 + bar_h,
-                   fill = col_ancestry, color = col_ancestry, alpha = 0.3))
-    } } +
-    scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
-                       breaks = cfg$xbreaks) +
-    scale_y_continuous(breaks = c(0, 25, 50, 75, 100), limits = c(-10, 160), expand = expansion(add = c(10, 50))) +
-    coord_cartesian(xlim = cfg$xlim) +
-    theme_minimal(base_size = 22) +
-    theme(panel.grid.minor = element_blank(),
-          plot.margin = margin(t = -15, r = 5, b = 0, l = 5),
-          axis.title = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text.x = element_blank())
-  p
-}
-
-# --- Arrow polygon builder ---
-make_arrow_grob <- function(vlines_cfg, panel, direction) {
-  v <- vlines_cfg[[panel]]
-  if (direction == "left") {
-    cy <- v$top_y - a_gap - a_h - svg$lw
-    xs <- c(v$up_x, v$up_x + a_pt, v$dn_x, v$dn_x, v$up_x + a_pt)
-    ys <- c(cy,     cy + a_h, cy + a_h, cy - a_h, cy - a_h)
-  } else {
-    cy <- v$bot_y + a_gap + a_h + svg$lw
-    xs <- c(v$up_x, v$dn_x - a_pt, v$dn_x, v$dn_x - a_pt, v$up_x)
-    ys <- c(cy + a_h, cy + a_h, cy, cy - a_h, cy - a_h)
-  }
-  draw_grob(grid::polygonGrob(
-    x = unit(xs / svg$W, "npc"), y = unit(1 - ys / svg$H, "npc"),
-    gp = grid::gpar(fill = col_inv4m, col = col_inv4m)))
-}
-
-# --- Sigmoid + connection line helpers ---
-sigmoid_path <- function(x1, y1, x2, y2, n = 50) {
-  t <- seq(-6, 6, length.out = n)
-  s <- 1 / (1 + exp(-t))
-  data.frame(x = x1 + (x2 - x1) * s,
-             y = y1 + (y2 - y1) * seq(0, 1, length.out = n))
-}
-
-draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = lw, lty = "solid") {
-  pts <- sigmoid_path(x1, y1, x2, y2)
-  draw_plot(
-    ggplot(pts, aes(x, y)) +
-      geom_path(color = color, linewidth = lwd, linetype = lty) +
-      scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
-      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-      theme_void(),
-    x = 0, y = 0, width = 1, height = 1)
-}
-
-# --- Connection line builder ---
-build_crossing_lines <- function(vlines_cfg, mid_x_cfg, pairs) {
-  unlist(lapply(pairs, function(pr) {
-    tv <- vlines_cfg[[pr$top]]; bv <- vlines_cfg[[pr$bot]]
-    tm <- mid_x_cfg[[pr$top]]; bm <- mid_x_cfg[[pr$bot]]
-    y1 <- 1 - tv$bot_y / svg$H
-    y2 <- 1 - bv$top_y / svg$H
-    t_up <- tv$up_x / svg$W; t_dn <- tv$dn_x / svg$W
-    b_up <- bv$up_x / svg$W; b_dn <- bv$dn_x / svg$W
-
-    if (isTRUE(pr$midline_only)) {
-      # Gray midline sigmoid only
-      list(draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"))
-    } else if (pr$inverted) {
-      # Sigmoid crossing: upstream↔downstream swap
-      list(
-        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
-        draw_sigmoid(t_up, y1, b_dn, y2, color = col_inv4m),
-        draw_sigmoid(t_dn, y1, b_up, y2, color = col_inv4m))
-    } else {
-      # Sigmoid parallel: same-side connections
-      list(
-        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
-        draw_sigmoid(t_up, y1, b_up, y2, color = col_inv4m),
-        draw_sigmoid(t_dn, y1, b_dn, y2, color = col_inv4m))
-    }
-  }), recursive = FALSE)
-}
-
-# --- Overlay annotation builder ---
-legend_dot <- function(col, x, y) {
-  draw_plot(
-    ggplot() + annotate("point", x = 0, y = 0, color = col, size = 4) + theme_void(),
-    x = x, y = y, width = 0.02, height = 0.02)
-}
-
-build_overlay <- function(genome_labels) {
-  sz_name    <- 24
-  sz_species <- 22
-  y_header   <- 0.92
-  y_bump     <- 0.02
-  x_gname    <- 0.97
-  x_species  <- 0.78
-  y_xtick    <- 0.108  # NPC position for x-axis tick labels
-
-  genome_annots <- unlist(lapply(genome_labels, function(g) {
-    out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
-                           size = sz_name, fontface = "bold", hjust = 1))
-    if (!is.null(g$desc_html))
-      out <- c(out, list(draw_grob(gridtext::richtext_grob(
-        g$desc_html,
-        x = unit(x_species, "npc"), y = unit(g$y + y_bump, "npc"),
-        hjust = 1, gp = grid::gpar(fontsize = sz_species, col = col_gray),
-        box_gp = grid::gpar(col = NA, fill = NA)))))
-    if (!is.null(g$desc))
-      out <- c(out, list(draw_label(g$desc, x = x_species, y = g$y + y_bump,
-        size = sz_species, fontface = "plain", color = col_gray, hjust = 1)))
-    out
-  }), recursive = FALSE)
-
-  xtick_annots <- lapply(names(xtick_x), function(lab) {
-    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
-               size = 18, color = "#4D4D4D", hjust = 0.5)
-  })
-
-  # White rectangle covering grid behind top labels
-  white_bg <- draw_grob(grid::rectGrob(
-    x = unit(0.5, "npc"), y = unit(y_header, "npc"),
-    width = unit(1, "npc"), height = unit(0.06, "npc"),
-    gp = grid::gpar(fill = "white", col = NA)))
-
-  c(list(
-    white_bg,
-    draw_label("Normalized Repeat Match Score", x = 0.02, y = 0.5,
-               angle = 90, size = 24),
-    draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.056, size = 24),
-    # Panel label added in combined assembly
-    draw_label("Inv4m", x = 0.4248, y = 0.855, size = sz_name,
-               fontface = "bold.italic", color = col_inv4m, hjust = 0.5),
-    legend_dot("gray50", 0.7863, y_header - 0.006),
-    draw_label("knob 180", x = 0.9655, y = y_header, size = sz_species,
-               fontface = "bold.italic", color = "gray50", hjust = 1),
-    legend_dot("gray80", 0.6580, y_header - 0.006),
-    draw_label("TR-1", x = 0.6849, y = y_header, size = sz_species,
-               fontface = "bold.italic", color = "gray80", hjust = 0)),
-    genome_annots,
-    xtick_annots)
-}
-
-# --- Full figure assembler ---
-spacer <- ggplot() + theme_void() + theme(plot.margin = margin(0, 10, 0, 10))
-
-build_panel_b <- function(variant) {
-  vl    <- variant$vlines
-  mx    <- variant$mid_x
-  pairs <- variant$pairs
-  gl    <- variant$genome_labels
-  gnames <- variant$genomes
-
-  # Set svg dims and xtick positions for this variant
-  svg <<- variant$svg
-  xtick_x <<- variant$xtick_x
-
-  crossing <- if (ENABLE_CONNECTORS) build_crossing_lines(vl, mx, pairs) else list()
-  overlay  <- build_overlay(gl)
-  anc <- variant$ancestry  # e.g., c("mexicana", "nil", "b73")
-
-  introg <- variant$introgression
-
-  # Introgression sigmoid connections between middle and bottom panels
-  introg_sigmoids <- if (ENABLE_CONNECTORS && !is.null(introg)) {
-    # Convert aligned Mb coords to SVG x using tick position scale
-    tx <- variant$xtick_x
-    tick_mbs <- as.numeric(names(tx))
-    px_per_mb <- (tx[2] - tx[1]) / (tick_mbs[2] - tick_mbs[1])
-    mb_to_svg <- function(mb) tx[1] + (mb - tick_mbs[1]) * px_per_mb
-    # Mi21 (middle panel, gnames[2]) introgression x-coords
-    mi_left  <- mb_to_svg(introg$mi21_left)
-    mi_right <- mb_to_svg(introg$mi21_right)
-    # B73 (bottom panel, gnames[3]) introgression x-coords
-    b_left   <- mb_to_svg(introg$b73_left)
-    b_right  <- mb_to_svg(introg$b73_right)
-    # Y coords: bottom of middle panel to top of bottom panel
-    y1 <- 1 - vl[[gnames[2]]]$bot_y / svg$H
-    y2 <- 1 - vl[[gnames[3]]]$top_y / svg$H
-    list(
-      draw_sigmoid(mi_left / svg$W,  y1, b_left / svg$W,  y2,
-                   color = "black", lty = "dashed"),
-      draw_sigmoid(mi_right / svg$W, y1, b_right / svg$W, y2,
-                   color = "black", lty = "dashed"))
-  } else list()
-
-  # Mi21 introgression bounds in aligned Mb (for nil ancestry bar)
-  ib <- if (!is.null(introg)) c(introg$mi21_left, introg$mi21_right) else NULL
-
-  function(show_points) {
-    stk <- plot_grid(
-      spacer,
-      make_panel(gnames[1], show_points = show_points, ancestry = anc[1]),
-      make_panel(gnames[2], show_points = show_points, ancestry = anc[2],
-                 introg_bounds = ib),
-      make_panel(gnames[3], show_points = show_points, bot_margin = 2, ancestry = anc[3]),
-      spacer,
-      ncol = 1, align = "v", axis = "lr",
-      rel_heights = c(0.15, 1, 1, 1, 0.15))
-    p <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
-    for (a in overlay)  p <- p + a
-    for (a in crossing) p <- p + a
-    for (a in introg_sigmoids) p <- p + a
-    p
-  }
-}
+# --- Load panel helpers (source into current environment so helpers see our variables) ---
+source(here("scripts", "inversion_paper", "fig1_panel_helpers.R"), local = TRUE)
 ```
 
 # Plot 2: TIL18 / PT / B73
@@ -509,7 +207,7 @@ variant_pt <- list(
 ```
 
 ```{r plot2-pt-render, fig.width=9, fig.height=6}
-make_pt <- build_panel_b(variant_pt)
+make_pt <- build_repeat_panel(variant_pt)
 make_pt(TRUE)
 ```
 
@@ -546,7 +244,7 @@ variant_mi21 <- list(
 ```
 
 ```{r plot3-mi21-render, fig.width=9, fig.height=6}
-make_mi21 <- build_panel_b(variant_mi21)
+make_mi21 <- build_repeat_panel(variant_mi21)
 make_mi21(TRUE)
 ```
 
@@ -775,27 +473,27 @@ ggsave(file.path(paths$figures, "Fig1_panel_A.svg"),
 
 # Combined layout: Panels A + B + C
 
-Assemble the three panels side by side matching the target layout
-(Figure1_top_layout_target.png). Panel A (dotplots) is narrow, Panel B
-(repeat annotation) is wide, Panel C (breakpoints) is medium.
+Assemble the three panels side by side. Panel A (repeat annotation) is wide,
+Panel B (AnchorWave dotplots) is narrow, Panel C (breakpoint dotplots) is
+medium — placing the two dotplot panels adjacent.
 
 ```{r fig1-top-assembly, fig.width=18, fig.height=8}
 # Build combined figure helper (skeleton vs points for SVG vs PNG)
 build_fig1_top <- function(show_points) {
-  p_panelb <- make_mi21(show_points)
+  p_repeat <- make_mi21(show_points)
 
   fig1_grid <- plot_grid(
+    p_repeat,
     p_panela,
-    p_panelb,
     p_panelc_brkpt,
     nrow = 1,
-    rel_widths = c(0.16, 0.56, 0.28))
+    rel_widths = c(0.56, 0.16, 0.28))
 
   label_y <- 0.965
   ggdraw(fig1_grid) +
     draw_label("A", x = 0.005, y = label_y, size = 32, fontface = "bold",
                hjust = 0.2, vjust = 1) +
-    draw_label("B", x = 0.16,  y = label_y, size = 32, fontface = "bold",
+    draw_label("B", x = 0.56,  y = label_y, size = 32, fontface = "bold",
                hjust = 0.2, vjust = 1) +
     draw_label("C", x = 0.71,  y = label_y, size = 32, fontface = "bold",
                hjust = 0.2, vjust = 1)

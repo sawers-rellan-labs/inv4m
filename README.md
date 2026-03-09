@@ -75,7 +75,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure/Table | Content | Notebook | Status |
 |--------------|---------|----------|--------|
 | **Main Figures** | | | |
-| Figure 1 | Inv4m delimitation, breakpoints, breeding design | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) + [`plot_repeat_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_repeat_analysis.html) (Panel A) | ✅ |
+| Figure 1 | Inv4m delimitation, breakpoints, breeding design | [`plot_repeat_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_repeat_analysis.html) (Panels A–C) + [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI | [`Corrected_phenotype_analysis_PSU2022.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2022.html) | ✅ |
 | Figure 3 | Global and local transcriptomic effects (8 panels) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + panel scripts | ✅ |
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |

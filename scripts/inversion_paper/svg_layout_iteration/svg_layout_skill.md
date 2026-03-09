@@ -124,6 +124,49 @@ for (a in connections) p <- p + a
 p + shape_1 + shape_2
 ```
 
+## Multi-canvas coordinate conversion (standalone vs combined figures)
+
+When a panel is rendered both standalone (e.g., 9×6" = 648×432 pt) and as part of a combined figure (e.g., 18×8" where the panel viewport is 725.76×576 pt), the same NPC values are used inside the panel's `ggdraw`. However, ggplot axis labels and margins occupy a **fixed point size** regardless of canvas dimensions. This means the data area left/right edges fall at **different NPC fractions** in each canvas:
+
+```
+Standalone (648 wide):  data area at x=64.31 → NPC = 64.31/648 = 0.0992
+Combined  (725.76 wide): data area at x=66.64 → NPC = 66.64/725.76 = 0.0918
+```
+
+**Never convert pixel positions from a standalone SVG directly to NPC for a combined figure.** The ~0.007 NPC difference is visually noticeable (~5 px shift).
+
+### Correct approach: extract clip path edges from the rendered SVG
+
+Extract the data area clip path boundaries directly from the SVG and store them in the variant config alongside other SVG-derived positions (vlines, xtick_x, etc.):
+
+```r
+# Clip path IDs in SVGs are base64-encoded: decode to get "x1|x2|y1|y2"
+# For combined figures, subtract the panel viewport offset from combined coords
+# e.g., combined clip x=274.00, panel starts at 207.36 → viewport x = 66.64
+
+variant <- list(
+  svg = list(W = 725.76, H = 576),
+  clip = list(left = 66.64, right = 701.28),  # data area edges in viewport coords
+  xtick_x = c("150" = 95.49, "175" = 265.18, ...),
+  # ... other SVG-derived positions
+)
+
+# In overlay builder — direct conversion, no assumptions
+x_gname   <- clip$left / svg$W    # left edge of data area
+x_species <- clip$right / svg$W   # right edge of data area
+```
+
+No expansion math, no derived calculations — just SVG coordinates divided by canvas width, same pattern as every other position in the coordinate table.
+
+**Use cases:**
+- Genome name labels: `x = x_left_npc, hjust = 0` (left-aligned to data area edge)
+- Species descriptions: `x = x_right_npc, hjust = 1` (right-aligned to data area edge)
+- Any annotation that should visually align with the axis/grid boundaries
+
+### Key rule
+
+If an overlay element should align with a ggplot axis feature (grid edge, tick mark, data boundary), **always derive its NPC position from the SVG coordinate table**, never from pixel measurements on a different-sized canvas. Pixel→NPC conversion is only valid for the specific canvas size the pixels were measured from.
+
 ## Recalibration cycle
 
 When something changes panel geometry (margins, rel_heights, inset position):
