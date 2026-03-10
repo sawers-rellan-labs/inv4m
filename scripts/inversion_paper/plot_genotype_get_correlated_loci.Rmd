@@ -302,13 +302,14 @@ gt_plot <- gt_runs %>%
     labels = gt_labels,
     na.value = "gray85",
     guide = guide_legend(
+      title = "Genotype",
       order = 1,
       label.position = "left",
       label.hjust = 1,
       theme = theme(
         legend.title = element_text(size = 28, hjust = 0,
-                                    margin = margin(t = 28, unit = "pt")),
-        legend.text = element_text(size = 25, vjust = 1.5),
+                                    margin = margin(t = 0, b = 6, unit = "pt")),
+        legend.text = element_text(size = 25, vjust = 0.5),
         legend.key.width = unit(2, "lines"),
         legend.key.height = unit(2, "lines")
       )
@@ -344,7 +345,7 @@ gt_plot <- gt_runs %>%
   ) +
   ggpubr::theme_classic2(base_size = 30) +
   theme(
-    legend.position = c(0.9 - 3.8 / (18 * 25.4), 0.85 + 1 / (8 * 25.4)),
+    legend.position = c(0.9 - 3.8 / (18 * 25.4), 0.83),
     legend.spacing.y = unit(-1.5, "lines"),
     legend.box.just = "right",
     strip.background = element_blank(),
@@ -529,18 +530,18 @@ plot_with_inset <- plot_base +
   draw_label(
     expression(italic("Inv4m") ~ "15 Mb"),
     x = (inv4m_left + inv4m_right) / 2, y = y_inv4m_label,
-    size = 30, fontface = "italic", color = col_inv4m, hjust = 0.5) +
+    size = 30, fontface = "plain", color = col_inv4m, hjust = 0.5) +
   # --- Shared introgression bracket (arms reach inv4m level) ---
   make_bracket(introg_left, introg_right, y_introg_bracket, introg_tick_h,
                col_inv4m, 6) +
   draw_label(
     paste0("Shared introgression ", introg_size_mb, " Mb"),
     x = (introg_left + introg_right) / 2, y = y_introg_bracket + mm_npc(7.7),
-    size = 30, fontface = "bold.italic", color = col_inv4m, hjust = 0.5) +
+    size = 30, fontface = "plain", color = col_inv4m, hjust = 0.5) +
   # Panel labels
   draw_label("E", x = 0.005, y = 0.98, size = 32, fontface = "bold",
              hjust = 0, vjust = 1) +
-  draw_label("F", x = 0.44, y = 0.52, size = 32, fontface = "bold",
+  draw_label("F", x = 0.505, y = 0.52, size = 32, fontface = "bold",
              hjust = 0, vjust = 1)
 
 plot_with_inset
