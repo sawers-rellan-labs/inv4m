@@ -272,9 +272,9 @@ by_length %>%
 **Approach**: Plot genotype runs as colored bars across chromosomes.
 
 ```{r genotype_plot, fig.height=5}
-# Genotype color breaks
-breaks <- c(0, 1.5, 2.5)
-names(breaks) <- c("B73/B73", "B73/Mi21", "Mi21/Mi21")
+# Genotype color palette (3 colors at values 0, 1, 2)
+gt_colors <- c("gold", "forestgreen", "purple4")
+gt_labels <- c("B73/B73", "B73/Mi21", "Mi21/Mi21")
 
 # Selection marker triangle
 triangle <- data.frame(
@@ -294,30 +294,14 @@ gt_plot <- gt_runs %>%
   mutate(chr = gsub("S", "", chr)) %>%
   ggplot(aes(y = ind, x = span, fill = gt)) +
   geom_col(width = 1) +
-  scale_fill_viridis_b(
-    breaks = breaks,
-    labels = names(breaks),
-    limits = c(-0.5, 2.5),
-    show.limits = FALSE,
+  scale_fill_gradientn(
+    colours = gt_colors,
+    values = scales::rescale(c(0, 1, 2)),
+    limits = c(0, 2),
+    breaks = c(0, 1, 2),
+    labels = gt_labels,
     na.value = "gray85",
-    direction = -1
-  ) +
-  geom_point(
-    data = triangle,
-    mapping = aes(shape = label),
-    position = position_nudge(y = 2),
-    size = 3,
-    color = "#43137D",
-    fill = "#43137D"
-  ) +
-  scale_shape_manual(values = 25) +
-  facet_wrap(factor(chr, 1:10) ~ ., strip.position = "left", ncol = 1) +
-  coord_cartesian(xlim = c(0, 450), expand = FALSE) +
-  xlab("Chromosome 4 Position [Mb]") +
-  ylab("Chromosome") +
-  labs(fill = "Genotype") +
-  guides(
-    fill = guide_colorsteps(
+    guide = guide_legend(
       order = 1,
       label.position = "left",
       label.hjust = 1,
@@ -326,9 +310,24 @@ gt_plot <- gt_runs %>%
                                     margin = margin(t = 28, unit = "pt")),
         legend.text = element_text(size = 25, vjust = 1.5),
         legend.key.width = unit(2, "lines"),
-        legend.key.height = unit(5.5, "lines")
+        legend.key.height = unit(2, "lines")
       )
-    ),
+    )
+  ) +
+  geom_point(
+    data = triangle,
+    mapping = aes(shape = label),
+    position = position_nudge(y = 2),
+    size = 3,
+    color = "purple4",
+    fill = "purple4"
+  ) +
+  scale_shape_manual(values = 25) +
+  facet_wrap(factor(chr, 1:10) ~ ., strip.position = "left", ncol = 1) +
+  coord_cartesian(xlim = c(0, 450), expand = FALSE) +
+  xlab("Chromosome 4 Position [Mb]") +
+  ylab("Chromosome") +
+  guides(
     shape = guide_legend(
       order = 2,
       override.aes = list(size = 8),
@@ -373,16 +372,15 @@ inlay <- gt_runs %>%
   mutate(chr = gsub("S", "", chr)) %>%
   ggplot(aes(x = span, y = ind, fill = gt)) +
   geom_col(width = 1) +
-  scale_fill_viridis_b(
-    breaks = breaks,
-    limits = c(-0.5, 2.5),
-    show.limits = TRUE,
-    na.value = "gray85",
-    direction = -1
+  scale_fill_gradientn(
+    colours = gt_colors,
+    values = scales::rescale(c(0, 1, 2)),
+    limits = c(0, 2),
+    na.value = "gray85"
   ) +
   annotate("point",
     x = 181.6, y = 14.4,
-    shape = 25, size = 6, color = "#43137D", fill = "#43137D"
+    shape = 25, size = 6, color = "purple4", fill = "purple4"
   ) +
   # Invisible diagonal spikes for SVG coordinate calibration
   annotate("text", x = 160, y = 2,  label = spike_id_a, alpha = 0, size = 1) +
@@ -538,7 +536,12 @@ plot_with_inset <- plot_base +
   draw_label(
     paste0("Shared introgression ", introg_size_mb, " Mb"),
     x = (introg_left + introg_right) / 2, y = y_introg_bracket + mm_npc(7.7),
-    size = 30, fontface = "bold.italic", color = col_inv4m, hjust = 0.5)
+    size = 30, fontface = "bold.italic", color = col_inv4m, hjust = 0.5) +
+  # Panel labels
+  draw_label("E", x = 0.005, y = 0.98, size = 32, fontface = "bold",
+             hjust = 0, vjust = 1) +
+  draw_label("F", x = 0.44, y = 0.52, size = 32, fontface = "bold",
+             hjust = 0, vjust = 1)
 
 plot_with_inset
 
@@ -574,18 +577,19 @@ gt3_plot <- gt_runs %>%
   ylab("Line") +
   geom_col(width = 1) +
   scale_y_discrete(expand = c(0, 0)) +
-  scale_fill_viridis_b(
-    breaks = breaks,
-    limits = c(-0.5, 2.5),
-    show.limits = TRUE,
-    na.value = "gray85",
-    direction = -1
+  scale_fill_gradientn(
+    colours = gt_colors,
+    values = scales::rescale(c(0, 1, 2)),
+    limits = c(0, 2),
+    breaks = c(0, 1, 2),
+    labels = gt_labels,
+    na.value = "gray85"
   ) +
   guides(fill = guide_legend(title = "Genotype", ncol = 3)) +
   coord_cartesian(xlim = c(150, 200)) +
   annotate("point",
     x = 181.6, y = 4,
-    shape = 25, size = 7, color = "#0D0887FF", fill = "#0D0887FF"
+    shape = 25, size = 7, color = "purple4", fill = "purple4"
   ) +
   annotate("text",
     x = c(inversion_limit, introgression_limit), y = 4,

@@ -1,0 +1,91 @@
+---
+title: "Figure 1 Assembly"
+author: "inv4m"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+
+library(ggplot2)
+library(cowplot)
+library(ggtext)
+```
+
+# Load pre-built panels
+
+Panels B–D come from `plot_synteny_and_repeats.Rmd`.
+Panel E (genotype map) with Panel F (chr4 inset) come from
+`plot_genotype_get_correlated_loci.Rmd` as `plot_with_inset`.
+
+```{r load-panels}
+p_bcd <- readRDS(file.path(paths$intermediate, "fig1_panel_BCD.rds"))
+p_ef  <- readRDS(file.path(paths$intermediate, "fig1_panel_E.rds"))
+```
+
+# Panel A placeholder
+
+Panel A (breeding scheme) is a hand-drawn/Inkscape illustration added in
+post-production. We reserve space with the correct aspect ratio.
+
+```{r panel-a-placeholder}
+p_a <- ggdraw() +
+  draw_label("Panel A\n(breeding scheme — added in Inkscape)",
+             size = 18, color = "gray60")
+```
+
+# Panels E + F (pre-built)
+
+`p_ef` is the full bottom row from `plot_genotype_get_correlated_loci.Rmd`:
+E = whole-genome genotype map, F = chr4 zoom inset, with spike-calibrated
+brackets and panel labels already included.
+
+```{r panel-ef-preview, fig.width=18, fig.height=8}
+p_ef
+```
+
+# Full Figure 1
+
+```{r figure1-full, fig.width=18, fig.height=22}
+fig1 <- plot_grid(
+  p_a,
+  p_bcd,
+  p_ef,
+  ncol = 1,
+  rel_heights = c(0.20, 0.45, 0.35),
+  labels = c("A", "", ""),
+  label_size = 32, label_fontface = "bold",
+  label_x = 0, label_y = 1)
+
+fig1
+```
+
+```{r figure1-save}
+ggsave(file.path(paths$figures, "Figure_1.png"),
+       plot = fig1, width = 18, height = 22, dpi = 300, bg = "white")
+ggsave(file.path(paths$figures, "Figure_1.svg"),
+       plot = fig1, width = 18, height = 22, device = "svg",
+       fix_text_size = TRUE)
+```
+
+# Session info
+
+```{r session-info}
+sessionInfo()
+```
