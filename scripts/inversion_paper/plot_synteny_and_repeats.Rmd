@@ -331,7 +331,7 @@ col_headers <- plot_grid(
   nrow = 1, rel_widths = c(0.08, 0.46, 0.46))
 
 title_row <- ggdraw() +
-  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.06, y = 0.5, size = 24, fontface = "bold", hjust = 0)
+  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.50, y = 0.5, size = 24, fontface = "bold")
 
 p_panelc_brkpt <- plot_grid(
   ggdraw(),  # top spacer — align with Panel B repeat header
@@ -477,7 +477,7 @@ Assemble the three panels side by side. Panel B (repeat annotation) is wide,
 Panel C (AnchorWave dotplots) is narrow, Panel D (breakpoint dotplots) is
 medium — placing the two dotplot panels adjacent.
 
-```{r fig1-top-assembly, fig.width=18, fig.height=8}
+```{r fig1-top-assembly, fig.width=18, fig.height=7}
 # Build combined figure helper (skeleton vs points for SVG vs PNG)
 build_fig1_top <- function(show_points) {
   p_repeat <- make_mi21(show_points)
@@ -487,15 +487,15 @@ build_fig1_top <- function(show_points) {
     p_panela,
     p_panelc_brkpt,
     nrow = 1,
-    rel_widths = c(0.56, 0.16, 0.28))
+    rel_widths = c(0.62, 0.13, 0.25))
 
   label_y <- 0.965
   ggdraw(fig1_grid) +
-    draw_label("B", x = 0.005, y = label_y, size = 32, fontface = "bold",
+    draw_label("B", x = 0.005, y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1) +
-    draw_label("C", x = 0.56,  y = label_y, size = 32, fontface = "bold",
+    draw_label("C", x = 0.62,  y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1) +
-    draw_label("D", x = 0.71,  y = label_y, size = 32, fontface = "bold",
+    draw_label("D", x = 0.755, y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1)
 }
 
@@ -504,9 +504,9 @@ build_fig1_top(TRUE)
 
 ```{r fig1-top-save}
 ggsave(file.path(paths$figures, "Fig1_top_BCD.png"),
-       plot = build_fig1_top(TRUE), width = 18, height = 8, dpi = 300, bg = "white")
+       plot = build_fig1_top(TRUE), width = 18, height = 7, dpi = 300, bg = "white")
 ggsave(file.path(paths$figures, "Fig1_top_BCD.svg"),
-       plot = build_fig1_top(FALSE), width = 18, height = 8, device = "svg",
+       plot = build_fig1_top(FALSE), width = 18, height = 7, device = "svg",
        fix_text_size = TRUE)
 saveRDS(build_fig1_top(TRUE), file.path(paths$intermediate, "fig1_panel_BCD.rds"))
 ```

@@ -351,6 +351,7 @@ gt_plot <- gt_runs %>%
     legend.box.just = "right",
     strip.background = element_blank(),
     strip.text.y.left = element_text(angle = 0),
+    axis.title.y = element_text(margin = margin(l = 2.5, unit = "mm")),
     panel.spacing.y = unit(0.5, "lines"),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
@@ -540,9 +541,9 @@ plot_with_inset <- plot_base +
     x = (introg_left + introg_right) / 2, y = y_introg_bracket + mm_npc(7.7),
     size = 30, fontface = "plain", color = col_inv4m, hjust = 0.5) +
   # Panel labels
-  draw_label("E", x = 0.005, y = 0.98, size = 32, fontface = "bold",
+  draw_label("E", x = 0.005, y = 0.995, size = 45, fontface = "bold",
              hjust = 0, vjust = 1) +
-  draw_label("F", x = 0.505, y = 0.52, size = 32, fontface = "bold",
+  draw_label("F", x = 0.505, y = 0.52, size = 45, fontface = "bold",
              hjust = 0, vjust = 1)
 
 plot_with_inset

@@ -62,15 +62,15 @@ p_ef
 
 # Full Figure 1
 
-```{r figure1-full, fig.width=18, fig.height=22}
+```{r figure1-full, fig.width=18, fig.height=19}
 fig1 <- plot_grid(
   p_a,
   p_bcd,
   p_ef,
   ncol = 1,
-  rel_heights = c(0.20, 0.45, 0.35),
+  rel_heights = c(0.23, 0.37, 0.40),
   labels = c("A", "", ""),
-  label_size = 32, label_fontface = "bold",
+  label_size = 45, label_fontface = "bold",
   label_x = 0, label_y = 1)
 
 fig1
@@ -78,9 +78,9 @@ fig1
 
 ```{r figure1-save}
 ggsave(file.path(paths$figures, "Figure_1.png"),
-       plot = fig1, width = 18, height = 22, dpi = 300, bg = "white")
+       plot = fig1, width = 18, height = 19, dpi = 300, bg = "white")
 ggsave(file.path(paths$figures, "Figure_1.svg"),
-       plot = fig1, width = 18, height = 22, device = "svg",
+       plot = fig1, width = 18, height = 19, device = "svg",
        fix_text_size = TRUE)
 ```
 
