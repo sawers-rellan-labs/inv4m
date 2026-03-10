@@ -26,6 +26,7 @@ paths <- setup_project_paths("inversion_paper")
 library(ggplot2)
 library(cowplot)
 library(ggtext)
+library(magick)
 ```
 
 # Load pre-built panels
@@ -39,15 +40,14 @@ p_bcd <- readRDS(file.path(paths$intermediate, "fig1_panel_BCD.rds"))
 p_ef  <- readRDS(file.path(paths$intermediate, "fig1_panel_E.rds"))
 ```
 
-# Panel A placeholder
+# Panel A (breeding scheme SVG)
 
-Panel A (breeding scheme) is a hand-drawn/Inkscape illustration added in
-post-production. We reserve space with the correct aspect ratio.
+Panel A is the breeding scheme diagram created in Inkscape.
 
-```{r panel-a-placeholder}
-p_a <- ggdraw() +
-  draw_label("Panel A\n(breeding scheme — added in Inkscape)",
-             size = 18, color = "gray60")
+```{r panel-a}
+panel_a_svg <- file.path(paths$figures, "panelA.svg")
+img_a <- magick::image_read_svg(panel_a_svg, width = 18 * 300)
+p_a <- ggdraw() + draw_image(img_a)
 ```
 
 # Panels E + F (pre-built)
