@@ -304,6 +304,7 @@ gt_plot <- gt_runs %>%
     guide = guide_legend(
       title = "Genotype",
       order = 1,
+      reverse = TRUE,
       label.position = "left",
       label.hjust = 1,
       theme = theme(
