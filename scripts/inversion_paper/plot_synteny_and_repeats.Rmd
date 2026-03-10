@@ -493,8 +493,6 @@ build_fig1_top <- function(show_points, w = 18, h = 7) {
 
   label_y <- 0.965
   base <- ggdraw(fig1_grid) +
-    draw_label("B", x = 0.005, y = label_y, size = 45, fontface = "bold",
-               hjust = 0.2, vjust = 1) +
     draw_label("C", x = 0.62,  y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1) +
     draw_label("D", x = 0.755, y = label_y, size = 45, fontface = "bold",

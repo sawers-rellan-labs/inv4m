@@ -63,15 +63,19 @@ p_ef
 # Full Figure 1
 
 ```{r figure1-full, fig.width=18, fig.height=19}
-fig1 <- plot_grid(
+fig1_grid <- plot_grid(
   p_a,
   p_bcd,
   p_ef,
   ncol = 1,
-  rel_heights = c(0.23, 0.37, 0.40),
-  labels = c("A", "", ""),
-  label_size = 45, label_fontface = "bold",
-  label_x = 0, label_y = 1)
+  rel_heights = c(0.23, 0.37, 0.40))
+
+# Add A and B labels on the Figure 1 canvas so they share NPC space with E
+fig1 <- ggdraw(fig1_grid) +
+  draw_label("A", x = 0.005, y = 0.995, size = 45, fontface = "bold",
+             hjust = 0, vjust = 1) +
+  draw_label("B", x = 0.005, y = 0.76, size = 45, fontface = "bold",
+             hjust = 0, vjust = 1)
 
 fig1
 ```
