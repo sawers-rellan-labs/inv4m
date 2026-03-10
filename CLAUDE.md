@@ -484,6 +484,8 @@ Then suggest next actions based on the handover document.
 
 3. **Agent sandbox:** `scripts/00_agent_work/` - Temporary work, git-ignored
 
+4. **LaTeX formatting:** `main.tex` uses **one-sentence-per-line** (semantic line breaks). When editing LaTeX prose, keep each sentence on its own line — do not wrap to a fixed column width. This produces clean single-line git diffs per sentence change.
+
 ### Terminal Commands Rule
 
 When giving multiline terminal commands or instructions to run on HPC/local shell, **always write them to a markdown file in `scripts/00_agent_work/`** with proper code blocks. Never rely on the user copy-pasting commands from the Claude Code chat window — the formatting breaks and corrupts the commands.
