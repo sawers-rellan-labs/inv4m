@@ -331,7 +331,7 @@ col_headers <- plot_grid(
   nrow = 1, rel_widths = c(0.08, 0.46, 0.46))
 
 title_row <- ggdraw() +
-  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.50, y = 0.5, size = 24, fontface = "bold")
+  draw_label(expression(italic("Inv4m") ~ "Breakpoints"), x = 0.06, y = 0.5, size = 24, fontface = "bold", hjust = 0)
 
 p_panelc_brkpt <- plot_grid(
   ggdraw(),  # top spacer — align with Panel B repeat header
@@ -339,7 +339,7 @@ p_panelc_brkpt <- plot_grid(
   rows[[1]], rows[[2]], rows[[3]],
   col_headers,
   ggdraw(),  # bottom spacer — align with Panel B repeat x-axis
-  ncol = 1, rel_heights = c(0.05, 0.07, 0.245, 0.245, 0.245, 0.07, 0.075))
+  ncol = 1, rel_heights = c(0.03, 0.07, 0.26, 0.26, 0.26, 0.07, 0.06))
 
 p_panelc_brkpt
 ```
@@ -458,7 +458,7 @@ p_panela <- plot_grid(
   panel_a_plots[[1]], panel_a_plots[[2]], panel_a_plots[[3]],
   ggdraw() + draw_label("Mi21 NIL", size = 24, fontface = "bold", x = 0.55),
   ggdraw(),  # bottom spacer — align with Panel B repeat x-axis
-  ncol = 1, rel_heights = c(0.30, 0.70, 0.70, 0.70, 0.18, 0.22))
+  ncol = 1, rel_heights = c(0.25, 0.70, 0.70, 0.70, 0.15, 0.20))
 
 p_panela
 ```

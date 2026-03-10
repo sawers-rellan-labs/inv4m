@@ -283,6 +283,6 @@ build_repeat_panel <- function(variant) {
     for (a in overlay)  p <- p + a
     for (a in crossing) p <- p + a
     for (a in introg_sigmoids) p <- p + a
-    p
+    p + theme(plot.margin = margin(t = -5, unit = "mm"))
   }
 }
