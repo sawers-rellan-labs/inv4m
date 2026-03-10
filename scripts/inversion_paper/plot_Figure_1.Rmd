@@ -68,13 +68,13 @@ fig1_grid <- plot_grid(
   p_bcd,
   p_ef,
   ncol = 1,
-  rel_heights = c(0.23, 0.37, 0.40))
+  rel_heights = c(220, 400, 400))
 
 # Add A and B labels on the Figure 1 canvas so they share NPC space with E
 fig1 <- ggdraw(fig1_grid) +
   draw_label("A", x = 0.005, y = 0.995, size = 45, fontface = "bold",
              hjust = 0, vjust = 1) +
-  draw_label("B", x = 0.005, y = 0.76, size = 45, fontface = "bold",
+  draw_label("B", x = 0.005, y = 0.762, size = 45, fontface = "bold",
              hjust = 0, vjust = 1)
 
 fig1
