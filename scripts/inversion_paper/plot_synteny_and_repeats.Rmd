@@ -114,6 +114,7 @@ midlines <- lapply(unique(bp_all$genome), function(g) {
     sstart >= min(bps) + 1e6, sstart <= max(bps) - 1e6)
   if (nrow(hits) == 0) return(NULL)
   data.frame(genome = g,
+    xmid = mean(hits$sstart),
     xmid_aligned = mean(hits$sstart) + offsets$offset[offsets$genome == g])
 }) %>% bind_rows()
 ```
@@ -125,29 +126,52 @@ bp_aligned %>% select(genome, side, xpos, xpos_aligned) %>%
 
 # Plot 1: Four-genome faceted overview
 
-Simple faceted plot of all four genomes at native coordinates (no alignment).
+Faceted plot of all four genomes at native coordinates with `free_x` to show
+each genome's breakpoint distance from its chromosome origin.
 
 ```{r plot1-faceted, fig.width=10, fig.height=10}
+genome_order <- c("TIL18", "PT", "Mi21", "B73")
 annotations <- bp_all %>%
-  mutate(genome = factor(genome, levels = genomes))
+  mutate(genome = factor(genome, levels = genome_order))
+midlines_native <- midlines %>%
+  mutate(genome = factor(genome, levels = genome_order))
+
+# Chr4 lengths (bp) — from FASTA indices
+# B73: Zm-B73-REFERENCE-NAM-5.0.fa.fai
+# PT:  Zm-PT-REFERENCE-HiLo-1.0.fa.fai (PT04)
+# Mi21: ragtag.merge.fasta.fai (scf00000010_RagTag)
+# TIL18: Zx-TIL18-REFERENCE-PanAnd-1.0.fa.fai
+chr4_lengths <- c(TIL18 = 274445545, PT = 248418599, Mi21 = 229108085, B73 = 250330460)
+chr4_ends <- data.frame(
+  genome = factor(names(chr4_lengths), levels = genome_order),
+  chr_end = chr4_lengths)
 
 p_faceted <- to_plot %>%
+  mutate(genome = factor(genome, levels = genome_order)) %>%
   ggplot(aes(x = sstart, y = bitscaled, color = rep)) +
   ylab("Normalized Repeat Match Score") +
+  geom_vline(data = midlines_native, aes(xintercept = xmid),
+             color = "gray55", linewidth = 1.2) +
   geom_vline(data = annotations, aes(xintercept = xpos),
-             color = "#3232a0", linewidth = 1.2) +
+             color = "purple4", linewidth = 1.2) +
+  geom_vline(data = chr4_ends, aes(xintercept = chr_end),
+             color = "black", linewidth = 0.8) +
   geom_point(size = 0.8) +
   facet_wrap(~ genome, nrow = 4, ncol = 1, scales = "free_x") +
-  scale_color_manual(values = c("knob180" = "#1d7f7a", "TR-1" = "gold")) +
+  scale_color_manual(
+    values = c("knob180" = "gray50", "TR-1" = "gray80"),
+    labels = c("knob180" = "knob 180", "TR-1" = "TR-1")) +
+  guides(color = guide_legend(override.aes = list(size = 5))) +
   scale_x_continuous(labels = unit_format(unit = "", scale = 1e-6),
-                     breaks = seq(150e6, 275e6, by = 25e6)) +
+                     breaks = seq(0, 275e6, by = 25e6)) +
   annotate("segment", x = -Inf, xend = Inf, y = -Inf, yend = -Inf) +
   annotate("segment", x = -Inf, xend = -Inf, y = -Inf, yend = Inf) +
-  theme_minimal(base_size = 16) +
+  theme_minimal(base_size = 20) +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_text(hjust = 0.8),
         strip.background = element_blank(),
-        legend.position = "none")
+        legend.position = "top",
+        legend.title = element_blank())
 
 p_faceted
 ```
@@ -200,7 +224,7 @@ variant_pt <- list(
     list(top = "TIL18", bot = "PT",  inverted = FALSE),
     list(top = "PT",    bot = "B73", inverted = TRUE)),
   genome_labels = list(
-    list(name = "TIL18", y = 0.835,  desc_html = "teosinte *mexicana*"),
+    list(name = "TIL18", y = 0.835,  desc_prefix = "teosinte", desc_italic = "mexicana", italic_offset = 0.125),
     list(name = "PT",    y = 0.574, desc = "highland maize"),
     list(name = "B73",   y = 0.314, desc = NULL)),
   ancestry = c("mexicana", "mexicana", "b73"))
@@ -235,7 +259,7 @@ variant_mi21 <- list(
     list(top = "TIL18", bot = "Mi21", inverted = FALSE),
     list(top = "Mi21",  bot = "B73",  inverted = TRUE)),
   genome_labels = list(
-    list(name = "TIL18", y = 0.835,  desc = "teosinte mexicana"),
+    list(name = "TIL18", y = 0.835,  desc_prefix = "teosinte", desc_italic = "mexicana", italic_offset = 0.125),
     list(name = "Mi21 NIL", y = 0.574, desc = "highland maize"),
     list(name = "B73",   y = 0.314, desc = NULL)),
   introgression = list(mi21_left = 155.45, mi21_right = 190.79,
@@ -406,7 +430,9 @@ print(table(dotplot_data$ref))
 # Zoom: 25 Mb window per genome, centered on each genome's Inv4m midpoint
 zoom_half <- 20
 
-# Introgression boundaries (from AnchorWave offset analysis)
+# Introgression boundaries
+# B73 coords from RNAseq genotype manual inspection (Section 3.2)
+# Mi21 coords from AnchorWave coordinate conversion
 introg_mi21 <- c(139.32, 174.66)  # Mi21 native Mb (x-axis)
 introg_b73  <- c(157.01, 195.90)  # B73 Mb  (y-axis)
 
@@ -497,6 +523,11 @@ build_fig1_top <- function(show_points, w = 18, h = 7) {
                hjust = 0.2, vjust = 1) +
     draw_label("D", x = 0.755, y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1)
+
+  # Calibrate x-axis break labels at the combined canvas size
+  xbreaks <- calibrate_xbreaks(base, w, h,
+                                variant_mi21$genomes[3])
+  for (b in xbreaks) base <- base + b
 
   # Calibrate sigmoids at the combined canvas size
   if (ENABLE_CONNECTORS) {

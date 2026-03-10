@@ -191,6 +191,46 @@ ggsave("combined.svg", add_overlays(p_combined, cal_combined), width = 18, heigh
 
 ---
 
+## New discovery: axis text causes non-linear panel compression (2026-03-10)
+
+### The problem
+
+When stacking 3 genome panels with `plot_grid(ncol = 1, align = "v", axis = "lr")`, adding `axis.text.x = element_text()` to **only the bottom panel** causes that panel to shrink vertically. The axis text takes space, compressing the data area, and `align = "v"` enforces uniform x-axis alignment across all three panels — so the bottom panel ends up narrower in the y-direction while the x-axis data area is resized to accommodate the text.
+
+This caused x-axis break labels to **misalign with gridlines** because the bottom panel's data-to-pixel mapping was different from the other panels.
+
+### The fix: uniform `element_blank()` + spike-calibrated tick overlays
+
+1. **All three panels** use `axis.text.x = element_blank()` — no panel has native axis text
+2. **`align = "v"` with `axis = "lr"`** ensures all panels have identical data area widths
+3. **`calibrate_xbreaks()`** function places break labels as `draw_label()` overlays at spike-calibrated NPC positions
+
+### How `calibrate_xbreaks()` works
+
+```r
+calibrate_xbreaks <- function(base_plot, width, height, bot_genome,
+                              break_values = c(150, 175, 200, 225),
+                              y_npc = 0.108)
+```
+
+1. Saves the base plot (without breaks) to a temp SVG at target dimensions
+2. Greps `#551A8B` `<line>` elements to find the bottom panel's two breakpoint lines
+3. Uses known breakpoint data coordinates from `bp_aligned` to derive a linear `data_x → pixel_x` mapping
+4. Converts each tick value (e.g., 150 Mb) to pixel, then to NPC (`px / svg_W`)
+5. Returns `draw_label()` calls at calibrated positions
+
+### Why this works
+
+The break labels are NPC overlays on the same `ggdraw()` canvas as the panels. The calibration happens at the **exact target dimensions**, so the data→NPC mapping is correct. The two BP lines provide two known data→pixel pairs, giving an exact linear mapping within the panel's data area.
+
+### Key insight: `align = "v"` is essential
+
+The user emphasized: "`align = 'v'` is what I wanted from the start." Without it, panels have independent x-axis widths that depend on y-axis label width, margin, and axis text — making cross-panel overlays (sigmoids, break labels) impossible to align.
+
+With `align = "v"` and uniform `element_blank()`, all panels share the same data area width, and a single linear mapping suffices for all three panels.
+
+---
+
 ## Immediate fix for Panel B
 
 Revert to the pre-spike-in `build_crossing_lines()` using the `vlines` hardcoded table. The table values were correct for the combined figure. Update the table if the combined figure dimensions change.

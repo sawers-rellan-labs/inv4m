@@ -31,7 +31,7 @@ make_panel <- function(genome_id, show_points = FALSE, bot_margin = 5,
   seg_ymin <- -3; seg_ymax <- 125
 
   p <- ggplot() +
-    geom_hline(yintercept = 0, color = "gray70", linewidth = 0.4) +
+    geom_hline(yintercept = 0, color = "black", linewidth = 0.6) +
     { if (nrow(gmid) > 0)
         geom_segment(data = gmid, aes(x = xmid_aligned, xend = xmid_aligned,
                      y = seg_ymin, yend = seg_ymax),
@@ -267,6 +267,58 @@ calibrate_sigmoids <- function(base_plot, width, height, pairs, gnames,
   c(crossing, introg_sigs)
 }
 
+# --- Calibrate x-axis break positions from BP lines in SVG ---
+# Saves a temp SVG, greps the purple breakpoint lines (#551A8B) from the
+# bottom panel, derives a linear data→NPC mapping, and returns draw_label
+# overlays for each break value.
+calibrate_xbreaks <- function(base_plot, width, height, bot_genome,
+                             break_values = c(150, 175, 200, 225),
+                             y_offset_mm = 2) {
+  tmp_svg <- file.path(tempdir(), "xbreak_calibration.svg")
+  ggsave(tmp_svg, plot = base_plot, width = width, height = height,
+         device = "svg", fix_text_size = TRUE)
+  svg_lines <- readLines(tmp_svg)
+
+  # Canvas dimensions
+  hdr <- svg_lines[grep("viewBox", svg_lines)[1]]
+  svg_W <- as.numeric(sub(".*viewBox='0 0 ([^']+) ([^']+)'.*", "\\1", hdr))
+  svg_H <- as.numeric(sub(".*viewBox='0 0 [^ ]+ ([^']+)'.*", "\\1", hdr))
+
+  # Grep purple BP lines — last 2 are the bottom panel (SVG renders top→bottom)
+  bp_lines <- svg_lines[grep("<line.*#551A8B", svg_lines)]
+  n <- length(bp_lines)
+  bot_lines <- bp_lines[(n - 1):n]
+  bot_bp_x <- sort(as.numeric(sub(".*x1='([^']+)'.*", "\\1", bot_lines)))
+
+  # Bottom of major gridlines: grep vertical #EBEBEB lines, take max y1
+  grid_lines_all <- svg_lines[grep("stroke: #EBEBEB", svg_lines)]
+  grid_vert  <- grid_lines_all[grep("points='[0-9.]+,[0-9.]+ [0-9.]+,[0-9.]+",
+                                     grid_lines_all)]
+  grid_y <- as.numeric(sub(".*points='[0-9.]+,([0-9.]+) .*", "\\1", grid_vert))
+  gridline_bot_y <- max(grid_y, na.rm = TRUE)  # SVG y increases downward
+
+  # Place labels y_offset_mm below gridline bottom (72 pt/inch, 25.4 mm/inch)
+  label_y_svg <- gridline_bot_y + y_offset_mm * 72 / 25.4
+  y_npc <- 1 - label_y_svg / svg_H
+
+  # Known data coordinates for bottom panel BPs
+  up_data <- bp_aligned$xpos_aligned[bp_aligned$genome == bot_genome &
+                                      bp_aligned$side == "upstream"]
+  dn_data <- bp_aligned$xpos_aligned[bp_aligned$genome == bot_genome &
+                                      bp_aligned$side == "downstream"]
+
+  # Linear mapping: data (bp) → SVG pixel x
+  ax <- (bot_bp_x[2] - bot_bp_x[1]) / (dn_data - up_data)
+  bx <- bot_bp_x[1] - ax * up_data
+
+  # Convert break values (Mb) to NPC
+  lapply(break_values, function(mb) {
+    px <- ax * (mb * 1e6) + bx
+    draw_label(as.character(mb), x = px / svg_W, y = y_npc,
+               size = 18, color = "#4D4D4D", hjust = 0.5)
+  })
+}
+
 # --- Overlay annotation builder ---
 legend_dot <- function(col, x, y) {
   draw_plot(
@@ -289,22 +341,21 @@ build_overlay <- function(genome_labels) {
   genome_annots <- unlist(lapply(genome_labels, function(g) {
     out <- list(draw_label(g$name, x = x_gname, y = g$y + y_bump,
                            size = sz_name, fontface = "bold", hjust = 0))
-    if (!is.null(g$desc_html))
-      out <- c(out, list(draw_grob(gridtext::richtext_grob(
-        g$desc_html,
-        x = unit(x_species, "npc"), y = unit(g$y + y_bump, "npc"),
-        hjust = 1, gp = grid::gpar(fontsize = sz_species, col = col_gray),
-        box_gp = grid::gpar(col = NA, fill = NA)))))
     if (!is.null(g$desc))
       out <- c(out, list(draw_label(g$desc, x = x_species, y = g$y + y_bump,
         size = sz_species, fontface = "plain", color = col_gray, hjust = 1)))
+    if (!is.null(g$desc_italic)) {
+      # Two labels: right-aligned italic species name at edge, then plain prefix
+      # to its left. This avoids expression()/richtext_grob SVG duplication.
+      out <- c(out, list(
+        draw_label(g$desc_italic, x = x_species, y = g$y + y_bump,
+          size = sz_species, fontface = "italic", color = col_gray, hjust = 1),
+        draw_label(g$desc_prefix, x = x_species - g$italic_offset,
+          y = g$y + y_bump,
+          size = sz_species, fontface = "plain", color = col_gray, hjust = 1)))
+    }
     out
   }), recursive = FALSE)
-
-  xtick_annots <- lapply(names(xtick_x), function(lab) {
-    draw_label(lab, x = xtick_x[lab] / svg$W, y = y_xtick,
-               size = 18, color = "#4D4D4D", hjust = 0.5)
-  })
 
   white_bg <- draw_grob(grid::rectGrob(
     x = unit(0.5, "npc"), y = unit(y_header, "npc"),
@@ -318,14 +369,13 @@ build_overlay <- function(genome_labels) {
     draw_label("Chromosome 4 Position [Mb]", x = 0.50, y = 0.056, size = 24),
     draw_label("Inv4m", x = 0.4248, y = 0.855, size = sz_name,
                fontface = "bold.italic", color = col_inv4m, hjust = 0.5),
-    legend_dot("gray50", 0.811, y_header - 0.006),
-    draw_label("knob 180", x = 0.966, y = y_header, size = sz_species,
-               fontface = "bold.italic", color = "gray50", hjust = 1),
-    legend_dot("gray80", 0.704, y_header - 0.006),
-    draw_label("TR-1", x = 0.726, y = y_header, size = sz_species,
-               fontface = "bold.italic", color = "gray80", hjust = 0)),
-    genome_annots,
-    xtick_annots)
+    legend_dot("gray80", 0.74, y_header - 0.006),
+    draw_label("TR-1", x = 0.76, y = y_header, size = sz_species,
+               fontface = "bold.italic", color = "gray80", hjust = 0),
+    legend_dot("gray50", 0.84, y_header - 0.006),
+    draw_label("knob 180", x = 0.86, y = y_header, size = sz_species,
+               fontface = "bold.italic", color = "gray50", hjust = 0)),
+    genome_annots)
 }
 
 # --- Full repeat annotation assembler ---
@@ -360,6 +410,12 @@ build_repeat_panel <- function(variant) {
       rel_heights = c(0.15, 1, 1, 1, 0.15))
     base <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
     for (a in overlay) base <- base + a
+
+    # Calibrate x-axis tick labels via spike-in at target dimensions
+    if (target_width > 0) {
+      breaks <- calibrate_xbreaks(base, target_width, target_height, gnames[3])
+      for (b in breaks) base <- base + b
+    }
 
     # Calibrate sigmoids at the target canvas size.
     # Pass target_width=0 to skip sigmoids (for when they'll be added at a
