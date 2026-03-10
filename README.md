@@ -75,11 +75,11 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure/Table | Content | Notebook | Status |
 |--------------|---------|----------|--------|
 | **Main Figures** | | | |
-| Figure 1 | Inv4m delimitation, breakpoints, breeding design | [`plot_Figure_1.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_Figure_1.html) (assembly) + [`plot_synteny_and_repeats.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_synteny_and_repeats.html) (Panels B–D) + [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) (Panels E–F) | ✅ Done — fully plotted with R (tag: `figure1-fully-plotted`) |
-| Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI | [`Corrected_phenotype_analysis_PSU2022.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2022.html) | ✅ |
+| Figure 1 | Inv4m delimitation: breeding scheme (A), repeat annotation (B), AnchorWave dotplots (C), breakpoint self-similarity (D), genotype map (E–F) | [`plot_Figure_1.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_Figure_1.html) (assembly) + [`plot_synteny_and_repeats.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_synteny_and_repeats.html) (B–D) + [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) (E–F) | ✅ |
+| Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI + SAM morphology | [`Corrected_phenotype_analysis_PSU2022.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2022.html) | ✅ |
 | Figure 3 | Global and local transcriptomic effects (8 panels) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + panel scripts | ✅ |
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
-| Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation.html) | ✅ |
+| Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation_network_split.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation_network_split.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ✅ |
 | Figure 7 | JMJ cluster expression + 5-genome microsynteny | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + [`replot_microsynteny_5genomes.sh`](scripts/02_genomics_foundation/replot_microsynteny_5genomes.sh) | ✅ |
 | Figure 8 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
@@ -101,6 +101,8 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Table S5 | Greenyellow module DEGs (sec6/pcna2 growth network) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
 | Table S6 | Pink module DEGs (jmj2/jmj4 co-expression) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
 | **Supporting Scripts** | | | |
+| Figure 1 assembly | Panel A (SVG) + B–D + E–F composition | [`plot_Figure_1.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_Figure_1.html) | ✅ |
+| Figure 1 panels B–D | Repeat annotation, AnchorWave dotplots, breakpoint self-similarity | [`plot_synteny_and_repeats.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_synteny_and_repeats.html) + [`fig1_panel_helpers.R`](scripts/inversion_paper/fig1_panel_helpers.R) | ✅ |
 | Field perturbation pipeline | WGCNA consensus + preservation | `scripts/inversion_paper/field_perturbation/` (7 scripts) | ✅ |
 | WGCNA figure assembly | Figure 6 composition | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
@@ -109,9 +111,14 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
+| JMJ paralog expression | Transcript-level DEG with corrected cDNA ref | [`jmj_paralog_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_paralog_expression_boxplot.html) | ✅ |
 | Greenyellow module | Greenyellow module characterization (sec6/pcna2) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
 | JMJ pink module | Pink module characterization (jmj2/jmj4 growth network) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
 | Phenotype association filter | FT/PH candidate gene overlap with DEGs | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
+| GxE analysis | 3-environment genotype-by-environment interaction | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
+| Internode analysis | CLY2025 internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
+| PSU2025 phenotypes | Spatial correction for PSU2025 | [`Corrected_phenotype_analysis_PSU2025.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2025.html) | ✅ |
+| CLY2025 phenotypes | Spatial correction for CLY2025 | [`Corrected_phenotype_analysis_CLY2025_modified.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_CLY2025_modified.html) | ✅ |
 
 **Status Legend:** ✅ Ready | 🔶 In Progress | ⚠️ Needs work | ❌ Missing
 
@@ -196,7 +203,7 @@ Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_A
 inv4m/
 ├── scripts/
 │   ├── phosphorus_paper/    # Paper 2 analysis notebooks (12 Rmd files) ✅
-│   ├── inversion_paper/     # Paper 1 analysis notebooks (12 Rmd files) ✅
+│   ├── inversion_paper/     # Paper 1 analysis notebooks (24 Rmd files) ✅
 │   └── utils/               # Shared utilities (setup_paths.R, render_notebook.R)
 ├── data/                    # Input data (symlink, not tracked)
 ├── docs/                    # Published HTML reports (GitHub Pages)
