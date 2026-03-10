@@ -479,8 +479,10 @@ medium — placing the two dotplot panels adjacent.
 
 ```{r fig1-top-assembly, fig.width=18, fig.height=7}
 # Build combined figure helper (skeleton vs points for SVG vs PNG)
-build_fig1_top <- function(show_points) {
-  p_repeat <- make_mi21(show_points)
+# Sigmoids are calibrated at the combined 18x7 canvas, not the standalone 9x6.
+build_fig1_top <- function(show_points, w = 18, h = 7) {
+  # Panel B WITHOUT sigmoids (pass ENABLE_CONNECTORS=FALSE via target dims trick)
+  p_repeat <- make_mi21(show_points, target_width = 0, target_height = 0)
 
   fig1_grid <- plot_grid(
     p_repeat,
@@ -490,13 +492,22 @@ build_fig1_top <- function(show_points) {
     rel_widths = c(0.62, 0.13, 0.25))
 
   label_y <- 0.965
-  ggdraw(fig1_grid) +
+  base <- ggdraw(fig1_grid) +
     draw_label("B", x = 0.005, y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1) +
     draw_label("C", x = 0.62,  y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1) +
     draw_label("D", x = 0.755, y = label_y, size = 45, fontface = "bold",
                hjust = 0.2, vjust = 1)
+
+  # Calibrate sigmoids at the combined canvas size
+  if (ENABLE_CONNECTORS) {
+    sigs <- calibrate_sigmoids(base, w, h,
+                               variant_mi21$pairs, variant_mi21$genomes,
+                               variant_mi21$introgression)
+    for (s in sigs) base <- base + s
+  }
+  base
 }
 
 build_fig1_top(TRUE)

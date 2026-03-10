@@ -143,30 +143,128 @@ draw_sigmoid <- function(x1, y1, x2, y2, color, lwd = lw, lty = "solid") {
     x = 0, y = 0, width = 1, height = 1)
 }
 
-# --- Inter-panel connection line builder ---
-build_crossing_lines <- function(vlines_cfg, mid_x_cfg, pairs) {
-  unlist(lapply(pairs, function(pr) {
-    tv <- vlines_cfg[[pr$top]]; bv <- vlines_cfg[[pr$bot]]
-    tm <- mid_x_cfg[[pr$top]]; bm <- mid_x_cfg[[pr$bot]]
-    y1 <- 1 - tv$bot_y / svg$H
-    y2 <- 1 - bv$top_y / svg$H
-    t_up <- tv$up_x / svg$W; t_dn <- tv$dn_x / svg$W
-    b_up <- bv$up_x / svg$W; b_dn <- bv$dn_x / svg$W
+# --- Calibrate sigmoids from SVG at target dimensions ---
+# Saves the plot to a temp SVG at the given width/height, greps for
+# breakpoint lines (#551A8B) and midlines (#8C8C8C), and returns a list
+# of draw_sigmoid overlays positioned to match the rendered elements.
+#
+# This runs at the TARGET canvas size so NPC always matches the final render.
+calibrate_sigmoids <- function(base_plot, width, height, pairs, gnames,
+                               introg = NULL) {
+  tmp_svg <- file.path(tempdir(), "calibration_target.svg")
+  ggsave(tmp_svg, plot = base_plot, width = width, height = height,
+         device = "svg", fix_text_size = TRUE)
+  svg_lines <- readLines(tmp_svg)
+
+  # Canvas dimensions
+  hdr <- svg_lines[grep("viewBox", svg_lines)[1]]
+  svg_W <- as.numeric(sub(".*viewBox='0 0 ([0-9.]+) ([0-9.]+)'.*", "\\1", hdr))
+  svg_H <- as.numeric(sub(".*viewBox='0 0 ([0-9.]+) ([0-9.]+)'.*", "\\2", hdr))
+
+  # --- Extract breakpoint lines (#551A8B <line> elements) ---
+  bp_lines <- svg_lines[grep("<line.*#551A8B", svg_lines)]
+  bp_x1 <- as.numeric(sub(".*x1='([^']+)'.*", "\\1", bp_lines))
+  bp_y1 <- as.numeric(sub(".*y1='([^']+)'.*", "\\1", bp_lines))  # bottom (larger SVG y)
+  bp_y2 <- as.numeric(sub(".*y2='([^']+)'.*", "\\1", bp_lines))  # top (smaller SVG y)
+
+  # --- Extract midlines (#8C8C8C <line> elements) ---
+  mid_lines <- svg_lines[grep("<line.*#8C8C8C", svg_lines)]
+  mid_x1 <- if (length(mid_lines) > 0) {
+    as.numeric(sub(".*x1='([^']+)'.*", "\\1", mid_lines))
+  } else numeric(0)
+  mid_y1 <- if (length(mid_lines) > 0) {
+    as.numeric(sub(".*y1='([^']+)'.*", "\\1", mid_lines))
+  } else numeric(0)
+
+  # --- Extract introgression boundary lines (black dashed <line> elements) ---
+  # These have stroke-dasharray and are black (#000000 or no explicit color)
+  introg_lines <- svg_lines[grep("<line.*stroke-dasharray", svg_lines)]
+  # Filter to black lines only (exclude any colored dashed lines)
+  introg_lines <- introg_lines[!grepl("#551A8B|#8C8C8C", introg_lines)]
+  introg_x1 <- if (length(introg_lines) > 0) {
+    as.numeric(sub(".*x1='([^']+)'.*", "\\1", introg_lines))
+  } else numeric(0)
+  introg_y1 <- if (length(introg_lines) > 0) {
+    as.numeric(sub(".*y1='([^']+)'.*", "\\1", introg_lines))
+  } else numeric(0)
+
+  # --- Group breakpoint lines into panels by y-position ---
+  # Each panel has 2 BP lines (upstream + downstream) at the same y range
+  n_panels <- length(gnames)
+  n_per_panel <- length(bp_x1) / n_panels
+
+  panels <- lapply(seq_len(n_panels), function(i) {
+    idx <- ((i - 1) * n_per_panel + 1):(i * n_per_panel)
+    list(
+      up_x  = min(bp_x1[idx]),    # upstream = leftmost
+      dn_x  = max(bp_x1[idx]),    # downstream = rightmost
+      top_y = min(bp_y2[idx]),     # top of panel (smallest SVG y)
+      bot_y = max(bp_y1[idx])      # bottom of panel (largest SVG y)
+    )
+  })
+  names(panels) <- gnames
+
+  # --- Group midlines by panel (match by y-range) ---
+  mid_by_panel <- lapply(gnames, function(g) {
+    pv <- panels[[g]]
+    # Find midlines whose y-range overlaps this panel
+    in_panel <- which(mid_y1 >= pv$top_y & mid_y1 <= pv$bot_y)
+    if (length(in_panel) > 0) mid_x1[in_panel[1]] else mean(c(pv$up_x, pv$dn_x))
+  })
+  names(mid_by_panel) <- gnames
+
+  # --- Group introgression lines by panel ---
+  introg_by_panel <- lapply(gnames, function(g) {
+    pv <- panels[[g]]
+    in_panel <- which(introg_y1 >= pv$top_y & introg_y1 <= pv$bot_y)
+    if (length(in_panel) > 0) sort(introg_x1[in_panel]) else numeric(0)
+  })
+  names(introg_by_panel) <- gnames
+
+  # --- Build sigmoid overlays ---
+  crossing <- unlist(lapply(pairs, function(pr) {
+    tv <- panels[[pr$top]]; bv <- panels[[pr$bot]]
+    y1 <- 1 - tv$bot_y / svg_H   # NPC bottom of top panel
+    y2 <- 1 - bv$top_y / svg_H   # NPC top of bottom panel
+    t_up <- tv$up_x / svg_W; t_dn <- tv$dn_x / svg_W
+    b_up <- bv$up_x / svg_W; b_dn <- bv$dn_x / svg_W
+    tm <- mid_by_panel[[pr$top]] / svg_W
+    bm <- mid_by_panel[[pr$bot]] / svg_W
 
     if (isTRUE(pr$midline_only)) {
-      list(draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"))
+      list(draw_sigmoid(tm, y1, bm, y2, color = "gray55"))
     } else if (pr$inverted) {
       list(
-        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
+        draw_sigmoid(tm, y1, bm, y2, color = "gray55"),
         draw_sigmoid(t_up, y1, b_dn, y2, color = col_inv4m),
         draw_sigmoid(t_dn, y1, b_up, y2, color = col_inv4m))
     } else {
       list(
-        draw_sigmoid(tm / svg$W, y1, bm / svg$W, y2, color = "gray55"),
+        draw_sigmoid(tm, y1, bm, y2, color = "gray55"),
         draw_sigmoid(t_up, y1, b_up, y2, color = col_inv4m),
         draw_sigmoid(t_dn, y1, b_dn, y2, color = col_inv4m))
     }
   }), recursive = FALSE)
+
+  # --- Introgression boundary sigmoids ---
+  introg_sigs <- list()
+  if (!is.null(introg)) {
+    mi_g <- gnames[2]; b_g <- gnames[3]
+    tv <- panels[[mi_g]]; bv <- panels[[b_g]]
+    y1 <- 1 - tv$bot_y / svg_H
+    y2 <- 1 - bv$top_y / svg_H
+    mi_bounds <- introg_by_panel[[mi_g]]
+    b_bounds  <- introg_by_panel[[b_g]]
+    if (length(mi_bounds) >= 2 && length(b_bounds) >= 2) {
+      introg_sigs <- list(
+        draw_sigmoid(mi_bounds[1] / svg_W, y1, b_bounds[1] / svg_W, y2,
+                     color = "black", lty = "dashed"),
+        draw_sigmoid(mi_bounds[2] / svg_W, y1, b_bounds[2] / svg_W, y2,
+                     color = "black", lty = "dashed"))
+    }
+  }
+
+  c(crossing, introg_sigs)
 }
 
 # --- Overlay annotation builder ---
@@ -243,33 +341,14 @@ build_repeat_panel <- function(variant) {
   svg <<- variant$svg
   xtick_x <<- variant$xtick_x
 
-  crossing <- if (ENABLE_CONNECTORS) build_crossing_lines(vl, mx, pairs) else list()
   overlay  <- build_overlay(gl)
   anc <- variant$ancestry
-
   introg <- variant$introgression
-
-  introg_sigmoids <- if (ENABLE_CONNECTORS && !is.null(introg)) {
-    tx <- variant$xtick_x
-    tick_mbs <- as.numeric(names(tx))
-    px_per_mb <- (tx[2] - tx[1]) / (tick_mbs[2] - tick_mbs[1])
-    mb_to_svg <- function(mb) tx[1] + (mb - tick_mbs[1]) * px_per_mb
-    mi_left  <- mb_to_svg(introg$mi21_left)
-    mi_right <- mb_to_svg(introg$mi21_right)
-    b_left   <- mb_to_svg(introg$b73_left)
-    b_right  <- mb_to_svg(introg$b73_right)
-    y1 <- 1 - vl[[gnames[2]]]$bot_y / svg$H
-    y2 <- 1 - vl[[gnames[3]]]$top_y / svg$H
-    list(
-      draw_sigmoid(mi_left / svg$W,  y1, b_left / svg$W,  y2,
-                   color = "black", lty = "dashed"),
-      draw_sigmoid(mi_right / svg$W, y1, b_right / svg$W, y2,
-                   color = "black", lty = "dashed"))
-  } else list()
-
   ib <- if (!is.null(introg)) c(introg$mi21_left, introg$mi21_right) else NULL
 
-  function(show_points) {
+  # Returns a closure. Call with show_points and target dimensions.
+  # The sigmoids are calibrated at the target dimensions each time.
+  function(show_points, target_width = 9, target_height = 6) {
     stk <- plot_grid(
       spacer,
       make_panel(gnames[1], show_points = show_points, ancestry = anc[1]),
@@ -279,10 +358,17 @@ build_repeat_panel <- function(variant) {
       spacer,
       ncol = 1, align = "v", axis = "lr",
       rel_heights = c(0.15, 1, 1, 1, 0.15))
-    p <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
-    for (a in overlay)  p <- p + a
-    for (a in crossing) p <- p + a
-    for (a in introg_sigmoids) p <- p + a
-    p + theme(plot.margin = margin(t = -5, unit = "mm"))
+    base <- ggdraw() + draw_plot(stk, x = 0.03, y = 0.08, width = 0.95, height = 0.86)
+    for (a in overlay) base <- base + a
+
+    # Calibrate sigmoids at the target canvas size.
+    # Pass target_width=0 to skip sigmoids (for when they'll be added at a
+    # parent level, e.g., the combined BCD figure).
+    if (ENABLE_CONNECTORS && target_width > 0) {
+      sigs <- calibrate_sigmoids(base, target_width, target_height,
+                                 pairs, gnames, introg)
+      for (s in sigs) base <- base + s
+    }
+    base
   }
 }
