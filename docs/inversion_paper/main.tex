@@ -1485,11 +1485,42 @@ compared the sum of measured internode lengths with directly measured plant
 height (PH) from field records using linear regression. Agreement between
 methods was assessed by $R^2$ and slope deviation from unity.
 
+\subsection{Mi21 NIL genome assembly and scaffolding}
+
+To obtain a reference-quality genome for the \invfour donor parent, we
+performed \textit{de novo} assembly of the Mi21 near-isogenic line from PacBio
+HiFi sequencing data. Two barcoded HiFi libraries (bc2051, $\sim$9$\times$
+coverage; bc2052, $\sim$5$\times$ coverage) were combined for a total of
+$\sim$14$\times$ genome coverage. Primary contigs were assembled with hifiasm
+v0.25.0 \cite{cheng2021hifiasm} using the \texttt{-l0} flag to disable purge
+duplication, yielding 740 contigs totaling 2.21~Gb with a contig N50 of
+13.7~Mb.
+
+Contigs were scaffolded against two reference genomes using RagTag
+\cite{alonge2022ragtag}: Zm-B73-REFERENCE-NAM-5.0 \cite{hufford2021} as the
+recurrent parent background and Zm-PT-REFERENCE-HiLo-1.0 as a highland
+representative carrying the standard \invfour arrangement. Each scaffolding was
+performed with \texttt{ragtag.py scaffold -u} (unplaced contigs retained)
+using minimap2 \cite{li2018minimap2} alignments. The two resulting AGP files
+were merged with \texttt{ragtag.py merge}, producing 10 pseudochromosomes and
+455 unplaced contigs. The merged scaffold placed 97.6--98.5\% of assembled
+bases onto chromosomes.
+
+\subsection{Gene model transfer}
+
+Gene models were transferred from B73 (Zm00001eb.1 annotation) to the Mi21
+NIL assembly using Liftoff \cite{shumate2021liftoff} with parameters
+\texttt{-s~0.5 -a~0.5 -flank~0.1 -cds -copies}. This lifted 1,145,935
+features, with 252 features unmapped. The \texttt{-copies} flag was used to
+detect copy-number variation at the JUMONJI histone demethylase cluster on
+chromosome~4.
+
 \subsection{Chromosomal knob repeat annotation}
 
 To characterize the repeat content of the \invfour breakpoint segments across
 genomes, we performed BLAST+ \cite{camacho2009} similarity searches of
-chromosome~4 in B73 (NAM5), PT (HiLo-1.0), and TIL18 (PanAnd-1.0) using
+chromosome~4 in B73 (NAM5), PT (HiLo-1.0), TIL18 (PanAnd-1.0), and the Mi21
+NIL assembly using
 representative sequences of two classes of chromosomal knob repeats as queries.
 For the 180~bp knob repeat we used accession M32524.1
 \cite{dennis1984knob180}, and for the \textit{TR-1} repeat we used accession
@@ -1507,6 +1538,27 @@ flanking each breakpoint and performed local self-alignment with LAST
 (Fig~\ref{fig::design}C) reveal tandem repeat arrays as diagonal and
 off-diagonal patterns, with forward matches shown in red and reverse
 (inverted) matches in blue.
+
+\subsection{Whole-genome alignment and microsynteny}
+
+To confirm the orientation of \invfour in the Mi21 NIL assembly and delimit
+breakpoint coordinates, we performed CDS-anchored whole-genome alignments
+against B73, PT, and TIL18 using AnchorWave \cite{song2022anchorwave}
+\texttt{proali} with \texttt{-R~1 -Q~1} (one-to-one mapping, no whole-genome
+duplication). CDS anchor sequences were extracted from each reference GFF3 with
+\texttt{anchorwave gff2seq} and mapped to both reference and query assemblies
+using minimap2 \cite{li2018minimap2} (\texttt{-x splice -k 12 -p 0.4 -N 20}).
+CDS-anchor dotplots were filtered to uniquely-mapped anchors
+(MAPQ~$\geq$~60) and dominant scaffold pairings to reduce multi-mapping noise
+from duplicated gene families (Fig~\ref{fig::design}C).
+
+To examine microsynteny at the JMJ cluster, we performed pairwise ortholog
+detection between B73 and Mi21 using jcvi/MCScan \cite{tang2008jcvi} with
+LAST \cite{kielbasa2011} alignments (\texttt{--cscore=.99},
+\texttt{--minspan=30}). The resulting synteny blocks confirmed that all B73 JMJ
+paralogs at the locus map to a single Mi21 gene (Mi21\_Zm00001eb191820),
+consistent with a single-copy state in the inverted haplotype
+(Fig~\ref{fig:jmj_cluster}B).
 
 \subsection{Tissue sampling, RNA extraction, and sequencing}
 
@@ -2304,5 +2356,77 @@ Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0
 \bottomrule
 \end{tabular}
 \end{table}
+
+% =============================================================================
+% todo(fausto) add to bibtex
+% =============================================================================
+%
+% @article{cheng2021hifiasm,
+%   author  = {Cheng, Haoyu and Concepcion, Gregory T. and Feng, Xiaowen and Zhang, Haowen and Li, Heng},
+%   title   = {Haplotype-resolved de novo assembly using phased assembly graphs with hifiasm},
+%   journal = {Nature Methods},
+%   volume  = {18},
+%   number  = {2},
+%   pages   = {170--175},
+%   year    = {2021},
+%   doi     = {10.1038/s41592-020-01056-5}
+% }
+%
+% @article{alonge2022ragtag,
+%   author  = {Alonge, Michael and Lebeigle, Ludivine and Kirsche, Melanie and Jenber, Kristen and Cseke, Sergey and Aganezov, Sergey and Wang, Xingang and Lippman, Zachary B. and Schatz, Michael C. and Soyk, Sebastian},
+%   title   = {{RagTag}: automated assembly scaffolding and misassembly correction},
+%   journal = {Genome Biology},
+%   volume  = {23},
+%   pages   = {199},
+%   year    = {2022},
+%   doi     = {10.1186/s13059-022-02823-7}
+% }
+%
+% @article{shumate2021liftoff,
+%   author  = {Shumate, Alaina and Salzberg, Steven L.},
+%   title   = {{Liftoff}: accurate mapping of gene annotations},
+%   journal = {Bioinformatics},
+%   volume  = {37},
+%   number  = {12},
+%   pages   = {1639--1643},
+%   year    = {2021},
+%   doi     = {10.1093/bioinformatics/btaa1016}
+% }
+%
+% @article{li2018minimap2,
+%   author  = {Li, Heng},
+%   title   = {Minimap2: pairwise alignment for nucleotide sequences},
+%   journal = {Bioinformatics},
+%   volume  = {34},
+%   number  = {18},
+%   pages   = {3094--3100},
+%   year    = {2018},
+%   doi     = {10.1093/bioinformatics/bty191}
+% }
+%
+% @article{tang2008jcvi,
+%   author  = {Tang, Haibao and Bowers, John E. and Wang, Xiyin and Ming, Ray and Alam, Maqsudul and Paterson, Andrew H.},
+%   title   = {Synteny and collinearity in plant genomes},
+%   journal = {Science},
+%   volume  = {320},
+%   number  = {5875},
+%   pages   = {486--488},
+%   year    = {2008},
+%   doi     = {10.1126/science.1153917}
+% }
+%
+% =============================================================================
+% todo(fausto) action items for Mi21 assembly methods
+% =============================================================================
+%
+% todo(fausto) Find out who performed the Mi21 NIL HiFi sequencing:
+%   - If a collaborator → add as co-author
+%   - If a core facility/company → name in methods text
+%   Info needed: instrument/chemistry, read lengths, total reads per barcode,
+%   library prep kit version
+%
+% todo(fausto) Run BUSCO on the Mi21 NIL assembly and report completeness
+%
+% todo(fausto) Add PT HiLo-1.0 reference citation if not already in bibtex
 
 \end{document}
