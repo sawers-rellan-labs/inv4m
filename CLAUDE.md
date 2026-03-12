@@ -34,7 +34,7 @@ README.md  # Figure/table coverage
 | 10 | Proofread Abstract | ✅ done | #9 |
 | 11 | Read aloud: Abstract + Discussion | pending | #10 |
 | 12 | Internal peer review: address 18 edits | ✅ done (2026-02-24) | #10 |
-| 13 | Overleaf vs repo diff review (22 hunks) | ✅ done (2026-03-12) | #12 |
+| 13 | Overleaf vs repo diff review (22 hunks) | 🔶 in progress — Results DONE, Discussion starts at `@@ -815` | #12 |
 | 14 | Prose style pass: active voice, no "reveal", site labels | ✅ done (2026-03-12) | #13 |
 | 15 | SAM p-values: switch to one-tailed, add flowering literature | ✅ done (2026-03-12) | #14 |
 | 16 | Finalize Abstract opener | pending | #15 |
