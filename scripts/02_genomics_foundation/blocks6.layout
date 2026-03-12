@@ -1,0 +1,15 @@
+# x,   y, rotation, ha, va, color, ratio, label
+# Row order matches blocks6 columns: B73, PT, TIL18, CML457, CML459, Mi21
+# Visual order top-to-bottom: TIL18, PT, CML457, CML459, Mi21 NIL, B73
+0.5, 0.25, 0, right, center, gold, 1, B73
+0.5, 0.45, 0, right, center, indigo, 1, PT
+0.5, 0.50, 0, right, center, indigo, 1, TIL18
+0.5, 0.40, 0, right, center, indigo, 1, CML457
+0.5, 0.35, 0, right, center, indigo, 1, CML459
+0.5, 0.30, 0, right, center, indigo, 1, Mi21 NIL
+# edges: daisy chain TIL18 -> PT -> CML457 -> CML459 -> Mi21 -> B73
+e, 2, 1
+e, 1, 3
+e, 3, 4
+e, 4, 5
+e, 5, 0

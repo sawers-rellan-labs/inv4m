@@ -81,7 +81,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation_network_split.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation_network_split.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ✅ |
-| Figure 7 | JMJ cluster expression + 5-genome microsynteny | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + [`replot_microsynteny_5genomes.sh`](scripts/02_genomics_foundation/replot_microsynteny_5genomes.sh) | ✅ |
+| Figure 7 | JMJ cluster expression + 6-genome microsynteny (incl. Mi21 NIL) | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + `blocks6` (from RSSTU Mi21 microsynteny) | 🔶 update figure |
 | Figure 8 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Supplementary Figures** | | | |
 | Figure S1 | SNP distribution and correlation | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -107,7 +107,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | WGCNA figure assembly | Figure 6 composition | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
 | Crow 2020 reanalysis | Reference dataset reanalysis | [`Crow2020_reanalysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Crow2020_reanalysis.html) | ✅ |
-| 5-genome microsynteny | JMJ cluster panel B (jcvi pipeline) | `scripts/02_genomics_foundation/replot_microsynteny_5genomes.sh` | ✅ |
+| 6-genome microsynteny | JMJ cluster panel B (jcvi pipeline, incl. Mi21 NIL) | `scripts/02_genomics_foundation/blocks6` + `blocks6.layout` (source: RSSTU `nilhifimi21/microsynteny/`) | 🔶 needs replot script |
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
