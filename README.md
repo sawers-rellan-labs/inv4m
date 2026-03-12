@@ -94,12 +94,13 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
 | **Supplementary Tables** | | | |
-| Table S1 | Inv4m breakpoints and knob repeats | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
-| Table S2 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
-| Table S3 | GxE interaction statistics (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
-| Table S4 | Module preservation statistics | `field_perturbation/06_preservation.Rmd` | ✅ |
-| Table S5 | Greenyellow module DEGs (sec6/pcna2 growth network) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
-| Table S6 | Pink module DEGs (jmj2/jmj4 co-expression) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
+| Table S1 | Inv4m breakpoints (4 genomes incl. Mi21 NIL) | [`make_breakpoint_tables.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_breakpoint_tables.html) | ✅ |
+| Table S2 | Breakpoint knob repeats (4 genomes incl. Mi21 NIL) | [`make_breakpoint_tables.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_breakpoint_tables.html) | ✅ |
+| Table S3 | Effect of conditions on gene expression | [`differential_expression_leaf_treatment_model.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/differential_expression_leaf_treatment_model.html) | ✅ |
+| Table S4 | GxE interaction statistics (3 environments) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
+| Table S5 | Module preservation statistics | `field_perturbation/06_preservation.Rmd` | ✅ |
+| Table S6 | Greenyellow module DEGs (sec6/pcna2 growth network) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
+| Table S7 | Pink module DEGs (jmj2/jmj4 co-expression) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
 | **Supporting Scripts** | | | |
 | Figure 1 assembly | Panel A (SVG) + B–D + E–F composition | [`plot_Figure_1.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_Figure_1.html) | ✅ |
 | Figure 1 panels B–D | Repeat annotation, AnchorWave dotplots, breakpoint self-similarity | [`plot_synteny_and_repeats.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_synteny_and_repeats.html) + [`fig1_panel_helpers.R`](scripts/inversion_paper/fig1_panel_helpers.R) | ✅ |
@@ -107,7 +108,8 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | WGCNA figure assembly | Figure 6 composition | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) | ✅ |
 | GO enrichment (network) | Network GO analysis | [`GO_Enrichment_Trans_Network.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/GO_Enrichment_Trans_Network.html) | ✅ |
 | Crow 2020 reanalysis | Reference dataset reanalysis | [`Crow2020_reanalysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Crow2020_reanalysis.html) | ✅ |
-| 6-genome microsynteny | JMJ cluster panel B (jcvi pipeline, incl. Mi21 NIL) | `scripts/02_genomics_foundation/blocks6` + `blocks6.layout` (source: RSSTU `nilhifimi21/microsynteny/`) | 🔶 needs replot script |
+| 6-genome microsynteny | JMJ cluster panel B (jcvi pipeline, incl. Mi21 NIL) | `scripts/02_genomics_foundation/blocks6` + `blocks6.layout` + `prepare_Mi21_for_mcscan.sh` + `run_ortholog_B73_Mi21.sh` + `merge_blocks_and_plot.sh` | 🔶 update figure |
+| Breakpoint tables | Table S1 (delimitation) + S2 (knob repeats) data | [`make_breakpoint_tables.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_breakpoint_tables.html) | ✅ |
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
