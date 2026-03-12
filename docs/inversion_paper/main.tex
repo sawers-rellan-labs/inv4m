@@ -689,8 +689,8 @@ Candidates}}
   1.22e-08 &
   \cite{liu2023, peiffer2014} \\
   \textit{Zm00001eb194020} &
-  \textit{exo} &
-  Phi-1-like phosphate-induced protein &
+  \textit{exo}/\textit{phi1} &
+  EXORDIUM/Phi-1-like phosphate-induced protein &
   -2.39 &
   1.86 &
   \textbf{\invfour} &
@@ -718,9 +718,9 @@ Notably, the epigenetic and growth terms were driven by \jmjii and \jmjiv (Table
 The greenyellow module, with the highest bootstrap support (LFP $= 0.80$), showed enrichment for developmental cell growth ($p = 8.5 \times 10^{-4}$), cell tip growth ($p = 6.0 \times 10^{-4}$), and regulation of DNA replication ($p = 0.019$) (Supplementary Fig.~\ref{fig::module_go}).
 This module contains two genes with independent functional support: \textit{sec6} (\textit{Zm00001eb194380}; $\log_2 \text{FC} = +2.87$), encoding an exocyst complex component associated with plant height in GWAS \cite{peiffer2014}, and \textit{pcna2} (\textit{Zm00001eb192050}; $\log_2 \text{FC} = +2.99$), encoding proliferating cell nuclear antigen 2, a DNA replication factor and marker of cell proliferation (Table~\ref{tab::greenyellow_module}).
 The module also includes \textit{ropgef14} (\textit{Zm00001eb188240}) ($\log_2 \text{FC} = -2.98$), a Rho GTPase activator required for polarized cell growth.
-The co-expression of these functionally distinct genes, including exocytosis, DNA replication, and cell polarity, in a highly stable module suggests coordinated regulation of cell division and growth in the B73 background.
 
-The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height GWAS candidate \textit{phi1}/\textit{exo} (\textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$; Table~\ref{tab:FT_PH_candidates}), showed enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$), suggesting an indirect link to growth through hormone and epigenetic pathways.
+The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height GWAS candidate \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like phosphate-induced protein; \textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$; Table~\ref{tab:FT_PH_candidates}), showed enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$).
+The brassinosteroid term was driven by a single additional module member, \textit{s2p} (\textit{Zm00001eb158090}; $\log_2 \text{FC} = -0.34$; FDR $= 0.018$), encoding an endopeptidase S2P.
 
 Comparison of intramodular connectivity ($k_{Within}$) between genotypes showed systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B).
 \texttt{modulePreservation()} analysis \cite{langfelder2011} with 1000 permutations classified 12 of 13 modules as moderately preserved ($Z_{summary}$ 2 to 10), meaning their internal connectivity patterns were partially maintained despite the introgression, while one module (salmon) was not preserved ($Z_{summary} < 2$; Table~\ref{tab::preservation}).
@@ -919,8 +919,11 @@ With the highest bootstrap support among all modules (LFP $= 0.80$), it contains
 The upregulation of these genes in \invfour ($\log_2 \text{FC} = +2.87$ and $+2.99$, respectively), alongside downregulation of the cell polarity regulator \textit{ropgef14} ($\log_2 \text{FC} = -2.98$), suggests coordinated rewiring of growth-related gene expression consistent with altered cell proliferation dynamics.
 
 The purple module (LFP $= 0.74$, $n = 22$) provides additional support through a distinct pathway.
-This module contains \textit{phi1}/\textit{exo} (\textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$), a plant height GWAS candidate \cite{liu2023,peiffer2014}, and shows enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$).
-The convergence of epigenetic and hormone signaling within a single coexpression module suggests that \invfour effects on growth may be mediated through multiple regulatory layers, not solely through JMJ-dependent chromatin modification.
+This module contains \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like phosphate-induced protein; \textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$), a plant height GWAS candidate \cite{liu2023,peiffer2014}, and shows enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$).
+In Arabidopsis, EXORDIUM was identified as a growth gene expressed in proliferating cells with a role in meristem function \cite{farrar2003}, shown to regulate brassinosteroid-responsive genes \cite{collgarcia2004}, and demonstrated to mediate cell expansion in leaves \cite{schroeder2009}.
+Two additional hi-confidence DEGs reinforce this brassinosteroid connection: the LRR receptor-like kinase paralogs \textit{imk3} ($\log_2 \text{FC} = +6.71$) and \textit{imk3b} ($\log_2 \text{FC} = -4.68$) are reciprocally regulated by the introgression.
+Their separation into different WGCNA modules reflects the analytical choice of a signed network; in the unsigned trans-regulatory network they share a direct negative coexpression edge ($r = -0.82$), confirming that their reciprocal regulation is a coherent signal.
+Together, \textit{exo}/\textit{phi1}, \textit{imk3}, and \textit{imk3b} point to brassinosteroid-mediated cell expansion as a component of the \invfour growth response.
 
 \begin{figure*}[!ht]
 \centering
