@@ -34,6 +34,11 @@ README.md  # Figure/table coverage
 | 10 | Proofread Abstract | ✅ done | #9 |
 | 11 | Read aloud: Abstract + Discussion | pending | #10 |
 | 12 | Internal peer review: address 18 edits | ✅ done (2026-02-24) | #10 |
+| 13 | Overleaf vs repo diff review (22 hunks) | ✅ done (2026-03-12) | #12 |
+| 14 | Prose style pass: active voice, no "reveal", site labels | ✅ done (2026-03-12) | #13 |
+| 15 | SAM p-values: switch to one-tailed, add flowering literature | ✅ done (2026-03-12) | #14 |
+| 16 | Finalize Abstract opener | pending | #15 |
+| 17 | Draft Introduction rewrite | pending | #16 |
 
 ### Section 3.2 corrections applied (2026-02-24):
 - 126 → 1394 fixed alternate allele markers
@@ -44,6 +49,18 @@ README.md  # Figure/table coverage
 - Notebook updated: `plot_genotype_get_correlated_loci.Rmd` (fixed_alternate_alleles, compute_sig_runlength)
 
 **Key threshold change:** "Top DEGs" now = FDR < 0.05 AND |log2FC| > 1.5 (was > 2)
+
+### Prose style and SAM corrections (2026-03-12):
+- Site labels renamed throughout: PSU2022→PA2022, PSU2025→PA2025, CLY2025→NC2025
+- Section 3.2 subsection title rewritten: "The Inv4m introgression alters flowering time and plant height, with responses that vary by environment"
+- All 17 "reveal/revealed/reveals" replaced with varied alternatives
+- Passive voice → active voice throughout Results and Discussion
+- SAM p-values switched to one-tailed (matching Figure 2C): height p=0.044, h/r p=0.019, shape p=0.018
+- SAM-flowering discussion expanded: Danilevskaya 2008, Ku 2008 (SAM elongation = floral competence marker), Leiboff 2015, Thompson 2015 (natural variation)
+- Collar diameter → cob diameter
+- 4 new bibtex entries as comments (leiboff2015, thompson2015, ku2008, danilevskaya2008)
+- Commits: `93af919`, `a6fdadb`
+- R script site label rename TODO: `scripts/00_agent_work/TODO_rename_site_labels.md`
 
 ### Peer review edits applied (2026-02-24):
 - Abstract: soften attribution ("Inv4m introgression"), add GxE reversal, reframe JMJ as CNV + regulatory suppression, "working model" not "mechanistic chain"
