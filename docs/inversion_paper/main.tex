@@ -202,7 +202,7 @@ Genotype color: gold = B73/B73, green = B73/Mi21 (heterozygous), purple = Mi21/M
 Plants are sorted by genotype at the \invfour tagging SNP PZE04175660223 (181.6 Mb, downwards pointing triangle) then by field row number. }
 \label{fig::design}
 \end{figure*}
-\clearpage
+
 
 
 \subsection{Divergent highland introgression is mostly confined to a 39 Mb 
@@ -236,37 +236,34 @@ Notably, the majority of these markers, 207 SNPs from 14 expressed genes, are ne
 In this segment, individuals selected for \invfour are homozygous for the B73 allele at all positions, while individuals selected for the standard karyotype are frequently heterozygous.
 
 In summary, each plant has an average of 117 Mb of homozygous Mi21 genome per line, 51 Mb of fixed highland introgression, 34 Mb of divergent highland introgression colocalized and matching the selection of \invfour, and 17 Mb of other dispersed divergent highland introgressions.
+\clearpage
 
 
-  \begin{figure*}[!ht]
-  \includegraphics[width=\linewidth]{figs/effects.png}
-  \centering
+\begin{figure*}[!ht]
+\includegraphics[width=\linewidth]{figs/effects.png}
+\centering
 \caption{\textbf{Effect of \invfour on field phenotypes and shoot apical meristem architecture.}
 \textbf{(A)} Spatially-corrected phenotype values (BLUEs from SpATS mixed models) for plant height (PH, cm), days to anthesis (DTA, days), days to silking (DTS, days), harvest index (HI), stover dry weight at harvest (STWHV, g), and cob diameter (CD, mm) comparing CTRL (yellow) and \invfour (purple) genotypes.
+Asterisks show two-sample \textit{t}-tests.
 Phosphorus treatment was modeled as a covariate and data are pooled across treatments.
 \textbf{(B)} Representative differential interference contrast micrographs of cleared vegetative shoot apical meristems from two-week-old seedlings grown in controlled environment chambers.
 Yellow lines indicate height and width measurements used for quantification.
 Scale bars: 100 $\mu$m.
 \textbf{(C)} Quantification of SAM dimensions: absolute height ($h$), radius ($r$), height-to-radius ratio ($h/r$), and shape factor ($h/r^2$).
 \invfour plants exhibit significantly taller and more elongated meristems (one-tailed $t$-test, $p < 0.05$).
-Significance: $^{*}p < 0.05$, $^{****}p < 0.0001$ (two-sample \textit{t}-test, FDR-adjusted).}
+Significance: $^{*}p < 0.05$, $^{****}p < 0.0001$ ( FDR-adjusted).}
   \label{fig:phenotypes}
   \end{figure*}
 
-\subsection{The \invfour introgression alters flowering time and plant height, with responses that vary by environment}
+
+
+\subsection{The \invfour introgression alters flowering time and plant height, and the phenotypic responses show environmental dependency}
 
 At the Pennsylvania 2022 site (PA2022), our spatially-corrected phenotype analysis showed that plants carrying the highland inversion allele flowered $1.30 \pm 0.27$ days earlier to anthesis ($p = 7.9 \times 10^{-6}$) and $1.05 \pm 0.22$ days earlier to silking ($p = 1.4 \times 10^{-5}$) compared to control lines.
 \invfour plants were also significantly taller, with a $6.48 \pm 1.11$ cm increase in plant height ($p = 2.3 \times 10^{-7}$).
 Harvest index showed a modest but significant increase of $0.11 \pm 0.04$ ($p = 0.01$), indicating that the enhanced vegetative growth did not come at the expense of reproductive allocation.
 We also found significant effects on stover dry weight at harvest and cob diameter (FDR $< 0.05$), consistent with the overall growth promotion phenotype.
 These effects were consistent across phosphorus treatments, which we modeled as a covariate in the spatial correction.
-
-To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
-Given prior evidence that \invfour promotes growth, we applied one-tailed $t$-tests (H$_0$: $\mu_{\text{Inv4m}} \leq \mu_{\text{CTRL}}$).
-SAM height increased by $9.65 \pm 5.50$ $\mu$m ($p = 0.044$), representing a 9\% elongation of the meristem dome, while the radius was unchanged ($0.03 \pm 1.12$ $\mu$m, $p = 0.49$).
-The shape metrics confirmed this elongation: the height-to-radius ratio increased by $0.158 \pm 0.074$ ($p = 0.019$) and the shape factor ($h/r^2$) increased by $2.49 \pm 1.14$ $\mu$m$^{-1}$ ($p = 0.018$).
-These findings establish that developmental differences in meristem geometry are present early in \invfour seedlings.
-Whether this early architectural change contributes causally to the subsequent flowering and height phenotypes observed in field-grown plants remains to be determined.
 
 To test whether \invfour effects are consistent across environments, we analyzed phenotypes from three location-year combinations using the MI21 donor background.
 Two-way ANOVA identified significant genotype $\times$ environment interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}, Supplementary Fig.~\ref{fig::gxe_interaction}).
@@ -281,8 +278,16 @@ To characterize the architectural basis of \invfour effects on plant height, we 
 In the MI21 background, we measured 1,556 internodes from 112 control plants and 1,607 internodes from 116 \invfour plants.
 Mean internode length was similar between genotypes (CTRL: $13.1 \pm 5.5$ cm; \invfour: $12.9 \pm 5.2$ cm).
 Internode profiles showed that the largest \invfour effects were concentrated at positions 2 to 4 from the top, with position 2 (just below the tassel) accounting for the majority of the height difference ($-4.1$ cm, $p < 10^{-19}$) (Supplementary Fig.~\ref{fig::internode}).
-Total node count did not differ significantly between genotypes within the MI21 background, indicating that \invfour effects on plant height are mediated by differential internode elongation at specific developmental positions rather than increased phytomer number.
+Above-ground node count did not differ between genotypes (CTRL: $13.9 \pm 0.8$; \invfour: $13.9 \pm 0.9$; $p = 0.73$), indicating that \invfour effects on plant height are mediated by differential internode elongation at specific developmental positions rather than increased phytomer number.
 Notably, the direction of internode effects in North Carolina (shortening at positions 2 to 5) is consistent with the overall height reversal observed in the GxE analysis, confirming that the same architectural mechanism operates in both directions depending on the environment.
+
+\subsection{Inv4m seedlings have elongated shoot apical meristems in the growth chamber}
+
+To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
+Given prior evidence that \invfour promotes early flowering, which is associated with larger, elongated SAMs \citep{danilevskaya2008, ku2008, leiboff2015, thompson2015}, we applied one-tailed $t$-tests (H$_0$: $\mu_{\text{Inv4m}} \leq \mu_{\text{CTRL}}$) looking for the dimentional increase.
+SAM height increased by $9.65 \pm 5.50$ $\mu$m ($p = 0.044$), representing a 9\% elongation of the meristem dome, while the radius was unchanged ($0.03 \pm 1.12$ $\mu$m, $p = 0.49$).
+The shape metrics confirmed this elongation: the height-to-radius ratio increased by $0.158 \pm 0.074$ ($p = 0.019$) and the shape factor ($h/r^2$) increased by $2.49 \pm 1.14$ $\mu$m$^{-1}$ ($p = 0.018$).
+These findings support early developmental differences in meristem geometry in \invfour seedlings.
 
 \begin{figure*}[!ht]
 \centering
@@ -401,7 +406,6 @@ Flanking vs Outside &
 \end{tabular}%
 }
 \end{table*}
-
 
 \subsection*{Leaf developmental stage drives global transcriptional changes while \invfour effects are predominantly local}
 
