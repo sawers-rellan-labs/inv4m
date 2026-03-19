@@ -26,6 +26,9 @@ paths <- setup_project_paths("inversion_paper")
 library(tidyverse)
 library(lubridate)
 library(ggrepel)
+
+# Display label mapping (input files retain original names)
+site_labels <- c("PSU2022" = "PA2022", "PSU2025" = "PA2025", "CLY2025" = "NC2025")
 ```
 
 ## Function Definitions
@@ -114,7 +117,8 @@ gdd_data <- environments %>%
     daily_gdd = map(temp_data, calculate_daily_gdd_from_hourly)
   ) %>%
   select(environment, planting_date, daily_gdd) %>%
-  unnest(daily_gdd)
+  unnest(daily_gdd) %>%
+  mutate(display_env = site_labels[environment])
 ```
 
 ```{r filter-and-export-hourly}
@@ -152,7 +156,7 @@ gdd_at_phenology <- gdd_data %>%
   select(environment, date, cumulative_gdd_from_planting)
 
 cat("GDD lookup table prepared with", nrow(gdd_at_phenology), "rows\n")
-cat("Environments:", paste(unique(gdd_at_phenology$environment), collapse = ", "), "\n")
+cat("Environments:", paste(site_labels[unique(gdd_at_phenology$environment)], collapse = ", "), "\n")
 ```
 
 ## Summary Statistics
@@ -176,7 +180,7 @@ print(gdd_summary)
 
 
 ```{r plot-daily-gdd, fig.width=10, fig.height=6}
-ggplot(gdd_data, aes(x = date, y = gdd, color = environment)) +
+ggplot(gdd_data, aes(x = date, y = gdd, color = display_env)) +
   geom_line(alpha = 0.7) +
   labs(
     title = "Daily Growing Degree Days",
@@ -192,7 +196,7 @@ ggplot(gdd_data, aes(x = date, y = gdd, color = environment)) +
 ```
 
 ```{r plot-daily-gdd-dap, fig.width=10, fig.height=6}
-ggplot(gdd_data, aes(x = days_after_planting, y = gdd, color = environment)) +
+ggplot(gdd_data, aes(x = days_after_planting, y = gdd, color = display_env)) +
   geom_line(alpha = 0.7) +
   labs(
     title = "Daily Growing Degree Days",
@@ -209,7 +213,7 @@ ggplot(gdd_data, aes(x = days_after_planting, y = gdd, color = environment)) +
 ```
 
 ```{r plot-daily-gdd-julian, fig.width=10, fig.height=6}
-ggplot(gdd_data, aes(x = julian_day, y = gdd, color = environment)) +
+ggplot(gdd_data, aes(x = julian_day, y = gdd, color = display_env)) +
   geom_line(alpha = 0.7) +
   labs(
     title = "Daily Growing Degree Days by Julian Day",
@@ -226,8 +230,8 @@ ggplot(gdd_data, aes(x = julian_day, y = gdd, color = environment)) +
 
 
 ```{r plot-gdd-accumulation, fig.width=10, fig.height=6}
-ggplot(gdd_data, aes(x = days_after_planting, y = cumulative_gdd_from_planting, 
-                     color = environment)) +
+ggplot(gdd_data, aes(x = days_after_planting, y = cumulative_gdd_from_planting,
+                     color = display_env)) +
   geom_line(linewidth = 1) +
   labs(
     title = "Growing Degree Day Accumulation Across Environments",
