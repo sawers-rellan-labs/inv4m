@@ -419,7 +419,7 @@ In contrast, the \invfour effect was sharply localized: a prominent peak of diff
 
 To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}).
 DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$).
-This enrichment was even stronger among high-confidence DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 high-confidence DEGs in the shared introgression represented a 141-fold enrichment over genomic background.
+This enrichment was even stronger among strong DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 strong DEGs in the shared introgression represented a 141-fold enrichment over genomic background.
 DEG density did not differ between \invfour proper and the flanking introgressed regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment rather than concentrating at the inversion boundaries.
 
 The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I).
@@ -905,7 +905,7 @@ Both studies converge on the finding that gene expression changes are not confin
 
 The JMJ histone demethylase cluster emerged as the most consistent shared signal between our field study and that of Crow et al.\ \cite{crow2020}, with differential expression reproduced across all 13 tissue-experiment combinations examined (Fig~\ref{fig:jmj_cluster}A).
 Microsynteny analysis showed that this consistency has a structural basis: B73 carries a lineage-specific tandem expansion of five JMJ paralogs, while TIL18, PT, CML457, and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B).
-The single-copy state is shared across highland and tropical lines, indicating it is likely the ancestral configuration, with the five-copy expansion specific to the B73 lineage.
+The single-copy state is shared across mexican highland traditional virieties, and tropical lines derived from that group, indicating it is likely the ancestral configuration, with the five-copy expansion specific to the B73 lineage.
 The high sequence identity among B73 paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) indicates recent tandem duplication and has two implications for interpretation: if the paralogs have functionally diverged, their similar sequences would confound individual expression attribution; if they remain functionally equivalent, the five-copy state in B73 effectively represents a dosage increase relative to the single-copy highland genomes.
 We therefore conservatively tested whether \invfour expression deviates from the 1/5 dosage expectation rather than attempting to resolve individual paralog contributions.
 
@@ -1191,7 +1191,7 @@ The precision weights $\phi_{ijrs}$ from the voom transformation capture heteros
 
 We adjusted the p-values for the t-tests of the linear model coefficients as false discovery rates (FDR).
 Genes whose effect had FDR $< 0.05$ were deemed differentially expressed.
-For phosphorus treatment ($\beta_2$) and \invfour genotype ($\beta_3$), genes with $|\log_2(\text{FC})| > 1.5$ were considered high-confidence DEGs.
+For phosphorus treatment ($\beta_2$) and \invfour genotype ($\beta_3$), genes with $|\log_2(\text{FC})| > 1.5$ were considered strong DEGs.
 For the leaf stage effect ($\beta_1$) and interaction terms, a threshold of $|\log_2(\text{FC})| > 0.5$ was applied, corresponding to $>2.8$-fold total change across the leaf gradient.
 R scripts and expression data are available at the \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour github repository}.
 
