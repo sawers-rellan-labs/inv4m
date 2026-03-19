@@ -872,7 +872,7 @@ Whether this parallel implies ectopic recombination at the root of \invfour orig
 
 In the PA2022 field trial, plants carrying \invfour flowered earlier, $-1.30 \pm 0.27$ days to anthesis ($p = 7.9 \times 10^{-6}$), and grew $6.48 \pm 1.11$ cm taller ($p = 2.3 \times 10^{-7}$) than controls (Fig~\ref{fig:phenotypes}A).
 Unlike the yield increase reported for \invfour above 2000~masl \cite{crow2020}, total kernel weight did not differ between genotypes in our temperate trial.
-However, the harvest index increased ($0.11 \pm 0.04$, $p = 0.01$), suggesting that \invfour alters vegetative-reproductive biomass allocation rather than promoting overall growth.
+However, the harvest index increased ($0.11 \pm 0.04$, $p = 0.01$, Fig~\ref{fig:phenotypes}A), suggesting that \invfour alters vegetative-reproductive biomass allocation rather than promoting overall growth.
 Surprisingly, we found no evidence that the taller plants accumulated more stover dry weight at harvest, indicating that the height increase reflects internode elongation rather than additional vegetative biomass.
 In adapted temperate maize, earlier flowering and shorter stature are positively correlated, reflecting parallel selection for both traits during adaptation to short growing seasons \cite{peiffer2014, buckler2009}.
 \invfour breaks this correlation: it accelerates flowering while simultaneously increasing plant height, a combination more characteristic of highland landraces than of temperate elite germplasm \cite{eagles1994}.
@@ -880,16 +880,6 @@ Because both flowering determination and stem elongation originate at the shoot 
 SAM measurements from two-week-old seedlings grown in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed; Fig~\ref{fig:phenotypes}C).
 In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{ku2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
 The elongated SAMs in \invfour seedlings are thus consistent with both the earlier flowering and the increased height observed in PA2022.
-
-Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
-Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
-The shared genes span several functional categories.
-Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
-In cell growth and proliferation, \textit{sec6} ($+2.87$), classified as ``Consistent DE'' by Crow et al., and \textit{pcna2} ($+2.99$), which they identified as ``Correlated Trans,'' were both upregulated.
-Additional shared DEGs include the transcription factors \textit{gata4} ($-1.02$) and \textit{ereb14} ($-0.46$), the signaling kinases \textit{vps15} ($-0.60$) and a PBL19-like receptor ($-1.39$), and the nitrite reductase \textit{nii2} ($-2.06$).
-Of the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped within the \invfour interval.
-Our field study, using a plant blocking model to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and extends this shared candidate set by providing a mechanistic explanation: the JMJ signal reflects copy number variation between highland and lowland genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression in field conditions (Fig~\ref{fig:jmj_cluster}A).
-Both studies converge on the finding that gene expression changes are not confined to breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects rather than simple position effects \citep{kollar2025}.
 
 \subsection*{Genotype-by-environment interactions reveal environment-dependent effects of \invfour}
 
@@ -901,7 +891,15 @@ Internode measurements in NC2025 localized the height effect: the largest differ
 This pattern of effect reversal across latitudes parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020} and is consistent with the antagonistic selection discussed above.
 We note that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
 
-
+Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
+Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
+The shared genes span several functional categories.
+Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
+In cell growth and proliferation, \textit{sec6} ($+2.87$), classified as ``Consistent DE'' by Crow et al., and \textit{pcna2} ($+2.99$), which they identified as ``Correlated Trans,'' were both upregulated.
+Additional shared DEGs include the transcription factors \textit{gata4} ($-1.02$) and \textit{ereb14} ($-0.46$), the signaling kinases \textit{vps15} ($-0.60$) and a PBL19-like receptor ($-1.39$), and the nitrite reductase \textit{nii2} ($-2.06$).
+Of the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped within the \invfour interval.
+Our field study, using a plant blocking model to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and extends this shared candidate set by providing a mechanistic explanation: the JMJ signal reflects copy number variation between highland and lowland genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression in field conditions (Fig~\ref{fig:jmj_cluster}A).
+Both studies converge on the finding that gene expression changes are not confined to breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects rather than simple position effects \citep{kollar2025}.
 
 \subsection*{JMJ copy number variation and environment-dependent regulatory suppression}
 
