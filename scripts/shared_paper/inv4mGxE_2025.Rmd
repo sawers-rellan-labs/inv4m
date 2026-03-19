@@ -1,5 +1,5 @@
 ---
-title: "Genotype × Environment Analysis of inv4m Introgression Effects: CLY25 vs PSU25"
+title: "Genotype × Environment Analysis of inv4m Introgression Effects: NC2025 vs PA2025"
 author: "Analysis of inv4m GxE Interactions"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -21,8 +21,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 
 This analysis examines **Genotype × Environment (GxE) interactions** for the inv4m introgression across two environments:
 
-- **PSU2025**: Pennsylvania environment (northern)
-- **CLY2025**: North Carolina environment (southern)
+- **PA2025**: Pennsylvania environment (northern)
+- **NC2025**: North Carolina environment (southern)
 
 **Research Questions:**
 1. Does inv4m show consistent effects across environments?
@@ -48,19 +48,19 @@ library(viridis)
 psu2025 <- read_csv("PSU2025_spatially_corrected_phenotypes.csv")
 cly2025 <- read_csv("CLY2025_spatially_corrected_phenotypes.csv")
 
-cat("PSU2025 dimensions:", dim(psu2025), "\n")
-cat("CLY2025 dimensions:", dim(cly2025), "\n")
-cat("PSU2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
-cat("CLY2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
-cat("PSU2025 donors:", paste(unique(psu2025$donor), collapse = ", "), "\n")
-cat("CLY2025 donors:", paste(unique(cly2025$donor), collapse = ", "), "\n")
+cat("PA2025 dimensions:", dim(psu2025), "\n")
+cat("NC2025 dimensions:", dim(cly2025), "\n")
+cat("PA2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
+cat("NC2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
+cat("PA2025 donors:", paste(unique(psu2025$donor), collapse = ", "), "\n")
+cat("NC2025 donors:", paste(unique(cly2025$donor), collapse = ", "), "\n")
 
 psu2025_donors_orig <- unique(psu2025$donor)
 cly2025_donors_orig <- unique(cly2025$donor)
 
 cat("\nChecking for donor name standardization needs...\n")
-cat("PSU2025 original donors:", paste(psu2025_donors_orig, collapse = ", "), "\n")
-cat("CLY2025 original donors:", paste(cly2025_donors_orig, collapse = ", "), "\n")
+cat("PA2025 original donors:", paste(psu2025_donors_orig, collapse = ", "), "\n")
+cat("NC2025 original donors:", paste(cly2025_donors_orig, collapse = ", "), "\n")
 
 psu2025 <- psu2025 %>%
   mutate(
@@ -72,23 +72,23 @@ psu2025 <- psu2025 %>%
   )
 
 cat("\nAfter standardization:\n")
-cat("PSU2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
-cat("CLY2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
-cat("PSU2025 donors:", paste(unique(psu2025$donor), collapse = ", "), "\n")
-cat("CLY2025 donors:", paste(unique(cly2025$donor), collapse = ", "), "\n")
+cat("PA2025 genotypes:", paste(unique(psu2025$genotype), collapse = ", "), "\n")
+cat("NC2025 genotypes:", paste(unique(cly2025$genotype), collapse = ", "), "\n")
+cat("PA2025 donors:", paste(unique(psu2025$donor), collapse = ", "), "\n")
+cat("NC2025 donors:", paste(unique(cly2025$donor), collapse = ", "), "\n")
 
 shared_phenotypes <- c("PH", "DTA", "DTS", "GDDA", "GDDS", "BL", "BW", "EBA")
 ```
 
 ## 2. Phase 1: Within-Environment Analysis
 
-### 2.1 PSU2025 Analysis by Donor
+### 2.1 PA2025 Analysis by Donor
 
 ```{r psu2025-analysis}
 psu2025_results_list <- list()
 
 for (current_donor in c("TMEX", "MI21")) {
-  cat("\n=== PSU2025", current_donor, "Analysis ===\n")
+  cat("\n=== PA2025", current_donor, "Analysis ===\n")
   
   psu2025_donor <- psu2025 %>%
     filter(donor == current_donor, genotype %in% c("CTRL", "INV4M")) %>%
@@ -121,8 +121,8 @@ for (current_donor in c("TMEX", "MI21")) {
   
   psu_summary <- psu_results %>%
     left_join(psu_cohens_d %>% select(trait, effsize, magnitude), by = "trait") %>%
-    mutate(donor = current_donor, environment = "PSU2025")
-  
+    mutate(donor = current_donor, environment = "PA2025")
+
   psu2025_results_list[[current_donor]] <- psu_summary
   
   cat("Results for", current_donor, ":\n")
@@ -132,13 +132,13 @@ for (current_donor in c("TMEX", "MI21")) {
 psu2025_all_results <- bind_rows(psu2025_results_list)
 ```
 
-### 2.2 CLY2025 Analysis by Donor
+### 2.2 NC2025 Analysis by Donor
 
 ```{r cly2025-analysis}
 cly2025_results_list <- list()
 
 for (current_donor in c("TMEX", "MI21")) {
-  cat("\n=== CLY2025", current_donor, "Analysis ===\n")
+  cat("\n=== NC2025", current_donor, "Analysis ===\n")
   
   cly2025_donor <- cly2025 %>%
     filter(donor == current_donor, genotype %in% c("CTRL", "INV4M")) %>%
@@ -171,8 +171,8 @@ for (current_donor in c("TMEX", "MI21")) {
   
   cly_summary <- cly_results %>%
     left_join(cly_cohens_d %>% select(trait, effsize, magnitude), by = "trait") %>%
-    mutate(donor = current_donor, environment = "CLY2025")
-  
+    mutate(donor = current_donor, environment = "NC2025")
+
   cly2025_results_list[[current_donor]] <- cly_summary
   
   cat("Results for", current_donor, ":\n")
@@ -192,7 +192,7 @@ common_donors <- intersect(names(psu2025_results_list), names(cly2025_results_li
 cat("Common donors for GxE analysis:", paste(common_donors, collapse = ", "), "\n")
 
 if (length(common_donors) == 0) {
-  stop("No common donors found between PSU2025 and CLY2025")
+  stop("No common donors found between PA2025 and NC2025")
 }
 ```
 
@@ -207,19 +207,19 @@ for (donor in common_donors) {
   psu_donor <- psu2025 %>%
     filter(donor == !!donor, genotype %in% c("CTRL", "INV4M")) %>%
     select(plotId, genotype, all_of(shared_phenotypes)) %>%
-    mutate(environment = "PSU2025", donor = donor) %>%
+    mutate(environment = "PA2025", donor = donor) %>%
     filter(complete.cases(.))
-  
+
   cly_donor <- cly2025 %>%
     filter(donor == !!donor, genotype %in% c("CTRL", "INV4M")) %>%
     select(plotId, genotype, all_of(shared_phenotypes)) %>%
-    mutate(environment = "CLY2025", donor = donor) %>%
+    mutate(environment = "NC2025", donor = donor) %>%
     filter(complete.cases(.))
-  
+
   donor_gxe <- bind_rows(psu_donor, cly_donor) %>%
     mutate(
       genotype = factor(genotype, levels = c("CTRL", "INV4M")),
-      environment = factor(environment, levels = c("CLY2025", "PSU2025"))
+      environment = factor(environment, levels = c("NC2025", "PA2025"))
     )
   
   gxe_data_list[[donor]] <- donor_gxe
@@ -461,7 +461,7 @@ for (donor in common_donors) {
     ) %>%
     mutate(
       trait = factor(trait, levels = shared_phenotypes),
-      environment = factor(environment, levels = c("CLY2025", "PSU2025"))
+      environment = factor(environment, levels = c("NC2025", "PA2025"))
     )
   
   interaction_plot <- ggplot(interaction_stats, 
@@ -500,7 +500,7 @@ all_effect_sizes <- bind_rows(
   filter(donor %in% common_donors) %>%
   mutate(
     trait = factor(trait, levels = shared_phenotypes),
-    environment = factor(environment, levels = c("CLY2025", "PSU2025"))
+    environment = factor(environment, levels = c("NC2025", "PA2025"))
   )
 
 forest_plot <- ggplot(all_effect_sizes, 
@@ -511,7 +511,7 @@ forest_plot <- ggplot(all_effect_sizes,
   geom_text(aes(label = paste0("(", magnitude, ")")),
             position = position_dodge(width = 0.4),
             hjust = -0.2, size = 3) +
-  scale_color_manual(values = c("CLY2025" = "tomato", "PSU2025" = "royalblue")) +
+  scale_color_manual(values = c("NC2025" = "tomato", "PA2025" = "royalblue")) +
   labs(
     title = "**Effect Sizes (Cohen's d) of inv4m Across Environments**",
     subtitle = "Positive values indicate INV4M > CTRL",
@@ -535,18 +535,18 @@ print(forest_plot)
 ```{r summary-tables}
 cat("=== FINAL SUMMARY ===\n\n")
 
-cat("1. PSU2025 Results by Donor:\n")
+cat("1. PA2025 Results by Donor:\n")
 if (nrow(psu2025_all_results) > 0) {
   print(psu2025_all_results)
 } else {
-  cat("No PSU2025 results available\n")
+  cat("No PA2025 results available\n")
 }
 
-cat("\n2. CLY2025 Results by Donor:\n")
+cat("\n2. NC2025 Results by Donor:\n")
 if (nrow(cly2025_all_results) > 0) {
   print(cly2025_all_results)
 } else {
-  cat("No CLY2025 results available\n")
+  cat("No NC2025 results available\n")
 }
 
 cat("\n3. GxE Interaction Effects:\n")
