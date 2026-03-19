@@ -1,5 +1,5 @@
 ---
-title: "Internode Length Analysis: CLY2025 Field Experiment"
+title: "Internode Length Analysis: NC2025 Field Experiment"
 author: "Fausto Rodriguez"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -31,7 +31,7 @@ paths <- setup_project_paths("inversion_paper")
 
 ## Overview
 
-This analysis examines **internode length measurements** from the CLY2025 field experiment to characterize the effect of the Inv4m introgression on plant architecture.
+This analysis examines **internode length measurements** from the NC2025 field experiment to characterize the effect of the Inv4m introgression on plant architecture.
 
 **Research Questions:**
 1. Does Inv4m affect internode length patterns along the stem?
