@@ -45,7 +45,7 @@ paths <- setup_project_paths("inversion_paper")
 - `fdr`: Confirmed DEGs (FDR < 0.05) - ~465 genes
 - `pvalue`: DEG neighborhood (P < 0.005) - ~851 genes
 
-**Approach**: Use the DEG effects from the PSU interaction model to select genes
+**Approach**: Use the DEG effects from the PA2022 interaction model to select genes
 based on the specified threshold for the Inv4m predictor.
 
 **Expected outcome**: Filtered expression matrix with differentially expressed genes.
@@ -111,10 +111,10 @@ sample_meta <- read_csv(
 }
 ```
 
-## DEG Effects from PSU Analysis
+## DEG Effects from PA2022 Analysis
 
 ```{r load_deg_effects}
-# Load DEG effects from PSU 2022 interaction model
+# Load DEG effects from PA2022 interaction model
 effects_df <- read_csv(
   file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
   show_col_types = FALSE
