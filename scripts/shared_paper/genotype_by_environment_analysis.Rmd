@@ -21,8 +21,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 
 This analysis examines **Genotype × Environment (GxE) interactions** for the inv4m introgression across two environments:
 
-- **PSU2022**: Pennsylvania environment (+P treatment, colder/northern)
-- **CLY2025**: North Carolina environment (warmer/southern)
+- **PA2022**: Pennsylvania environment (+P treatment, colder/northern)
+- **NC2025**: North Carolina environment (warmer/southern)
 
 **Research Questions:**
 1. Does inv4m show consistent effects across environments?
@@ -49,12 +49,12 @@ psu2022 <- read.csv("PSU2022_spatially_corrected_phenotypes.csv", stringsAsFacto
 cly2025 <- read.csv("CLY2025_spatially_corrected_phenotypes.csv", stringsAsFactors = FALSE)
 
 # Check data structure
-cat("PSU2022 dimensions:", dim(psu2022), "\n")
-cat("CLY2025 dimensions:", dim(cly2025), "\n")
-cat("PSU2022 genotypes:", unique(psu2022$genotype), "\n")
-cat("CLY2025 genotypes:", unique(cly2025$genotype), "\n")
-cat("PSU2022 treatments:", unique(psu2022$Treatment), "\n")
-cat("CLY2025 donors:", unique(cly2025$donor), "\n")
+cat("PA2022 dimensions:", dim(psu2022), "\n")
+cat("NC2025 dimensions:", dim(cly2025), "\n")
+cat("PA2022 genotypes:", unique(psu2022$genotype), "\n")
+cat("NC2025 genotypes:", unique(cly2025$genotype), "\n")
+cat("PA2022 treatments:", unique(psu2022$Treatment), "\n")
+cat("NC2025 donors:", unique(cly2025$donor), "\n")
 
 # Define shared phenotypes
 shared_phenotypes <- c("PH", "DTA", "DTS")
@@ -62,26 +62,26 @@ shared_phenotypes <- c("PH", "DTA", "DTS")
 
 ## 2. Phase 1: Within-Environment Analysis
 
-### 2.1 PSU2022 High-P Environment Analysis
+### 2.1 PA2022 High-P Environment Analysis
 
 ```{r psu2022-prep}
-# Filter PSU2022 to +P treatment and relevant genotypes
+# Filter PA2022 to +P treatment and relevant genotypes
 psu2022_highp <- psu2022 %>%
   filter(Treatment == "+P", genotype %in% c("CTRL", "Inv4m")) %>%
   select(plotId, genotype, repId, all_of(shared_phenotypes)) %>%
   mutate(
     genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
-    environment = "PSU2022_HighP"
+    environment = "PA2022_HighP"
   ) %>%
   filter(complete.cases(.))
 
-cat("PSU2022 +P data - Genotype counts:\n")
+cat("PA2022 +P data - Genotype counts:\n")
 print(table(psu2022_highp$genotype))
 cat("Sample size per genotype:", nrow(psu2022_highp), "total plots\n")
 ```
 
 ```{r psu2022-stats}
-# Statistical analysis for PSU2022 +P
+# Statistical analysis for PA2022 +P
 psu2022_results <- psu2022_highp %>%
   pivot_longer(cols = all_of(shared_phenotypes), 
                names_to = "trait", values_to = "value") %>%
@@ -101,14 +101,14 @@ psu2022_cohens_d <- psu2022_highp %>%
 psu2022_summary <- psu2022_results %>%
   left_join(psu2022_cohens_d %>% select(trait, effsize, magnitude), by = "trait")
 
-print("PSU2022 High-P Results:")
+print("PA2022 High-P Results:")
 print(psu2022_summary)
 ```
 
-### 2.2 CLY2025 MI21 Donor Analysis
+### 2.2 NC2025 MI21 Donor Analysis
 
 ```{r cly2025-prep}
-# Filter CLY2025 to MI21 donor and standardize genotype names
+# Filter NC2025 to MI21 donor and standardize genotype names
 cly2025_mi21 <- cly2025 %>%
   filter(donor == "MI21") %>%
   select(plotId, genotype, repId, donor, all_of(shared_phenotypes)) %>%
@@ -119,18 +119,18 @@ cly2025_mi21 <- cly2025 %>%
       TRUE ~ genotype
     ),
     genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
-    environment = "CLY2025"
+    environment = "NC2025"
   ) %>%
   filter(genotype %in% c("CTRL", "Inv4m")) %>%
   filter(complete.cases(.))
 
-cat("CLY2025 MI21 data - Genotype counts:\n")
+cat("NC2025 MI21 data - Genotype counts:\n")
 print(table(cly2025_mi21$genotype))
 cat("Sample size per genotype:", nrow(cly2025_mi21), "total plots\n")
 ```
 
 ```{r cly2025-stats}
-# Statistical analysis for CLY2025 MI21
+# Statistical analysis for NC2025 MI21
 cly2025_results <- cly2025_mi21 %>%
   pivot_longer(cols = all_of(shared_phenotypes), 
                names_to = "trait", values_to = "value") %>%
@@ -150,7 +150,7 @@ cly2025_cohens_d <- cly2025_mi21 %>%
 cly2025_summary <- cly2025_results %>%
   left_join(cly2025_cohens_d %>% select(trait, effsize, magnitude), by = "trait")
 
-print("CLY2025 MI21 Results:")
+print("NC2025 MI21 Results:")
 print(cly2025_summary)
 ```
 
@@ -166,7 +166,7 @@ gxe_data <- bind_rows(
 ) %>%
   mutate(
     genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
-    environment = factor(environment, levels = c("PSU2022_HighP", "CLY2025"))
+    environment = factor(environment, levels = c("PA2022_HighP", "NC2025"))
   ) %>%
   filter(complete.cases(.))
 
@@ -309,7 +309,7 @@ pheno_theme <- ggpubr::theme_classic2(base_size = 20) +
 interaction_stats$trait <- factor(interaction_stats$trait, levels = c("PH","DTA","DTS"))
 
 interaction_stats$environment <- factor(interaction_stats$environment,
-                                  levels = c( "CLY2025","PSU2022_HighP"))
+                                  levels = c( "NC2025","PA2022_HighP"))
 
 # Create interaction plots
 interaction_plot <- ggplot(interaction_stats, 
@@ -337,8 +337,8 @@ print(interaction_plot)
 ```{r effect-size-comparison}
 # Calculate environment-specific effect sizes
 env_effect_sizes <- bind_rows(
-  psu2022_cohens_d %>% mutate(environment = "PSU2022_HighP"),
-  cly2025_cohens_d %>% mutate(environment = "CLY2025")
+  psu2022_cohens_d %>% mutate(environment = "PA2022_HighP"),
+  cly2025_cohens_d %>% mutate(environment = "NC2025")
 ) %>%
   select(trait, environment, magnitude, effsize, conf.low, conf.high) %>%
   mutate(trait = factor(trait, levels = c( "DTS","DTA","PH")))
@@ -385,8 +385,8 @@ print(forest_plot)
 ```{r summary-tables}
 # Create comprehensive summary table
 final_summary <- list(
-  PSU2022_HighP = psu2022_summary,
-  CLY2025_MI21 = cly2025_summary,
+  PA2022_HighP = psu2022_summary,
+  NC2025_MI21 = cly2025_summary,
   GxE_Interactions = gxe_interaction_summary,
   Effect_Sizes_by_Environment = env_effect_sizes
 )
@@ -394,11 +394,11 @@ final_summary <- list(
 # Print final summary
 cat("=== FINAL SUMMARY ===\n\n")
 
-cat("1. PSU2022 High-P:\n")
-print(final_summary$PSU2022_HighP)
+cat("1. PA2022 High-P:\n")
+print(final_summary$PA2022_HighP)
 
-cat("\n2. CLY2025 MI21:\n") 
-print(final_summary$CLY2025_MI21)
+cat("\n2. NC2025 MI21:\n")
+print(final_summary$NC2025_MI21)
 
 cat("\n3. GxE Interaction Effects:\n")
 print(final_summary$GxE_Interactions)
@@ -412,8 +412,8 @@ print(final_summary$Effect_Sizes_by_Environment)
 
 ```{r export-results}
 # Export summary tables
-write.csv(final_summary$PSU2022_HighP, "PSU2022_HighP_inv4m_results.csv", row.names = FALSE)
-write.csv(final_summary$CLY2025_MI21, "CLY2025_MI21_inv4m_results.csv", row.names = FALSE)
+write.csv(final_summary$PA2022_HighP, "PA2022_HighP_inv4m_results.csv", row.names = FALSE)
+write.csv(final_summary$NC2025_MI21, "CLY2025_MI21_inv4m_results.csv", row.names = FALSE)
 write.csv(final_summary$GxE_Interactions, "GxE_interaction_results.csv", row.names = FALSE)
 write.csv(final_summary$Effect_Sizes_by_Environment, "effect_sizes_by_environment.csv", row.names = FALSE)
 
@@ -421,7 +421,7 @@ write.csv(final_summary$Effect_Sizes_by_Environment, "effect_sizes_by_environmen
 write.csv(gxe_data, "combined_gxe_dataset.csv", row.names = FALSE)
 
 cat("Results exported to CSV files:\n")
-cat("- PSU2022_HighP_inv4m_results.csv\n")
+cat("- PA2022_HighP_inv4m_results.csv\n")
 cat("- CLY2025_MI21_inv4m_results.csv\n") 
 cat("- GxE_interaction_results.csv\n")
 cat("- effect_sizes_by_environment.csv\n")

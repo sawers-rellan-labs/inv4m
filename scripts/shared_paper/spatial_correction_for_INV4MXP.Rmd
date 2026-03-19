@@ -1,5 +1,5 @@
 ---
-title: "PSU 2022 Spatial Analysis: SpATS Spatial Correction for Both P Treatments"
+title: "PA2022 Spatial Analysis: SpATS Spatial Correction for Both P Treatments"
 author: "Fausto Rodriguez"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:

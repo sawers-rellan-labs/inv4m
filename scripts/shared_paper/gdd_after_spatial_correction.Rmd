@@ -11,6 +11,9 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(lubridate)
 library(ggrepel)
+
+# Display label mapping (input files retain original names)
+site_labels <- c("PSU2022" = "PA2022", "PSU2025" = "PA2025", "CLY2025" = "NC2025")
 ```
 
 
@@ -54,7 +57,8 @@ phenotypes <- map2_dfr(
     environments %>% select(environment, planting_date),
     by = "environment"
   ) %>%
-  filter(donor == "MI21")
+  filter(donor == "MI21") %>%
+  mutate(display_env = site_labels[environment])
 ```
 
 
@@ -81,7 +85,7 @@ print(gdd_summary)
 ## Visualizations
 
 ```{r plot-gdd-vs-dta}
-ggplot(pheno_with_gdd, aes(x = DTA, y = GDDA,group =environment, col = environment)) +
+ggplot(pheno_with_gdd, aes(x = DTA, y = GDDA, group = display_env, col = display_env)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm", se = FALSE) +
   xlim(70,80)+
@@ -96,7 +100,7 @@ ggplot(pheno_with_gdd, aes(x = DTA, y = GDDA,group =environment, col = environme
 
 
 ```{r plot-gdd-vs-dts}
-ggplot(pheno_with_gdd, aes(x = DTS, y = GDDS,group =environment, col = environment)) +
+ggplot(pheno_with_gdd, aes(x = DTS, y = GDDS, group = display_env, col = display_env)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm", se = FALSE) +
   xlim(70,80)+
