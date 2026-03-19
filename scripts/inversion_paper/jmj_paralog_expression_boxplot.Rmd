@@ -192,7 +192,7 @@ cat("\nRetained", n_distinct(jmj_filtered$sample), "samples\n")
 # Add Metadata
 
 ```{r add_metadata}
-# Load PSU2022 metadata
+# Load PA2022 metadata
 meta <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
 
 # Join with paralog info and metadata
