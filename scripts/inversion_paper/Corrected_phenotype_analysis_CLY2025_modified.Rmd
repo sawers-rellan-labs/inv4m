@@ -1,5 +1,5 @@
 ---
-title: "CLY 2025 Spatial Analysis: SpATS Spatial Correction with GDD Integration"
+title: "NC2025 Spatial Analysis: SpATS Spatial Correction with GDD Integration"
 author: "Fausto Rodríguez Zapata"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -33,9 +33,9 @@ paths <- setup_project_paths("inversion_paper")
 
 This notebook fits a SpATS PSANOVA surface **per phenotype** and returns spatially-corrected plot-level values for each phenotype, including GDD-based traits (GDDA and GDDS). The approach uses `statgenHTP::fitModels()` (which wraps SpATS when provided a TimePoints object) and `getCorrected()` to extract corrected plot-level observations. The workflow:
 
-1. Load GDD lookup table for CLY2025.
-2. Load and clean plant-level data from CLY2025.
-3. **Aggregate to plot-level means** (matching PSU2022 structure).
+1. Load GDD lookup table for NC2025.
+2. Load and clean plant-level data from NC2025.
+3. **Aggregate to plot-level means** (matching PA2022 structure).
 4. **Merge GDD values** based on anthesis and silking dates.
 5. Build a `TimePoints` object for `statgenHTP`.
 6. Loop over usable phenotypes (including GDDA, GDDS) and apply `fitModels()` → `getCorrected()`.
@@ -427,7 +427,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
         geom_quasirandom(size = 2) +
         scale_color_manual(values = c("CTRL" = "gold", "INV4M" = "purple4")) +
         labs(
-          title = paste("CLY25: ", current_donor, 
+          title = paste("NC2025: ", current_donor,
                        " Spatially Corrected (FDR-Adjusted)"),
           y = "Corrected Value",
           x = "Genotype"
@@ -487,7 +487,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
 }
 ```
 
-## 9. Statistical comparisons and visualization for CLY2025
+## 9. Statistical comparisons and visualization for NC2025
 
 ```{r statistical-comparisons, fig.width=14, fig.height=8}
 if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
@@ -602,7 +602,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
       legend = "bottom"
     ) %>%
       annotate_figure(
-        top = text_grob("CLY2025 — Spatially Corrected Phenotypes", 
+        top = text_grob("NC2025 — Spatially Corrected Phenotypes",
                        color = "black", 
                        face = "bold", 
                        size = 18)
@@ -628,7 +628,7 @@ if (exists("sp_corrected") && nrow(sp_corrected) > 0) {
   print(overall_sig)
   
 } else {
-  message("No spatially corrected data available for CLY2025")
+  message("No spatially corrected data available for NC2025")
 }
 ```
 
