@@ -36,7 +36,7 @@ paths <- setup_project_paths("inversion_paper")
 This script creates an expression boxplot for the JMJ cluster genes (jmj2, jmj4, jmj21)
 comparing Inv4m vs CTRL across all tissues in:
 
-1. **PSU2022**: Field experiment with 4 leaf positions
+1. **PA2022**: Field experiment with 4 leaf positions
 2. **Crow2020**: Growth chamber experiment with 5 tissues (V1_Leaf, V1_Root, V3_Leaf, V3_Root, V3_SAM)
 
 The output is saved as an RDS file for composition with the JMJ microsynteny figure.
@@ -71,7 +71,7 @@ print(jmj_genes)
 
 
 
-# Load PSU2022 Data
+# Load PA2022 Data
 
 ```{r load_psu2022}
 # Load expression matrix (logCPM)
@@ -81,7 +81,7 @@ expr_psu <- readRDS(file.path(paths$intermediate, "normalized_expression_logCPM_
 meta_psu <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
 
 {
- cat("=== PSU2022 DATA ===\n")
+ cat("=== PA2022 DATA ===\n")
  cat("Expression matrix:", nrow(expr_psu), "genes x", ncol(expr_psu), "samples\n")
  cat("Metadata samples:", nrow(meta_psu), "\n")
  cat("\nGenotypes:\n")
@@ -94,7 +94,7 @@ meta_psu <- read.csv(file.path(paths$data, "PSU2022_metadata.csv"))
 ```{r extract_psu2022}
 # Extract JMJ expression
 jmj_in_psu <- jmj_genes$gene[jmj_genes$gene %in% rownames(expr_psu)]
-cat("JMJ genes found in PSU2022:", length(jmj_in_psu), "\n")
+cat("JMJ genes found in PA2022:", length(jmj_in_psu), "\n")
 
 if (length(jmj_in_psu) > 0) {
  # Extract expression for JMJ genes
@@ -119,12 +119,12 @@ if (length(jmj_in_psu) > 0) {
    filter(!is.na(Genotype)) %>%
    left_join(jmj_genes, by = "gene") %>%
    mutate(
-     experiment = "PSU2022 (Field)",
+     experiment = "PA2022 (Field)",
      tissue = paste0("Leaf ", leaf_tissue),
      genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m")
    )
 
- cat("PSU2022 expression records:", nrow(jmj_expr_psu), "\n")
+ cat("PA2022 expression records:", nrow(jmj_expr_psu), "\n")
 }
 ```
 
@@ -218,7 +218,7 @@ jmj_combined <- jmj_combined %>%
  mutate(
    symbol = factor(symbol, levels = c("jmj2", "jmj4", "jmj21")),
    genotype = factor(genotype, levels = c("B73", "Inv4m")),
-   experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
+   experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PA2022 (Field)"))
  )
 
 {
@@ -247,7 +247,7 @@ copy-number scaling is B73/5 (one copy out of five).
 
 ```{r total_cluster_calc}
 # Convert logCPM to CPM and sum jmj2 + jmj4 per sample
-# First, get unique sample info from PSU2022
+# First, get unique sample info from PA2022
 psu_samples <- jmj_expr_psu %>%
   filter(symbol %in% c("jmj2", "jmj4")) %>%
   mutate(CPM = 2^logCPM) %>%
@@ -266,7 +266,7 @@ total_cluster_samples <- bind_rows(psu_samples, crow_samples) %>%
   mutate(
     genotype = recode(genotype, "B73" = "CTRL"),
     genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
-    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
+    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PA2022 (Field)"))
   )
 
 {
@@ -734,9 +734,9 @@ print(cellprolif_genes)
 ## Extract Cell Proliferation Gene Expression
 
 ```{r extract_cellprolif_psu2022}
-# Extract from PSU2022
+# Extract from PA2022
 cellprolif_in_psu <- cellprolif_genes$gene[cellprolif_genes$gene %in% rownames(expr_psu)]
-cat("Cell proliferation genes found in PSU2022:", length(cellprolif_in_psu), "\n")
+cat("Cell proliferation genes found in PA2022:", length(cellprolif_in_psu), "\n")
 
 if (length(cellprolif_in_psu) > 0) {
   cellprolif_expr_psu <- expr_psu[cellprolif_in_psu, , drop = FALSE] %>%
@@ -756,12 +756,12 @@ if (length(cellprolif_in_psu) > 0) {
     filter(!is.na(Genotype)) %>%
     left_join(cellprolif_genes, by = "gene") %>%
     mutate(
-      experiment = "PSU2022 (Field)",
+      experiment = "PA2022 (Field)",
       tissue = paste0("Leaf ", leaf_tissue),
       genotype = ifelse(Genotype == "CTRL", "B73", "Inv4m")
     )
 
-  cat("PSU2022 expression records:", nrow(cellprolif_expr_psu), "\n")
+  cat("PA2022 expression records:", nrow(cellprolif_expr_psu), "\n")
 }
 ```
 
@@ -811,7 +811,7 @@ cellprolif_combined <- cellprolif_combined %>%
   mutate(
     symbol = factor(symbol, levels = c("pcna2", "smo4")),
     genotype = factor(genotype, levels = c("B73", "Inv4m")),
-    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PSU2022 (Field)"))
+    experiment = factor(experiment, levels = c("Crow et al., 2020 (Growth Chamber)", "PA2022 (Field)"))
   )
 
 {
