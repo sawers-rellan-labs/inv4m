@@ -1,5 +1,5 @@
 ---
-title: "PSU2025 — Spatial analysis (statgenHTP + SpATS) with GDD integration"
+title: "PA2025 — Spatial analysis (statgenHTP + SpATS) with GDD integration"
 author: "Fausto Rodríguez Zapata"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -41,7 +41,7 @@ library(ggbeeswarm)
 
 # Purpose
 
-This R Markdown adapts the working PSU2025 statgenHTP + SpATS workflow to the PSU2025 data structure and integrates GDD (Growing Degree Days) calculations. It preserves the same pipeline: create plot-level data, build a `TimePoints` object, fit SpATS models using `fitModels()`, extract spatially corrected values with `getCorrected()`, then run donor-specific comparisons (INV4M vs CTRL).
+This R Markdown adapts the working PA2025 statgenHTP + SpATS workflow to the PA2025 data structure and integrates GDD (Growing Degree Days) calculations. It preserves the same pipeline: create plot-level data, build a `TimePoints` object, fit SpATS models using `fitModels()`, extract spatially corrected values with `getCorrected()`, then run donor-specific comparisons (INV4M vs CTRL).
 
 ## 0. Configuration / file paths
 
@@ -78,7 +78,7 @@ cat("GDD range:", min(gdd_at_phenology$cumulative_gdd_from_planting), "to",
     max(gdd_at_phenology$cumulative_gdd_from_planting), "°C\n")
 ```
 
-## 1. Read + tidy (produce plot-level table matching PSU2025 column names)
+## 1. Read + tidy (produce plot-level table matching PA2025 column names)
 
 ```{r data-processing}
 pheno <- read_csv(pheno_file) %>% 
