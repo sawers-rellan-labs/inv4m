@@ -903,23 +903,21 @@ Both studies converge on the finding that gene expression changes are not confin
 
 \subsection*{JMJ copy number variation and environment-dependent regulatory suppression}
 
-Microsynteny analysis showed that the B73 reference carries a lineage-specific tandem expansion of five JMJ paralogs, while highland teosinte TIL18, the highland landrace PT, and the CIMMYT tropical inbred lines CML457 and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B).
-The single-copy state is shared across both highland and tropical lines, indicating it is likely the ancestral configuration, with the five-copy expansion specific to the B73 lineage.
+The JMJ histone demethylase cluster emerged as the most consistent shared signal between our field study and that of Crow et al.\ \cite{crow2020}, with differential expression reproduced across all 13 tissue-experiment combinations examined (Fig~\ref{fig:jmj_cluster}A).
+Microsynteny analysis showed that this consistency has a structural basis: B73 carries a lineage-specific tandem expansion of five JMJ paralogs, while TIL18, PT, CML457, and CML459 each retain only a single \textit{jmj6} ortholog (Fig~\ref{fig:jmj_cluster}B).
+The single-copy state is shared across highland and tropical lines, indicating it is likely the ancestral configuration, with the five-copy expansion specific to the B73 lineage.
 The high sequence identity among B73 paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) indicates recent tandem duplication.
 
-The \jmjii/\jmjiv cluster exhibited the largest apparent expression difference among all DEGs ($\log_2 \text{FC} = -3.49$, $\textit{FDR} < 10^{-20}$; Table~\ref{tab:FT_PH_candidates}), consistent across all 13 tissue-experiment combinations (Fig~\ref{fig:jmj_cluster}A).
-However, this fold-change is substantially explained by the 5:1 copy number difference.
-The more informative comparison is whether \invfour expression deviates from the copy number expectation (CTRL/5).
+The 5:1 copy number difference accounts for most of the apparent expression fold-change ($\log_2 \text{FC} = -3.49$, $\textit{FDR} < 10^{-20}$; Table~\ref{tab:FT_PH_candidates}).
+We therefore asked whether \invfour expression deviates from what copy number alone would predict (CTRL/5).
 In field samples, expression was consistently and significantly below this expectation: 49 to 61\% of predicted levels (linear contrast $t$-test, $\textit{FDR} < 0.05$ for all four leaf stages).
-Growth chamber data were less consistent (48 to 83\% of expectation, 4/9 tissues significant), suggesting environment-specific regulatory suppression beyond baseline copy number effects.
-This additional suppression in field conditions, rather than copy number alone, makes the JMJ cluster a candidate for environment-dependent regulation of flowering and growth.
+Growth chamber data were less consistent (48 to 83\% of expectation, 4/9 tissues significant), suggesting that the regulatory suppression beyond copy number is environment-dependent.
+This distinction matters: if the fold-change were entirely explained by copy number, the JMJ cluster would be a passive consequence of genome structure rather than a candidate for environment-dependent regulation.
 
-GWAS support links the JMJ cluster to flowering time variation \cite{tibbs-cortes2024}.
-JUMONJI domain proteins function as histone demethylases that remove methyl groups from H3K4, a mark associated with active transcription \cite{klose2007}.
-In Arabidopsis, JMJ homologs regulate flowering time through chromatin modification of floral pathway genes \cite{gan2014}.
-Crow et al.\ \cite{crow2020} listed JMJ demethylases among their consistently differentially expressed genes, though the underlying copy number variation was not characterized.
-Our microsynteny analysis (Fig~\ref{fig:jmj_cluster}B) provides a structural explanation for this shared signal and, combined with independent GWAS support, strengthens JMJ candidacy beyond differential expression alone.
-The \textit{sec6} gene, also identified by Crow et al.\ as consistently DE and encoding an exocyst complex component involved in cytokinesis, emerged as a plant height candidate with GWAS support \cite{peiffer2014} (Table~\ref{tab:FT_PH_candidates}).
+GWAS independently links the JMJ cluster to flowering time variation \cite{tibbs-cortes2024}.
+JUMONJI domain proteins function as histone demethylases that remove methyl groups from H3K4, a mark associated with active transcription \cite{klose2007}, and in Arabidopsis, JMJ homologs regulate flowering time through chromatin modification of floral pathway genes \cite{gan2014}.
+Crow et al.\ \cite{crow2020} identified JMJ demethylases among their top candidates but lacked the genome assemblies needed to characterize the underlying copy number variation.
+Our microsynteny analysis provides this structural explanation and, together with the environment-dependent suppression and GWAS support, positions the JMJ cluster as a candidate not only for differential expression but for the environment-dependent flowering and growth phenotypes we observed.
 
 
 
