@@ -1,5 +1,5 @@
 ---
-title: "JMJ Paralog Expression Boxplot (PSU2022)"
+title: "JMJ Paralog Expression Boxplot (PA2022)"
 author: "Analysis Pipeline"
 date: "`r Sys.Date()`"
 output:
