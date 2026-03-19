@@ -868,16 +868,17 @@ Ectopic recombination between repetitive sequences can generate chromosomal rear
 In the Atlantic cod \textit{Gadus morhua}, tandem arrays of hAT-derived elements at the breakpoints of megabase-scale inversions show a close structural parallel to \invfour: the two breakpoint segments of each inversion differ in size and repeat orientation, with one segment carrying inverted tandem arrays and the other showing a simpler repeat structure \cite{araya2025}.
 Whether this parallel implies ectopic recombination at the root of \invfour origin remains unknown.
 
-\subsection*{\invfour affects flowering time and plant height with strong genotype-by-environment interactions}
+\subsection*{\invfour accelerates flowering and increases plant height in the PA2022 field trial}
 
-In the PA2022 field trial, plants carrying \invfour flowered $1.30 \pm 0.27$ days earlier to anthesis ($p = 7.9 \times 10^{-6}$) and grew $6.48 \pm 1.11$ cm taller ($p = 2.3 \times 10^{-7}$) than controls (Fig~\ref{fig:phenotypes}A).
-These effects were consistent across phosphorus treatments.
-The harvest index increase ($0.11 \pm 0.04$, $p = 0.01$) suggests altered vegetative-reproductive resource allocation rather than simple growth promotion.
-Internode measurements in the NC2025 field trial localized the height effect: the largest difference was concentrated at internode position 2, just below the tassel ($-4.1$~cm, $p < 10^{-19}$; Supplementary Fig.~\ref{fig::internode}), while total node count did not differ between genotypes.
-This indicates that \invfour promotes internode elongation at specific developmental positions rather than increasing phytomer number, consistent with altered growth dynamics during the transition from vegetative to reproductive development.
-
-These results are consistent with previous studies showing \invfour association with flowering time variation across elevation gradients \cite{romero_navarro2017-cn} and gene-by-environment interactions in controlled environments \cite{crow2020}.
-The earlier flowering we observe in temperate conditions aligns with the prediction that \invfour accelerates flowering at high elevations, where limited growing degree days favor rapid development \cite{romero_navarro2017-cn}.
+In the PA2022 field trial, plants carrying \invfour flowered earlier, $-1.30 \pm 0.27$ days to anthesis ($p = 7.9 \times 10^{-6}$), and grew $6.48 \pm 1.11$ cm taller ($p = 2.3 \times 10^{-7}$) than controls (Fig~\ref{fig:phenotypes}A).
+Unlike the yield increase reported for \invfour above 2000~masl \cite{crow2020}, total kernel weight did not differ between genotypes in our temperate trial.
+However, the harvest index increased ($0.11 \pm 0.04$, $p = 0.01$), suggesting that \invfour alters vegetative-reproductive resource allocation rather than promoting overall growth.
+In adapted temperate maize, earlier flowering and shorter stature are positively correlated, reflecting parallel selection for both traits during adaptation to short growing seasons \cite{peiffer2014, buckler2009}.
+\invfour breaks this correlation: it accelerates flowering while simultaneously increasing plant height, a combination more characteristic of highland landraces than of temperate elite germplasm \cite{eagles1994}.
+Because both flowering determination and stem elongation originate at the shoot apical meristem, we asked whether the field phenotypes had an anatomical correlate at the meristem level.
+SAM measurements from two-week-old seedlings grown in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed; Fig~\ref{fig:phenotypes}C).
+In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{ku2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
+The elongated SAMs in \invfour seedlings are thus consistent with both the earlier flowering and the increased height observed in PA2022.
 
 Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
 Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
@@ -889,14 +890,14 @@ Of the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped w
 Our field study, using a plant blocking model to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and extends this shared candidate set by providing a mechanistic explanation: the JMJ signal reflects copy number variation between highland and lowland genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression in field conditions (Fig~\ref{fig:jmj_cluster}A).
 Both studies converge on the finding that gene expression changes are not confined to breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects rather than simple position effects \citep{kollar2025}.
 
-\subsection*{Gene-by-environment interactions are consistent with local adaptation}
+\subsection*{Genotype-by-environment interactions reveal environment-dependent effects of \invfour}
 
-Analysis across three location-year combinations identified significant GxE interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}).
+To test whether the PA2022 effects were stable across environments, we grew the same NILs in two additional location-year combinations: PA2025 and NC2025.
+Analysis across all three environments identified significant GxE interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}).
 Plant height showed the strongest interaction ($\eta^2_p = 0.29$, $p < 8.7 \times 10^{-10}$), with effect direction reversing between Pennsylvania (Cohen's $d = 1.45$ to $2.23$) and North Carolina ($d = -1.28$; Supplementary Fig.~\ref{fig::gxe_forest}).
-
-This pattern is consistent with local adaptation, where alleles beneficial in one environment may be neutral or deleterious in others \cite{kirkpatrick2006b}, and parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020}.
-The rarity of \invfour in temperate maize, despite introgression opportunities during northward expansion \cite{hufford2013-gs}, may reflect selection against the inversion in environments with long growing seasons where earlier flowering provides no advantage.
-The 432 genes within \invfour (Table~\ref{tab:DEGs_distro}) are maintained as a coadapted unit by suppressed recombination \cite{gonzalez-segovia2019-jy}, preserving highland-adapted allele combinations.
+Unexpectedly, the flowering time effect observed in PA2022 was not reproduced as days to anthesis in PA2025, although it remained detectable in NC2025 as a delay.
+Internode measurements in NC2025 localized the height effect: the largest difference was concentrated at internode position 2, just below the tassel ($-4.1$~cm, $p < 10^{-19}$; Supplementary Fig.~\ref{fig::internode}), while total node count did not differ between genotypes, indicating that \invfour affects internode elongation at specific developmental positions rather than phytomer number.
+This pattern of effect reversal across latitudes parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020} and is consistent with the antagonistic selection discussed above.
 We note that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
 
 
