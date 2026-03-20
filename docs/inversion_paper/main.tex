@@ -962,30 +962,36 @@ Bottom track shows genomic positions of individual cluster members.}
 
 \clearpage
 
-\subsection*{Chromosomal inversions maintain coadapted allele complexes}
+\subsection*{Coexpression networks as a tool to study the adaptive value of recombination-suppressed inversions}
 
-\invfour exemplifies how chromosomal inversions can facilitate local adaptation by maintaining coadapted allele combinations \cite{kirkpatrick2006b}.
-The 15.2~Mb inversion contains 432 annotated genes (Table~\ref{tab:breakpoints}) and shows suppressed recombination \cite{gonzalez-segovia2019-jy}, ensuring that highland-adapted alleles are inherited as a unit.
-Genome-wide analysis of adaptive introgression identified \invfour as the strongest signal for clinal ancestry variation across Mexican elevation gradients, with introgression dating to over 1000 generations ago, consistent with ancient adaptive introgression from \mex rather than contemporary gene flow \cite{calfee2021-mr}.
+Chromosomal inversions maintain coadapted allele complexes by suppressing recombination \cite{kirkpatrick2006b, dobzhansky1970}.
+This functional coordination among loci implies that alleles selected to work together should produce coordinated gene expression in the native genome and retain that coordination even when introgressed into a different genetic background.
+In our NIL population, \invfour segregates as a single block after eight backcross generations, precluding genetic dissection of individual loci within the inversion.
+Moreover, studying the adaptive value of a highland allele complex by introgressing it into temperate maize and phenotyping it in US fields is inherently paradoxical: the very environment that makes the experiment tractable is not the environment in which the inversion is adaptive.
+Coexpression network analysis offers a way around both constraints: by comparing network architecture between genotypes, we can identify which regulatory relationships are reconfigured and which genes occupy positions --- such as network hubs --- where dosage changes would propagate through the transcriptome, regardless of whether the phenotypic effects in a given environment are beneficial or deleterious.
+The network reconfiguration we observed when \invfour was introgressed into B73 (Table~\ref{tab::preservation}) is consistent with the replacement of one coordinated regulatory program by another.
+The trans-coexpression analysis was designed to look through the correlated expression of genes within the introgression and identify downstream targets, offering a view of what the \mex haplotype's regulatory architecture produces even in a foreign genetic background.
+That this reconfigured network is associated with earlier flowering --- an adaptive phenotype even in temperate conditions --- suggests that the coadapted allele complex retains functional coherence outside its native environment.
 
-Researchers have now characterized megabase-scale inversions that modulate gene expression and contribute to adaptation across diverse taxa.
-The 1.5~Mb inversion at human 17q21.31 acts simultaneously as an eQTL, mQTL, and sQTL for genes within the rearranged region, altering expression, methylation, and splicing patterns that associate with cortical surface area, intracranial volume, and subcortical brain morphology \cite{wang2023inversions}.
-This demonstrates that balanced rearrangements can modulate regulatory architecture rather than gene dosage, paralleling our finding that \invfour disrupts coexpression networks rather than simply altering transcript levels of breakpoint-proximal genes.
-In \textit{Mimulus guttatus}, a 6.7~Mb inversion on chromosome 8 modulates \textit{GA20ox2} expression in the floral shoot apex, affecting flowering time and growth architecture in a tissue-specific manner \cite{kollar2025}; this inversion remains the only case definitively linked to local adaptation via field reciprocal transplant experiments \cite{lowry2010}.
-The parallel between \textit{Mimulus} and our results is striking: both inversions modulate expression of growth-regulatory genes in meristematic tissue, producing flowering time and stature phenotypes.
-In sunflower, inversions contribute disproportionately to parallel dune ecotype divergence across independent populations, with seed size QTLs clustering within inversions more often than expected by chance \cite{huang2025}, demonstrating that inversions serve as vehicles for repeated adaptation to novel environments.
+A growing body of work across taxa establishes that megabase-scale inversions alter gene regulation and produce phenotypic consequences, the two prerequisites for adaptive relevance.
+The 1.5~Mb inversion at human 17q21.31 acts simultaneously as an eQTL, mQTL, and sQTL, altering expression, methylation, and splicing of genes within the rearranged region in patterns that associate with brain morphology \cite{wang2023inversions}, demonstrating that balanced rearrangements can reshape regulatory architecture beyond simple gene dosage.
+In \textit{Mimulus guttatus}, a 6.7~Mb inversion on chromosome 8 modulates \textit{GA20ox2} expression in the floral shoot apex, affecting flowering time and growth architecture \cite{kollar2025}; this inversion remains the only case definitively linked to local adaptation through field reciprocal transplant experiments \cite{lowry2010}.
+Expression divergence within this \textit{Mimulus} inversion evolved gradually through accumulated mutations rather than breakpoint effects \cite{kollar2025}, paralleling our finding that DEGs are not enriched inside versus outside \invfour (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects from hub genes rather than position effects.
+In sunflower, inversions contribute disproportionately to parallel dune ecotype divergence, with seed size QTLs clustering within inversions more often than expected by chance \cite{huang2025}.
+Engineered inversions in yeast cause expression changes in up to 13\% of genes through indirect mechanisms, including upregulation of a chromatin remodeling gene near one breakpoint that cascades into genome-wide transcriptional perturbation \cite{naseeb2016}; yet yeast phenotypes remain largely buffered, suggesting that network robustness can compensate for transcriptional disruption.
 
-The mechanisms by which inversions modulate gene expression extend beyond simple breakpoint disruption.
-In yeast, engineered inversions cause expression changes in up to 13\% of genes through indirect mechanisms, including upregulation of a chromatin remodeling gene near one breakpoint that cascades into genome-wide transcriptional perturbation \cite{naseeb2016}.
-Yet yeast phenotypes remain largely buffered, suggesting that network robustness compensates for transcriptional disruption.
-In \invfour, expression changes correlate with quantitative phenotypes (flowering, height, meristem shape), indicating that the network perturbation exceeds the buffering capacity, or that the coordinated expression changes are themselves the adaptive target of selection.
-In \textit{Mimulus}, expression divergence within the chromosome 8 inversion evolved gradually through accumulated mutations rather than breakpoint effects \cite{kollar2025}.
-Similarly, our DEGs are not enriched inside versus outside \invfour (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects from hub genes rather than position effects.
-Across taxa, the average adaptive inversion spans 8.4~Mb \cite{wellenreuther2018}; \invfour at 15.2~Mb exceeds this average, consistent with the prediction that larger inversions are favored when they protect more coadapted loci from recombination.
+\invfour extends these findings by connecting the two levels at which inversions act: coordination among genes within the inversion and phenotypic effects on the individual in its environment.
+The expression changes we observe are not buffered as in yeast --- they correlate with quantitative variation in flowering time, plant height, and meristem geometry across environments.
+At the same time, the reconfiguration operates at the network level: hub genes shift position, modules gain or lose connectivity, and growth-related modules containing independent GWAS candidates show coordinated changes in expression.
+If the functional coordination captured by coexpression networks reflects the coadaptation that theory predicts for inversion-maintained haplotypes \cite{kirkpatrick2006b, dobzhansky1970}, then epistatic regulators --- genes whose dosage changes reshape entire modules --- are strong candidates for mediating the phenotypic effects of the inversion.
+The JMJ histone demethylase cluster, with its five-to-one copy number difference between B73 and highland genomes and its hub-to-peripheral transition in \invfour, fits this profile.
+We stress that this remains a hypothesis: we cannot yet distinguish whether JMJ drives the network reconfiguration or whether both JMJ downregulation and network changes are parallel consequences of the introgression.
+But it generates a testable prediction --- that restoring JMJ dosage should rescue network connectivity --- and motivates the functional follow-up experiments outlined below.
 
 Highland-associated inversions including \invfour and \textit{Inv9f} are prevalent in \mex populations \cite{pyhajarvi2013} and Mexican traditional varieties \cite{crow2020} but rare in temperate maize.
-Calfee et al.\ identified \textit{Inv9f} as a second highland-adaptive inversion with independent clinal introgression \cite{calfee2021-mr} suggests that multiple structural variants act in concert for highland adaptation.
+Calfee et al.\ \cite{calfee2021-mr} identified \textit{Inv9f} as a second highland-adaptive inversion with independent clinal introgression, suggesting that multiple structural variants act in concert for highland adaptation.
 The presence of copy number variation within \invfour (JMJ cluster expansion in B73) adds structural complexity beyond simple haplotype differences, as the introgressed \mex haplotype carries a single JMJ ortholog while the B73 haplotype contains five tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
+Across taxa, the average adaptive inversion spans 8.4~Mb \cite{wellenreuther2018}; \invfour at 15.2~Mb exceeds this average, consistent with the prediction that larger inversions are favored when they protect more coadapted loci from recombination.
 
 Several limitations constrain interpretation of our results.
 First, 24 Mb of flanking introgression persists after eight backcross generations (Fig~\ref{fig::design}E, F), a challenge inherent to inversions that suppress recombination.
