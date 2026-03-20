@@ -154,11 +154,9 @@ Gene annotations were transferred from B73 via Liftoff \cite{shumate2021}.
 
 To delimit the recombination breakpoints of \invfour, we performed CDS-anchored whole-genome alignments with AnchorWave \cite{song2022} on chromosome~4.
 We aligned the Mi21 NIL assembly, PT (a close relative to the \invfour donor parent Mi21, representing the Mexican highlands), and TIL18 (highland teosinte \mex) to B73, the recurrent parent used for \invfour introgression (Fig~\ref{fig::design}A, Supplementary Table~\ref{tab:breakpoints}).
-
 In each pairwise comparison, the \invfour region aligned to the B73 minus strand while flanking regions aligned to the plus strand, as expected for an inversion.
 This allowed us to narrow down \invfour to between genes \textit{Zm00001eb190470} and \textit{Zm00001eb194800}, spanning 15.2 Mb and 432 annotated genes in the B73 v5 genome.
 The same bounding genes delimited a 13.4 Mb inversion in PT, a 13.2 Mb inversion in TIL18, and a 10.9 Mb inverted segment in the Mi21 NIL (Supplementary Table~\ref{tab:breakpoints}).
-
 The inversion was not bounded by collinear (plus/plus) alignments on either side.
 Instead, each breakpoint coincided with an unaligned segment, i.e. a gap in the AnchorWave alignment where no CDS anchors could be placed.
 These breakpoint segments were largely devoid of annotated genes; only \textit{Zm00001eb190490} was present, in the upstream segment of B73.
@@ -283,7 +281,7 @@ Notably, the direction of internode effects in North Carolina (shortening at pos
 \subsection{Inv4m seedlings have elongated shoot apical meristems in the growth chamber}
 
 To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
-Given prior evidence that \invfour promotes early flowering, which is associated with larger, elongated SAMs \citep{danilevskaya2008, ku2008, leiboff2015, thompson2015}, we applied one-tailed $t$-tests (H$_0$: $\mu_{\text{Inv4m}} \leq \mu_{\text{CTRL}}$) looking for the dimentional increase.
+Given prior evidence that \invfour promotes early flowering, which is associated with larger, elongated SAMs \citep{danilevskaya2008, wu2008, leiboff2015, thompson2015}, we applied one-tailed $t$-tests (H$_0$: $\mu_{\text{Inv4m}} \leq \mu_{\text{CTRL}}$) looking for the dimentional increase.
 SAM height increased by $9.65 \pm 5.50$ $\mu$m ($p = 0.044$), representing a 9\% elongation of the meristem dome, while the radius was unchanged ($0.03 \pm 1.12$ $\mu$m, $p = 0.49$).
 The shape metrics confirmed this elongation: the height-to-radius ratio increased by $0.158 \pm 0.074$ ($p = 0.019$) and the shape factor ($h/r^2$) increased by $2.49 \pm 1.14$ $\mu$m$^{-1}$ ($p = 0.018$).
 These findings support early developmental differences in meristem geometry in \invfour seedlings.
@@ -320,7 +318,7 @@ The blue triangle indicates the tagging SNP PZE04175660223 used for selection.
   \multicolumn{1}{c}{} &
   \multicolumn{1}{c}{\textbf{}} &
   \multicolumn{1}{c}{\textbf{DEGs}} &
-  \multicolumn{1}{l}{\textbf{High-conf DEGs}} \\
+  \multicolumn{1}{l}{\textbf{Strong DEGs}} \\
 \textbf{Location of genes} &
   \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total \\ Annotated\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total\\  Expressed\end{tabular}}} &
@@ -366,7 +364,7 @@ Shared Introgression &
   \multicolumn{1}{l}{} \\
  &
   \multicolumn{3}{c}{\textbf{DEGs Enrichment}} &
-  \multicolumn{3}{c}{\textbf{High-conf DEGs Enrichment}} \\ \cline{2-7}
+  \multicolumn{3}{c}{\textbf{Strong DEGs Enrichment}} \\ \cline{2-7}
 \textbf{Comparison} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Odds\\ Ratio\end{tabular}}} &
   \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fisher's \\ Exact test\\ \textit{p-value}\end{tabular}}} &
@@ -419,7 +417,7 @@ In contrast, the \invfour effect was sharply localized: a prominent peak of diff
 
 To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}).
 DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$).
-This enrichment was even stronger among strong DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 strong DEGs in the shared introgression represented a 141-fold enrichment over genomic background.
+This enrichment was even larger among strong DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 strong DEGs in the shared introgression represented a 141-fold enrichment over genomic background.
 DEG density did not differ between \invfour proper and the flanking introgressed regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment rather than concentrating at the inversion boundaries.
 
 The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I).
@@ -878,7 +876,7 @@ In adapted temperate maize, earlier flowering and shorter stature are positively
 \invfour breaks this correlation: it accelerates flowering while simultaneously increasing plant height, a combination more characteristic of highland landraces than of temperate elite germplasm \cite{eagles1994}.
 Because both flowering determination and stem elongation originate at the shoot apical meristem, we asked whether the field phenotypes had an anatomical correlate at the meristem level.
 SAM measurements from two-week-old seedlings grown in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed; Fig~\ref{fig:phenotypes}C).
-In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{ku2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
+In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{wu2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
 The elongated SAMs in \invfour seedlings are thus consistent with both the earlier flowering and the increased height observed in PA2022.
 
 \subsection*{Genotype-by-environment interactions reveal environment-dependent effects of \invfour}
@@ -925,7 +923,7 @@ Our microsynteny analysis provides this structural explanation and, together wit
 \subsection*{Coexpression network disruption suggests a link between chromatin regulators and growth phenotypes}
 
 SAM measurements from two-week-old seedlings showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed; Fig~\ref{fig:phenotypes}C).
-SAM elongation is a recognized morphological marker of the floral transition in maize: the vegetative meristem is roughly symmetrical, but becomes taller than wide as plants acquire floral competence \cite{danilevskaya2008}, and this elongation marks the end of the photoperiod-sensitive inductive phase \cite{ku2008}.
+SAM elongation is a recognized morphological marker of the floral transition in maize: the vegetative meristem is roughly symmetrical, but becomes taller than wide as plants acquire floral competence \cite{danilevskaya2008}, and this elongation marks the end of the photoperiod-sensitive inductive phase \cite{wu2008}.
 Studies of natural variation across maize inbreds confirmed that larger SAMs correlate with shorter flowering time \cite{leiboff2015,thompson2015}, with GWAS candidate alleles at the \textit{CONZ1} locus linking meristem geometry to flowering \cite{leiboff2015}.
 Conversely, Wu et al.\ \cite{wu2016} showed that a \textit{ZmCCT} near-isogenic line with delayed flowering failed to undergo SAM elongation by V6, while its earlier-flowering recurrent parent had already transitioned to a cone-shaped meristem, directly linking delayed SAM elongation to later flowering.
 The elongated SAMs we observe in \invfour seedlings are consistent with these findings and with the earlier flowering and increased plant height we measured in field-grown plants.
@@ -1879,6 +1877,5 @@ Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0
 \bottomrule
 \end{tabular}
 \end{table}
-
 
 \end{document}
