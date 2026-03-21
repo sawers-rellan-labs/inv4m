@@ -760,26 +760,74 @@ is most parsimoniously attributed to \\textit{trans}-regulatory effects originat
 divergent loci elsewhere in the introgression.')
 
 caption_latex <- paste0(
-'\\textbf{Figure X.} CDS sequence divergence and expression change in the \\invfour
-introgression.
-\\textbf{(A)} Distribution of CDS divergence (100 $-$ \\% identity) for expressed genes
-inside the inversion (\\invfour, $n$ = ', n_inv4m, ') and in
-the flanking introgression (flanking, $n$ = ', n_flank, ').
+'\\begin{figure}[!ht]
+\\includegraphics[width=\\linewidth]{figs/sequence_divergence_multipanel.pdf}
+\\caption{\\textbf{CDS sequence divergence and expression change in the \\invfour introgression.}
+\\textbf{(A)} Distribution of CDS divergence (100 $-$ \\% identity) for expressed genes inside the inversion (\\invfour, $n$ = ', n_inv4m, ') and in the flanking introgression (flanking, $n$ = ', n_flank, ').
 Points show individual genes (beeswarm); boxes show median and interquartile range.
 $y$-axis is log$_{10}$-scaled.
 Wilcoxon rank-sum $p$ = ', wt_p, '.
 \\textbf{(B)} Absolute log$_2$ fold change vs CDS divergence.
-Parallel lines show the additive ANCOVA model (shared slope for divergence effect,
-vertical offset for region effect).
+Parallel lines show the additive ANCOVA model (shared slope for divergence effect, vertical offset for region effect).
 Region $p$ = ', add_p_loc, ';
 divergence $p$ = ', add_p_div, ';
-adj.\\ $R^2$ = ', add_r2, '.')
+adj.\\ $R^2$ = ', add_r2, '.}
+\\label{fig::divergence}
+\\end{figure}')
 
 cat("\n\n````\nRESULTS PARAGRAPH\n\n")
 cat(results_latex)
 cat("\n````\n\n")
-cat("````\nFIGURE CAPTION\n\n")
+# Build model comparison table LaTeX
+bic_df <- data.frame(
+  model = names(models),
+  df = sapply(models, function(m) length(coef(m))),
+  AIC = round(sapply(models, AIC), 1),
+  BIC = round(sapply(models, BIC), 1),
+  adj_R2 = round(sapply(models, function(m) summary(m)$adj.r.squared), 4),
+  stringsAsFactors = FALSE
+) %>% arrange(BIC)
+
+# Format model names for LaTeX
+model_labels <- c(
+  null = "Null (intercept only)",
+  divergence = "CDS divergence",
+  location = "Region",
+  additive = "CDS divergence + region",
+  interaction = "CDS divergence $\\times$ region"
+)
+
+table_rows <- paste0(
+  sapply(seq_len(nrow(bic_df)), function(i) {
+    paste0(model_labels[bic_df$model[i]], " & ",
+           bic_df$df[i], " & ",
+           bic_df$AIC[i], " & ",
+           bic_df$BIC[i], " & ",
+           bic_df$adj_R2[i])
+  }),
+  collapse = " \\\\\n"
+)
+
+table_latex <- paste0(
+'\\begin{table}[!ht]
+\\caption{\\textbf{Model comparison for the relationship between CDS divergence and expression change in the \\invfour introgression.}
+Five linear models predicting $|\\text{log}_2\\text{FC}|$ were compared by BIC and AIC.
+The additive model (CDS divergence + region) provided the best fit, with the interaction term adding no improvement.
+Region distinguishes genes inside \\invfour from the flanking introgression.}
+\\label{tab::divergence_models}
+\\centering
+\\begin{tabular}{@{}lcccc@{}}
+\\toprule
+\\textbf{Model} & \\textbf{df} & \\textbf{AIC} & \\textbf{BIC} & \\textbf{adj.\\ $R^2$} \\\\ \\midrule
+', table_rows, ' \\\\ \\bottomrule
+\\end{tabular}
+\\end{table}')
+
+cat("````\nFIGURE FLOAT\n\n")
 cat(caption_latex)
+cat("\n````\n\n")
+cat("````\nMODEL COMPARISON TABLE\n\n")
+cat(table_latex)
 cat("\n````\n\n")
 ```
 

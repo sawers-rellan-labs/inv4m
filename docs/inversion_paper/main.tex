@@ -1668,6 +1668,40 @@ sec6      & 3.1  & $-0.55$  & Exocyst complex component Sec6             \\ \bot
 \end{tabular}
 \end{table}
 
+\begin{figure}[!ht]
+\includegraphics[width=\linewidth]{figs/divergence.png}
+\caption{\textbf{CDS sequence divergence and expression change in the \invfour introgression.}
+\textbf{(A)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes inside the inversion (\invfour, $n$ = 107) and in the flanking introgression (flanking, $n$ = 147).
+Points show individual genes (beeswarm); boxes show median and interquartile range.
+$y$-axis is log$_{10}$-scaled.
+Wilcoxon rank-sum $p$ = 0.0034.
+\textbf{(B)} Absolute log$_2$ fold change vs CDS divergence.
+Parallel lines show the additive model (shared slope for divergence effect, vertical offset for region effect).
+Region $p$ = 0.0023;
+divergence $p$ = 2.4e-06;
+adj.\ $R^2$ = 0.104.}
+\label{fig::divergence}
+\end{figure}
+
+\begin{table}[!ht]
+\caption{\textbf{Model comparison for the relationship between CDS divergence and expression change in the \invfour introgression.}
+Five linear models predicting $|\text{log}_2\text{FC}|$ were compared by BIC and AIC.
+The additive model (CDS divergence + region) provided the best fit, with the interaction term adding no improvement.
+Region distinguishes genes inside \invfour from the flanking introgression.}
+\label{tab::divergence_models}
+\centering
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{df} & \textbf{AIC} & \textbf{BIC} & \textbf{adj.\ $R^2$} \\ \midrule
+CDS divergence + region & 3 & 1032.2 & 1046.3 & 0.1037 \\
+CDS divergence & 2 & 1039.6 & 1050.2 & 0.0734 \\
+CDS divergence $\times$ region & 4 & 1033.2 & 1050.9 & 0.1035 \\
+Region & 2 & 1052.8 & 1063.4 & 0.0242 \\
+Null (intercept only) & 1 & 1058 & 1065.1 & 0 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
 
 \begin{table}[!ht]
 \caption{\textbf{Genotype $\times$ Environment interaction statistics.} Two-way ANOVA results for \invfour effects across three location-year combinations (PA2022, PA2025, NC2025) using the MI21 donor background. Interaction $p$-values and effect sizes ($\eta^2_p$) are shown for each phenotype.}
