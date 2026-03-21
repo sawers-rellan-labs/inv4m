@@ -1,0 +1,663 @@
+---
+title: "Sequence Divergence vs Differential Expression in the Inv4m Introgression"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+# Overview
+
+Are the expression differences between Inv4m and B73 haplotypes explained by
+per-gene CDS sequence divergence, or do some genes show excess DE beyond what
+divergence predicts?
+
+We use LAST alignments (B73 vs Mi21 CDS) already computed by the jcvi ortholog
+pipeline. Only genes within the shared introgression on chromosome 4 are
+analyzed.
+
+```{r load_libraries}
+library(here)
+library(tidyverse)
+library(ggrepel)
+library(GenomicRanges)
+library(MASS)      # rlm (robust regression)
+library(quantreg)  # rq  (quantile regression)
+library(evd)       # GPD fitting for extreme value analysis
+library(ggtext)    # richtext labels
+
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Load data
+
+## LAST alignments (CDS percent identity)
+
+```{r load_last}
+last_file <- "/Users/fvrodriguez/mnt/rrellan/DOE_CAREER/inv4m/nilhifimi21/microsynteny/B73.Mi21.last"
+
+last_cols <- c("query", "subject", "pct_identity", "aln_len", "mismatches",
+               "gaps", "qstart", "qend", "sstart", "send", "evalue", "score")
+
+last_raw <- read.table(last_file, header = FALSE, sep = "\t",
+                       col.names = last_cols, comment.char = "#")
+
+# Strip transcript suffix to get gene IDs
+last_raw <- last_raw %>%
+  mutate(
+    b73_gene = sub("_T\\d+$", "", query),
+    mi21_gene = sub("^Mi21_", "", sub("_T\\d+$", "", subject))
+  )
+
+cat("Raw LAST alignments:", nrow(last_raw), "\n")
+```
+
+## DEG results
+
+```{r load_degs}
+degs <- read.csv(file.path(paths$intermediate, "deg_both_models_genotype.csv"))
+cat("DEG results:", nrow(degs), "genes\n")
+```
+
+## Gene coordinates (B73 v5 GFF)
+
+```{r load_coordinates}
+v5_gff_file <- file.path(paths$data, "Zea_mays.Zm-B73-REFERENCE-NAM-5.0.59.chr.gff3")
+genes_gr <- rtracklayer::import(v5_gff_file)
+genes_gr <- genes_gr[genes_gr$type == "gene" &
+                     as.character(seqnames(genes_gr)) %in% as.character(1:10)]
+genes <- as.data.frame(genes_gr)
+genes$ID <- gsub("gene:", "", genes$ID)
+```
+
+# Define regions and filter
+
+```{r define_regions}
+# Boundaries
+introgression_start <- 157012149
+introgression_end   <- 195900523
+inv4m_start <- genes$start[genes$ID == "Zm00001eb190470"]
+inv4m_end   <- genes$end[genes$ID == "Zm00001eb194800"]
+
+# Chr4 introgression genes
+introgression_genes <- genes %>%
+  filter(seqnames == 4, start >= introgression_start, end <= introgression_end) %>%
+  mutate(location = ifelse(start >= inv4m_start & end <= inv4m_end,
+                           "Inv4m", "flanking"))
+
+cat("Introgression genes:", nrow(introgression_genes), "\n")
+cat("  Inv4m:", sum(introgression_genes$location == "Inv4m"), "\n")
+cat("  CTRL:", sum(introgression_genes$location == "flanking"), "\n")
+```
+
+# Best LAST hit per gene in introgression
+
+Keep the highest-scoring ortholog alignment for each B73 gene within the
+introgression.
+
+```{r best_hits}
+best_hits <- last_raw %>%
+  filter(b73_gene %in% introgression_genes$ID) %>%
+  # Keep only self-ortholog hits (same gene ID in B73 and Mi21)
+  filter(b73_gene == mi21_gene) %>%
+  group_by(b73_gene) %>%
+  slice_max(score, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  dplyr::select(gene = b73_gene, pct_identity, aln_len, score)
+
+cat("Genes with ortholog hits:", nrow(best_hits), "\n")
+cat("Identity range:", round(min(best_hits$pct_identity), 2), "-",
+    round(max(best_hits$pct_identity), 2), "%\n")
+```
+
+# Merge datasets
+
+```{r merge}
+# Load master locus labels
+locus_labels <- read.csv(file.path(paths$data, "locus_labels_master.csv")) %>%
+  dplyr::select(gene, locus_label)
+
+merged <- best_hits %>%
+  inner_join(degs, by = "gene") %>%
+  inner_join(
+    introgression_genes %>% dplyr::select(ID, location, start),
+    by = c("gene" = "ID")
+  ) %>%
+  left_join(locus_labels, by = "gene") %>%
+  mutate(
+    cds_divergence = 100 - pct_identity,
+    abs_logFC = abs(logFC),
+    direction = ifelse(logFC > 0, "Up in Inv4m", "Down in Inv4m"),
+    display_label = coalesce(locus_label, gene)
+  )
+
+cat("Merged dataset:", nrow(merged), "genes\n")
+cat("  DEGs (FDR < 0.05):", sum(merged$adj.P.Val < 0.05), "\n")
+cat("  Up:", sum(merged$direction == "Up in Inv4m"),
+    " Down:", sum(merged$direction == "Down in Inv4m"), "\n")
+```
+
+# Analysis
+
+## Scatter: |log2FC| vs CDS divergence
+
+```{r scatter_plot, fig.width=8, fig.height=6}
+# ANCOVA fit: parallel slopes by location
+fit_ancova <- lm(abs_logFC ~ cds_divergence + location, data = merged)
+
+# Predicted ANCOVA lines
+ancova_pred <- expand.grid(
+  cds_divergence = seq(0, max(merged$cds_divergence), length.out = 100),
+  location = c("Inv4m", "flanking")
+)
+ancova_pred$abs_logFC <- predict(fit_ancova, newdata = ancova_pred)
+
+# Residuals for outlier labeling
+merged$residual <- residuals(fit_ancova)
+
+# Top outliers by residual magnitude
+top_outliers <- merged %>%
+  filter(abs(residual) > quantile(abs(residual), 0.95) | abs_logFC > 2) %>%
+  mutate(
+    fontface = ifelse(grepl("^jmj3$", display_label, ignore.case = TRUE),
+                      "bold.italic", "italic")
+  )
+
+# Extract stats for legend labels
+ancova_sum <- summary(fit_ancova)
+ancova_coefs <- coef(ancova_sum)
+r2 <- round(ancova_sum$adj.r.squared, 3)
+p_div <- ancova_coefs["cds_divergence", "Pr(>|t|)"]
+p_loc <- ancova_coefs["locationInv4m", "Pr(>|t|)"]
+
+# Fixed coordinate range
+x_max <- ceiling(max(merged$cds_divergence))
+y_max <- ceiling(max(merged$abs_logFC))
+
+# Stats annotation (ggtext richtext for italic p)
+stat_label <- paste0(
+  "Region *p* = ", format(p_loc, digits = 2), "<br>",
+  "Divergence *p* = ", format(p_div, digits = 2), "<br>",
+  "adj. R\u00B2 = ", r2
+)
+
+p_scatter <- ggplot(merged, aes(x = cds_divergence, y = abs_logFC,
+                                 color = location)) +
+  geom_point(aes(shape = adj.P.Val < 0.05), size = 2, alpha = 0.5) +
+  geom_line(data = ancova_pred, linewidth = 1) +
+  geom_text_repel(
+    data = top_outliers,
+    aes(label = display_label, fontface = fontface),
+    size = 2.5, max.overlaps = 15, segment.alpha = 0.4,
+    show.legend = FALSE
+  ) +
+  coord_cartesian(xlim = c(0, x_max), ylim = c(0, y_max)) +
+  scale_color_manual(
+    values = c("Inv4m" = "purple4", "flanking" = "plum")
+  ) +
+  scale_shape_manual(values = c("TRUE" = 16, "FALSE" = 1), guide = "none") +
+  geom_richtext(
+    data = data.frame(x = 5.1, y = 11.2),
+    aes(x = x, y = y), label = stat_label,
+    inherit.aes = FALSE, hjust = 0, vjust = 1,
+    size = 4.5, label.colour = NA, fill = NA
+  ) +
+  labs(
+    x = "CDS divergence (100 - % identity)",
+    y = "|log2 fold change|",
+    title = "Expression change vs sequence divergence in the Inv4m introgression"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = c(0.18, 0.98),
+    legend.justification = c(0, 1),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 13),
+    legend.key.size = unit(1.2, "lines"),
+    legend.background = element_rect(fill = alpha("white", 0.8), color = NA)
+  )
+
+print(p_scatter)
+```
+
+## Linear models
+
+```{r models}
+fit_null <- lm(abs_logFC ~ 1, data = merged)
+fit_div  <- lm(abs_logFC ~ cds_divergence, data = merged)
+fit_loc  <- lm(abs_logFC ~ location, data = merged)
+fit_add  <- lm(abs_logFC ~ cds_divergence + location, data = merged)
+fit_int  <- lm(abs_logFC ~ cds_divergence * location, data = merged)
+
+models <- list(null = fit_null, divergence = fit_div, location = fit_loc,
+               additive = fit_add, interaction = fit_int)
+
+data.frame(
+  model = names(models),
+  df = sapply(models, function(m) length(coef(m))),
+  AIC = round(sapply(models, AIC), 1),
+  BIC = round(sapply(models, BIC), 1),
+  adj_R2 = round(sapply(models, function(m) summary(m)$adj.r.squared), 4)
+) %>% arrange(BIC)
+```
+
+```{r model_summaries}
+cat("=== Additive model ===\n")
+summary(fit_add)
+
+cat("\n=== Interaction model ===\n")
+summary(fit_int)
+
+anova(fit_add, fit_int)
+```
+
+```{r models_by_direction}
+for (dir in c("Up in Inv4m", "Down in Inv4m")) {
+  cat("\n===", dir, "===\n")
+  d <- merged %>% filter(direction == dir)
+  cat("n =", nrow(d), "\n")
+  fit_dir <- lm(logFC ~ cds_divergence + location, data = d)
+  print(summary(fit_dir))
+}
+```
+
+## Robust and quantile regression
+
+OLS is sensitive to the few high-divergence, high-|logFC| genes that act as
+leverage points. Robust regression (Huber M-estimator) downweights these
+automatically. Quantile regression at the median provides a complementary
+check that does not assume symmetric errors.
+
+```{r robust_regression}
+fit_rlm_add <- rlm(abs_logFC ~ cds_divergence + location, data = merged)
+cat("=== Robust regression (rlm, additive) ===\n")
+summary(fit_rlm_add)
+
+# Huber weights: values near 1 = well-behaved, <<1 = downweighted
+cat("\nDownweighted genes (Huber weight < 0.5):\n")
+merged$huber_w <- fit_rlm_add$w
+merged %>%
+  filter(huber_w < 0.5) %>%
+  dplyr::select(gene, location, cds_divergence, abs_logFC, huber_w) %>%
+  arrange(huber_w)
+```
+
+```{r quantile_regression}
+fit_rq_add <- rq(abs_logFC ~ cds_divergence + location, data = merged, tau = 0.5)
+cat("=== Quantile regression (median, additive) ===\n")
+summary(fit_rq_add, se = "boot")
+```
+
+```{r compare_coefficients}
+coef_table <- data.frame(
+  term = names(coef(fit_add)),
+  OLS = round(coef(fit_add), 4),
+  Robust = round(coef(fit_rlm_add), 4),
+  Quantile = round(coef(fit_rq_add), 4)
+)
+cat("=== Coefficient comparison ===\n")
+print(coef_table, row.names = FALSE)
+```
+
+## Binned regression (visual summary)
+
+Bin genes by CDS divergence and regress on bin means. This upweights sparse
+high-divergence bins that would otherwise be overwhelmed by the mass of
+low-divergence genes. Shown for visual clarity; inferential results come from
+the robust regression above.
+
+```{r binned_regression, fig.width=8, fig.height=6}
+merged$div_bin <- cut(merged$cds_divergence,
+                      breaks = seq(0, ceiling(max(merged$cds_divergence)), by = 1),
+                      include.lowest = TRUE)
+
+bin_means <- merged %>%
+  group_by(div_bin) %>%
+  summarise(
+    n = n(),
+    mean_div = mean(cds_divergence),
+    mean_absFC = mean(abs_logFC),
+    se_absFC = sd(abs_logFC) / sqrt(n()),
+    .groups = "drop"
+  )
+
+bin_means
+
+fit_bin_uw <- lm(mean_absFC ~ mean_div, data = bin_means)
+fit_bin_w  <- lm(mean_absFC ~ mean_div, data = bin_means, weights = n)
+
+cat("=== Unweighted bin-mean regression ===\n")
+summary(fit_bin_uw)
+
+cat("\n=== Weighted bin-mean regression (weights = n) ===\n")
+summary(fit_bin_w)
+```
+
+```{r binned_by_location_direction, fig.width=10, fig.height=5.5}
+bin_means_loc <- merged %>%
+  group_by(div_bin, location, direction) %>%
+  summarise(
+    n = n(),
+    mean_div = mean(cds_divergence),
+    mean_logFC = mean(logFC),
+    se_logFC = sd(logFC) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Fit separate ANCOVA per direction (on signed logFC)
+ancova_fits <- bin_means_loc %>%
+  group_by(direction) %>%
+  group_map(~ {
+    fit <- lm(mean_logFC ~ mean_div + location, data = .x, weights = n)
+    cat("===", .y$direction, "===\n")
+    print(summary(fit))
+    cat("\n")
+
+    pred <- expand.grid(
+      mean_div = seq(0, max(.x$mean_div, na.rm = TRUE), length.out = 100),
+      location = c("flanking", "Inv4m")
+    )
+    pred$mean_logFC <- predict(fit, newdata = pred)
+    pred$direction <- .y$direction
+    pred
+  }, .keep = TRUE) %>%
+  bind_rows()
+
+p_ancova <- ggplot(bin_means_loc, aes(x = mean_div, y = mean_logFC,
+                                       color = location)) +
+  geom_point(aes(size = n), alpha = 0.8) +
+  geom_errorbar(aes(ymin = mean_logFC - se_logFC,
+                    ymax = mean_logFC + se_logFC),
+                width = 0.15, alpha = 0.4) +
+  geom_line(data = ancova_fits, linewidth = 0.9) +
+  facet_wrap(~ direction) +
+  scale_color_manual(values = c("Inv4m" = "purple4", "flanking" = "plum"),
+                     name = "Region") +
+  scale_size_continuous(name = "Genes per bin") +
+  labs(
+    x = "Mean CDS divergence (%)",
+    y = "Mean log2 fold change",
+    title = "ANCOVA by direction: shared slope (divergence), offset = location"
+  ) +
+  theme_bw(base_size = 13)
+
+print(p_ancova)
+```
+
+## Quantile regression on raw data (no binning)
+
+Raw scatter with median regression lines per location, split by direction.
+No binning or aggregation — all 254 points shown.
+
+```{r quantile_by_direction, fig.width=10, fig.height=5.5}
+# Fit quantile regression (median) per direction
+rq_fits <- merged %>%
+  group_by(direction) %>%
+  group_map(~ {
+    fit <- rq(logFC ~ cds_divergence + location, data = .x, tau = 0.5)
+    cat("===", .y$direction, "===\n")
+    print(summary(fit, se = "boot"))
+    cat("\n")
+
+    pred <- expand.grid(
+      cds_divergence = seq(0, max(.x$cds_divergence), length.out = 100),
+      location = c("flanking", "Inv4m")
+    )
+    pred$logFC <- predict(fit, newdata = pred)
+    pred$direction <- .y$direction
+    pred
+  }, .keep = TRUE) %>%
+  bind_rows()
+
+p_qr <- ggplot(merged, aes(x = cds_divergence, y = logFC, color = location)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_line(data = rq_fits, linewidth = 1) +
+  facet_wrap(~ direction) +
+  scale_color_manual(values = c("Inv4m" = "purple4", "flanking" = "plum"),
+                     name = "Region") +
+  labs(
+    x = "CDS divergence (100 - % identity)",
+    y = "log2 fold change",
+    title = "Quantile regression (median) on raw data, by direction"
+  ) +
+  theme_bw(base_size = 13)
+
+print(p_qr)
+```
+
+## Outlier genes (excess DE beyond divergence)
+
+Genes with large positive residuals have more expression change than expected
+from their sequence divergence alone — candidates for trans-regulation or CNV
+effects.
+
+```{r outliers}
+outliers <- merged %>%
+  arrange(desc(abs(residual))) %>%
+  dplyr::select(gene, location, pct_identity, cds_divergence,
+                logFC, abs_logFC, adj.P.Val, residual) %>%
+  head(20)
+
+outliers
+```
+
+## Distribution of divergence by region
+
+```{r divergence_boxplot, fig.width=6, fig.height=4}
+ggplot(merged, aes(x = location, y = cds_divergence, fill = location)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = 21) +
+  scale_fill_manual(values = c("Inv4m" = "purple4", "flanking" = "plum")) +
+  labs(x = NULL, y = "CDS divergence (%)") +
+  theme_bw(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+```{r divergence_test}
+wilcox.test(cds_divergence ~ location, data = merged)
+```
+
+# Extreme value analysis
+
+## Rationale
+
+The ANCOVA and quantile regressions model the *average* or *median* relationship
+between divergence and expression change. But our interest is in the DEGs — the
+genes in the *tail* of the distribution that show extreme expression responses.
+Extreme value theory (EVT) models this tail behavior directly.
+
+The approach:
+
+1. Regress `logFC ~ cds_divergence` to remove the divergence effect
+2. Take `|residual|` to pool both tails (comparable to the `abs_logFC` additive model)
+3. Fit a Generalized Pareto Distribution (GPD) to the extreme |residuals|
+4. Compare GPD parameters between Inv4m and flanking regions
+5. If the scale or shape parameter differs, the inversion produces heavier tails
+   (more extreme DE) than divergence alone predicts
+
+## Residuals from divergence model
+
+```{r evt_residuals}
+# Robust residuals from divergence-only model, then take absolute value
+# to pool both tails — directly comparable to the abs_logFC additive model
+merged$robust_resid <- merged$logFC - predict(
+  rlm(logFC ~ cds_divergence, data = merged),
+  newdata = merged
+)
+merged$abs_resid <- abs(merged$robust_resid)
+
+cat("Absolute residual summary:\n")
+summary(merged$abs_resid)
+```
+
+## GPD threshold selection
+
+```{r gpd_threshold}
+# Use 75th percentile of |residual| as threshold
+thresh <- quantile(merged$abs_resid, 0.75)
+
+cat("Threshold (75th pct of |residual|):", round(thresh, 3), "\n")
+cat("Total exceedances:", sum(merged$abs_resid > thresh), "\n")
+cat("  Inv4m:", sum(merged$abs_resid[merged$location == "Inv4m"] > thresh), "\n")
+cat("  flanking:", sum(merged$abs_resid[merged$location == "flanking"] > thresh), "\n")
+```
+
+## GPD fits by location (pooled tails)
+
+```{r gpd_by_location}
+gpd_results <- list()
+
+for (loc in c("Inv4m", "flanking")) {
+  d <- merged %>% filter(location == loc)
+  exc <- d$abs_resid[d$abs_resid > thresh]
+
+  if (length(exc) >= 5) {
+    fit <- fpot(d$abs_resid, threshold = thresh, model = "gpd")
+    gpd_results[[loc]] <- list(
+      location = loc,
+      n_exceed = length(exc),
+      scale = fit$estimate["scale"],
+      shape = fit$estimate["shape"],
+      se_scale = fit$std.err["scale"],
+      se_shape = fit$std.err["shape"],
+      nllh = fit$deviance  # negative log-likelihood
+    )
+    cat("===", loc, "===\n")
+    cat("  Exceedances:", length(exc), "\n")
+    cat("  Scale:", round(fit$estimate["scale"], 4),
+        "±", round(fit$std.err["scale"], 4), "\n")
+    cat("  Shape:", round(fit$estimate["shape"], 4),
+        "±", round(fit$std.err["shape"], 4), "\n\n")
+  }
+}
+
+gpd_df <- bind_rows(lapply(gpd_results, as.data.frame))
+gpd_df
+```
+
+## Compare tail behavior
+
+```{r gpd_comparison, fig.width=7, fig.height=5}
+gpd_long <- gpd_df %>%
+  pivot_longer(cols = c(scale, shape), names_to = "parameter", values_to = "estimate") %>%
+  mutate(se = ifelse(parameter == "scale", se_scale, se_shape))
+
+ggplot(gpd_long, aes(x = location, y = estimate, color = location)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = estimate - 1.96 * se, ymax = estimate + 1.96 * se),
+                width = 0.15) +
+  facet_wrap(~ parameter, scales = "free_y") +
+  scale_color_manual(values = c("Inv4m" = "purple4", "flanking" = "plum")) +
+  labs(
+    x = NULL, y = "GPD parameter estimate",
+    title = "Generalized Pareto fits (pooled tails): |residual| by region",
+    caption = "Error bars: 95% CI from MLE standard errors"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+## Likelihood ratio test
+
+Compare a model where both regions share GPD parameters vs separate fits.
+
+```{r gpd_lrt}
+# Pooled fit (all locations combined)
+fit_pooled <- fpot(merged$abs_resid, threshold = thresh, model = "gpd")
+
+# Sum of separate negative log-likelihoods
+nllh_separate <- sum(sapply(gpd_results, function(x) x$nllh))
+nllh_pooled <- fit_pooled$deviance
+
+# LRT: 2 * (loglik_separate - loglik_pooled), df = 2 (extra scale + shape)
+lrt_stat <- 2 * (nllh_pooled - nllh_separate)
+lrt_pval <- pchisq(lrt_stat, df = 2, lower.tail = FALSE)
+
+cat("=== Likelihood ratio test: shared vs separate GPD ===\n")
+cat("  Pooled nllh:", round(nllh_pooled, 2), "\n")
+cat("  Separate nllh:", round(nllh_separate, 2), "\n")
+cat("  LRT statistic:", round(lrt_stat, 3), "\n")
+cat("  p-value:", format(lrt_pval, digits = 4), "\n")
+```
+
+## Exceedance probability by location
+
+```{r exceedance_rate}
+exc_table <- merged %>%
+  group_by(location) %>%
+  summarise(
+    n = n(),
+    n_extreme = sum(abs_resid > thresh),
+    pct_extreme = round(100 * n_extreme / n, 1),
+    .groups = "drop"
+  )
+
+exc_table
+
+cat("\n=== Fisher's test: exceedance rate by location ===\n")
+mat <- matrix(c(
+  exc_table$n_extreme[exc_table$location == "Inv4m"],
+  exc_table$n[exc_table$location == "Inv4m"] - exc_table$n_extreme[exc_table$location == "Inv4m"],
+  exc_table$n_extreme[exc_table$location == "flanking"],
+  exc_table$n[exc_table$location == "flanking"] - exc_table$n_extreme[exc_table$location == "flanking"]
+), nrow = 2, dimnames = list(c("extreme", "not"), c("Inv4m", "flanking")))
+print(fisher.test(mat))
+```
+
+## QQ plots
+
+```{r gpd_qq, fig.width=10, fig.height=5}
+par(mfrow = c(1, 2))
+
+for (loc in c("Inv4m", "flanking")) {
+  d <- merged %>% filter(location == loc)
+  if (sum(d$abs_resid > thresh) >= 5) {
+    fit <- fpot(d$abs_resid, threshold = thresh, model = "gpd")
+    plot(fit, which = 4, main = paste(loc, "- GPD QQ (pooled tails)"))
+  }
+}
+```
+
+# Save outputs
+
+```{r save}
+write.csv(merged, file.path(paths$intermediate, "sequence_divergence_vs_DE.csv"),
+          row.names = FALSE)
+
+ggsave(file.path(paths$figures, "sequence_divergence_vs_DE.pdf"),
+       p_scatter, width = 8, height = 6)
+ggsave(file.path(paths$figures, "sequence_divergence_vs_DE.svg"),
+       p_scatter, width = 8, height = 6, fix_text_size = TRUE)
+
+cat("Outputs saved to:", paths$intermediate, "and", paths$figures, "\n")
+```
+
+# Session info
+
+```{r session_info}
+sessionInfo()
+```
