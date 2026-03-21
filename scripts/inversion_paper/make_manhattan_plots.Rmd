@@ -494,7 +494,7 @@ inv4mxP.plot
 
 ```{r chr4-detail-plot}
 # Define color palette
-pal <- c("#C84B79", "#0F1D87", "#F1FA41")
+pal <- c("purple4", "plum", "gold")
 names(pal) <- c("inv4m", "flanking", "outside")
 FDR_thresh <- -log10(0.05)
 

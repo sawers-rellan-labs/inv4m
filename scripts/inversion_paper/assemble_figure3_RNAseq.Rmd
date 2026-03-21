@@ -224,16 +224,17 @@ panel_B <- panel_B +
     legend.title = element_markdown(size = 15),
     legend.background = element_rect(fill = "transparent"),
     legend.key = element_rect(fill = "transparent", colour = NA),
-    legend.position = "top"
+    legend.position = "top",
+    plot.margin = unit(c(5.5, 5.5, 5.5, 40), "pt")
   )
 
 # Panel C (Volcano): Readable axes, smaller legend
 panel_C <- panel_C +
-
   theme(
     axis.title = element_text(size = base_size),
     axis.text = element_text(size = base_size - 2),
     legend.key.size = unit(0.12, "cm"),
+    legend.position = c(0.81, 0.94),
     legend.background = element_rect(fill = "transparent"),
     legend.key = element_rect(fill = "transparent", colour = NA)
   )
