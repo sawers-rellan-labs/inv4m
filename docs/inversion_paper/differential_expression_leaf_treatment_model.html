@@ -11,7 +11,7 @@
 
 <meta name="author" content="Fausto Rodríguez Zapata" />
 
-<meta name="date" content="2026-01-02" />
+<meta name="date" content="2026-03-21" />
 
 <title>Differential Gene Expression Analysis: Leaf-Treatment Interaction Model</title>
 
@@ -1588,7 +1588,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">Differential Gene Expression Analysis:
 Leaf-Treatment Interaction Model</h1>
 <h4 class="author">Fausto Rodríguez Zapata</h4>
-<h4 class="date">2026-01-02</h4>
+<h4 class="date">2026-03-21</h4>
 
 </div>
 
@@ -2704,7 +2704,7 @@ add_mahalanobis_outliers &lt;- function(
 ##             is_mh_outlier
 ## predictor    FALSE  TRUE
 ##   Leaf       19388  4861
-##   -P         19542  4707
+##   -P         19540  4709
 ##   Leaf:-P    21008  3241
 ##   Inv4m      23783   466
 ##   Inv4m:-P   24249     0
@@ -2963,25 +2963,40 @@ effects_df &lt;- effects_df %&gt;%
 
 # Make locus_symbol the default locus_label
 # Remove symbols corresponding to DNA markers in the consensus map
+# Marker types (from data/maizegdb_consensus_map/):
+#   umc  - University of Missouri, Columbia SSR markers
+#   pco  - Pioneer Company markers
+#   bnlg - Brookhaven National Laboratory (SSR)
+#   pza  - Pioneer SNP markers
+#   gpm  - Gene primer markers
+#   csu  - Colorado State University markers
+#   php  - Pioneer hybrid markers
+#   IDP  - Insertion-Deletion Polymorphism markers
+#   TIDP - Tagged IDP markers
+#   cl   - Clone numbers (cDNA libraries)
+#   si   - Sequence identifiers
+#   LOC  - NCBI gene identifiers
+#   AY   - GenBank accessions
+# Key insight: Markers have locus_symbol but NO locus_name
+marker_pattern &lt;- paste0(
+  &quot;^(umc|pco|bnlg|pza|gpm|csu|php|IDP|TIDP)[0-9]+&quot;,
+  &quot;|^cl[0-9]+_&quot;,
+  &quot;|^si[0-9]{5,}&quot;,
+  &quot;|^LOC[0-9]+&quot;,
+  &quot;|^AY[0-9]+&quot;,
+  &quot;|^Zm00001[de]?b?[0-9]+&quot;,
+  &quot;|^GRMZM&quot;
+)
+
 effects_df &lt;- effects_df %&gt;%
   mutate(
     locus_label = case_when(
       is.na(locus_symbol) ~ NA_character_,
-      grepl(&quot;^si\\d*[a-h]&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^umc&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^csu&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^bnlg&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^php\\d\\d&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^csu\\d+\a&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^pco&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^IDP&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^TIDP\\d{4}&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^cl\\d*_\\d&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^cl\\d*_-&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^Zm00001eb&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^Zm00001d&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;^GRM&quot;, locus_symbol) ~ NA_character_,
-      grepl(&quot;LOC\\d{4}&quot;, locus_symbol) ~ NA_character_,
+      # If locus_name exists, the symbol is a real gene name
+      !is.na(locus_name) &amp; locus_name != &quot;&quot; ~ locus_symbol,
+      # If no locus_name and matches marker pattern, filter it
+      grepl(marker_pattern, locus_symbol) ~ NA_character_,
+      # Otherwise keep the symbol
       TRUE ~ locus_symbol
     )
   )
@@ -3861,6 +3876,85 @@ write.csv(
 ##   inv4m_selected_DEGs_leaf_interaction_model.csv - Inv4m effect
 ##   leafxP_selected_DEGs_leaf_interaction_model.csv - Leaf:Treatment interaction</code></pre>
 </div>
+<div id="latex-table-inv4m-gene-effects-table-s3" class="section level2">
+<h2>LaTeX table: Inv4m gene effects (Table S3)</h2>
+<pre class="r"><code># Prepare Inv4m DEGs + Leaf×Inv4m interaction for LaTeX table
+inv4m_degs &lt;- selected_degs %&gt;%
+  filter(predictor == &quot;Inv4m&quot;) %&gt;%
+  arrange(regulation, -neglogP)
+
+interaction_degs &lt;- selected_degs %&gt;%
+  filter(predictor == &quot;Leaf:Inv4m&quot;) %&gt;%
+  arrange(-neglogP)
+
+# Row formatter (same pattern as pink module table)
+format_gene_effect_row &lt;- function(gene, label, desc, log2fc, neglogp, adj_p_val) {
+  label_fmt &lt;- if (is.na(label) || label == &quot;&quot; || label == gene) &quot;&quot; else paste0(&quot;\\textit{&quot;, label, &quot;}&quot;)
+  desc_clean &lt;- if (is.na(desc) || desc == &quot;&quot;) &quot;&quot; else {
+    stringr::str_trunc(desc, 40) %&gt;%
+      stringr::str_replace_all(&quot;_&quot;, &quot;\\\\_&quot;) %&gt;%
+      stringr::str_replace_all(&quot;&amp;&quot;, &quot;\\\\&amp;&quot;) %&gt;%
+      stringr::str_replace_all(&quot;%&quot;, &quot;\\\\%&quot;)
+  }
+  log2fc_fmt &lt;- if (log2fc &gt;= 0) paste0(&quot;$+&quot;, sprintf(&quot;%.2f&quot;, log2fc), &quot;$&quot;) else paste0(&quot;$&quot;, sprintf(&quot;%.2f&quot;, log2fc), &quot;$&quot;)
+  neglogp_fmt &lt;- sprintf(&quot;%.1f&quot;, neglogp)
+  paste(gene, label_fmt, neglogp_fmt, log2fc_fmt, desc_clean, sep = &quot; &amp; &quot;) %&gt;% paste0(&quot; \\\\&quot;)
+}
+
+# Generate rows
+down_rows &lt;- inv4m_degs %&gt;%
+  filter(regulation == &quot;Downregulated&quot;) %&gt;%
+  rowwise() %&gt;%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %&gt;%
+  pull(row)
+
+up_rows &lt;- inv4m_degs %&gt;%
+  filter(regulation == &quot;Upregulated&quot;) %&gt;%
+  rowwise() %&gt;%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %&gt;%
+  pull(row)
+
+int_rows &lt;- interaction_degs %&gt;%
+  rowwise() %&gt;%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %&gt;%
+  pull(row)
+
+# Assemble table
+latex_header &lt;- &#39;\\begin{table}[!ht]
+\\caption{\\textbf{Effect of \\invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $&lt; 0.05$, $|\\log_2 \\text{FC}| &gt; 1.5$). Bottom rows show significant Leaf$\\times$\\invfour interactions.}
+\\label{tab:gene_effects}
+\\centering
+\\small
+\\begin{tabular}{@{}llrrl@{}}
+\\toprule
+\\textbf{Gene ID} &amp; \\textbf{Locus} &amp; \\textbf{$-\\log_{10}$(\\textit{FDR})} &amp; \\textbf{$\\log_2$FC} &amp; \\textbf{Description} \\\\ \\midrule
+\\multicolumn{5}{l}{\\textbf{\\invfour: Downregulated}} \\\\ \\midrule&#39;
+
+latex_middle &lt;- &#39;\\midrule
+\\multicolumn{5}{l}{\\textbf{\\invfour: Upregulated}} \\\\ \\midrule&#39;
+
+latex_interaction &lt;- &#39;\\midrule
+\\multicolumn{5}{l}{\\textbf{Leaf$\\times$\\invfour}} \\\\ \\midrule&#39;
+
+latex_footer &lt;- &#39;\\bottomrule
+\\end{tabular}
+\\end{table}&#39;
+
+latex_table &lt;- paste(
+  latex_header,
+  paste(down_rows, collapse = &quot;\n&quot;),
+  latex_middle,
+  paste(up_rows, collapse = &quot;\n&quot;),
+  latex_interaction,
+  paste(int_rows, collapse = &quot;\n&quot;),
+  latex_footer,
+  sep = &quot;\n&quot;
+)
+
+writeLines(latex_table, file.path(paths$tables, &quot;gene_effects.tex&quot;))
+cat(&quot;LaTeX table saved: tables/gene_effects.tex\n&quot;)</code></pre>
+<pre><code>## LaTeX table saved: tables/gene_effects.tex</code></pre>
+</div>
 </div>
 <div id="summary" class="section level1">
 <h1>Summary</h1>
@@ -3926,14 +4020,14 @@ combinations</strong>.</p>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.5.2 (2025-10-31)
 ## Platform: aarch64-apple-darwin20
-## Running under: macOS Sequoia 15.6.1
+## Running under: macOS Tahoe 26.3.1
 ## 
 ## Matrix products: default
 ## BLAS:   /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib 
 ## LAPACK: /Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
 ## 
 ## locale:
-## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+## [1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
 ## 
 ## time zone: America/New_York
 ## tzcode source: internal
@@ -3972,32 +4066,32 @@ combinations</strong>.</p>
 ## [37] jquerylib_0.1.4             Rcpp_1.1.0                 
 ## [39] SummarizedExperiment_1.40.0 knitr_1.51                 
 ## [41] splines_4.5.2               Matrix_1.7-4               
-## [43] tidyselect_1.2.1            abind_1.4-8                
-## [45] yaml_2.3.12                 codetools_0.2-20           
-## [47] curl_7.0.0                  lattice_0.22-7             
-## [49] tibble_3.3.0                Biobase_2.70.0             
-## [51] withr_3.0.2                 S7_0.2.1                   
-## [53] evaluate_1.0.5              xml2_1.5.1                 
-## [55] Biostrings_2.78.0           pillar_1.11.1              
-## [57] MatrixGenerics_1.22.0       carData_3.0-5              
-## [59] rprojroot_2.1.1             RCurl_1.98-1.17            
-## [61] commonmark_2.0.0            scales_1.4.0               
-## [63] glue_1.8.0                  tools_4.5.2                
-## [65] BiocIO_1.20.0               locfit_1.5-9.12            
-## [67] ggsignif_0.6.4              GenomicAlignments_1.46.0   
-## [69] forcats_1.0.1               XML_3.99-0.20              
-## [71] cowplot_1.2.0               grid_4.5.2                 
-## [73] nlme_3.1-168                restfulr_0.0.16            
-## [75] Formula_1.2-5               cli_3.6.5                  
-## [77] textshaping_1.0.4           S4Arrays_1.10.1            
-## [79] viridisLite_0.4.2           gtable_0.3.6               
-## [81] DEoptimR_1.1-4              rstatix_0.7.3              
-## [83] sass_0.4.10                 digest_0.6.39              
-## [85] SparseArray_1.10.8          rjson_0.2.23               
-## [87] farver_2.1.2                htmltools_0.5.9            
-## [89] lifecycle_1.0.4             httr_1.4.7                 
-## [91] here_1.0.2                  statmod_1.5.1              
-## [93] gridtext_0.1.5</code></pre>
+## [43] tidyselect_1.2.1            dichromat_2.0-0.1          
+## [45] abind_1.4-8                 yaml_2.3.12                
+## [47] codetools_0.2-20            curl_7.0.0                 
+## [49] lattice_0.22-7              tibble_3.3.0               
+## [51] Biobase_2.70.0              withr_3.0.2                
+## [53] S7_0.2.1                    evaluate_1.0.5             
+## [55] xml2_1.5.1                  Biostrings_2.78.0          
+## [57] pillar_1.11.1               MatrixGenerics_1.22.0      
+## [59] carData_3.0-5               rprojroot_2.1.1            
+## [61] RCurl_1.98-1.17             commonmark_2.0.0           
+## [63] scales_1.4.0                glue_1.8.0                 
+## [65] tools_4.5.2                 BiocIO_1.20.0              
+## [67] locfit_1.5-9.12             ggsignif_0.6.4             
+## [69] GenomicAlignments_1.46.0    forcats_1.0.1              
+## [71] XML_3.99-0.20               cowplot_1.2.0              
+## [73] grid_4.5.2                  nlme_3.1-168               
+## [75] restfulr_0.0.16             Formula_1.2-5              
+## [77] cli_3.6.5                   textshaping_1.0.4          
+## [79] S4Arrays_1.10.1             viridisLite_0.4.2          
+## [81] gtable_0.3.6                DEoptimR_1.1-4             
+## [83] rstatix_0.7.3               sass_0.4.10                
+## [85] digest_0.6.39               SparseArray_1.10.8         
+## [87] rjson_0.2.23                farver_2.1.2               
+## [89] htmltools_0.5.9             lifecycle_1.0.4            
+## [91] httr_1.4.7                  here_1.0.2                 
+## [93] statmod_1.5.1               gridtext_0.1.5</code></pre>
 </div>
 
 

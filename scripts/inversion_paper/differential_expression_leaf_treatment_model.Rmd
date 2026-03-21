@@ -1808,6 +1808,86 @@ write.csv(
 }
 ```
 
+## LaTeX table: Inv4m gene effects (Table S3)
+
+```{r inv4m_gene_effects_latex}
+# Prepare Inv4m DEGs + Leaf×Inv4m interaction for LaTeX table
+inv4m_degs <- selected_degs %>%
+  filter(predictor == "Inv4m") %>%
+  arrange(regulation, -neglogP)
+
+interaction_degs <- selected_degs %>%
+  filter(predictor == "Leaf:Inv4m") %>%
+  arrange(-neglogP)
+
+# Row formatter (same pattern as pink module table)
+format_gene_effect_row <- function(gene, label, desc, log2fc, neglogp, adj_p_val) {
+  label_fmt <- if (is.na(label) || label == "" || label == gene) "" else paste0("\\textit{", label, "}")
+  desc_clean <- if (is.na(desc) || desc == "") "" else {
+    stringr::str_trunc(desc, 40) %>%
+      stringr::str_replace_all("_", "\\\\_") %>%
+      stringr::str_replace_all("&", "\\\\&") %>%
+      stringr::str_replace_all("%", "\\\\%")
+  }
+  log2fc_fmt <- if (log2fc >= 0) paste0("$+", sprintf("%.2f", log2fc), "$") else paste0("$", sprintf("%.2f", log2fc), "$")
+  neglogp_fmt <- sprintf("%.1f", neglogp)
+  paste(gene, label_fmt, neglogp_fmt, log2fc_fmt, desc_clean, sep = " & ") %>% paste0(" \\\\")
+}
+
+# Generate rows
+down_rows <- inv4m_degs %>%
+  filter(regulation == "Downregulated") %>%
+  rowwise() %>%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %>%
+  pull(row)
+
+up_rows <- inv4m_degs %>%
+  filter(regulation == "Upregulated") %>%
+  rowwise() %>%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %>%
+  pull(row)
+
+int_rows <- interaction_degs %>%
+  rowwise() %>%
+  mutate(row = format_gene_effect_row(gene, locus_label, desc_merged, logFC, neglogP)) %>%
+  pull(row)
+
+# Assemble table
+latex_header <- '\\begin{table}[!ht]
+\\caption{\\textbf{Effect of \\invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|\\log_2 \\text{FC}| > 1.5$). Bottom rows show significant Leaf$\\times$\\invfour interactions.}
+\\label{tab:gene_effects}
+\\centering
+\\small
+\\begin{tabular}{@{}llrrl@{}}
+\\toprule
+\\textbf{Gene ID} & \\textbf{Locus} & \\textbf{$-\\log_{10}$(\\textit{FDR})} & \\textbf{$\\log_2$FC} & \\textbf{Description} \\\\ \\midrule
+\\multicolumn{5}{l}{\\textbf{\\invfour: Downregulated}} \\\\ \\midrule'
+
+latex_middle <- '\\midrule
+\\multicolumn{5}{l}{\\textbf{\\invfour: Upregulated}} \\\\ \\midrule'
+
+latex_interaction <- '\\midrule
+\\multicolumn{5}{l}{\\textbf{Leaf$\\times$\\invfour}} \\\\ \\midrule'
+
+latex_footer <- '\\bottomrule
+\\end{tabular}
+\\end{table}'
+
+latex_table <- paste(
+  latex_header,
+  paste(down_rows, collapse = "\n"),
+  latex_middle,
+  paste(up_rows, collapse = "\n"),
+  latex_interaction,
+  paste(int_rows, collapse = "\n"),
+  latex_footer,
+  sep = "\n"
+)
+
+writeLines(latex_table, file.path(paths$tables, "gene_effects.tex"))
+cat("LaTeX table saved: tables/gene_effects.tex\n")
+```
+
 # Summary
 
 This analysis identified differentially expressed genes across four main effects:

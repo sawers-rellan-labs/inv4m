@@ -1631,40 +1631,45 @@ Each point represents a NIL, \invfour plants are tagged by the highland allele o
 
 
 \begin{table}[!ht]
-\caption{\textbf{Effect of \invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|log_2 FC| > 1.5$). Bottom row shows the only significant Leaf$\times$\invfour interaction.}
+\caption{\textbf{Effect of \invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|\log_2 \text{FC}| > 1.5$). Bottom rows show significant Leaf$\times$\invfour interactions.}
 \label{tab:gene_effects}
-\begin{tabular}{@{}lrrl@{}}
+\centering
+\small
+\begin{tabular}{@{}llrrl@{}}
 \toprule
-\textbf{Locus} & \textbf{$-\log_{10}$(\textit{FDR})} & \textbf{$\log_2$FC} & \textbf{Name} \\ \midrule
-\multicolumn{4}{l}{\textbf{\invfour: Downregulated}} \\ \midrule
-jmj2      & 21.9 & $-3.49$ & JUMONJI-transcription factor 2              \\
-jmj4      & 19.7 & $-2.84$ & JUMONJI-transcription factor 4              \\
-metrs1    & 17.5 & $-2.86$ & Methionyl-tRNA synthetase                   \\
-uba2      & 17.5 & $-1.98$ & SUMO-activating enzyme subunit              \\
-ccta      & 15.8 & $-1.69$ & CCT-alpha                                   \\
-arf1      & 15.8 & $-2.78$ & ADP-ribosylation factor                     \\
-hsp70-17  & 14.2 & $-6.48$ & Heat shock 70 kDa protein 17                \\
-Zm00001eb190240  & 14.2 & $-9.16$ &                                             \\
-ropgef14  & 13.6 & $-2.98$ & Rop guanine nucleotide exchange factor 14   \\
-trxl2     & 13.2 & $-6.10$ & Thioredoxin-like 3-1, chloroplastic         \\
-ank       & 13.0 & $-1.83$ & Ankyrin repeat-containing protein           \\ \midrule
-\multicolumn{4}{l}{\textbf{\invfour: Upregulated}} \\ \midrule
-sec6      & 16.5 & $+2.87$  & Exocyst complex component Sec6             \\
-zfrvt     & 15.6 & $+1.97$  &                                            \\
-pig3      & 15.0 & $+1.97$  & Quinone oxidoreductase PIG3                \\
-etfa      & 14.0 & $+4.46$  & Electron transfer flavoprotein alpha       \\
-gbp1      & 13.7 & $+8.96$  & GTP-binding protein-related                \\
-Zm00001eb195370  & 13.6 & $+1.63$  &                                            \\
-kan1      & 13.6 & $+1.68$  & KANADI1                                    \\
-aldh2     & 13.6 & $+2.70$  & aldehyde dehydrogenase2                    \\
-jmj21     & 13.5 & $+2.28$  & JUMONJI-transcription factor 21            \\
-Zm00001eb189580  & 13.2 & $+7.38$  &                                            \\
-mybsant   & 12.4 & $+6.96$  &                                            \\
-engd2     & 12.3 & $+6.14$  &                                            \\
-gpm458    & 11.2 & $+10.47$ & Oil body-associated protein like            \\
-ychf      & 9.7  & $+4.19$  &                                            \\ \midrule
-\multicolumn{4}{l}{\textbf{Leaf$\times$\invfour}} \\ \midrule
-sec6      & 3.1  & $-0.55$  & Exocyst complex component Sec6             \\ \bottomrule
+\textbf{Gene ID} & \textbf{Locus} & \textbf{$-\log_{10}$(\textit{FDR})} & \textbf{$\log_2$FC} & \textbf{Description} \\ \midrule
+\multicolumn{5}{l}{\textbf{\invfour: Downregulated}} \\ \midrule
+Zm00001eb191790 & \textit{jmj2} & 21.9 & $-3.49$ & JUMONJI-transcription factor 2 \\
+Zm00001eb191820 & \textit{jmj4} & 19.7 & $-2.84$ & JUMONJI-transcription factor 4 \\
+Zm00001eb189910 & \textit{metrs1} & 17.5 & $-2.86$ & Methionyl-tRNA synthetase \\
+Zm00001eb192850 &  & 17.5 & $-1.98$ & SUMO-activating enzyme subunit uba-2 ... \\
+Zm00001eb192630 &  & 15.8 & $-1.69$ & CCT-alpha \\
+Zm00001eb188070 & \textit{arf1} & 15.8 & $-2.78$ & ADP-ribosylation factor \\
+Zm00001eb188750 & \textit{hsp70-17} & 14.2 & $-6.48$ & Heat shock 70 kDa protein 17 \\
+Zm00001eb190240 &  & 14.2 & $-9.16$ &  \\
+Zm00001eb188240 & \textit{ropgef14} & 13.6 & $-2.98$ & Rop guanine nucleotide exchange facto... \\
+Zm00001eb193260 & \textit{trxl2} & 13.2 & $-6.10$ & Thioredoxin-like 3-1, chloroplastic \\
+Zm00001eb190350 &  & 13.0 & $-1.83$ & Ankyrin repeat-containing protein \\
+\midrule
+\multicolumn{5}{l}{\textbf{\invfour: Upregulated}} \\ \midrule
+Zm00001eb264460 & \textit{ychf} & 16.9 & $+6.50$ &  \\
+Zm00001eb194380 & \textit{sec6} & 16.5 & $+2.87$ & Exocyst complex component Sec6 \\
+Zm00001eb190670 & \textit{zfrvt} & 15.6 & $+1.97$ &  \\
+Zm00001eb191990 & \textit{pig3} & 15.0 & $+1.97$ & Quinone oxidoreductase PIG3 \\
+Zm00001eb241410 & \textit{etfa} & 14.0 & $+4.46$ & Electron transfer flavoprotein subuni... \\
+Zm00001eb213070 & \textit{gbp1} & 13.7 & $+8.96$ & GTP-binding protein-related \\
+Zm00001eb195370 &  & 13.6 & $+1.63$ &  \\
+Zm00001eb041890 & \textit{kan1} & 13.6 & $+1.68$ & KANADI1 \\
+Zm00001eb189920 & \textit{aldh2} & 13.6 & $+2.70$ & aldehyde dehydrogenase2 \\
+Zm00001eb190750 & \textit{jmj21} & 13.5 & $+2.28$ & JUMONJI-transcription factor 21 \\
+Zm00001eb189580 &  & 13.2 & $+7.38$ &  \\
+Zm00001eb182850 & \textit{mybsant} & 12.4 & $+6.96$ &  \\
+Zm00001eb112470 & \textit{engd2} & 12.3 & $+6.14$ &  \\
+Zm00001eb187280 & \textit{gpm458} & 11.2 & $+10.47$ & Oil body-associated protein like \\
+\midrule
+\multicolumn{5}{l}{\textbf{Leaf$\times$\invfour}} \\ \midrule
+Zm00001eb194380 & \textit{sec6} & 3.1 & $-0.55$ & Exocyst complex component Sec6 \\
+\bottomrule
 \end{tabular}
 \end{table}
 
