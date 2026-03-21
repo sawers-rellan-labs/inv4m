@@ -418,7 +418,15 @@ In contrast, the \invfour effect was sharply localized: a prominent peak of diff
 To quantify this localization, we classified the 465 \invfour-responsive DEGs ($\textit{FDR} < 0.05$) by their position relative to the inversion (Table~\ref{tab:DEGs_distro}).
 DEGs within the shared introgression (39 Mb spanning \invfour and flanking regions) showed 97-fold enrichment compared to the rest of the genome (Fisher's exact test, $p < 10^{-200}$).
 This enrichment was even larger among strong DEGs ($|\log_2 \text{FC}| > 1.5$): the 116 strong DEGs in the shared introgression represented a 141-fold enrichment over genomic background.
-DEG density did not differ between \invfour proper and the flanking introgressed regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment rather than concentrating at the inversion boundaries.
+DEG density did not differ between \invfour proper and the flanking introgressed regions (odds ratio = 1.02, $p = 0.95$), indicating that the transcriptional perturbation extends throughout the introgressed segment rather than concentrating at the inversion, or the flanking regions.
+
+To test whether differential expression in the introgression is explained by coding sequence divergence between the B73 and Mi21 haplotypes, we computed CDS percent identity from LAST pairwise alignments for 254 expressed genes with ortholog hits in the shared introgression.
+Genes inside the inversion had significantly higher CDS divergence than flanking genes (median 1.1\% vs 0.75\%; Wilcoxon $p$ = 0.0034; Fig.~\ref{fig::divergence} A), consistent with suppressed recombination preserving ancestral \textit{mexicana} divergence within the inversion.
+An additive linear model ($|\text{log}_2\text{FC}| \sim \text{CDS divergence} + \text{region}$) explained 10.4\% of the variance in expression change (adj.\ $R^2$ = 0.104; divergence $p$ = 2.4e-06; region $p$ = 0.0023; Fig.~\ref{fig::divergence} B).
+After accounting for divergence, genes inside the inversion showed smaller absolute expression changes than flanking genes, indicating that the inversion dampens rather than amplifies expression divergence.
+Notably, 21 genes had identical CDS between B73 and Mi21, and all were significantly differentially expressed (FDR $<$ 0.05).
+Of these, 20 of 21 were located in the flanking region, a significant overrepresentation (Fisher's exact test, $p$ = 0.00013, OR = 0.1).
+Because these genes lack coding sequence divergence, their differential expression is most parsimoniously attributed to \textit{trans}-regulatory effects originating from divergent loci elsewhere in the introgression.
 
 The peak of differential expression within \invfour proper corresponds to a cluster of \textit{JUMONJI} histone demethylases comprising \jmjii, \jmjvi, and \jmjiv (Fig~\ref{fig:transcriptome}H-I).
 The NAM v5 annotation consolidates \jmjii, \jmjvi, and \jmjix as alternative transcripts of a single locus (\textit{Zm00001eb191790}), while \jmjiv is annotated separately (\textit{Zm00001eb191820}).
@@ -874,12 +882,15 @@ However, the harvest index increased ($0.11 \pm 0.04$, $p = 0.01$, Fig~\ref{fig:
 Surprisingly, we found no evidence that the taller plants accumulated more stover dry weight at harvest, indicating that the height increase reflects internode elongation rather than additional vegetative biomass.
 In adapted temperate maize, earlier flowering and shorter stature are positively correlated, reflecting parallel selection for both traits during adaptation to short growing seasons \cite{peiffer2014, buckler2009}.
 \invfour breaks this correlation: it accelerates flowering while simultaneously increasing plant height, a combination more characteristic of highland landraces than of temperate elite germplasm \cite{eagles1994}.
+
+\subsection*{Seedling SAM elongation in the growth chamber echoes the effects of \invfour on PA2022 flowering time and plant height}
+
 Because both flowering determination and stem elongation originate at the shoot apical meristem, we asked whether the field phenotypes had an anatomical correlate at the meristem level.
 SAM measurements from two-week-old seedlings grown in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed; Fig~\ref{fig:phenotypes}C).
 In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{wu2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
 The elongated SAMs in \invfour seedlings are thus consistent with both the earlier flowering and the increased height observed in PA2022.
 
-\subsection*{Genotype-by-environment interactions reveal environment-dependent effects of \invfour}
+\subsection*{Phenotypic effects of \invfour depend on the environment}
 
 To test whether the PA2022 effects were stable across environments, we grew the same NILs in two additional location-year combinations: PA2025 and NC2025.
 Analysis across all three environments identified significant GxE interactions for all phenotypes tested (Supplementary Table~\ref{tab::gxe}).
@@ -887,7 +898,7 @@ Plant height showed the strongest interaction ($\eta^2_p = 0.29$, $p < 8.7 \time
 Unexpectedly, the flowering time effect observed in PA2022 was not reproduced as days to anthesis in PA2025, although it remained detectable in NC2025 as a delay.
 Internode measurements in NC2025 localized the height effect: the largest difference was concentrated at internode position 2, just below the tassel ($-4.1$~cm, $p < 10^{-19}$; Supplementary Fig.~\ref{fig::internode}), while total node count did not differ between genotypes, indicating that \invfour affects internode elongation at specific developmental positions rather than phytomer number.
 This pattern of effect reversal across latitudes parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020} and is consistent with the antagonistic selection discussed above.
-We note that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
+We acknlowledge that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
 
 Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
 Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
@@ -962,7 +973,7 @@ Bottom track shows genomic positions of individual cluster members.}
 
 \clearpage
 
-\subsection*{Coexpression networks as a tool to study the adaptive value of recombination-suppressed inversions}
+\subsection*{Coexpression networks as a tool to study the adaptive value of chromosomal inversions}
 
 Chromosomal inversions maintain coadapted allele complexes by suppressing recombination \cite{kirkpatrick2006b, dobzhansky1970}.
 This functional coordination among loci implies that alleles selected to work together should produce coordinated gene expression in the native genome and retain that coordination even when introgressed into a different genetic background.

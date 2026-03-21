@@ -730,51 +730,58 @@ n_inv4m <- sum(merged$location == "Inv4m")
 n_flank <- sum(merged$location == "flanking")
 ```
 
-\begin{quote}
-To test whether differential expression in the introgression is explained by
+```{r results_paragraph, echo=FALSE, results='asis'}
+results_latex <- paste0(
+'To test whether differential expression in the introgression is explained by
 coding sequence divergence between the B73 and Mi21 haplotypes, we computed
-CDS percent identity from LAST pairwise alignments for `r nrow(merged)` expressed
+CDS percent identity from LAST pairwise alignments for ', nrow(merged), ' expressed
 genes with ortholog hits in the shared introgression.
 Genes inside the inversion had significantly higher CDS divergence than flanking
-genes (median `r med_inv4m`\% vs `r med_flank`\%;
-Wilcoxon $p$ = `r wt_p`; Fig.~X A), consistent with
-suppressed recombination preserving ancestral \textit{mexicana} divergence within the
+genes (median ', med_inv4m, '\\% vs ', med_flank, '\\%;
+Wilcoxon $p$ = ', wt_p, '; Fig.~\\ref{fig::divergence} A), consistent with
+suppressed recombination preserving ancestral \\textit{mexicana} divergence within the
 inversion.
-An additive linear model ($|\text{log}_2\text{FC}| \sim \text{CDS divergence} + \text{region}$)
-explained `r add_r2_pct`\% of the variance
-in expression change (adj.\ $R^2$ = `r add_r2`;
-divergence $p$ = `r add_p_div`;
-region $p$ = `r add_p_loc`; Fig.~X B).
+An additive linear model ($|\\text{log}_2\\text{FC}| \\sim \\text{CDS divergence} + \\text{region}$)
+explained ', add_r2_pct, '\\% of the variance
+in expression change (adj.\\ $R^2$ = ', add_r2, ';
+divergence $p$ = ', add_p_div, ';
+region $p$ = ', add_p_loc, '; Fig.~\\ref{fig::divergence} B).
 After accounting for divergence, genes inside the inversion showed smaller
 absolute expression changes than flanking genes, indicating that the inversion
 dampens rather than amplifies expression divergence.
-Notably, `r n_zero` genes had identical CDS between B73 and
+Notably, ', n_zero, ' genes had identical CDS between B73 and
 Mi21, and all were significantly differentially expressed (FDR $<$ 0.05).
-Of these, `r n_zero_flank` of `r n_zero` were located in the
+Of these, ', n_zero_flank, ' of ', n_zero, ' were located in the
 flanking region, a significant overrepresentation
-(Fisher's exact test, $p$ = `r ft_p`,
-OR = `r ft_or`).
+(Fisher\'s exact test, $p$ = ', ft_p, ',
+OR = ', ft_or, ').
 Because these genes lack coding sequence divergence, their differential expression
-is most parsimoniously attributed to \textit{trans}-regulatory effects originating from
-divergent loci elsewhere in the introgression.
-\end{quote}
+is most parsimoniously attributed to \\textit{trans}-regulatory effects originating from
+divergent loci elsewhere in the introgression.')
 
-\begin{quote}
-\textbf{Figure X.} CDS sequence divergence and expression change in the \textit{Inv4m}
+caption_latex <- paste0(
+'\\textbf{Figure X.} CDS sequence divergence and expression change in the \\invfour
 introgression.
-\textbf{(A)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes
-inside the inversion (\textit{Inv4m}, $n$ = `r n_inv4m`) and in
-the flanking introgression (flanking, $n$ = `r n_flank`).
+\\textbf{(A)} Distribution of CDS divergence (100 $-$ \\% identity) for expressed genes
+inside the inversion (\\invfour, $n$ = ', n_inv4m, ') and in
+the flanking introgression (flanking, $n$ = ', n_flank, ').
 Points show individual genes (beeswarm); boxes show median and interquartile range.
 $y$-axis is log$_{10}$-scaled.
-Wilcoxon rank-sum $p$ = `r wt_p`.
-\textbf{(B)} Absolute log$_2$ fold change vs CDS divergence.
+Wilcoxon rank-sum $p$ = ', wt_p, '.
+\\textbf{(B)} Absolute log$_2$ fold change vs CDS divergence.
 Parallel lines show the additive ANCOVA model (shared slope for divergence effect,
 vertical offset for region effect).
-Region $p$ = `r add_p_loc`;
-divergence $p$ = `r add_p_div`;
-adj.\ $R^2$ = `r add_r2`.
-\end{quote}
+Region $p$ = ', add_p_loc, ';
+divergence $p$ = ', add_p_div, ';
+adj.\\ $R^2$ = ', add_r2, '.')
+
+cat("\n\n````\nRESULTS PARAGRAPH\n\n")
+cat(results_latex)
+cat("\n````\n\n")
+cat("````\nFIGURE CAPTION\n\n")
+cat(caption_latex)
+cat("\n````\n\n")
+```
 
 # Session info
 
