@@ -900,20 +900,19 @@ Internode measurements in NC2025 localized the height effect: the largest differ
 This pattern of effect reversal across latitudes parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020} and is consistent with the antagonistic selection discussed above.
 We acknlowledge that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
 
-\subsection*{Transcriptomic effects of \invfour are localized to the introgressed haplotype}
+\subsection*{Transcriptomic effects of \invfour are concentrated to the Mi21 introgression}
 
-In the Crow et al.\ \cite{crow2020} growth chamber dataset, no MDS axis was diagnostic for \invfour genotype (S3 Fig in \cite{crow2020}).
-In our field experiment, the third MDS dimension classified genotypes with $r = 0.92$ (Fig~\ref{fig:transcriptome}B), identifying a transcriptomic axis that separates \invfour from control samples against the larger effects of phosphorus treatment and leaf developmental stage (dimensions 1--2; \cite{rodriguez2026phosphorus}).
-The 465 DEGs associated with this genotype axis concentrated within the 39 Mb shared introgression on chromosome 4, with 97-fold enrichment relative to the rest of the genome (Table~\ref{tab:DEGs_distro}).
-In contrast, DEGs associated with leaf developmental stage distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D versus E).
-
-This localized pattern is not a trivial expectation.
-Chromosomal inversions can disrupt gene expression through position effects at breakpoints, where juxtaposition of euchromatic genes with heterochromatic sequences leads to stochastic silencing \cite{elgin2013}.
-However, DEG density did not differ between \invfour proper and the flanking introgressed regions (OR $= 1.02$, $p = 0.95$; Table~\ref{tab:DEGs_distro}), indicating that the transcriptional perturbation tracks the introgression boundaries rather than the inversion breakpoints.
+As established in our companion study \cite{rodriguez2026phosphorus}, the first two dimensions of the gene expression MDS space reflected tissue differences (leaf stage, phosphorus treatment) among samples in our field experiment.
+In contrast, the third MDS dimension was diagnostic for
+\invfour vs CTRL genotype ($r = 0.92$;
+Fig.~\ref{fig:transcriptome}B).
+Although \cite{crow2020} identified cis effects of \invfour introgression shared between Mi21 and PT, a diagnostic gene expression MDS axis for the \invfour karyotype was not reported.
+The 465 \invfour DEGs  concentrated within the 39 Mb shared introgression on chromosome 4, with 97-fold enrichment relative to the rest of the genome (Table~\ref{tab:DEGs_distro}).
+In contrast, leaf developmental stage DEGs distributed homogeneously throughout the genome.
+However, DEG density did not differ between \invfour proper and the flanking introgressed regions (OR $= 1.02$, $p = 0.95$; Table~\ref{tab:DEGs_distro}), 
 This pattern is consistent with expression differences driven by sequence divergence between the highland and B73 haplotypes rather than by the structural rearrangement itself.
-Said et al.\ \cite{said2018} reached the same conclusion experimentally in \textit{Drosophila}: synthetic inversions engineered on controlled genetic backgrounds produced no differential expression, while natural inversions with accumulated linked variation produced widespread DE.
-In \textit{Arabidopsis}, CRISPR-induced inversions that relocated heterochromatic sequences into euchromatin produced no detectable changes in epigenetic marks or gene expression at the rearranged segments \cite{khosravi2025}.
-In \textit{Mimulus}, expression divergence within a locally adaptive inversion accumulated gradually through linked mutations rather than breakpoint effects \cite{kollar2025}.
+Experimental evidence across taxa supports this interpretation: synthetic inversions engineered on  controlled genetic backgrounds in \textit{Drosophila} produced no differential expression, while natural inversions with accumulated linked variation produced widespread DE \cite{said2018}.
+Similarly CRISPR-induced inversions in \textit{Arabidopsis} similarly left epigenetic marks and gene expression unchanged \cite{khosravi2025}.
 
 Because the DEG signal tracks the introgression rather than the inversion, we cannot attribute specific expression changes to \invfour as opposed to the broader introgressed haplotype from the differential expression analysis alone.
 Introgressed segments are expected to produce local DE proportional to sequence divergence from the recurrent parent, as demonstrated empirically in \textit{Solanum} introgression lines \cite{guerrero2016}.
@@ -922,16 +921,15 @@ After accounting for divergence, Inv4m genes showed smaller absolute expression 
 Twenty-one genes had identical CDS and were all DE; 20 of 21 were flanking (Fisher p = 0.00013), consistent with trans-regulatory effects from divergent loci elsewhere in the introgression.
 We address this confounding in subsequent sections through trans-coexpression network analysis, which identifies genes within the introgression whose expression changes propagate to targets elsewhere in the genome.
 
-Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
-Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
+Our results overlap with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines in a previous generation of the Mi21 and PT NIls.
+They reported 27 unique candidate genes within the \invfour haplotype, each classified as either consistently differentially expressed, correlated in trans, or encoding a transcription factor.
+After mapping v4 to v5 gene identifiers, 20 of these were also DEGs in our field study (FDR $< 0.05$).
+Of the 20 shared DEGs, 13 were downregulated and 7 upregulated.
 The shared genes span several functional categories.
-
-In cell growth and proliferation, \textit{sec6} ($+2.87$), classified as ``Consistent DE'' by Crow et al., and \textit{pcna2} ($+2.99$), which they identified as ``Correlated Trans,'' were both upregulated.
+In cell proliferation, \textit{pcna2} ($+2.99$, correlated in trans), and in growth, \textit{sec6} ($+2.87$, consistently differentially expressed), were both upregulated.
 Additional shared DEGs include the transcription factors \textit{gata4} ($-1.02$) and \textit{ereb14} ($-0.46$), the signaling kinases \textit{vps15} ($-0.60$) and a PBL19-like receptor ($-1.39$), and the nitrite reductase \textit{nii2} ($-2.06$).
-Of the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped within the \invfour interval.
-Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
-Our field study, using a plant blocking model to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and extends this shared candidate set by providing a mechanistic explanation: the JMJ signal reflects copy number variation between highland and lowland genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression in field conditions (Fig~\ref{fig:jmj_cluster}A).
-Both studies converge on the finding that gene expression changes are not confined to breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects rather than simple position effects \citep{kollar2025}.
+Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a separate JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
+
 
 \subsection*{JMJ copy number variation and environment-dependent regulatory suppression}
 
@@ -954,12 +952,12 @@ Crow et al.\ \cite{crow2020} identified the same JMJ demethylases among their mo
 Our microsynteny analysis provides this structural explanation and, together with the environment-dependent suppression and independent GWAS support, positions the JMJ cluster as a candidate for the environment-dependent flowering and growth phenotypes we observed.
 
 
-\subsection*{Coexpression networks connect JMJ to growth-related genes}
+\subsection*{Perturbation of coexpression networks connect \invfour to growth-related genes}
 
 The JMJ dosage reduction described above raised the question of whether it is associated with broader transcriptional reorganization.
 WGCNA analysis of the PA2022 leaf transcriptome identified 13 modules, of which 12 showed significant connectivity loss in \invfour relative to CTRL (one-sample $t$-test, $\textit{FDR} < 0.05$; Table~\ref{tab::preservation}).
-JMJ genes functioned as network hubs in CTRL ($k_{Within} = 3.17$ to $3.33$) but became peripheral in \invfour ($k_{Within} = 0.59$ to $0.61$; Fig~\ref{fig:wgcna}C), consistent with the dosage reduction disrupting their coexpression relationships.
-The pink module, enriched for ribosome biogenesis and growth regulation (Table~\ref{tab::pink_module}), showed the most significant connectivity reduction (mean $\Delta k_{Within} = -1.36$, $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation ($Z_{summary} = 5.8$).
+JMJ genes functioned more as network hubs in CTRL ($k_{Within} = 3.17$ to $3.33$) but became peripheral in \invfour ($k_{Within} = 0.59$ to $0.61$; Fig~\ref{fig:wgcna}C), consistent with the dosage reduction disrupting their coexpression relationships.
+The pink module, where jmj2 belongs, is enriched for ribosome biogenesis and growth regulation (Table~\ref{tab::pink_module}), and showed the most significant connectivity reduction (mean $\Delta k_{Within} = -1.36$, $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation ($Z_{summary} = 5.8$).
 The trans coexpression network independently linked JMJ genes to cell proliferation factors including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A), with edges assigned only when JMJ was the strongest correlated regulator within the 15 Mb inversion (see Methods).
 
 Two additional modules contained growth-related genes with independent GWAS support for plant height.
@@ -968,7 +966,7 @@ The purple module (LFP $= 0.74$, $n = 22$) contained \textit{exo}/\textit{phi1} 
 In Arabidopsis, EXORDIUM mediates brassinosteroid-responsive cell expansion in leaves \cite{farrar2003, collgarcia2004, schroeder2009}.
 Two LRR receptor-like kinase paralogs, \textit{imk3} ($\log_2 \text{FC} = +6.71$) and \textit{imk3b} ($\log_2 \text{FC} = -4.68$), were reciprocally regulated by the introgression and share a direct negative coexpression edge in the unsigned network ($r = -0.82$), confirming that this reciprocal pattern is a coherent signal rather than an artifact of signed module assignment.
 
-These network observations are consistent with a model in which reduced JMJ dosage alters H3K4 methylation patterns, disrupting coexpression of growth-related genes and contributing to the meristem and whole-plant phenotypes we observed.
+These network observations are consistent with a hypothetical model in which reduced JMJ dosage alters H3K4 methylation patterns, disrupting coexpression of growth-related genes and contributing to the meristem and whole-plant phenotypes we observed.
 However, several steps in this chain remain untested: we have not measured H3K4 methylation directly, the coexpression edges represent filtered correlations from a single field environment rather than demonstrated regulatory relationships, and the 24 Mb of flanking introgression means we cannot exclude that JMJ connectivity loss and growth gene misexpression are parallel consequences of the introgression rather than causally linked.
 Whether JMJ drives the network disruption or both reflect independent effects of the same structural variant will require ChIP-seq for H3K4me3 and fine-mapping to separate inversion effects from flanking linkage drag.
 
