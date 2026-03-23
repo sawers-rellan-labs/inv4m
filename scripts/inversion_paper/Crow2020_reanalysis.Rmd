@@ -1136,6 +1136,126 @@ This analysis identified differentially expressed genes across three main effect
 Donor batch effect was controlled as a fixed effect in the model. Expression data 
 was normalized using TMM and transformed with voom for variance stabilization.
 
+# Concordance with Crow et al. 2020 Table S2
+
+Cross-reference the 29 genes from Crow et al. Table S2 (three categories:
+Consistent DE, Correlated Trans, TF) against our field DEGs. Requires
+v4-to-v5 gene ID mapping since Crow used B73 v4 annotations.
+
+```{r crow_concordance_setup}
+# v4 to v5 gene ID mapping
+v4_v5 <- read.table(
+  here("data", "B73v4_to_B73v5.tsv"),
+  header = FALSE, sep = "\t",
+  col.names = c("v4", "v5_all")
+) %>%
+  mutate(v5 = sapply(strsplit(v5_all, ","), `[`, 1))
+
+# Our field DEG results
+field_effects <- read.csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv")
+)
+
+# Pannzer functional annotations
+pannzer <- read.table(
+  here("data", "PANNZER_DESC.tab"),
+  quote = "", header = TRUE, sep = "\t"
+) %>%
+  group_by(gene_model) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
+  select(gene_model, desc)
+
+# Locus labels
+labels <- read.csv(here("data", "locus_labels_master.csv")) %>%
+  select(gene, locus_label)
+
+# Crow Table S2
+crow_s2 <- read.table(
+  here("scripts", "00_agent_work", "Crow2020_table_S2.tsv"),
+  header = TRUE, sep = "\t", fill = TRUE
+) %>%
+  left_join(v4_v5, by = c(Gene = "v4"))
+
+cat("Crow Table S2:", nrow(crow_s2), "rows,",
+    length(unique(crow_s2$Gene)), "unique v4 IDs\n")
+cat("Mapped to v5:", sum(!is.na(crow_s2$v5)), "\n")
+cat("No v5 mapping:", sum(is.na(crow_s2$v5)), "\n")
+```
+
+## Overall concordance
+
+```{r crow_overall}
+inv4m_eff <- field_effects %>%
+  filter(predictor == "Inv4m") %>%
+  select(gene, locus_label, logFC, adj.P.Val, is_DEG, is_hiconf_DEG,
+         in_Inv4m, in_cis, in_flank, in_trans)
+
+# Build full table: Crow genes with our effects
+full <- crow_s2 %>%
+  left_join(inv4m_eff, by = c(v5 = "gene")) %>%
+  left_join(pannzer, by = c(v5 = "gene_model")) %>%
+  mutate(conserved = !is.na(is_DEG) & is_DEG == TRUE)
+
+# Deduplicate by v5 (some genes appear in multiple Crow categories)
+dedup <- full %>%
+  filter(!is.na(v5)) %>%
+  distinct(v5, .keep_all = TRUE)
+
+cat("Unique v5 genes:", nrow(dedup), "\n")
+cat("DEGs in our study:", sum(dedup$conserved), "of", nrow(dedup), "\n")
+cat("NOT DEGs:", sum(!dedup$conserved), "\n")
+```
+
+## Concordance by Crow category
+
+```{r crow_by_category}
+conserved <- full %>% filter(conserved)
+
+for (cat_name in c("Consistent DE", "Correlated Trans", "TF")) {
+  cat_rows <- full %>% filter(List == cat_name)
+  cat_conserved <- cat_rows %>% filter(conserved)
+
+  cat("\n===", cat_name, "===\n")
+  cat("Total:", nrow(cat_rows), " | Conserved:", nrow(cat_conserved),
+      " | Not conserved:", nrow(cat_rows) - nrow(cat_conserved), "\n")
+
+  if (nrow(cat_conserved) > 0) {
+    cat_conserved %>%
+      mutate(direction = ifelse(logFC > 0, "UP", "DOWN")) %>%
+      select(locus_label, v5, direction, logFC, adj.P.Val, desc) %>%
+      arrange(logFC) %>%
+      as.data.frame() %>%
+      print()
+  }
+}
+```
+
+## Direction summary
+
+```{r crow_direction}
+cat("Upregulated (logFC > 0):", sum(conserved$logFC > 0), "\n")
+cat("Downregulated (logFC < 0):", sum(conserved$logFC < 0), "\n")
+cat("Inside Inv4m:", sum(conserved$in_Inv4m, na.rm = TRUE), "\n")
+cat("In shared introgression:", sum(conserved$in_cis, na.rm = TRUE), "\n")
+cat("In trans:", sum(conserved$in_trans, na.rm = TRUE), "\n")
+```
+
+## Genes NOT conserved
+
+```{r crow_not_conserved}
+not_conserved <- full %>%
+  filter(!is.na(v5)) %>%
+  filter(!conserved)
+
+cat("Not conserved genes with effect sizes in our data:\n")
+not_conserved %>%
+  select(List, v5, locus_label, logFC, adj.P.Val, Description) %>%
+  arrange(adj.P.Val) %>%
+  as.data.frame() %>%
+  print()
+```
+
 # Session Information
 ```{r session_info}
 sessionInfo()
