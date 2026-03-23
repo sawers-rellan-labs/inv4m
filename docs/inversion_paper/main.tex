@@ -79,13 +79,13 @@
 \begin{abstract}
 Chromosomal inversions can facilitate local adaptation by maintaining coadapted allele complexes as a single inherited unit, but the specific traits and genes they affect are rarely known.
 \invfour is a 15 Mb inversion from the highland teosinte  \textit{Zea mays} ssp. \mex, that is nearly fixed above 2500 m in Mexican traditional varieties but absent in temperate maize. 
-Association studies have linked \invfour to variation in flowering time and yield, and growth chamber assays showed broad \invfour transcriptomic effects enriched in genes for photosynthesis and lipid synthesis with some interaction with cold response.
+Association studies have linked \invfour to variation in flowering time and yield, and growth chamber assays showed broad \invfour transcriptomic effects enriched in genes for photosynthesis and lipid synthesis in response low temperature stress.
 However, a manipulative field experiment testing the effect of \invfour introgression on gene expression and reproductive traits has been lacking.
-Here we introgressed \invfour into the B73 background through eight generations of backcrossing and characterized the effects of the introgression on phenotype, transcriptome, and gene coexpression networks.
-By aligning an \invfour introgression line genome to three \textit{Zea} references we delimited \invfour, and found that the inversion breakpoints map to chromosomal knob repeat arrays.
-In a Pennsylvania field trial, the \invfour introgression accelerated flowering by 1.3 days and increased plant height by 6.5 cm; however, genotype-by-environment interactions across three environments reversed the height effect in North Carolina, consistent with environment-dependent contributions.
+Here we generated Near Isogenic Lines by introgressing an allele of \invfour from the highland Michoacan 21 (Mi21) traditional variety into the B73 background through eight generations of backcrossing and characterized the effects of \invfour on fitness, transcriptome, and gene co-expression networks in field experiments across several environments.
+We assembled the genome of \invfour -Mi21 NIL and by aligning to three \textit{Zea} references we delimited \invfour, and found that the inversion breakpoints map to chromosomal knob repeat arrays.
+Field experiments showed that in a northern, Pennsylvania field trial, the \invfour introgression accelerated flowering by 1.3 days and increased plant height by 6.5 cm; however, genotype-by-environment interactions across environments reversed the height effect in a southern North Carolina, consistent with environment-dependent contributions.
 In a growth chamber assay shoot apical meristems (SAMs) were 9\% longer in \invfour seedlings supporting a role of \invfour in a developental phenotype marking early flowering.
-We identified 465 differentially expressed genes (DEG) by RNA-seq, with the strongest signal from a JUMONJI histone demethylase cluster that shows a lineage-specific tandem expansion in B73 (five paralogs) relative to highland genomes (single ortholog).
+We identified 465 differentially expressed genes (DEG) by RNA-seq, with the strongest signal from a JUMONJI histone demethylase cluster that shows a lineage-specific tandem expansion in B73 (five paralogs) relative to highland genomes that only carry one copy.
 We found that field expression of the cluster fell significantly below copy number expectation in \invfour, indicating additional regulatory suppression.
 Weighted gene coexpression network analysis shows that the introgression disrupts 12 of 13 DEG coexpression modules, with JMJ genes losing hub connectivity.
 A trans coexpression network links JMJ genes to cell proliferation genes including \textit{pcna2} and \textit{sec6}, suggesting a working hypothesis in which chromatin modification changes propagate to growth-related gene networks.
@@ -254,6 +254,7 @@ Significance: $^{*}p < 0.05$, $^{****}p < 0.0001$ ( FDR-adjusted).}
 
 
 
+
 \subsection{The \invfour introgression modulates flowering time and plant height depending on the environment}
 
 At the Pennsylvania 2022 site (PA2022), our spatially-corrected phenotype analysis showed that plants carrying the highland inversion allele flowered $1.30 \pm 0.27$ days earlier to anthesis ($p = 7.9 \times 10^{-6}$) and $1.05 \pm 0.22$ days earlier to silking ($p = 1.4 \times 10^{-5}$) compared to control lines.
@@ -278,7 +279,7 @@ Internode profiles showed that the largest \invfour effects were concentrated at
 Above-ground node count did not differ between genotypes (CTRL: $13.9 \pm 0.8$; \invfour: $13.9 \pm 0.9$; $p = 0.73$), indicating that \invfour effects on plant height are mediated by differential internode elongation at specific developmental positions rather than increased phytomer number.
 Notably, the direction of internode effects in North Carolina (shortening at positions 2 to 5) is consistent with the overall height reversal observed in the GxE analysis, confirming that the same architectural mechanism operates in both directions depending on the environment.
 
-\subsection{Inv4m seedlings have elongated shoot apical meristems in the growth chamber}
+\subsection{Inv4m seedlings have elongated shoot apical meristems}
 
 To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
 Given prior evidence that \invfour promotes early flowering, which is associated with larger, elongated SAMs \citep{danilevskaya2008, wu2008, leiboff2015, thompson2015}, we applied one-tailed $t$-tests (H$_0$: $\mu_{\text{Inv4m}} \leq \mu_{\text{CTRL}}$) looking for the dimentional increase.
@@ -781,6 +782,7 @@ Notable enrichments include negative regulation of gene expression (epigenetic) 
 \label{fig::transnetwork}
 \end{figure*}
 
+
 \subsection{Trans-regulatory network analysis detects potential \invfour epigenetic regulators belonging to a growth related module }
 
 To investigate the potential trans-regulatory effects of the \invfour chromosomal inversion, we constructed a coexpression network linking DEGs within the introgressed region (regulators) to differentially expressed genes located elsewhere in the genome (trans targets).
@@ -791,7 +793,7 @@ Of the 103 regulator genes within or flanking the introgression, 33 were located
 These regulators showed coexpression relationships with 32 trans target genes distributed across all ten maize chromosomes.
 We classified 16 edges (2.9\%) as ``Reference'' because they appear in the MaizeNetome database, and the remaining 536 edges (97.1\%) as ``Dataset-specific.''
 The low overlap likely reflects differences in tissue representation and developmental context: MaizeNetome aggregates expression from 7,603 RNA-seq samples spanning diverse tissues and genotypes \cite{feng2023}, whereas our network captures coexpression relationships specific to field-grown V10-V12 leaves.
-The dataset-specific edges are statistically well-supported in our experiment (FDR-corrected Pearson correlation $p < 0.05$) and their absence from MaizeNetome indicates condition-specificity rather than lack of biological support.
+The dataset-specific edges are statistically well-supported in our experiment (Pearson correlation $FDR < 0.05$) and their absence from MaizeNetome indicates condition-specificity rather than lack of biological support.
 
 The Reference network included known regulatory relationships involving \textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC = +2.99$), a DNA replication factor, and \textit{outer cell layer2} (\textit{ocl2}, \textit{Zm00001eb428740}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor involved in epidermal cell differentiation.
 Notably, the Reference network also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets, supporting a conserved regulatory role for this histone demethylase.
@@ -803,7 +805,6 @@ This connection suggests that the JMJ cluster may influence cell division throug
 Gene Ontology enrichment analysis of genes within \invfour proper (Fig~\ref{fig::transnetwork}B) found significant over-representation of negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.2 \times 10^{-4}$, fold enrichment = 90.4) and positive regulation of growth (GO:0045927; $p = 1.3 \times 10^{-3}$, fold enrichment = 37.7).
 Both terms were driven by the \jmjii/\jmjiv cluster, which encodes JmjC domain-containing histone demethylases.
 The enrichment of growth regulation terms among \invfour-downregulated genes is consistent with the altered SAM geometry observed in \invfour plants, suggesting that perturbation of epigenetic regulators may underlie the developmental phenotypes.
-
 
 \subsection{JMJ cluster expression differences reflect copy number variation, with additional regulatory effects evident in field conditions}
 
