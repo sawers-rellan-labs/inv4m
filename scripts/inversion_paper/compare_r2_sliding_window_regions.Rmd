@@ -1,0 +1,586 @@
+---
+title: "Regional correlation structure and expression magnitude along the Inv4m introgression"
+author: "FV Rodriguez"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, warning = FALSE, message = FALSE,
+  fig.width = 7, fig.height = 4
+)
+```
+
+# Overview
+
+This notebook examines how expression correlation and fold change magnitude
+vary along the Inv4m introgression on chromosome 4. Three questions:
+
+1. **Inter-regional correlation:** Do DEGs inside Inv4m correlate more or less
+   strongly with DEGs outside the introgression than flanking DEGs do?
+2. **Intra-regional correlation:** How tightly are DEGs co-regulated within
+   each region (inv4m, flanking, outside)?
+3. **Sliding window patterns:** How do correlation with outside DEGs and
+   fold change magnitude vary along the physical map?
+
+# Setup
+
+```{r libraries}
+library(here)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(tidyr)
+
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+```{r load-data}
+effects_df <- read.csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv")
+) %>%
+  filter(predictor == "Inv4m")
+
+nrow(effects_df)
+
+effects_df$P <- effects_df$P.Value
+effects_df$neglogP <- -log10(effects_df$P)
+
+xp <- readRDS(file.path(paths$intermediate, "normalized_expression_logCPM_leaf_trt.rds"))
+```
+
+```{r define-regions}
+# Remap column names to match the original analysis
+# DE script uses: in_Inv4m, in_cis (shared introgression), in_flank, in_trans
+# Add convenience columns
+effects_df <- effects_df %>%
+  mutate(
+    in_inv4m = in_Inv4m,
+    in_flanking = in_flank,
+    in_shared = in_cis,
+    region = case_when(
+      in_Inv4m ~ "inv4m",
+      in_flank ~ "flanking",
+      TRUE ~ "outside"
+    ),
+    is_significant = adj.P.Val < 0.05
+  )
+
+bonferroni_threshold <- 0.05 / nrow(effects_df)
+```
+
+# DEG lists by region
+
+Identify Bonferroni-significant DEGs in each region, removing duplicated gene
+names (e.g., JMJ paralogs mapped to the same locus label).
+
+```{r deg-lists}
+inv4_inv4 <- effects_df$gene[effects_df$P < bonferroni_threshold & effects_df$in_inv4m] %>%
+  sort() %>% unique()
+
+inv4_flanking <- effects_df$gene[effects_df$P < bonferroni_threshold & effects_df$in_flanking] %>%
+  sort() %>% unique()
+
+inv4_outside <- effects_df$gene[effects_df$P < bonferroni_threshold & !effects_df$in_shared] %>%
+  sort() %>% unique()
+
+inv4_introgression <- effects_df$gene[effects_df$P < bonferroni_threshold & effects_df$in_shared] %>%
+  sort() %>% unique()
+
+cat("DEGs by region (Bonferroni):\n")
+cat("  Inv4m:", length(inv4_inv4), "\n")
+cat("  Flanking:", length(inv4_flanking), "\n")
+cat("  Outside:", length(inv4_outside), "\n")
+cat("  Total introgression:", length(inv4_introgression), "\n")
+```
+
+# Inter-regional correlations (DEGs vs outside DEGs)
+
+Compute pairwise expression correlations between outside DEGs and DEGs
+inside Inv4m or in the flanking region. This tests whether genes in one
+region of the introgression are more tightly co-regulated with the rest
+of the genome than genes in the other region.
+
+```{r inter-regional-correlations}
+out_inv4m <- cor(t(xp[inv4_outside, ]), t(xp[inv4_inv4, ]))
+out_flanking <- cor(t(xp[inv4_outside, ]), t(xp[inv4_flanking, ]))
+out_introgression <- cor(t(xp[inv4_outside, ]), t(xp[inv4_introgression, ]))
+
+cat("Correlation matrix dimensions:\n")
+cat("  Outside x Inv4m:", paste(dim(out_inv4m), collapse = " x "), "\n")
+cat("  Outside x Flanking:", paste(dim(out_flanking), collapse = " x "), "\n")
+cat("  Outside x Introgression:", paste(dim(out_introgression), collapse = " x "), "\n")
+```
+
+```{r inter-regional-boxplot, fig.width=5, fig.height=5}
+to_plot <- rbind(
+  data.frame(region = "inv4m", cor = as.numeric(out_inv4m)),
+  data.frame(region = "flanking", cor = as.numeric(out_flanking))
+)
+to_plot$R2 <- to_plot$cor^2
+
+to_plot %>%
+  ggplot(aes(x = region, y = R2)) +
+  geom_boxplot() +
+  ylab(expression(R^2 ~ "(squared correlation with outside DEGs)")) +
+  ggpubr::theme_classic2(base_size = 16)
+```
+
+```{r inter-regional-tests}
+cat("=== R2 ~ region (all correlations) ===\n")
+lm(R2 ~ region, data = to_plot) %>% summary() %>% print()
+
+cat("\n=== R2 ~ region (negative correlations only) ===\n")
+lm(R2 ~ region, data = to_plot[to_plot$cor < 0, ]) %>% summary() %>% print()
+
+cat("\n=== R2 ~ region (positive correlations only) ===\n")
+lm(R2 ~ region, data = to_plot[to_plot$cor > 0, ]) %>% summary() %>% print()
+```
+
+# Intra-regional correlations
+
+How tightly co-regulated are DEGs within each region? Compute pairwise
+correlations within inv4m, flanking, and outside DEGs separately.
+
+```{r intra-regional-correlations}
+inner_inv4m <- cor(t(xp[inv4_inv4, ]))
+inner_flanking <- cor(t(xp[inv4_flanking, ]))
+inner_outside <- cor(t(xp[inv4_outside, ]))
+
+to_plot <- rbind(
+  data.frame(
+    comparison = "inv4m\noutside",
+    cor = out_inv4m[upper.tri(out_inv4m, diag = FALSE)]
+  ),
+  data.frame(
+    comparison = "flanking\noutside",
+    cor = out_flanking[upper.tri(out_flanking, diag = FALSE)]
+  ),
+  data.frame(
+    comparison = "inv4m\ninv4m",
+    cor = inner_inv4m[upper.tri(inner_inv4m, diag = FALSE)]
+  ),
+  data.frame(
+    comparison = "flanking\nflanking",
+    cor = inner_flanking[upper.tri(inner_flanking, diag = FALSE)]
+  ),
+  data.frame(
+    comparison = "outside\noutside",
+    cor = inner_outside[upper.tri(inner_outside, diag = FALSE)]
+  )
+)
+
+to_plot$R2 <- to_plot$cor^2
+```
+
+```{r intra-regional-boxplot, fig.width=8, fig.height=5}
+to_plot %>%
+  mutate(comparison = factor(comparison)) %>%
+  mutate(comparison = forcats::fct_reorder(comparison, -R2)) %>%
+  ggplot(aes(x = comparison, y = R2)) +
+  ggtitle("Correlation between Inv4m DEGs by region") +
+  ylab(expression(R^2 ~ "(squared correlation)")) +
+  geom_boxplot() +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none")
+```
+
+```{r intra-regional-test}
+lm(R2 ~ comparison, data = to_plot) %>% summary()
+```
+
+# Sliding window: R² with outside DEGs along chromosome 4
+
+For each 25-gene window along chromosome 4, compute the mean R² between
+genes in that window and all outside DEGs. This shows how the strength
+of trans-correlation varies along the introgression.
+
+```{r sliding-window-r2}
+in_out_cor <- t(out_introgression)
+in_out_R2 <- in_out_cor^2
+
+rollme <- cbind(
+  data.frame(gene = unique(colnames(out_introgression))),
+  as.data.frame(in_out_cor)
+)
+
+get_midelement <- function(vec) vec[ceiling(length(vec) / 2)]
+
+r2 <- rollapply(
+  rollme$gene,
+  width = 25,
+  function(x) mean(as.numeric(in_out_R2[x, ])),
+  by.column = FALSE
+)
+
+mid_gene <- rollapply(
+  rollme$gene,
+  width = 25,
+  function(x) get_midelement(x),
+  by.column = FALSE
+)
+
+by_window <- data.frame(r2_win = r2, gene = mid_gene)
+```
+
+```{r define-inv4m-boundaries}
+# Derive boundaries from gene positions in the effects data
+introgression_limit <- c(
+  min(effects_df$BP[effects_df$in_shared]),
+  max(effects_df$BP[effects_df$in_shared])
+) / 1e6
+
+inversion_limit <- c(
+  min(effects_df$BP[effects_df$in_inv4m]),
+  max(effects_df$BP[effects_df$in_inv4m])
+) / 1e6
+```
+
+```{r sliding-window-r2-plot, fig.width=8, fig.height=5}
+to_plot <- effects_df %>%
+  mutate(BP = BP / 1e6) %>%
+  inner_join(by_window, by = "gene")
+
+to_plot %>%
+  ggplot(aes(x = BP, y = r2_win, col = region)) +
+  geom_vline(
+    xintercept = c(introgression_limit, inversion_limit),
+    linetype = "dashed"
+  ) +
+  ylab(expression(R^2 ~ "with outside DEGs (25-gene window mean)")) +
+  xlab("Chromosome 4 Position [Mb]") +
+  geom_point() +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "top")
+```
+
+# Sliding window: fold change along chromosome 4
+
+Separate sliding windows for upregulated and downregulated genes show how
+the magnitude and direction of the Inv4m effect vary along the physical map.
+This addresses whether expression changes are directionally biased (as in
+Guerrero et al. 2016, Solanum introgression lines) or symmetrically dampened.
+
+```{r sliding-window-fc-up}
+up_genes <- effects_df %>%
+  filter(logFC > 0, CHR == 4) %>%
+  arrange(BP) %>%
+  distinct(gene, .keep_all = TRUE)
+
+fc_up <- rollapply(up_genes$logFC, FUN = mean, width = 10)
+mid_up <- rollapply(up_genes$gene, width = 10,
+                    function(x) get_midelement(x), by.column = FALSE)
+by_window_up <- data.frame(foldchange = fc_up, gene = mid_up)
+
+to_plot_up <- effects_df %>%
+  filter(CHR == 4) %>%
+  arrange(BP) %>%
+  inner_join(by_window_up, by = "gene")
+```
+
+```{r sliding-window-fc-down}
+down_genes <- effects_df %>%
+  filter(logFC < 0, CHR == 4) %>%
+  arrange(BP) %>%
+  distinct(gene, .keep_all = TRUE)
+
+fc_down <- rollapply(down_genes$logFC, FUN = mean, width = 10)
+mid_down <- rollapply(down_genes$gene, width = 10,
+                      function(x) get_midelement(x), by.column = FALSE)
+by_window_down <- data.frame(foldchange = fc_down, gene = mid_down)
+
+to_plot_down <- effects_df %>%
+  filter(CHR == 4) %>%
+  arrange(BP) %>%
+  inner_join(by_window_down, by = "gene")
+```
+
+```{r sliding-window-fc-plot, fig.width=7, fig.height=4}
+pal <- c("purple4", "plum", "gold")
+names(pal) <- c("inv4m", "flanking", "outside")
+
+logFC_label <- expression(log[2]("Fold change"))
+
+effects_df %>%
+  filter(CHR == 4, BP > 150e6, BP < 200e6) %>%
+  ggplot(aes(x = BP / 1e6, y = logFC, col = region)) +
+  annotate("rect", xmin = 150, xmax = 200, ymin = -2, ymax = 2,
+           alpha = 0.5, fill = "grey75") +
+  geom_point() +
+  scale_color_manual(values = pal) +
+  coord_cartesian(xlim = c(150, 200)) +
+  geom_line(
+    data = to_plot_up,
+    aes(x = BP / 1e6, y = foldchange), inherit.aes = FALSE,
+    col = "darkgreen", linewidth = 1
+  ) +
+  geom_line(
+    data = to_plot_down,
+    aes(x = BP / 1e6, y = foldchange), inherit.aes = FALSE,
+    col = "darkred", linewidth = 1
+  ) +
+  ylab(logFC_label) +
+  xlab("Chromosome 4 Position [Mb]") +
+  annotate("text", x = c(151, 151), y = c(6.5, -5),
+           label = c("Upregulated", "Downregulated"),
+           color = c("darkgreen", "darkred"),
+           fontface = "bold", size = 5, hjust = 0) +
+  geom_hline(yintercept = 0) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none")
+```
+
+# Boxplots: fold change and significance by region
+
+## Setup
+
+```{r shared-setup}
+regulation_order <- c("Downregulated", "Upregulated")
+names(regulation_order) <- c("-1", "1")
+
+to_plot <- effects_df %>%
+  filter(CHR == 4) %>%
+  mutate(
+    regulation = regulation_order[as.character(sign(logFC))],
+    zone = case_when(
+      in_flanking & BP < 180e6 ~ "left",
+      in_flanking & BP > 180e6 ~ "right",
+      in_inv4m ~ "inv4m",
+      .default = "outside"
+    ),
+    region = factor(region, levels = c("inv4m", "flanking", "outside"))
+  )
+
+to_plot$zone <- factor(to_plot$zone,
+                       levels = c("left", "inv4m", "right", "outside"))
+```
+
+## Without splitting by direction
+
+All expressed genes on chromosome 4, no up/down split.
+
+### logFC by region (inv4m, flanking, outside)
+
+```{r boxplot-logfc-by-region-nosplit, fig.width=6, fig.height=5}
+wilcox_region <- to_plot %>%
+  rstatix::wilcox_test(logFC ~ region) %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance()
+
+wilcox_region
+
+# Manual bracket positions:
+# inv4m=1, flanking=2, outside=3
+# Level 1: inv4m-flanking and flanking-outside at same height
+# Level 2: inv4m-outside spanning above both
+ymax <- max(to_plot$logFC, na.rm = TRUE)
+level1 <- ymax * 1.05
+level2 <- ymax * 1.20
+
+wilcox_region$xmin <- c(1, 1, 2.1)
+wilcox_region$xmax <- c(1.9, 3, 3)
+wilcox_region$y.position <- c(level1, level2, level1)
+
+p_logfc_region <- to_plot %>%
+  ggplot(aes(x = region, y = logFC, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_region, hide.ns = FALSE) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  ggpubr::theme_classic2(base_size = 25) +
+  theme(legend.position = "none")
+
+p_logfc_region
+
+saveRDS(p_logfc_region, file.path(paths$intermediate, "panel_logfc_by_region.rds"))
+```
+
+### logFC by zone (left, inv4m, right, outside)
+
+```{r boxplot-logfc-by-zone-nosplit, fig.width=7, fig.height=5}
+wilcox_zone <- to_plot %>%
+  rstatix::wilcox_test(logFC ~ zone, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "zone", step.increase = 0.05)
+
+wilcox_zone
+
+to_plot %>%
+  ggplot(aes(x = zone, y = logFC, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_zone, hide.ns = TRUE) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none")
+```
+
+### -log10(P) by region (inv4m, flanking, outside)
+
+```{r boxplot-neglogP-by-region-nosplit, fig.width=6, fig.height=5}
+wilcox_nlp_region <- to_plot %>%
+  rstatix::wilcox_test(neglogP ~ region, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "region", step.increase = 0.03)
+
+wilcox_nlp_region
+
+to_plot %>%
+  ggplot(aes(x = region, y = neglogP, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_nlp_region, hide.ns = TRUE) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none")
+```
+
+### -log10(P) by zone (left, inv4m, right, outside)
+
+```{r boxplot-neglogP-by-zone-nosplit, fig.width=7, fig.height=5}
+wilcox_nlp_zone <- to_plot %>%
+  rstatix::wilcox_test(neglogP ~ zone, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "zone", step.increase = 0.03)
+
+wilcox_nlp_zone
+
+to_plot %>%
+  ggplot(aes(x = zone, y = neglogP, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_nlp_zone, hide.ns = TRUE) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none")
+```
+
+## Split by direction of regulation
+
+Same panels but faceted by up/down.
+
+### logFC by region
+
+```{r boxplot-logfc-by-region, fig.width=8, fig.height=5}
+wilcox_region_dir <- to_plot %>%
+  group_by(regulation) %>%
+  rstatix::wilcox_test(logFC ~ region, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "region", step.increase = 0.05)
+
+wilcox_region_dir
+
+to_plot %>%
+  ggplot(aes(x = region, y = logFC, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_region_dir, hide.ns = TRUE) +
+  facet_wrap(. ~ regulation, scales = "free_y") +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none", strip.background = element_blank())
+```
+
+### logFC by zone
+
+```{r boxplot-logfc-by-zone, fig.width=8, fig.height=5}
+wilcox_zone_dir <- to_plot %>%
+  group_by(regulation) %>%
+  rstatix::wilcox_test(logFC ~ zone, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "zone", step.increase = 0.05)
+
+wilcox_zone_dir
+
+to_plot %>%
+  ggplot(aes(x = zone, y = logFC, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_zone_dir, hide.ns = TRUE) +
+  facet_wrap(. ~ regulation, scales = "free_y") +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none", strip.background = element_blank())
+```
+
+### -log10(P) by region
+
+```{r boxplot-neglogP-by-region, fig.width=8, fig.height=5}
+wilcox_nlp_region_dir <- to_plot %>%
+  group_by(regulation) %>%
+  rstatix::wilcox_test(neglogP ~ region, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "region", step.increase = 0.03)
+
+wilcox_nlp_region_dir
+
+to_plot %>%
+  ggplot(aes(x = region, y = neglogP, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_nlp_region_dir, hide.ns = TRUE) +
+  facet_wrap(. ~ regulation) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none", strip.background = element_blank())
+```
+
+### -log10(P) by zone
+
+```{r boxplot-neglogP-by-zone, fig.width=8, fig.height=5}
+wilcox_nlp_zone_dir <- to_plot %>%
+  group_by(regulation) %>%
+  rstatix::wilcox_test(neglogP ~ zone, ref.group = "inv4m") %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_xy_position(x = "zone", step.increase = 0.03)
+
+to_plot %>%
+  ggplot(aes(x = zone, y = neglogP, color = region)) +
+  ggbeeswarm::geom_quasirandom() +
+  geom_boxplot(width = 0.25, fill = NA, color = "black", outliers = FALSE) +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  ggpubr::stat_pvalue_manual(wilcox_nlp_zone_dir, hide.ns = TRUE) +
+  facet_wrap(. ~ regulation) +
+  ggpubr::theme_classic2(base_size = 16) +
+  theme(legend.position = "none", strip.background = element_blank())
+```
+
+# Summary
+
+```{r region-counts}
+with(effects_df %>% filter(is_significant), table(region))
+```
+
+# Session info
+
+```{r session-info}
+sessionInfo()
+```

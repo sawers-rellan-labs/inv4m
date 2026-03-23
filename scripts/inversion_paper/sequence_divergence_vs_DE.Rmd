@@ -267,7 +267,7 @@ p_scatter <- ggplot(merged, aes(x = cds_divergence, y = abs_logFC,
     title = "Expression change vs sequence divergence in the Inv4m introgression"
   ) +
   guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-  theme_bw(base_size = 13) +
+  theme_bw(base_size = 25) +
   theme(
     legend.position = c(0.18, 0.98),
     legend.justification = c(0, 1),
@@ -412,7 +412,7 @@ p_ancova <- ggplot(bin_means_loc, aes(x = mean_div, y = mean_absFC,
     y = "Mean |log2 fold change|",
     title = "Binned ANCOVA: shared slope (divergence), offset = location"
   ) +
-  theme_bw(base_size = 13)
+  theme_bw(base_size = 25)
 
 print(p_ancova)
 ```
@@ -463,7 +463,7 @@ p_beeswarm <- ggplot(merged_div_plot, aes(x = location, y = div_plot, color = lo
   ) +
   scale_y_continuous(trans = "log10", expand = expansion(mult = c(0.1, 0.15))) +
   labs(x = NULL, y = "CDS divergence (%)") +
-  theme_bw(base_size = 13) +
+  theme_bw(base_size = 25) +
   theme(
     legend.position = "none",
     axis.text.x = element_markdown(size = 13)
@@ -577,7 +577,7 @@ ggplot(gpd_long, aes(x = location, y = estimate, color = location)) +
     title = "Generalized Pareto fits (pooled tails): |residual| by region",
     caption = "Error bars: 95% CI from MLE standard errors"
   ) +
-  theme_bw(base_size = 13) +
+  theme_bw(base_size = 25) +
   theme(legend.position = "none")
 ```
 
@@ -658,30 +658,50 @@ cat("Outputs saved to:", paths$intermediate, "and", paths$figures, "\n")
 
 ## Multipanel figure
 
-```{r multipanel, fig.width=14, fig.height=6}
+```{r multipanel, fig.width=14, fig.height=12}
 library(cowplot)
-library(gridExtra)
 
-# Remove title from plots for the assembled figure
+# Load logFC by region panel from compare_r2_sliding_window_regions.Rmd
+p_logfc_region <- readRDS(file.path(paths$intermediate, "panel_logfc_by_region.rds"))
+
+# Remove titles from plots for the assembled figure
 p_scatter_notitle <- p_scatter + labs(title = NULL)
 p_beeswarm_notitle <- p_beeswarm + labs(title = NULL)
 
-# Assemble: beeswarm (A) | scatter (B)
-p_combined <- plot_grid(
+# Top row: (A) logFC by region | (B) CDS divergence beeswarm
+top_row <- plot_grid(
+  p_logfc_region + labs(title = NULL),
   p_beeswarm_notitle,
-  p_scatter_notitle,
   nrow = 1,
-  rel_widths = c(0.3, 0.7),
+  rel_widths = c(0.5, 0.5),
   labels = c("A", "B"),
   label_size = 18
 )
 
+# Bottom row: (C) |logFC| vs CDS divergence scatter (full width)
+bottom_row <- plot_grid(
+  p_scatter_notitle,
+  nrow = 1,
+  labels = c("C"),
+  label_size = 18
+)
+
+# Stack rows
+p_combined <- plot_grid(
+  top_row,
+  bottom_row,
+  nrow = 2,
+  rel_heights = c(1, 1)
+)
+
 print(p_combined)
 
-ggsave(file.path(paths$figures, "sequence_divergence_multipanel.pdf"),
-       p_combined, width = 14, height = 6)
-ggsave(file.path(paths$figures, "sequence_divergence_multipanel.svg"),
-       p_combined, width = 14, height = 6, fix_text_size = TRUE)
+ggsave(file.path(paths$figures, "divergence.pdf"),
+       p_combined, width = 14, height = 12)
+ggsave(file.path(paths$figures, "divergence.png"),
+       p_combined, width = 14, height = 12, dpi = 300)
+ggsave(file.path(paths$figures, "divergence.svg"),
+       p_combined, width = 14, height = 12, fix_text_size = TRUE)
 ```
 
 # Zero-divergence DEGs and flanking enrichment

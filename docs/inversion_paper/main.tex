@@ -900,13 +900,36 @@ Internode measurements in NC2025 localized the height effect: the largest differ
 This pattern of effect reversal across latitudes parallels the elevation-dependent fitness trade-offs reported for \invfour in Mexican landrace field trials \cite{crow2020} and is consistent with the antagonistic selection discussed above.
 We acknlowledge that a formal test of local adaptation would require reciprocal transplant experiments including highland environments where \invfour is nearly fixed.
 
+\subsection*{Transcriptomic effects of \invfour are localized to the introgressed haplotype}
+
+In the Crow et al.\ \cite{crow2020} growth chamber dataset, no MDS axis was diagnostic for \invfour genotype (S3 Fig in \cite{crow2020}).
+In our field experiment, the third MDS dimension classified genotypes with $r = 0.92$ (Fig~\ref{fig:transcriptome}B), identifying a transcriptomic axis that separates \invfour from control samples against the larger effects of phosphorus treatment and leaf developmental stage (dimensions 1--2; \cite{rodriguez2026phosphorus}).
+The 465 DEGs associated with this genotype axis concentrated within the 39 Mb shared introgression on chromosome 4, with 97-fold enrichment relative to the rest of the genome (Table~\ref{tab:DEGs_distro}).
+In contrast, DEGs associated with leaf developmental stage distributed across all ten chromosomes (Fig~\ref{fig:transcriptome}D versus E).
+
+This localized pattern is not a trivial expectation.
+Chromosomal inversions can disrupt gene expression through position effects at breakpoints, where juxtaposition of euchromatic genes with heterochromatic sequences leads to stochastic silencing \cite{elgin2013}.
+However, DEG density did not differ between \invfour proper and the flanking introgressed regions (OR $= 1.02$, $p = 0.95$; Table~\ref{tab:DEGs_distro}), indicating that the transcriptional perturbation tracks the introgression boundaries rather than the inversion breakpoints.
+This pattern is consistent with expression differences driven by sequence divergence between the highland and B73 haplotypes rather than by the structural rearrangement itself.
+Said et al.\ \cite{said2018} reached the same conclusion experimentally in \textit{Drosophila}: synthetic inversions engineered on controlled genetic backgrounds produced no differential expression, while natural inversions with accumulated linked variation produced widespread DE.
+In \textit{Arabidopsis}, CRISPR-induced inversions that relocated heterochromatic sequences into euchromatin produced no detectable changes in epigenetic marks or gene expression at the rearranged segments \cite{khosravi2025}.
+In \textit{Mimulus}, expression divergence within a locally adaptive inversion accumulated gradually through linked mutations rather than breakpoint effects \cite{kollar2025}.
+
+Because the DEG signal tracks the introgression rather than the inversion, we cannot attribute specific expression changes to \invfour as opposed to the broader introgressed haplotype from the differential expression analysis alone.
+Introgressed segments are expected to produce local DE proportional to sequence divergence from the recurrent parent, as demonstrated empirically in \textit{Solanum} introgression lines \cite{guerrero2016}.
+We tested this expectation directly by comparing CDS percent identity between B73 and Mi21 orthologs for 254 expressed genes in the introgression. CDS divergence predicted |logFC| (additive model adj R² = 0.104, divergence p = 2.4e-06). Genes inside Inv4m were more diverged than flanking genes (median 1.1\% vs 0.75\%, Wilcoxon p = 0.003), consistent with suppressed recombination preserving ancestral mexicana divergence.
+After accounting for divergence, Inv4m genes showed smaller absolute expression changes than flanking genes (region p = 0.002), indicating that the inversion dampens rather than amplifies expression divergence.
+Twenty-one genes had identical CDS and were all DE; 20 of 21 were flanking (Fisher p = 0.00013), consistent with trans-regulatory effects from divergent loci elsewhere in the introgression.
+We address this confounding in subsequent sections through trans-coexpression network analysis, which identifies genes within the introgression whose expression changes propagate to targets elsewhere in the genome.
+
 Our results show strong concordance with the growth chamber study of Crow et al.\ \cite{crow2020}, who identified DEGs associated with \invfour in B73 near-isogenic lines.
 Of the 29 genes they reported as consistently differentially expressed, correlated in trans, or encoding transcription factors (Table S2 in \cite{crow2020}), 20 of 27 unique genes are also DEGs in our field study after mapping v4 to v5 gene identifiers (FDR $< 0.05$).
 The shared genes span several functional categories.
-Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
+
 In cell growth and proliferation, \textit{sec6} ($+2.87$), classified as ``Consistent DE'' by Crow et al., and \textit{pcna2} ($+2.99$), which they identified as ``Correlated Trans,'' were both upregulated.
 Additional shared DEGs include the transcription factors \textit{gata4} ($-1.02$) and \textit{ereb14} ($-0.46$), the signaling kinases \textit{vps15} ($-0.60$) and a PBL19-like receptor ($-1.39$), and the nitrite reductase \textit{nii2} ($-2.06$).
 Of the 20 shared DEGs, 13 were downregulated and 7 upregulated, and all mapped within the \invfour interval.
+Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a flanking JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
 Our field study, using a plant blocking model to account for spatial variation, identified 465 DEGs at FDR $< 0.05$ and extends this shared candidate set by providing a mechanistic explanation: the JMJ signal reflects copy number variation between highland and lowland genomes (Fig~\ref{fig:jmj_cluster}B), with additional regulatory suppression in field conditions (Fig~\ref{fig:jmj_cluster}A).
 Both studies converge on the finding that gene expression changes are not confined to breakpoint-proximal genes: our DEGs show no enrichment inside \invfour versus flanking regions (OR $= 1.02$, Table~\ref{tab:DEGs_distro}), consistent with trans-regulatory effects rather than simple position effects \citep{kollar2025}.
 
@@ -1200,6 +1223,16 @@ Genes whose effect had FDR $< 0.05$ were deemed differentially expressed.
 For phosphorus treatment ($\beta_2$) and \invfour genotype ($\beta_3$), genes with $|\log_2(\text{FC})| > 1.5$ were considered strong DEGs.
 For the leaf stage effect ($\beta_1$) and interaction terms, a threshold of $|\log_2(\text{FC})| > 0.5$ was applied, corresponding to $>2.8$-fold total change across the leaf gradient.
 R scripts and expression data are available at the \href{https://github.com/sawers-rellan-labs/inv4m}{\invfour github repository}.
+
+\subsection{CDS sequence divergence analysis}
+
+To test whether expression differences in the introgression are explained by coding sequence divergence between haplotypes, we compared CDS percent identity with differential expression magnitude for genes in the shared introgression.
+CDS sequences for B73 (NAM v5) and Mi21 were aligned using LAST \cite{kielbasa2011} as part of the microsynteny pipeline described above.
+For each B73 gene in the shared introgression with a reciprocal best hit in Mi21, we retained the highest-scoring alignment and computed CDS divergence as $100 - \text{\% identity}$.
+We restricted the analysis to CDS alignments because upstream regulatory regions in maize are frequently interrupted by polymorphic transposon insertions that make percent identity unreliable for non-coding sequences \cite{liang2022}.
+Of the 512 expressed genes in the shared introgression, 254 had ortholog alignments and were included in the analysis (107 inside \invfour, 147 in the flanking introgression).
+We fit five linear models predicting $|\log_2\text{FC}|$ as a function of CDS divergence, region (inside \invfour vs flanking), their interaction, each term alone, and an intercept-only null, and selected the best model by BIC (Table~\ref{tab::divergence_models}).
+Wilcoxon rank-sum tests compared CDS divergence and $\log_2$ fold change distributions between regions.
 
 \subsection{WGCNA module perturbation analysis}
 
@@ -1675,12 +1708,14 @@ Zm00001eb194380 & \textit{sec6} & 3.1 & $-0.55$ & Exocyst complex component Sec6
 
 \begin{figure}[!ht]
 \includegraphics[width=\linewidth]{figs/divergence.png}
-\caption{\textbf{CDS sequence divergence and expression change in the \invfour introgression.}
-\textbf{(A)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes inside the inversion (\invfour, $n$ = 107) and in the flanking introgression (flanking, $n$ = 147).
+\caption{\textbf{Expression change and CDS sequence divergence in the \invfour introgression.}
+\textbf{(A)} Distribution of $\log_2$ fold change for all expressed genes on chromosome 4, grouped by region (\invfour, flanking introgression, outside).
+Wilcoxon rank-sum tests show no significant directional bias between regions.
+\textbf{(B)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes inside the inversion (\invfour, $n$ = 107) and in the flanking introgression (flanking, $n$ = 147).
 Points show individual genes (beeswarm); boxes show median and interquartile range.
 $y$-axis is log$_{10}$-scaled.
 Wilcoxon rank-sum $p$ = 0.0034.
-\textbf{(B)} Absolute log$_2$ fold change vs CDS divergence.
+\textbf{(C)} Absolute $\log_2$ fold change vs CDS divergence.
 Parallel lines show the additive model (shared slope for divergence effect, vertical offset for region effect).
 Region $p$ = 0.0023;
 divergence $p$ = 2.4e-06;
