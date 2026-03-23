@@ -37,6 +37,8 @@
 
 \title{The teosinte \mex chromosomal inversion \textit{Inv4m} modulates maize flowering time, plant height, and growth regulation gene networks}
 
+%\title{Introgression of the teosinte \mex chromosomal inversion \textit{Inv4m} modulates maize flowering time, plant height, and growth regulation gene networks in a temperate genetic background}
+
 % Teosinte Inv4m Inversion Modulates Maize Growth and Flowering via Gene Network Rewiring
 
 
@@ -165,7 +167,7 @@ The dotplots showed prominent tandem repeat arrays at both breakpoints in all fo
 
 The repeat annotation available in MaizeGDB for B73 identified the tandem arrays at the breakpoints as chromosomal knob-associated repeats of the \textit{knob180} and \textit{TR-1} classes.
 The dotplots, however, showed tandem repeat signal extending beyond the annotated repeat boundaries, suggesting that more divergent copies were not captured by the existing annotation.
-We therefore retrieved the original \textit{knob180} \cite{dennis1984knob180} and \textit{TR-1} \cite{hsu2003} reference sequences and performed BLAST+ \cite{camacho2009} megablast searches against each chromosome~4, both to capture these additional copies in B73 and to extend the analysis to PT, TIL18, and the Mi21 NIL, which lack public repeat annotations (see Methods).
+We therefore retrieved the original \textit{knob180} \cite{dennis1984} and \textit{TR-1} \cite{hsu2003} reference sequences and performed BLAST+ \cite{camacho2009} megablast searches against each chromosome~4, both to capture these additional copies in B73 and to extend the analysis to PT, TIL18, and the Mi21 NIL, which lack public repeat annotations (see Methods).
 
 This search detected knob repeats in the breakpoint segments, inside the inversion, and elsewhere on chromosome~4 in all four genomes (Fig~\ref{fig::design}B).
 Knob repeats were the most abundant repeat class within the breakpoint segments (Supplementary Table~\ref{tab:knob_repeats}).
@@ -856,7 +858,7 @@ The orientation asymmetry is clearest in B73, where the upstream segment contain
 Although the Mi21 NIL shows an attenuated version of the tandem array orientation asymmetry, all three asymmetries are mirrored between standard and inverted karyotypes, as expected if the original inversion event swapped the two breakpoint segments.
 
 Chromosomal knob repeats have been previously associated with megabase-scale inversions in maize and \textit{Arabidopsis}.
-For instance, the maize abnormal chromosome Ab10 shows, relative to N10, two inversions, 12 Mb and 15 Mb in size, each closely preceded by one of three TR-1 repeat arrays corresponding to cytogenetic chromomeres \cite{liu2020c, mroczek2006}.
+For instance, the maize abnormal chromosome Ab10 shows, relative to N10, two inversions, 12 Mb and 15 Mb in size, each closely preceded by one of three TR-1 repeat arrays corresponding to cytogenetic chromomeres \cite{liu2020, mroczek2006}.
 Also, in the maize line Zi330, \textit{in situ} hybridization with knob probes revealed two bands on the long arm of chromosome 2: one corresponding to a TR-1 and the other to a 180 bp knob repeat array \cite{yang2012}.
 Here the researchers found that, despite being an inbred line, Zi330 had homologous chromosomes with inverted knob repeat band order, resulting in heterozygosity at this locus.
 In \textit{Arabidopsis thaliana} Col-0, the 750 kb \textit{hks4} chromosomal knob, consisting of pericentromeric heterochromatin repeat arrays and other interspersed repeats \cite{schmidt2020, fransz2000}, overlaps a 1.2 Mb paracentric inversion with respect to Ler and \textit{A. lyrata} \cite{zapata2016}.
@@ -908,7 +910,7 @@ Similarly CRISPR-induced inversions in \textit{Arabidopsis} similarly left epige
 Because the DEG signal tracks the introgression rather than the inversion, we cannot attribute specific expression changes to \invfour as opposed to the broader introgressed haplotype from the differential expression analysis alone.
 Introgressed segments are expected to produce local DE, most likely downregulation, as demonstrated in \textit{Solanum} introgression lines \cite{guerrero2016}, but  upregulation has recently been reported in maize accombapnied by reduced sRNA silencing \cite{minow2021}.
 Crow et al.\ \cite{crow2020} showed greater sequence divergence among Mexican traditional varieties inside \invfour than outside, consistent with suppressed recombination.
-Our coding sequence comparison between B73 and Mi21 orthologs confirms this pattern at the gene level: genes inside \invfour were more diverged than flanking genes (median 1.1\% vs 0.75\%, Wilcoxon $p = 0.003$; Fig~\ref{fig:divergence}).
+Our coding sequence comparison between B73 and Mi21 orthologs confirms this pattern at the gene level: genes inside \invfour were more diverged than flanking genes (median 1.1\% vs 0.75\%, Wilcoxon $p = 0.003$; Fig~\ref{fig::divergence}).
 CDS divergence was a significant but weak predictor of $|\log_2\text{FC}|$ (additive model adj $R^2 = 0.104$, divergence coefficient $p = 2.4 \times 10^{-6}$), and the relationship was driven largely by a few highly divergent genes with large expression changes.
 After accounting for divergence, Inv4m genes showed smaller absolute expression changes than flanking genes (region coefficient p = 0.002), indicating that the inversion dampens rather than amplifies expression divergence.
 Twenty-one genes had identical CDS and were all DE; 20 of 21 were flanking (Fisher p = 0.00013), consistent with trans-regulatory effects from divergent loci elsewhere in the introgression.
@@ -924,7 +926,7 @@ Additional shared DEGs include the transcription factors \textit{gata4} ($-1.02$
 Among chromatin regulators, both studies identified the JMJ histone demethylase cluster (listed as ``Putative lysine-specific demethylase JMJ16'' in their v4 annotation): \jmjii ($\log_2\text{FC} = -3.49$), \jmjiv ($-2.84$), and a separate JMJ-domain transcription factor (\textit{jmj21}, $+2.28$).
 
 
-\subsection*{Genomic and functional evidence suggest a link between,\jmjii copy number, growth, and flowering time plasticity}
+\subsection*{Genomic and functional evidence suggest a link between \jmjii copy number, growth, and flowering time plasticity}
 
 The JMJ histone demethylase cluster emerged as the most consistent shared signal between our field study and that of Crow et al.\ \cite{crow2020}, with differential expression reproduced across all 13 tissue-experiment combinations examined (Fig~\ref{fig:jmj_cluster}A).
 Of particular interest, JMJ suppression extended to the sample enriched in shoot apical meristem tissue in the Crow et al.\ growth chamber data, the sample most directly relevant to the height and flowering phenotypes.
@@ -990,7 +992,7 @@ Bottom track shows genomic positions of individual cluster members.}
 
 \subsection*{Coexpression networks as a tool to study the adaptive value of chromosomal inversions}
 
-Chromosomal inversions maintain coadapted allele complexes by suppressing recombination \cite{kirkpatrick2006b, dobzhansky1970}.
+Chromosomal inversions maintain coadapted allele complexes by suppressing recombination \cite{kirkpatrick2006b, dobzhansky1971}.
 This functional coordination among loci implies that alleles selected to work together should produce coordinated gene expression in the native genome and retain that coordination even when introgressed into a different genetic background.
 As we showed above, most differential expression within the introgression tracks sequence divergence rather than the inversion itself.
 However, the trans-coexpression network filters for genes inside \invfour whose expression changes correlate most strongly with targets elsewhere in the genome, isolating a subset where coordinated regulation is plausible.
@@ -1017,19 +1019,15 @@ The JMJ histone demethylase cluster, with its five-to-one copy number difference
 However, because genes within the introgression are highly correlated with each other, we cannot isolate the contribution of any single locus from the coexpression data alone.
 Distinguishing whether JMJ dosage drives the network reconfiguration or whether both are parallel consequences of the introgression will require experimental manipulation, such as transgenic complementation of JMJ copy number or fine-mapping to separate inversion effects from flanking linkage drag.
 
-Highland-associated inversions including \invfour and \textit{Inv9f} are prevalent in \mex populations \cite{pyhajarvi2013} and Mexican traditional varieties \cite{crow2020} but rare in temperate maize.
-Calfee et al.\ \cite{calfee2021-mr} identified \textit{Inv9f} as a second highland-adaptive inversion with independent clinal introgression, suggesting that multiple structural variants act in concert for highland adaptation.
-The presence of copy number variation within \invfour (JMJ cluster expansion in B73) adds structural complexity beyond simple haplotype differences, as the introgressed \mex haplotype carries a single JMJ ortholog while the B73 haplotype contains five tandem paralogs (Fig~\ref{fig:jmj_cluster}B).
-Across taxa, the average adaptive inversion spans 8.4~Mb \cite{wellenreuther2018}; \invfour at 15.2~Mb exceeds this average, consistent with the prediction that larger inversions are favored when they protect more coadapted loci from recombination.
-
 Several limitations constrain interpretation of our results.
-First, 24 Mb of flanking introgression persists after eight backcross generations (Fig~\ref{fig::design}E, F), a challenge inherent to inversions that suppress recombination.
-We reduced this drag from the 57 Mb observed in the BC$_5$ populations of \cite{crow2020}, and we addressed the attribution problem by applying a strongest-correlated-gene criterion in the trans coexpression network, assigning trans targets only when their strongest correlated potential regulator lies within the 15 Mb inversion proper (see Methods).
+First, 24 Mb of flanking introgression persists after eight backcross generations (Fig~\ref{fig::design}E, F).
+We reduced this drag from the 57 Mb observed in the BC$_5$ populations of \cite{crow2020}.
+We aimed to address the attribution problem by applying a strongest correlated gene criterion in the trans coexpression network, assigning trans targets only when their strongest correlated potential regulator lies within the 15 Mb inversion proper (see Methods).
 Nevertheless, phenotypic effects cannot be unambiguously attributed to \invfour versus the flanking introgression.
 Second, only B73 was tested as the recurrent parent; effects may differ in other genetic backgrounds, and divergence among B73 seed stocks \cite{liang2016} could introduce subtle confounds.
 Third, the effective sample size of four biological replicates per genotype-treatment combination limits statistical power for detecting small-effect DEGs, although the convergence of 20 out of 27 candidate genes with the independent Crow et al.\ \cite{crow2020} dataset provides external validation.
-Fourth, the high sequence identity among JMJ paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) complicates individual gene attribution, and the SAM morphology and transcriptomic data were collected from different developmental stages and environments (growth chamber seedlings versus field-grown V10--V12 leaves), so the connection between meristem geometry and gene expression changes, while consistent, remains indirect.
-Functional validation through ChIP-seq for H3K4me3, heterologous expression of JMJ genes, and Hi-C analysis of 3D chromatin organization on chromosome 4 would strengthen the working model proposed here.
+Fourth, the high sequence identity among JMJ paralogs ($>$97\%; Fig~\ref{fig:jmj_cluster}C) complicates individual gene attribution, and the SAM morphology and transcriptomic data were collected from different developmental stages and environments (growth chamber seedlings versus field-grown V10-V12 leaves), so the connection between meristem geometry and gene expression changes, while consistent, remains indirect.
+Functional validation through ChIP-seq for H3K4me3, heterologous expression of JMJ genes, and Hi-C analysis of 3D chromatin organization on chromosome 4 would strengthen the working hypothesis and connections proposed here.
 
 \section{Materials and Methods}
 \label{sec:materials:methods}
@@ -1100,7 +1098,7 @@ y_{ijk} = \mu + G_i + E_j + (G \times E)_{ij} + \varepsilon_{ijk}
 
 where $G_i$ is the genotype effect, $E_j$ is the environment effect, and $(G \times E)_{ij}$ is the genotype-by-environment interaction.
 Effect sizes were quantified using partial eta-squared ($\eta^2_p$) for ANOVA effects and Cohen's $d$ for pairwise genotype comparisons within each environment.
-Marginal means and contrasts were estimated using the \textit{emmeans} package \cite{lenth2023}.
+Marginal means and contrasts were estimated using the \textit{emmeans} package \cite{lenth2025}.
 P-values were adjusted for multiple testing using the Benjamini-Hochberg FDR method \cite{benjamini1995}.
 
 To examine temperature sensitivity of \invfour effects, we correlated genotype effect sizes (Cohen's $d$) with mean environmental temperature during the first 100 days after planting, calculated from NASA POWER hourly temperature data.
@@ -1126,31 +1124,31 @@ To obtain a reference-quality genome for the \invfour donor parent, we performed
 Two barcoded HiFi libraries (bc2051, $\sim$9$\times$ coverage; bc2052, $\sim$5$\times$ coverage) were combined for a total of $\sim$14$\times$ genome coverage.
 Primary contigs were assembled with hifiasm v0.25.0 \cite{cheng2021hifiasm} using the \texttt{-l0} flag to disable purge duplication, yielding 740 contigs totaling 2.21~Gb with a contig N50 of 13.7~Mb.
 
-Contigs were scaffolded against two reference genomes using RagTag \cite{alonge2022ragtag}: Zm-B73-REFERENCE-NAM-5.0 \cite{hufford2021} as the recurrent parent background and Zm-PT-REFERENCE-HiLo-1.0 as a highland representative carrying the standard \invfour arrangement.
+Contigs were scaffolded against two reference genomes using RagTag \cite{alonge2022}: Zm-B73-REFERENCE-NAM-5.0 \cite{hufford2021} as the recurrent parent background and Zm-PT-REFERENCE-HiLo-1.0 as a highland representative carrying the standard \invfour arrangement.
 Each scaffolding was performed with \texttt{ragtag.py scaffold -u} (unplaced contigs retained) using minimap2 \cite{li2018minimap2} alignments.
 The two resulting AGP files were merged with \texttt{ragtag.py merge}, producing 10 pseudochromosomes and 455 unplaced contigs.
 The merged scaffold placed 97.6--98.5\% of assembled bases onto chromosomes.
 
 \subsection{Gene model transfer}
 
-Gene models were transferred from B73 (Zm00001eb.1 annotation) to the Mi21 NIL assembly using Liftoff \cite{shumate2021liftoff} with parameters \texttt{-s~0.5 -a~0.5 -flank~0.1 -cds -copies}.
+Gene models were transferred from B73 (Zm00001eb.1 annotation) to the Mi21 NIL assembly using Liftoff \cite{shumate2021} with parameters \texttt{-s~0.5 -a~0.5 -flank~0.1 -cds -copies}.
 This lifted 1,145,935 features, with 252 features unmapped.
 The \texttt{-copies} flag was used to detect copy-number variation at the JUMONJI histone demethylase cluster on chromosome~4.
 
 \subsection{Chromosomal knob repeat annotation}
 
 To characterize the repeat content of the \invfour breakpoint segments across genomes, we performed BLAST+ \cite{camacho2009} similarity searches of chromosome~4 in B73 (NAM5), PT (HiLo-1.0), TIL18 (PanAnd-1.0), and the Mi21 NIL assembly using representative sequences of two classes of chromosomal knob repeats as queries.
-For the 180~bp knob repeat we used accession M32524.1 \cite{dennis1984knob180}, and for the \textit{TR-1} repeat we used accession AY083942.1 \cite{hsu2003}.
+For the 180~bp knob repeat we used accession M32524.1 \cite{dennis1984}, and for the \textit{TR-1} repeat we used accession AY083942.1 \cite{hsu2003}.
 Searches were run with the \texttt{megablast} task (\texttt{blastn -task megablast}), which uses a word size of 28 and is optimized for highly similar sequences.
 Hits were plotted along chromosome~4 with normalized bitscore on the $y$-axis (Fig~\ref{fig::design}B).
-Breakpoint annotation coordinates were defined by the AnchorWave \cite{song2022anchorwave} genome alignment endpoints where reference-orientation synteny was lost (Table~\ref{tab:breakpoints}).
+Breakpoint annotation coordinates were defined by the AnchorWave \cite{song2022} genome alignment endpoints where reference-orientation synteny was lost (Table~\ref{tab:breakpoints}).
 
 For breakpoint self-similarity analysis, we extracted the unaligned segments flanking each breakpoint and performed local self-alignment with LAST \cite{kielbasa2011}.
 The resulting dotplots (Fig~\ref{fig::design}C) show tandem repeat arrays as diagonal and off-diagonal patterns, with forward matches shown in red and reverse (inverted) matches in blue.
 
 \subsection{Whole-genome alignment and microsynteny}
 
-To confirm the orientation of \invfour in the Mi21 NIL assembly and delimit breakpoint coordinates, we performed CDS-anchored whole-genome alignments against B73, PT, and TIL18 using AnchorWave \cite{song2022anchorwave} \texttt{proali} with \texttt{-R~1 -Q~1} (one-to-one mapping, no whole-genome duplication).
+To confirm the orientation of \invfour in the Mi21 NIL assembly and delimit breakpoint coordinates, we performed CDS-anchored whole-genome alignments against B73, PT, and TIL18 using AnchorWave \cite{song2022} \texttt{proali} with \texttt{-R~1 -Q~1} (one-to-one mapping, no whole-genome duplication).
 CDS anchor sequences were extracted from each reference GFF3 with \texttt{anchorwave gff2seq} and mapped to both reference and query assemblies using minimap2 \cite{li2018minimap2} (\texttt{-x splice -k 12 -p 0.4 -N 20}).
 CDS-anchor dotplots were filtered to uniquely-mapped anchors (MAPQ~$\geq$~60) and dominant scaffold pairings to reduce multi-mapping noise from duplicated gene families (Fig~\ref{fig::design}C).
 
@@ -1269,7 +1267,7 @@ Pearson correlation coefficients were calculated between all \textit{cis}-\texti
 Edges were retained if the correlation was significant after FDR correction ($q < 0.05$).
 Prior to network construction, we excluded \textit{trans} targets carrying SNPs in linkage disequilibrium with the \invfour tagging marker (Pearson correlation FDR $< 0.005$; see Section~3.1), which removed 2 of 39 \textit{trans} DEGs (\textit{Zm00001eb070810} on chromosome~2 and \textit{tip4c} on chromosome~3).
 
-To distinguish \invfour-specific effects from flanking introgression effects, we applied a strongest-correlated-gene criterion: for each \textit{trans} target, we identified the \textit{cis} potential regulator with the highest absolute correlation.
+To distinguish \invfour-specific effects from flanking introgression effects, we applied a strongest correlated gene criterion: for each \textit{trans} target, we identified the \textit{cis} potential regulator with the highest absolute correlation.
 Targets were assigned to the \invfour network only if their strongest regulator was located within the 15 Mb inversion proper, not in the flanking introgressed regions.
 This approach recovered 50 genes in the \invfour trans-regulatory network (22 upregulated, 28 downregulated).
 

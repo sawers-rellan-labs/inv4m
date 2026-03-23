@@ -34,11 +34,13 @@ README.md  # Figure/table coverage
 | 10 | Proofread Abstract | ✅ done | #9 |
 | 11 | Read aloud: Abstract + Discussion | pending | #10 |
 | 12 | Internal peer review: address 18 edits | ✅ done (2026-02-24) | #10 |
-| 13 | Overleaf vs repo diff review (22 hunks) | 🔶 in progress — Results DONE, Discussion starts at `@@ -815` | #12 |
+| 13 | Overleaf vs repo diff review (22 hunks) | ✅ done (2026-03-23) | #12 |
 | 14 | Prose style pass: active voice, no "reveal", site labels | ✅ done (2026-03-12) | #13 |
 | 15 | SAM p-values: switch to one-tailed, add flowering literature | ✅ done (2026-03-12) | #14 |
-| 16 | Finalize Abstract opener | pending | #15 |
-| 17 | Draft Introduction rewrite | pending | #16 |
+| 16 | Discussion overclaim/framing pass | ✅ done (2026-03-23) | #13 |
+| 17 | Overleaf full sync | ✅ done (2026-03-23, tag: overleaf-sync-2026-03-23) | #16 |
+| 18 | Rubén full feedback | pending | #17 |
+| 19 | Coauthor suggestions | pending | #18 |
 
 ### Section 3.2 corrections applied (2026-02-24):
 - 126 → 1394 fixed alternate allele markers
@@ -61,6 +63,21 @@ README.md  # Figure/table coverage
 - 4 new bibtex entries as comments (leiboff2015, thompson2015, ku2008, danilevskaya2008)
 - Commits: `93af919`, `a6fdadb`
 - R script site label rename TODO: `scripts/00_agent_work/TODO_rename_site_labels.md`
+
+### Discussion overclaim/framing pass (2026-03-23):
+- Guerrero 2016 citation corrected: removed false "proportional to divergence" claim
+- Kollar 2025 Mimulus sentences removed (misrepresented paper findings)
+- Dobzhansky/Kirkpatrick coadaptation framework replaced with Des Marais et al. 2017
+- "coordination among genes" → "rewires native B73 coexpression modules"
+- "regulator" → "potential regulator" throughout Results/Methods/Discussion
+- Pink module: "most significant connectivity reduction" → "connectivity loss in all 30 genes"
+- JMJ reframed as "one candidate among many" with complete-graph caveat
+- Added: Fransz 2016 (Arabidopsis FRIGIDA inversion), Said/Khosravi caveat, Minow 2021
+- Cross-taxa examples reordered: Arabidopsis → Mimulus → yeast → human
+- Removed grab-bag paragraph (Inv9f, CNV recap, inversion size)
+- Overleaf fully synced (tag: `overleaf-sync-2026-03-23`)
+- 3 new bibtex entries needed: fransz2016, desmarais2017, minow2021
+- Pending typo: "acknlowledge" → "acknowledge" (~line 901)
 
 ### Peer review edits applied (2026-02-24):
 - Abstract: soften attribution ("Inv4m introgression"), add GxE reversal, reframe JMJ as CNV + regulatory suppression, "working model" not "mechanistic chain"
