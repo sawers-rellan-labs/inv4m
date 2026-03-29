@@ -961,6 +961,7 @@ The greenyellow module (LFP $= 0.80$, highest bootstrap support) contained both 
 The purple module (LFP $= 0.74$, $n = 22$) contained \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like; \textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$), also a plant height GWAS candidate \cite{liu2023,peiffer2014}, and showed enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$).
 In Arabidopsis, EXORDIUM mediates brassinosteroid-responsive cell expansion in leaves \cite{farrar2003, collgarcia2004, schroeder2009}.
 Two LRR receptor-like kinase paralogs, \textit{imk3} ($\log_2 \text{FC} = +6.71$) and \textit{imk3b} ($\log_2 \text{FC} = -4.68$), were reciprocally regulated by the introgression and share a direct negative coexpression edge in the unsigned network ($r = -0.82$), confirming that this reciprocal pattern is a coherent signal rather than an artifact of signed module assignment.
+The red module ($n = 34$, $p_{adj} = 8.5 \times 10^{-5}$; LFP $= 0.63$, below the 0.70 stability threshold) contained \textit{d3} (dwarf plant 3; \textit{Zm00001eb379120}; $\log_2 \text{FC} = -0.98$), encoding ent-kaurenoic acid oxidase in the gibberellin biosynthesis pathway, and \textit{abh1} (abscisic acid 8'-hydroxylase 1; \textit{Zm00001eb251960}; $\log_2 \text{FC} = -2.83$), which catabolizes ABA; the module was enriched for sterol metabolic process ($p = 0.006$), and the downregulation of both genes is consistent with reduced growth hormone signaling in \invfour.
 
 These network observations are consistent with a hypothetical model in which reduced JMJ dosage alters H3K4 methylation patterns, disrupting coexpression of growth-related genes and contributing to the meristem and whole-plant phenotypes we observed.
 However, several steps in this chain remain untested: we have not measured H3K4 methylation directly, the coexpression edges represent filtered correlations from a single field environment rather than demonstrated regulatory relationships, and the 24 Mb of flanking introgression means we cannot exclude that JMJ connectivity loss and growth gene misexpression are parallel consequences of the introgression rather than causally linked.
@@ -1855,6 +1856,16 @@ Notable enrichments include chromatin organization (blue module), translation (b
 \clearpage
 
 
+% TODO: Add the 3 component Z-statistics from Langfelder & Horvath 2011
+% (Z_density, Z_connectivity, Z_separability) as additional columns.
+% These are in the modulePreservation() output from 06_preservation.Rmd.
+% TODO: Add a companion table for the topology control modules
+% (photosynthesis/senescence, permutation_test_delta_kWithin.Rmd).
+% Needs: LFP (run bootstrap on control modules), Z_summary components,
+% delta_kWithin, FDR from permutation test.
+% TODO: Run consensus module pipeline (step 04) on control gene set
+% before bootstrap, so LFP comparison with DEG modules is fair.
+% Current control modules use single cutreeDynamic (no consensus).
 \begin{table}[!ht]
 \caption{\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected $p$-value from one-sample $t$-test of $\Delta k_{Within} \neq 0$. $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $< 2$ = not preserved, $2$ to $10$ = moderate, $> 10$ = strong. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
 \label{tab::preservation}
