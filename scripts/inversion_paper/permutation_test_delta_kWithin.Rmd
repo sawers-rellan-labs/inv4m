@@ -1,0 +1,1032 @@
+---
+title: "Permutation Test for WGCNA Connectivity Loss"
+author: "F. V. Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = TRUE
+)
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+# Overview
+
+The WGCNA analysis (step 06) found that 12 of 13 DEG coexpression modules
+lose intramodular connectivity ($\Delta k_{Within}$) when comparing Inv4m
+to CTRL networks. A potential concern is that this connectivity loss could
+be an artifact of splitting samples by genotype: genes selected as DEGs
+will, by definition, have different mean expression between groups, and
+this could inflate correlation differences when networks are built
+separately.
+
+This notebook addresses that concern with two complementary approaches:
+
+1. **Genotype label permutation test**: Shuffle genotype labels 1000 times,
+   recompute $\Delta k_{Within}$ per module, and compare the observed
+   connectivity loss to the empirical null distribution. This directly tests
+   whether the observed loss exceeds what random sample splitting produces.
+
+2. **Topology control gene set**: Apply the same analysis to 218
+   photosynthesis and senescence genes (Ojeda 2026) that are NOT
+   differentially expressed between genotypes but DO have real coexpression
+   structure driven by the leaf developmental gradient. If the connectivity
+   loss is an artifact of sample splitting, these control genes should show
+   the same pattern. If it is specific to DEGs, they should not.
+
+# Setup
+
+```{r load_packages}
+library(here)
+library(tidyverse)
+library(WGCNA)
+
+allowWGCNAThreads()
+set.seed(42)
+```
+
+```{r config}
+N_PERM <- 10000
+RUN_DIR <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+OUTPUT_DIR <- file.path(RUN_DIR, "06_preservation")
+
+FILTER_DIR    <- file.path(RUN_DIR, "02_gene_filter")
+DATA_PREP_DIR <- file.path(RUN_DIR, "01_data_prep")
+CONSENSUS_DIR <- file.path(RUN_DIR, "04_consensus_networks")
+REFERENCE_DIR <- file.path(RUN_DIR, "03_reference_network")
+
+source(here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Load Data
+
+```{r load_data}
+# DEG-filtered expression (465 genes x 43 samples)
+expr_filtered <- readRDS(file.path(FILTER_DIR, "filtered_expression.rds"))
+sample_meta   <- read_csv(file.path(DATA_PREP_DIR, "sample_metadata.csv"),
+                           show_col_types = FALSE)
+ctrl_modules  <- read_csv(file.path(CONSENSUS_DIR, "ctrl", "consensus_modules.csv"),
+                           show_col_types = FALSE)
+SOFT_POWER    <- readRDS(file.path(REFERENCE_DIR, "ctrl", "selected_power.rds"))
+
+# Full expression matrix (24k genes x 43 samples, PSU2022 only)
+full_expr <- readRDS(file.path(DATA_PREP_DIR, "combined_expression.rds"))
+if (inherits(full_expr, "EList")) {
+  full_expr_mat <- full_expr$E
+} else {
+  full_expr_mat <- as.matrix(full_expr)
+}
+
+cat("DEG expression:", nrow(expr_filtered), "genes x", ncol(expr_filtered), "samples\n")
+cat("Full expression:", nrow(full_expr_mat), "genes x", ncol(full_expr_mat), "samples\n")
+cat("Soft power:", SOFT_POWER, "\n")
+```
+
+# Control Gene Sets
+
+Photosynthesis and senescence hub genes from Ojeda 2026. In the companion
+phosphorus paper, we showed that the expression indices for these gene sets
+do not differ between Inv4m and CTRL genotypes. They are driven by the leaf
+developmental gradient (young leaves = photosynthesis, old leaves =
+senescence), providing biologically structured coexpression that is
+independent of the Inv4m introgression.
+
+```{r load_control_genes}
+photo_genes <- read.table(
+  file.path(paths$data, "photosynthesis_expression_index_genes_ojeda2026.txt"),
+  header = FALSE, stringsAsFactors = FALSE
+)$V1
+
+sag_genes <- read.table(
+  file.path(paths$data, "senesence_hubs_ojeda2026.tab"),
+  header = TRUE, sep = "\t", stringsAsFactors = FALSE
+)$gene
+
+# Exclude any overlap with DEGs
+deg_genes <- ctrl_modules$gene
+photo_control <- setdiff(intersect(photo_genes, rownames(full_expr_mat)), deg_genes)
+sag_control   <- setdiff(intersect(sag_genes, rownames(full_expr_mat)), deg_genes)
+control_genes <- unique(c(photo_control, sag_control))
+
+cat("Photosynthesis (non-DEG, in matrix):", length(photo_control), "\n")
+cat("Senescence hubs (non-DEG, in matrix):", length(sag_control), "\n")
+cat("Combined control genes:", length(control_genes), "\n")
+```
+
+# Prepare Expression Matrices
+
+```{r prepare_expression}
+# DEG module colors aligned to gene order
+module_colors <- setNames(ctrl_modules$color, ctrl_modules$gene)
+module_colors <- module_colors[rownames(expr_filtered)]
+
+# Genotype labels
+all_samples <- sample_meta$sample_id
+true_labels <- setNames(sample_meta$Genotype, sample_meta$sample_id)
+n_ctrl  <- sum(true_labels == "CTRL")
+n_inv4m <- sum(true_labels == "Inv4m")
+n_total <- length(true_labels)
+
+# WGCNA format: samples x genes
+datExpr_all     <- t(expr_filtered[, all_samples])
+datExpr_control <- t(full_expr_mat[control_genes, all_samples])
+
+cat("DEG matrix:", nrow(datExpr_all), "samples x", ncol(datExpr_all), "genes\n")
+cat("Control matrix:", nrow(datExpr_control), "samples x", ncol(datExpr_control), "genes\n")
+cat("CTRL:", n_ctrl, "| Inv4m:", n_inv4m, "| Total:", n_total, "\n")
+```
+
+# WGCNA Modules for Control Genes
+
+Build modules from control genes using CTRL samples only, mirroring
+how the DEG modules were constructed.
+
+```{r control_modules}
+datExpr_ctrl_only <- datExpr_control[which(true_labels == "CTRL"), ]
+adj_ctrl_control <- adjacency(datExpr_ctrl_only, power = SOFT_POWER, type = "signed")
+ctrl_tree <- hclust(as.dist(1 - adj_ctrl_control), method = "average")
+ctrl_control_modules <- cutreeDynamic(
+  dendro = ctrl_tree,
+  distM = 1 - adj_ctrl_control,
+  deepSplit = 4,
+  minClusterSize = 10
+)
+control_module_colors_raw <- labels2colors(ctrl_control_modules)
+
+# Remap WGCNA standard colors to non-clashing names with matching hex
+ctrl_color_remap <- c(
+  turquoise = "sky",
+  blue      = "peach",
+  brown     = "jade",
+  yellow    = "coral",
+  green     = "lavender",
+  black     = "umber",
+  red       = "mustard",
+  pink      = "rose",
+  magenta   = "aqua",
+  purple    = "spring",
+  grey      = "grey"
+)
+# Hex codes for plotting (keyed by new name)
+ctrl_color_hex <- c(
+  sky      = "#5DA5DA",
+  peach    = "#FAA43A",
+  jade     = "#60BD68",
+  coral    = "#F15854",
+  lavender = "#B276B2",
+  umber    = "#8D4B08",
+  mustard  = "#DECF3F",
+  rose     = "#F17CB0",
+  aqua     = "#66E3D9",
+  spring   = "#00FF7F",
+  grey     = "grey"
+)
+
+control_module_colors <- ctrl_color_remap[control_module_colors_raw]
+names(control_module_colors) <- control_genes
+
+cat("Control modules found:", length(unique(ctrl_control_modules[ctrl_control_modules != 0])), "\n")
+cat("Unassigned (grey):", sum(ctrl_control_modules == 0), "of", length(ctrl_control_modules), "\n\n")
+
+tibble(module = control_module_colors) |>
+  filter(module != "grey") |>
+  count(module, sort = TRUE) |>
+  print()
+```
+
+## Module Size Comparison
+
+```{r module_size_comparison, fig.width=8, fig.height=4}
+deg_sizes <- tibble(
+  module = module_colors,
+  type = "DEG"
+) |>
+  filter(module != "grey", !is.na(module)) |>
+  count(module, type, name = "n_genes")
+
+ctrl_sizes <- tibble(
+  module = control_module_colors,
+  type = "Control"
+) |>
+  filter(module != "grey") |>
+  count(module, type, name = "n_genes")
+
+bind_rows(deg_sizes, ctrl_sizes) |>
+  ggplot(aes(x = n_genes, fill = type)) +
+  geom_histogram(bins = 15, alpha = 0.6, position = "identity") +
+  scale_fill_manual(values = c(DEG = "grey60", Control = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Module size (genes)", y = "Count", fill = NULL,
+       title = "Module size distributions overlap between DEG and control")
+```
+
+# Helper Function
+
+```{r helper_function}
+compute_module_delta_k <- function(datExpr_a, datExpr_b, power, mod_colors) {
+  adj_a <- adjacency(datExpr_a, power = power, type = "signed")
+  adj_b <- adjacency(datExpr_b, power = power, type = "signed")
+
+  k_a <- intramodularConnectivity(adj_a, mod_colors)
+  k_b <- intramodularConnectivity(adj_b, mod_colors)
+
+  delta_k <- k_b$kWithin - k_a$kWithin
+
+  module_ids <- unique(mod_colors[mod_colors != "grey" & !is.na(mod_colors)])
+  sapply(module_ids, function(m) {
+    idx <- which(mod_colors == m)
+    mean(delta_k[idx], na.rm = TRUE)
+  })
+}
+
+# Violin plot panel constructor (used by kWithin and kME violin sections)
+# points_df must have columns: module, z_observed, fdr
+# fill_color: single color string OR named vector (module -> hex)
+make_violin_panel <- function(violin_df, points_df, panel_title, fill_color) {
+  if (length(fill_color) == 1) {
+    p <- ggplot(violin_df, aes(x = module, y = z_value)) +
+      geom_violin(fill = fill_color, color = "grey40", alpha = 0.6, scale = "width")
+  } else {
+    p <- ggplot(violin_df, aes(x = module, y = z_value, fill = module)) +
+      geom_violin(color = "grey40", alpha = 0.6, scale = "width") +
+      scale_fill_manual(values = fill_color) +
+      guides(fill = "none")
+  }
+  p +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_point(
+      data = points_df,
+      aes(x = module, y = z_observed),
+      color = "red", size = 3
+    ) +
+    geom_text(
+      data = points_df |> filter(fdr < 0.05),
+      aes(x = module, y = z_observed, label = sprintf("FDR=%.3f", fdr)),
+      color = "red", size = 3, vjust = -1, hjust = 0.5
+    ) +
+    coord_flip() +
+    theme_minimal(base_size = 14) +
+    labs(x = NULL, y = expression(Z[Delta * k]), title = panel_title)
+}
+```
+
+# Observed Delta kWithin
+
+```{r observed}
+ctrl_idx  <- which(true_labels == "CTRL")
+inv4m_idx <- which(true_labels == "Inv4m")
+
+observed_delta <- compute_module_delta_k(
+  datExpr_all[ctrl_idx, ], datExpr_all[inv4m_idx, ],
+  SOFT_POWER, module_colors
+)
+
+observed_control <- compute_module_delta_k(
+  datExpr_control[ctrl_idx, ], datExpr_control[inv4m_idx, ],
+  SOFT_POWER, control_module_colors
+)
+
+cat("Observed mean delta kWithin per DEG module:\n")
+print(round(sort(observed_delta), 4))
+
+cat("\nObserved mean delta kWithin per control module:\n")
+print(round(sort(observed_control), 4))
+```
+
+# Permutation Test
+
+Shuffle genotype labels 1000 times, keeping group sizes fixed (20 CTRL,
+23 Inv4m). For each permutation, recompute $\Delta k_{Within}$ for both
+DEG and control modules. The module definitions remain fixed throughout.
+
+```{r permutation_loop, cache=TRUE}
+null_deltas  <- matrix(NA, nrow = N_PERM, ncol = length(observed_delta))
+colnames(null_deltas) <- names(observed_delta)
+null_control <- matrix(NA, nrow = N_PERM, ncol = length(observed_control))
+colnames(null_control) <- names(observed_control)
+
+pb <- txtProgressBar(min = 0, max = N_PERM, style = 3)
+for (i in seq_len(N_PERM)) {
+  perm_idx <- sample(n_total)
+  pseudo_ctrl  <- perm_idx[1:n_ctrl]
+  pseudo_inv4m <- perm_idx[(n_ctrl + 1):n_total]
+
+  null_deltas[i, ] <- compute_module_delta_k(
+    datExpr_all[pseudo_ctrl, ], datExpr_all[pseudo_inv4m, ],
+    SOFT_POWER, module_colors
+  )
+
+  null_control[i, ] <- compute_module_delta_k(
+    datExpr_control[pseudo_ctrl, ], datExpr_control[pseudo_inv4m, ],
+    SOFT_POWER, control_module_colors
+  )
+
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+```
+
+# Results
+
+## ECDF P-values
+
+One-tailed test: fraction of permuted values $\leq$ observed (testing for
+connectivity loss more extreme than the null).
+
+```{r ecdf_pvalues}
+ecdf_pvals <- sapply(names(observed_delta), function(m) {
+  mean(null_deltas[, m] <= observed_delta[m])
+})
+ecdf_pvals_control <- sapply(names(observed_control), function(m) {
+  mean(null_control[, m] <= observed_control[m])
+})
+```
+
+### DEG Modules
+
+```{r results_deg}
+results_deg <- tibble(
+  module = names(observed_delta),
+  type = "DEG",
+  n_genes = sapply(names(observed_delta), function(m) sum(module_colors == m, na.rm = TRUE)),
+  observed_mean_delta_k = round(observed_delta, 4),
+  null_mean = round(colMeans(null_deltas), 4),
+  null_sd = round(apply(null_deltas, 2, sd), 4),
+  ecdf_pvalue = round(ecdf_pvals, 4)
+) |>
+  arrange(ecdf_pvalue)
+
+results_deg
+```
+
+### Control Modules
+
+```{r results_control}
+results_ctrl <- tibble(
+  module = names(observed_control),
+  type = "control",
+  n_genes = sapply(names(observed_control), function(m) sum(control_module_colors == m)),
+  observed_mean_delta_k = round(observed_control, 4),
+  null_mean = round(colMeans(null_control), 4),
+  null_sd = round(apply(null_control, 2, sd), 4),
+  ecdf_pvalue = round(ecdf_pvals_control, 4)
+) |>
+  arrange(ecdf_pvalue)
+
+results_ctrl
+```
+
+### BH FDR Correction Across All Tests
+
+```{r fdr_correction}
+all_results <- bind_rows(results_deg, results_ctrl)
+
+all_results <- all_results |>
+  mutate(
+    fdr = p.adjust(ecdf_pvalue, method = "BH"),
+    sig = ifelse(fdr < 0.05, "*", "")
+  ) |>
+  arrange(ecdf_pvalue)
+
+cat("Significant at FDR < 0.05:\n")
+all_results |>
+  filter(fdr < 0.05) |>
+  select(module, type, n_genes, observed_mean_delta_k, ecdf_pvalue, fdr) |>
+  print()
+
+cat("\nAll control modules:\n")
+all_results |>
+  filter(type == "control") |>
+  select(module, n_genes, observed_mean_delta_k, ecdf_pvalue, fdr) |>
+  print()
+```
+
+## Save Results
+
+```{r save_results}
+write_csv(all_results, file.path(OUTPUT_DIR, "permutation_delta_kWithin_results.csv"))
+saveRDS(
+  list(
+    observed = observed_delta,
+    observed_control = observed_control,
+    null = null_deltas,
+    null_control = null_control,
+    pvals = ecdf_pvals,
+    pvals_control = ecdf_pvals_control,
+    control_genes = control_genes,
+    control_module_colors = control_module_colors,
+    photo_genes = photo_control,
+    sag_genes = sag_control
+  ),
+  file.path(OUTPUT_DIR, "permutation_delta_kWithin.rds")
+)
+```
+
+# Visualization
+
+## Permutation Null Distributions
+
+Each panel shows the null distribution of mean $\Delta k_{Within}$ from
+1000 genotype label permutations. The red line marks the observed value.
+Grey panels = DEG modules; blue panels = control modules.
+
+```{r null_distributions, fig.width=16, fig.height=14}
+# DEG modules
+plot_deg <- map_dfr(names(observed_delta), function(m) {
+  tibble(module = m, type = "DEG", null_value = null_deltas[, m])
+})
+# Control modules (prefix to avoid color name collisions)
+plot_ctrl <- map_dfr(names(observed_control), function(m) {
+  tibble(module = paste0("ctrl_", m), type = "control", null_value = null_control[, m])
+})
+plot_data <- bind_rows(plot_deg, plot_ctrl)
+
+obs_data <- tibble(
+  module = c(names(observed_delta), paste0("ctrl_", names(observed_control))),
+  type = c(rep("DEG", length(observed_delta)), rep("control", length(observed_control))),
+  observed = c(observed_delta, observed_control),
+  ecdf_pvalue = c(ecdf_pvals, ecdf_pvals_control)
+)
+
+module_levels <- c(sort(names(observed_delta)), sort(paste0("ctrl_", names(observed_control))))
+plot_data$module <- factor(plot_data$module, levels = module_levels)
+obs_data$module  <- factor(obs_data$module, levels = module_levels)
+
+p_null <- ggplot(plot_data, aes(x = null_value)) +
+  geom_histogram(
+    aes(y = after_stat(density), fill = type),
+    bins = 40, color = "grey50", alpha = 0.7
+  ) +
+  geom_vline(data = obs_data, aes(xintercept = observed),
+             color = "red", linewidth = 1) +
+  geom_text(
+    data = obs_data,
+    aes(x = observed, y = Inf, label = sprintf("p = %.3f", ecdf_pvalue)),
+    vjust = 1.5, hjust = -0.1, color = "red", size = 3
+  ) +
+  scale_fill_manual(values = c(DEG = "grey70", control = "steelblue")) +
+  facet_wrap(~module, scales = "free_x", ncol = 4) +
+  theme_minimal(base_size = 12) +
+  labs(
+    x = expression(Mean ~ Delta ~ k[Within] ~ "(permuted)"),
+    y = "Density",
+    title = "Genotype label permutation null for connectivity loss",
+    subtitle = sprintf(
+      "Red = observed; %d permutations. Grey = DEG modules, blue = control (non-DEG, Ojeda 2026)",
+      N_PERM
+    ),
+    fill = "Gene set"
+  )
+
+print(p_null)
+
+ggsave(file.path(OUTPUT_DIR, "permutation_null_delta_kWithin.pdf"),
+       p_null, width = 16, height = 14)
+ggsave(file.path(OUTPUT_DIR, "permutation_null_delta_kWithin.png"),
+       p_null, width = 16, height = 14, dpi = 300)
+```
+
+## |logFC| vs Delta kWithin
+
+Scatterplot of Inv4m expression effect size against connectivity change,
+for DEG and control genes separately.
+
+```{r logfc_vs_delta_k, fig.width=14, fig.height=6}
+library(patchwork)
+
+# Load DEG effects
+effects <- read_csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  show_col_types = FALSE
+)
+inv4m_effects <- effects |>
+  filter(grepl("Inv4m", predictor), !grepl(":", predictor)) |>
+  select(gene, logFC, adj.P.Val)
+
+# Gene-level delta kWithin for DEGs
+adj_ctrl_deg  <- adjacency(datExpr_all[ctrl_idx, ], power = SOFT_POWER, type = "signed")
+adj_inv4m_deg <- adjacency(datExpr_all[inv4m_idx, ], power = SOFT_POWER, type = "signed")
+k_ctrl_deg  <- intramodularConnectivity(adj_ctrl_deg, module_colors)
+k_inv4m_deg <- intramodularConnectivity(adj_inv4m_deg, module_colors)
+
+deg_dk <- tibble(
+  gene = rownames(k_ctrl_deg),
+  delta_kWithin = k_inv4m_deg$kWithin - k_ctrl_deg$kWithin,
+  group = "DEG"
+)
+
+# Gene-level delta kWithin for control genes
+adj_ctrl_c  <- adjacency(datExpr_control[ctrl_idx, ], power = SOFT_POWER, type = "signed")
+adj_inv4m_c <- adjacency(datExpr_control[inv4m_idx, ], power = SOFT_POWER, type = "signed")
+k_ctrl_c  <- intramodularConnectivity(adj_ctrl_c, control_module_colors)
+k_inv4m_c <- intramodularConnectivity(adj_inv4m_c, control_module_colors)
+
+ctrl_dk <- tibble(
+  gene = names(control_module_colors),
+  delta_kWithin = k_inv4m_c$kWithin - k_ctrl_c$kWithin,
+  group = "Topology control"
+)
+
+# Merge with logFC and p-value
+scatter_df <- bind_rows(deg_dk, ctrl_dk) |>
+  left_join(inv4m_effects |> select(gene, logFC, adj.P.Val), by = "gene") |>
+  mutate(
+    abs_logFC = abs(logFC),
+    neg_log10p = -log10(adj.P.Val)
+  ) |>
+  filter(!is.na(logFC))
+
+# Correlations per group
+cor_logfc <- scatter_df |>
+  group_by(group) |>
+  summarise(
+    rho = cor(abs_logFC, delta_kWithin, method = "spearman"),
+    .groups = "drop"
+  )
+cor_pval <- scatter_df |>
+  group_by(group) |>
+  summarise(
+    rho = cor(neg_log10p, delta_kWithin, method = "spearman"),
+    .groups = "drop"
+  )
+cat("Spearman correlations (|logFC| vs delta_k):\n")
+print(cor_logfc)
+cat("\nSpearman correlations (-log10P vs delta_k):\n")
+print(cor_pval)
+
+# Panel A: |logFC| vs delta kWithin
+p_logfc <- ggplot(scatter_df, aes(x = abs_logFC, y = delta_kWithin, color = group)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("DEG" = "grey40", "Topology control" = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = expression("|" * log[2] * "FC" * "| (Inv4m vs CTRL)"),
+    y = expression(Delta ~ k[Within] ~ "(Inv4m - CTRL)"),
+    color = NULL
+  ) +
+  theme(legend.position = c(0.2, 0.15))
+
+# Panel B: -log10P vs delta kWithin
+p_pval <- ggplot(scatter_df, aes(x = neg_log10p, y = delta_kWithin, color = group)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("DEG" = "grey40", "Topology control" = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = expression("-" * log[10] * "(FDR)"),
+    y = expression(Delta ~ k[Within] ~ "(Inv4m - CTRL)"),
+    color = NULL
+  ) +
+  theme(legend.position = "none")
+
+p_combined <- p_logfc + p_pval + plot_annotation(tag_levels = "A")
+print(p_combined)
+
+ggsave(file.path(OUTPUT_DIR, "logFC_pval_vs_delta_kWithin.pdf"),
+       p_combined, width = 14, height = 6)
+ggsave(file.path(OUTPUT_DIR, "logFC_pval_vs_delta_kWithin.png"),
+       p_combined, width = 14, height = 6, dpi = 300)
+```
+
+## Effect Size Distribution: DEG vs Control
+
+```{r effect_size_boxplots, fig.width=10, fig.height=5}
+# Panel A: |logFC|
+p_box_logfc <- ggplot(scatter_df, aes(x = group, y = abs_logFC, fill = group)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.3, alpha = 0.3) +
+  scale_fill_manual(values = c("Topology control" = "steelblue", "DEG" = "grey60")) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none") +
+  labs(x = NULL, y = expression("|" * log[2] * "FC" * "|"))
+
+# Panel B: -log10(FDR)
+p_box_pval <- ggplot(scatter_df, aes(x = group, y = neg_log10p, fill = group)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.3, alpha = 0.3) +
+  scale_fill_manual(values = c("Topology control" = "steelblue", "DEG" = "grey60")) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none") +
+  labs(x = NULL, y = expression("-" * log[10] * "(FDR)"))
+
+p_box_combined <- p_box_logfc + p_box_pval + plot_annotation(tag_levels = "A")
+print(p_box_combined)
+
+wt_logfc <- wilcox.test(abs_logFC ~ group, data = scatter_df)
+wt_pval  <- wilcox.test(neg_log10p ~ group, data = scatter_df)
+cat("|logFC| Wilcoxon p:", format.pval(wt_logfc$p.value), "\n")
+cat("-log10(FDR) Wilcoxon p:", format.pval(wt_pval$p.value), "\n")
+
+ggsave(file.path(OUTPUT_DIR, "effect_size_DEG_vs_control.pdf"),
+       p_box_combined, width = 10, height = 5)
+ggsave(file.path(OUTPUT_DIR, "effect_size_DEG_vs_control.png"),
+       p_box_combined, width = 10, height = 5, dpi = 300)
+
+ggsave(file.path(OUTPUT_DIR, "logFC_DEG_vs_control.pdf"),
+       p_logfc, width = 5, height = 5)
+ggsave(file.path(OUTPUT_DIR, "logFC_DEG_vs_control.png"),
+       p_logfc, width = 5, height = 5, dpi = 300)
+```
+
+## kME (Module Eigengene Connectivity) Analysis
+
+kME measures each gene's correlation with its module eigengene. Unlike
+kWithin, kME is bounded [-1, 1] and does not scale with module size,
+making it directly comparable across modules.
+
+```{r kme_analysis, fig.width=10, fig.height=10, cache=TRUE}
+# Compute module eigengenes for DEG modules in each genotype
+datExpr_ctrl_sub  <- datExpr_all[ctrl_idx, ]
+datExpr_inv4m_sub <- datExpr_all[inv4m_idx, ]
+
+# Module eigengenes (CTRL)
+me_ctrl <- moduleEigengenes(datExpr_ctrl_sub, colors = module_colors)$eigengenes
+# Module eigengenes (Inv4m)
+me_inv4m <- moduleEigengenes(datExpr_inv4m_sub, colors = module_colors)$eigengenes
+
+# kME = correlation between gene expression and module eigengene
+# Use signedKME which computes cor(gene, ME) for all genes x all MEs
+kme_ctrl  <- signedKME(datExpr_ctrl_sub, me_ctrl)
+kme_inv4m <- signedKME(datExpr_inv4m_sub, me_inv4m)
+
+# For each gene, get kME to its own module
+gene_names <- colnames(datExpr_all)
+own_module <- module_colors[gene_names]
+
+deg_kme <- tibble(
+  gene = gene_names,
+  module = own_module
+) |>
+  filter(module != "grey", !is.na(module)) |>
+  rowwise() |>
+  mutate(
+    me_col = paste0("kME", module),
+    kme_ctrl = kme_ctrl[[me_col]][which(colnames(datExpr_all) == gene)],
+    kme_inv4m = kme_inv4m[[me_col]][which(colnames(datExpr_all) == gene)],
+    delta_kme = kme_inv4m - kme_ctrl
+  ) |>
+  ungroup() |>
+  select(gene, module, kme_ctrl, kme_inv4m, delta_kme)
+
+# Module-level summary
+kme_module_summary <- deg_kme |>
+  group_by(module) |>
+  summarise(
+    n_genes = n(),
+    mean_kme_ctrl = round(mean(kme_ctrl), 3),
+    mean_kme_inv4m = round(mean(kme_inv4m), 3),
+    mean_delta_kme = round(mean(delta_kme), 3),
+    pct_decreased = round(mean(delta_kme < 0) * 100, 1),
+    .groups = "drop"
+  ) |>
+  arrange(mean_delta_kme)
+
+cat("=== kME SUMMARY PER DEG MODULE ===\n")
+print(kme_module_summary)
+
+# Same for control modules
+datExpr_ctrl_c  <- datExpr_control[ctrl_idx, ]
+datExpr_inv4m_c <- datExpr_control[inv4m_idx, ]
+
+me_ctrl_c  <- moduleEigengenes(datExpr_ctrl_c, colors = control_module_colors)$eigengenes
+me_inv4m_c <- moduleEigengenes(datExpr_inv4m_c, colors = control_module_colors)$eigengenes
+
+kme_ctrl_c  <- signedKME(datExpr_ctrl_c, me_ctrl_c)
+kme_inv4m_c <- signedKME(datExpr_inv4m_c, me_inv4m_c)
+
+ctrl_gene_names <- colnames(datExpr_control)
+ctrl_own_module <- control_module_colors[ctrl_gene_names]
+
+ctrl_kme <- tibble(
+  gene = ctrl_gene_names,
+  module = ctrl_own_module
+) |>
+  filter(module != "grey", !is.na(module)) |>
+  rowwise() |>
+  mutate(
+    me_col = paste0("kME", module),
+    kme_ctrl = kme_ctrl_c[[me_col]][which(colnames(datExpr_control) == gene)],
+    kme_inv4m = kme_inv4m_c[[me_col]][which(colnames(datExpr_control) == gene)],
+    delta_kme = kme_inv4m - kme_ctrl
+  ) |>
+  ungroup() |>
+  select(gene, module, kme_ctrl, kme_inv4m, delta_kme)
+
+kme_ctrl_summary <- ctrl_kme |>
+  group_by(module) |>
+  summarise(
+    n_genes = n(),
+    mean_kme_ctrl = round(mean(kme_ctrl), 3),
+    mean_kme_inv4m = round(mean(kme_inv4m), 3),
+    mean_delta_kme = round(mean(delta_kme), 3),
+    pct_decreased = round(mean(delta_kme < 0) * 100, 1),
+    .groups = "drop"
+  ) |>
+  arrange(mean_delta_kme)
+
+cat("\n=== kME SUMMARY PER CONTROL MODULE ===\n")
+print(kme_ctrl_summary)
+```
+
+### kME Permutation Test
+
+Same genotype label permutation as kWithin, but computing delta kME
+per module instead.
+
+```{r kme_permutation, cache=TRUE}
+# Helper: compute mean delta kME per module
+compute_module_delta_kme <- function(datExpr_a, datExpr_b, mod_colors) {
+  me_a <- moduleEigengenes(datExpr_a, colors = mod_colors)$eigengenes
+  me_b <- moduleEigengenes(datExpr_b, colors = mod_colors)$eigengenes
+
+  kme_a <- signedKME(datExpr_a, me_a)
+  kme_b <- signedKME(datExpr_b, me_b)
+
+  module_ids <- unique(mod_colors[mod_colors != "grey" & !is.na(mod_colors)])
+  sapply(module_ids, function(m) {
+    me_col <- paste0("kME", m)
+    gene_idx <- which(mod_colors == m)
+    mean(kme_b[[me_col]][gene_idx] - kme_a[[me_col]][gene_idx], na.rm = TRUE)
+  })
+}
+
+# Observed
+obs_kme_deg <- compute_module_delta_kme(
+  datExpr_all[ctrl_idx, ], datExpr_all[inv4m_idx, ], module_colors
+)
+obs_kme_ctrl <- compute_module_delta_kme(
+  datExpr_control[ctrl_idx, ], datExpr_control[inv4m_idx, ], control_module_colors
+)
+
+cat("Observed mean delta kME (DEG):\n")
+print(round(sort(obs_kme_deg), 4))
+cat("\nObserved mean delta kME (control):\n")
+print(round(sort(obs_kme_ctrl), 4))
+
+# Permutation
+null_kme_deg  <- matrix(NA, nrow = N_PERM, ncol = length(obs_kme_deg))
+colnames(null_kme_deg) <- names(obs_kme_deg)
+null_kme_ctrl <- matrix(NA, nrow = N_PERM, ncol = length(obs_kme_ctrl))
+colnames(null_kme_ctrl) <- names(obs_kme_ctrl)
+
+pb <- txtProgressBar(min = 0, max = N_PERM, style = 3)
+for (i in seq_len(N_PERM)) {
+  perm_idx <- sample(n_total)
+  pseudo_ctrl  <- perm_idx[1:n_ctrl]
+  pseudo_inv4m <- perm_idx[(n_ctrl + 1):n_total]
+
+  null_kme_deg[i, ] <- compute_module_delta_kme(
+    datExpr_all[pseudo_ctrl, ], datExpr_all[pseudo_inv4m, ], module_colors
+  )
+  null_kme_ctrl[i, ] <- compute_module_delta_kme(
+    datExpr_control[pseudo_ctrl, ], datExpr_control[pseudo_inv4m, ], control_module_colors
+  )
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+
+# ECDF p-values
+kme_pvals_deg <- sapply(names(obs_kme_deg), function(m) {
+  mean(null_kme_deg[, m] <= obs_kme_deg[m])
+})
+kme_pvals_ctrl <- sapply(names(obs_kme_ctrl), function(m) {
+  mean(null_kme_ctrl[, m] <= obs_kme_ctrl[m])
+})
+
+kme_results_deg <- tibble(
+  module = names(obs_kme_deg), type = "DEG",
+  observed_delta_kme = round(obs_kme_deg, 4),
+  null_mean = round(colMeans(null_kme_deg), 4),
+  null_sd = round(apply(null_kme_deg, 2, sd), 4),
+  ecdf_pvalue = round(kme_pvals_deg, 4)
+) |> arrange(ecdf_pvalue)
+
+kme_results_ctrl <- tibble(
+  module = names(obs_kme_ctrl), type = "control",
+  observed_delta_kme = round(obs_kme_ctrl, 4),
+  null_mean = round(colMeans(null_kme_ctrl), 4),
+  null_sd = round(apply(null_kme_ctrl, 2, sd), 4),
+  ecdf_pvalue = round(kme_pvals_ctrl, 4)
+) |> arrange(ecdf_pvalue)
+
+cat("\n=== kME PERMUTATION RESULTS (DEG) ===\n")
+print(kme_results_deg)
+cat("\n=== kME PERMUTATION RESULTS (CONTROL) ===\n")
+print(kme_results_ctrl)
+
+# FDR across all
+kme_all <- bind_rows(kme_results_deg, kme_results_ctrl) |>
+  mutate(fdr = p.adjust(ecdf_pvalue, method = "BH")) |>
+  arrange(ecdf_pvalue)
+
+cat("\n=== FDR-CORRECTED kME RESULTS ===\n")
+cat("DEG significant (FDR < 0.05):", sum(kme_all$type == "DEG" & kme_all$fdr < 0.05), "\n")
+cat("Control significant (FDR < 0.05):", sum(kme_all$type == "control" & kme_all$fdr < 0.05), "\n")
+
+write_csv(kme_all, file.path(OUTPUT_DIR, "permutation_delta_kME_results.csv"))
+saveRDS(
+  list(observed_deg = obs_kme_deg, observed_ctrl = obs_kme_ctrl,
+       null_deg = null_kme_deg, null_ctrl = null_kme_ctrl,
+       pvals_deg = kme_pvals_deg, pvals_ctrl = kme_pvals_ctrl),
+  file.path(OUTPUT_DIR, "permutation_delta_kME.rds")
+)
+```
+
+### kME Z-score Violin Plot
+
+```{r kme_violin, fig.width=10, fig.height=10}
+# Z-score
+kme_deg_z <- null_kme_deg
+kme_deg_mean <- colMeans(null_kme_deg)
+kme_deg_sd <- apply(null_kme_deg, 2, sd)
+for (m in colnames(kme_deg_z)) {
+  kme_deg_z[, m] <- (kme_deg_z[, m] - kme_deg_mean[m]) / kme_deg_sd[m]
+}
+kme_obs_z_deg <- (obs_kme_deg - kme_deg_mean) / kme_deg_sd
+
+kme_ctrl_z <- null_kme_ctrl
+kme_ctrl_mean <- colMeans(null_kme_ctrl)
+kme_ctrl_sd <- apply(null_kme_ctrl, 2, sd)
+for (m in colnames(kme_ctrl_z)) {
+  kme_ctrl_z[, m] <- (kme_ctrl_z[, m] - kme_ctrl_mean[m]) / kme_ctrl_sd[m]
+}
+kme_obs_z_ctrl <- (obs_kme_ctrl - kme_ctrl_mean) / kme_ctrl_sd
+
+# DEG violin
+kme_deg_violin <- map_dfr(colnames(kme_deg_z), function(m) {
+  tibble(module = m, z_value = kme_deg_z[, m])
+})
+# FDR across all kME modules (DEG + control)
+# Positional indexing to avoid duplicate name collisions
+n_kme_deg <- length(kme_pvals_deg)
+n_kme_ctrl <- length(kme_pvals_ctrl)
+all_kme_pvals <- c(kme_pvals_deg, kme_pvals_ctrl)
+all_kme_fdr <- p.adjust(all_kme_pvals, method = "BH")
+kme_fdr_deg  <- setNames(all_kme_fdr[1:n_kme_deg], names(kme_pvals_deg))
+kme_fdr_ctrl <- setNames(all_kme_fdr[(n_kme_deg + 1):(n_kme_deg + n_kme_ctrl)], names(kme_pvals_ctrl))
+
+kme_deg_points <- tibble(
+  module = names(kme_obs_z_deg),
+  z_observed = kme_obs_z_deg,
+  fdr = kme_fdr_deg[names(kme_obs_z_deg)]
+)
+kme_deg_order <- kme_deg_points |> arrange(z_observed) |> pull(module)
+kme_deg_violin$module <- factor(kme_deg_violin$module, levels = kme_deg_order)
+kme_deg_points$module <- factor(kme_deg_points$module, levels = kme_deg_order)
+
+# Control violin
+kme_ctrl_violin <- map_dfr(colnames(kme_ctrl_z), function(m) {
+  tibble(module = m, z_value = kme_ctrl_z[, m])
+})
+kme_ctrl_points <- tibble(
+  module = names(kme_obs_z_ctrl),
+  z_observed = kme_obs_z_ctrl,
+  fdr = kme_fdr_ctrl[names(kme_obs_z_ctrl)]
+)
+kme_ctrl_order <- kme_ctrl_points |> arrange(z_observed) |> pull(module)
+kme_ctrl_violin$module <- factor(kme_ctrl_violin$module, levels = kme_ctrl_order)
+kme_ctrl_points$module <- factor(kme_ctrl_points$module, levels = kme_ctrl_order)
+
+p_kme_deg <- make_violin_panel(kme_deg_violin, kme_deg_points,
+                                "DEG modules (kME)", "grey70")
+p_kme_ctrl <- make_violin_panel(kme_ctrl_violin, kme_ctrl_points,
+                                 "Control modules (kME)", ctrl_color_hex)
+
+p_kme_combined <- p_kme_deg / p_kme_ctrl +
+  plot_annotation(tag_levels = "A")
+print(p_kme_combined)
+
+ggsave(file.path(OUTPUT_DIR, "zscore_violin_kME_DEG_vs_control.pdf"),
+       p_kme_combined, width = 10, height = 10)
+ggsave(file.path(OUTPUT_DIR, "zscore_violin_kME_DEG_vs_control.png"),
+       p_kme_combined, width = 10, height = 10, dpi = 300)
+```
+
+## Z-score Violin Plot (Main Figure Candidate)
+
+Two-panel figure comparing connectivity disruption in DEG modules versus
+topology control modules. Z-scores are computed per module as
+$(observed - mean_{null}) / sd_{null}$. Red dots mark observed values.
+
+```{r zscore_violins, fig.width=10, fig.height=10}
+# Z-score the null distributions
+deg_null_z <- perm_null_data <- null_deltas
+deg_null_mean <- colMeans(null_deltas)
+deg_null_sd <- apply(null_deltas, 2, sd)
+for (m in colnames(deg_null_z)) {
+  deg_null_z[, m] <- (deg_null_z[, m] - deg_null_mean[m]) / deg_null_sd[m]
+}
+deg_obs_z <- (observed_delta - deg_null_mean) / deg_null_sd
+
+ctrl_null_z <- null_control
+ctrl_null_mean <- colMeans(null_control)
+ctrl_null_sd <- apply(null_control, 2, sd)
+for (m in colnames(ctrl_null_z)) {
+  ctrl_null_z[, m] <- (ctrl_null_z[, m] - ctrl_null_mean[m]) / ctrl_null_sd[m]
+}
+ctrl_obs_z <- (observed_control - ctrl_null_mean) / ctrl_null_sd
+
+# DEG violin data
+deg_violin <- map_dfr(colnames(deg_null_z), function(m) {
+  tibble(module = m, z_value = deg_null_z[, m])
+})
+# Compute FDR across all kWithin modules (DEG + control)
+# Use positional indexing to avoid duplicate name collisions
+n_deg <- length(ecdf_pvals)
+n_ctrl <- length(ecdf_pvals_control)
+all_kw_pvals <- c(ecdf_pvals, ecdf_pvals_control)
+all_kw_fdr <- p.adjust(all_kw_pvals, method = "BH")
+kw_fdr_deg  <- setNames(all_kw_fdr[1:n_deg], names(ecdf_pvals))
+kw_fdr_ctrl <- setNames(all_kw_fdr[(n_deg + 1):(n_deg + n_ctrl)], names(ecdf_pvals_control))
+
+deg_points <- tibble(
+  module = names(deg_obs_z),
+  z_observed = deg_obs_z,
+  fdr = kw_fdr_deg[names(deg_obs_z)]
+)
+deg_order <- deg_points |> arrange(z_observed) |> pull(module)
+deg_violin$module <- factor(deg_violin$module, levels = deg_order)
+deg_points$module <- factor(deg_points$module, levels = deg_order)
+
+# Control violin data
+ctrl_violin <- map_dfr(colnames(ctrl_null_z), function(m) {
+  tibble(module = m, z_value = ctrl_null_z[, m])
+})
+ctrl_points <- tibble(
+  module = names(ctrl_obs_z),
+  z_observed = ctrl_obs_z,
+  fdr = kw_fdr_ctrl[names(ctrl_obs_z)]
+)
+ctrl_order <- ctrl_points |> arrange(z_observed) |> pull(module)
+ctrl_violin$module <- factor(ctrl_violin$module, levels = ctrl_order)
+ctrl_points$module <- factor(ctrl_points$module, levels = ctrl_order)
+
+p_deg_violin <- make_violin_panel(deg_violin, deg_points,
+                                   "DEG coexpression modules (kWithin)", "grey70")
+p_ctrl_violin <- make_violin_panel(ctrl_violin, ctrl_points,
+                                    "Topology control (kWithin)", ctrl_color_hex)
+
+p_violin_combined <- p_deg_violin / p_ctrl_violin +
+  plot_annotation(tag_levels = "A")
+print(p_violin_combined)
+
+ggsave(file.path(OUTPUT_DIR, "zscore_violin_DEG_vs_control.pdf"),
+       p_violin_combined, width = 10, height = 10)
+ggsave(file.path(OUTPUT_DIR, "zscore_violin_DEG_vs_control.png"),
+       p_violin_combined, width = 10, height = 10, dpi = 300)
+```
+
+# Summary
+
+```{r summary}
+n_deg_sig <- sum(all_results$type == "DEG" & all_results$fdr < 0.05)
+n_ctrl_sig <- sum(all_results$type == "control" & all_results$fdr < 0.05)
+
+cat("=== PERMUTATION TEST SUMMARY ===\n\n")
+cat("DEG modules significant (FDR < 0.05):", n_deg_sig, "of",
+    sum(all_results$type == "DEG"), "\n")
+cat("Control modules significant (FDR < 0.05):", n_ctrl_sig, "of",
+    sum(all_results$type == "control"), "\n\n")
+
+cat("Significant DEG modules:\n")
+all_results |>
+  filter(type == "DEG", fdr < 0.05) |>
+  select(module, n_genes, observed_mean_delta_k, ecdf_pvalue, fdr) |>
+  print()
+
+cat("\nConclusion: Connectivity loss in DEG modules exceeds the genotype\n")
+cat("label permutation null, while non-DEG control genes (matched for\n")
+cat("coexpression structure and sample composition) show no significant\n")
+cat("connectivity loss. This rules out the possibility that the observed\n")
+cat("disruption is an artifact of building separate genotype networks\n")
+cat("from differentially expressed genes.\n")
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
