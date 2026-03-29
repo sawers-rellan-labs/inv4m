@@ -166,12 +166,14 @@ how the DEG modules were constructed.
 datExpr_ctrl_only <- datExpr_control[which(true_labels == "CTRL"), ]
 adj_ctrl_control <- adjacency(datExpr_ctrl_only, power = SOFT_POWER, type = "signed")
 ctrl_tree <- hclust(as.dist(1 - adj_ctrl_control), method = "average")
-ctrl_control_modules <- cutreeDynamic(
-  dendro = ctrl_tree,
-  distM = 1 - adj_ctrl_control,
-  deepSplit = 4,
-  minClusterSize = 10
-)
+invisible(capture.output(
+  ctrl_control_modules <- cutreeDynamic(
+    dendro = ctrl_tree,
+    distM = 1 - adj_ctrl_control,
+    deepSplit = 4,
+    minClusterSize = 10
+  )
+))
 control_module_colors_raw <- labels2colors(ctrl_control_modules)
 
 # Remap WGCNA standard colors to non-clashing names with matching hex
@@ -234,7 +236,6 @@ ctrl_ref_modules <- data.frame(
 )
 
 boot_results <- vector("list", N_BOOT)
-pb <- txtProgressBar(min = 0, max = N_BOOT, style = 3)
 
 for (b in seq_len(N_BOOT)) {
   n_samp <- nrow(datExpr_ctrl_only)
@@ -247,21 +248,21 @@ for (b in seq_len(N_BOOT)) {
                          type = "signed")
   tree_boot <- hclust(as.dist(1 - adj_boot),
                        method = "average")
-  mods_boot <- cutreeDynamic(
-    dendro = tree_boot,
-    distM = 1 - adj_boot,
-    deepSplit = 4,
-    minClusterSize = 10
-  )
+  invisible(capture.output(
+    mods_boot <- cutreeDynamic(
+      dendro = tree_boot,
+      distM = 1 - adj_boot,
+      deepSplit = 4,
+      minClusterSize = 10
+    )
+  ))
 
   boot_results[[b]] <- data.frame(
     gene = colnames(expr_boot),
     module = mods_boot,
     stringsAsFactors = FALSE
   )
-  setTxtProgressBar(pb, b)
 }
-close(pb)
 
 # Compute LFP per module
 ctrl_modules_list <- unique(
@@ -696,7 +697,6 @@ null_control_out <- matrix(NA, nrow = N_PERM, ncol = length(observed_control_out
 colnames(null_control)     <- names(observed_control)
 colnames(null_control_out) <- names(observed_control_out)
 
-pb <- txtProgressBar(min = 0, max = N_PERM, style = 3)
 for (i in seq_len(N_PERM)) {
   perm_idx <- sample(n_total)
   pseudo_ctrl  <- perm_idx[1:n_ctrl]
@@ -716,9 +716,7 @@ for (i in seq_len(N_PERM)) {
   null_control[i, ]     <- perm_ctrl$kWithin
   null_control_out[i, ] <- perm_ctrl$kOut
 
-  setTxtProgressBar(pb, i)
 }
-close(pb)
 ```
 
 # Results
@@ -1469,7 +1467,7 @@ combined_table <- bind_rows(deg_table, ctrl_table) |>
   arrange(gene_set, kWithin_FDR)
 
 cat("=== COMBINED MODULE STATISTICS ===\n\n")
-print(combined_table, n = 30)
+print(combined_table, n = 30, width = Inf)
 
 # Save
 write_csv(
@@ -1501,31 +1499,37 @@ all_results |>
 n_deg_sig_out <- sum(kout_fdr_deg < 0.05)
 n_ctrl_sig_out <- sum(kout_fdr_ctrl < 0.05)
 
-cat("\n=== kOut (inter-modular) ===\n")
-cat("DEG modules with significant kOut gain (FDR < 0.05):",
-    n_deg_sig_out, "of", length(kout_fdr_deg), "\n")
-cat("Control modules with significant kOut gain (FDR < 0.05):",
-    n_ctrl_sig_out, "of", length(kout_fdr_ctrl), "\n")
+cat("
+=== kOut (inter-modular) ===
+DEG modules with significant kOut gain (FDR < 0.05):",
+    n_deg_sig_out, "of", length(kout_fdr_deg), "
+Control modules with significant kOut gain (FDR < 0.05):",
+    n_ctrl_sig_out, "of", length(kout_fdr_ctrl), "
 
-cat("\n=== CONCLUSIONS ===\n\n")
-cat("1. kWithin: DEG modules show significant intramodular\n")
-cat("   connectivity loss beyond the permutation null.\n")
-cat("   Control modules do not.\n\n")
-cat("2. kOut: No significant gain in inter-modular connectivity\n")
-cat("   for DEG or control modules. The perturbation degrades\n")
-cat("   within-module coexpression structure without causing\n")
-cat("   genes to gain spurious cross-module connections.\n\n")
-cat("3. This asymmetry (kWithin loss without kOut gain) argues\n")
-cat("   against a global artifact of mean expression shifts:\n")
-cat("   if the connectivity change were driven by correlated\n")
-cat("   mean shifts inflating all pairwise differences, both\n")
-cat("   kWithin and kOut would be affected. Instead, only\n")
-cat("   within-module relationships are disrupted, consistent\n")
-cat("   with degradation of specific coexpression programs.\n\n")
-cat("4. The linear model confirms this: |logFC| does not\n")
-cat("   predict delta kWithin (p = 0.65, R2 = 0.0004),\n")
-cat("   ruling out differential expression magnitude as a\n")
-cat("   driver of connectivity loss.\n")
+=== CONCLUSIONS ===
+
+1. kWithin: DEG modules show significant intramodular
+   connectivity loss beyond the permutation null.
+   Control modules do not.
+
+2. kOut: No significant gain in inter-modular connectivity
+   for DEG or control modules. The perturbation degrades
+   within-module coexpression structure without causing
+   genes to gain spurious cross-module connections.
+
+3. This asymmetry (kWithin loss without kOut gain) argues
+   against a global artifact of mean expression shifts:
+   if the connectivity change were driven by correlated
+   mean shifts inflating all pairwise differences, both
+   kWithin and kOut would be affected. Instead, only
+   within-module relationships are disrupted, consistent
+   with degradation of specific coexpression programs.
+
+4. The linear model confirms this: |logFC| does not
+   predict delta kWithin (p = 0.65, R2 = 0.0004),
+   ruling out differential expression magnitude as a
+   driver of connectivity loss.
+")
 ```
 
 # Session Info

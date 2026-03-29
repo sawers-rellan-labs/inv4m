@@ -1729,15 +1729,15 @@ how the DEG modules were constructed.</p>
 <pre class="r"><code>datExpr_ctrl_only &lt;- datExpr_control[which(true_labels == &quot;CTRL&quot;), ]
 adj_ctrl_control &lt;- adjacency(datExpr_ctrl_only, power = SOFT_POWER, type = &quot;signed&quot;)
 ctrl_tree &lt;- hclust(as.dist(1 - adj_ctrl_control), method = &quot;average&quot;)
-ctrl_control_modules &lt;- cutreeDynamic(
-  dendro = ctrl_tree,
-  distM = 1 - adj_ctrl_control,
-  deepSplit = 4,
-  minClusterSize = 10
-)</code></pre>
-<pre><code>##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.</code></pre>
-<pre class="r"><code>control_module_colors_raw &lt;- labels2colors(ctrl_control_modules)
+invisible(capture.output(
+  ctrl_control_modules &lt;- cutreeDynamic(
+    dendro = ctrl_tree,
+    distM = 1 - adj_ctrl_control,
+    deepSplit = 4,
+    minClusterSize = 10
+  )
+))
+control_module_colors_raw &lt;- labels2colors(ctrl_control_modules)
 
 # Remap WGCNA standard colors to non-clashing names with matching hex
 ctrl_color_remap &lt;- c(
@@ -1809,9 +1809,8 @@ ctrl_ref_modules &lt;- data.frame(
 )
 
 boot_results &lt;- vector(&quot;list&quot;, N_BOOT)
-pb &lt;- txtProgressBar(min = 0, max = N_BOOT, style = 3)</code></pre>
-<pre><code>##   |                                                                              |                                                                      |   0%</code></pre>
-<pre class="r"><code>for (b in seq_len(N_BOOT)) {
+
+for (b in seq_len(N_BOOT)) {
   n_samp &lt;- nrow(datExpr_ctrl_only)
   boot_idx &lt;- sample(n_samp, n_samp, replace = TRUE)
   expr_boot &lt;- datExpr_ctrl_only[boot_idx, ]
@@ -1822,2022 +1821,23 @@ pb &lt;- txtProgressBar(min = 0, max = N_BOOT, style = 3)</code></pre>
                          type = &quot;signed&quot;)
   tree_boot &lt;- hclust(as.dist(1 - adj_boot),
                        method = &quot;average&quot;)
-  mods_boot &lt;- cutreeDynamic(
-    dendro = tree_boot,
-    distM = 1 - adj_boot,
-    deepSplit = 4,
-    minClusterSize = 10
-  )
+  invisible(capture.output(
+    mods_boot &lt;- cutreeDynamic(
+      dendro = tree_boot,
+      distM = 1 - adj_boot,
+      deepSplit = 4,
+      minClusterSize = 10
+    )
+  ))
 
   boot_results[[b]] &lt;- data.frame(
     gene = colnames(expr_boot),
     module = mods_boot,
     stringsAsFactors = FALSE
   )
-  setTxtProgressBar(pb, b)
-}</code></pre>
-<pre><code>##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |                                                                      |   1% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=                                                                     |   1% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=                                                                     |   2% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==                                                                    |   2% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==                                                                    |   3% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==                                                                    |   4% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===                                                                   |   4% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===                                                                   |   5% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====                                                                  |   5% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====                                                                  |   6% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====                                                                 |   6% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====                                                                 |   7% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====                                                                 |   8% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======                                                                |   8% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======                                                                |   9% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======                                                               |   9% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======                                                               |  10% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======                                                               |  11% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========                                                              |  11% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========                                                              |  12% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========                                                             |  12% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========                                                             |  13% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========                                                             |  14% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========                                                            |  14% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========                                                            |  15% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========                                                           |  15% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========                                                           |  16% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============                                                          |  16% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============                                                          |  17% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============                                                          |  18% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============                                                         |  18% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============                                                         |  19% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============                                                        |  19% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============                                                        |  20% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============                                                        |  21% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============                                                       |  21% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============                                                       |  22% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================                                                      |  22% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================                                                      |  23% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================                                                      |  24% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================                                                     |  24% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================                                                     |  25% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================                                                    |  25% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================                                                    |  26% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================                                                   |  26% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================                                                   |  27% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================                                                   |  28% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================                                                  |  28% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================                                                  |  29% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================                                                 |  29% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================                                                 |  30% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================                                                 |  31% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================                                                |  31% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================                                                |  32% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.993  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================                                               |  32% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================                                               |  33% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================                                               |  34% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================                                              |  34% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================                                              |  35% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================                                             |  35% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================                                             |  36% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================                                            |  36% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================                                            |  37% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================                                            |  38% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================                                           |  38% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================                                           |  39% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================                                          |  39% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================                                          |  40% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================                                          |  41% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================                                         |  41% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================                                         |  42% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================                                        |  42% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================                                        |  43% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================                                        |  44% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================                                       |  44% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================                                       |  45% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================                                      |  45% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================                                      |  46% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================                                     |  46% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================                                     |  47% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================                                     |  48% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================                                    |  48% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================                                    |  49% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================                                   |  49% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================                                   |  50% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================                                   |  51% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================                                  |  51% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================                                  |  52% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================================                                 |  52% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================================                                 |  53% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================================                                 |  54% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================                                |  54% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================                                |  55% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================================                               |  55% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================================                               |  56% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================                              |  56% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================                              |  57% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================                              |  58% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================================                             |  58% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================================                             |  59% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================                            |  59% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================                            |  60% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================                            |  61% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================================                           |  61% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================================                           |  62% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================================                          |  62% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================================                          |  63% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================================                          |  64% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================================                         |  64% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================================                         |  65% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================================                        |  65% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================================                        |  66% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================                       |  66% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================                       |  67% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================                       |  68% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================================                      |  68% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================================                      |  69% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================                     |  69% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================                     |  70% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================                     |  71% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================================                    |  71% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================================                    |  72% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================                   |  72% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================                   |  73% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================                   |  74% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================================                  |  74% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================================                  |  75% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================================================                 |  75% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=====================================================                 |  76% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================================                |  76% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================================                |  77% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================================                |  78% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================================================               |  78% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=======================================================               |  79% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================================              |  79% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================================              |  80% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |========================================================              |  81% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================================================             |  81% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=========================================================             |  82% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================================            |  82% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================================            |  83% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==========================================================            |  84% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================================================           |  84% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===========================================================           |  85% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================================================          |  85% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |============================================================          |  86% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================================================         |  86% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================================================         |  87% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=============================================================         |  88% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================================================        |  88% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==============================================================        |  89% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================================       |  89% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================================       |  90% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===============================================================       |  91% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================================================      |  91% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |================================================================      |  92% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================================     |  92% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================================     |  93% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |=================================================================     |  94% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================================================    |  94% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |==================================================================    |  95% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================================   |  95% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================================   |  96% ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================================================  |  96% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================================================  |  97% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |====================================================================  |  98% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================================== |  98% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |===================================================================== |  99% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================================================|  99% ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##   |                                                                              |======================================================================| 100% ..cutHeight not given, setting it to 0.99  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.991  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.
-##  ..cutHeight not given, setting it to 0.992  ===&gt;  99% of the (truncated) height range in dendro.
-##  ..done.</code></pre>
-<pre class="r"><code>close(pb)</code></pre>
-<pre class="r"><code># Compute LFP per module
+}
+
+# Compute LFP per module
 ctrl_modules_list &lt;- unique(
   ctrl_ref_modules$module[ctrl_ref_modules$module != 0]
 )
@@ -4356,9 +2356,7 @@ null_control_out &lt;- matrix(NA, nrow = N_PERM, ncol = length(observed_control_
 colnames(null_control)     &lt;- names(observed_control)
 colnames(null_control_out) &lt;- names(observed_control_out)
 
-pb &lt;- txtProgressBar(min = 0, max = N_PERM, style = 3)</code></pre>
-<pre><code>##   |                                                                              |                                                                      |   0%</code></pre>
-<pre class="r"><code>for (i in seq_len(N_PERM)) {
+for (i in seq_len(N_PERM)) {
   perm_idx &lt;- sample(n_total)
   pseudo_ctrl  &lt;- perm_idx[1:n_ctrl]
   pseudo_inv4m &lt;- perm_idx[(n_ctrl + 1):n_total]
@@ -4377,10 +2375,7 @@ pb &lt;- txtProgressBar(min = 0, max = N_PERM, style = 3)</code></pre>
   null_control[i, ]     &lt;- perm_ctrl$kWithin
   null_control_out[i, ] &lt;- perm_ctrl$kOut
 
-  setTxtProgressBar(pb, i)
 }</code></pre>
-<pre><code>##   |                                                                              |                                                                      |   1%  |                                                                              |=                                                                     |   1%  |                                                                              |=                                                                     |   2%  |                                                                              |==                                                                    |   2%  |                                                                              |==                                                                    |   3%  |                                                                              |==                                                                    |   4%  |                                                                              |===                                                                   |   4%  |                                                                              |===                                                                   |   5%  |                                                                              |====                                                                  |   5%  |                                                                              |====                                                                  |   6%  |                                                                              |=====                                                                 |   6%  |                                                                              |=====                                                                 |   7%  |                                                                              |=====                                                                 |   8%  |                                                                              |======                                                                |   8%  |                                                                              |======                                                                |   9%  |                                                                              |=======                                                               |   9%  |                                                                              |=======                                                               |  10%  |                                                                              |=======                                                               |  11%  |                                                                              |========                                                              |  11%  |                                                                              |========                                                              |  12%  |                                                                              |=========                                                             |  12%  |                                                                              |=========                                                             |  13%  |                                                                              |=========                                                             |  14%  |                                                                              |==========                                                            |  14%  |                                                                              |==========                                                            |  15%  |                                                                              |===========                                                           |  15%  |                                                                              |===========                                                           |  16%  |                                                                              |============                                                          |  16%  |                                                                              |============                                                          |  17%  |                                                                              |============                                                          |  18%  |                                                                              |=============                                                         |  18%  |                                                                              |=============                                                         |  19%  |                                                                              |==============                                                        |  19%  |                                                                              |==============                                                        |  20%  |                                                                              |==============                                                        |  21%  |                                                                              |===============                                                       |  21%  |                                                                              |===============                                                       |  22%  |                                                                              |================                                                      |  22%  |                                                                              |================                                                      |  23%  |                                                                              |================                                                      |  24%  |                                                                              |=================                                                     |  24%  |                                                                              |=================                                                     |  25%  |                                                                              |==================                                                    |  25%  |                                                                              |==================                                                    |  26%  |                                                                              |===================                                                   |  26%  |                                                                              |===================                                                   |  27%  |                                                                              |===================                                                   |  28%  |                                                                              |====================                                                  |  28%  |                                                                              |====================                                                  |  29%  |                                                                              |=====================                                                 |  29%  |                                                                              |=====================                                                 |  30%  |                                                                              |=====================                                                 |  31%  |                                                                              |======================                                                |  31%  |                                                                              |======================                                                |  32%  |                                                                              |=======================                                               |  32%  |                                                                              |=======================                                               |  33%  |                                                                              |=======================                                               |  34%  |                                                                              |========================                                              |  34%  |                                                                              |========================                                              |  35%  |                                                                              |=========================                                             |  35%  |                                                                              |=========================                                             |  36%  |                                                                              |==========================                                            |  36%  |                                                                              |==========================                                            |  37%  |                                                                              |==========================                                            |  38%  |                                                                              |===========================                                           |  38%  |                                                                              |===========================                                           |  39%  |                                                                              |============================                                          |  39%  |                                                                              |============================                                          |  40%  |                                                                              |============================                                          |  41%  |                                                                              |=============================                                         |  41%  |                                                                              |=============================                                         |  42%  |                                                                              |==============================                                        |  42%  |                                                                              |==============================                                        |  43%  |                                                                              |==============================                                        |  44%  |                                                                              |===============================                                       |  44%  |                                                                              |===============================                                       |  45%  |                                                                              |================================                                      |  45%  |                                                                              |================================                                      |  46%  |                                                                              |=================================                                     |  46%  |                                                                              |=================================                                     |  47%  |                                                                              |=================================                                     |  48%  |                                                                              |==================================                                    |  48%  |                                                                              |==================================                                    |  49%  |                                                                              |===================================                                   |  49%  |                                                                              |===================================                                   |  50%  |                                                                              |===================================                                   |  51%  |                                                                              |====================================                                  |  51%  |                                                                              |====================================                                  |  52%  |                                                                              |=====================================                                 |  52%  |                                                                              |=====================================                                 |  53%  |                                                                              |=====================================                                 |  54%  |                                                                              |======================================                                |  54%  |                                                                              |======================================                                |  55%  |                                                                              |=======================================                               |  55%  |                                                                              |=======================================                               |  56%  |                                                                              |========================================                              |  56%  |                                                                              |========================================                              |  57%  |                                                                              |========================================                              |  58%  |                                                                              |=========================================                             |  58%  |                                                                              |=========================================                             |  59%  |                                                                              |==========================================                            |  59%  |                                                                              |==========================================                            |  60%  |                                                                              |==========================================                            |  61%  |                                                                              |===========================================                           |  61%  |                                                                              |===========================================                           |  62%  |                                                                              |============================================                          |  62%  |                                                                              |============================================                          |  63%  |                                                                              |============================================                          |  64%  |                                                                              |=============================================                         |  64%  |                                                                              |=============================================                         |  65%  |                                                                              |==============================================                        |  65%  |                                                                              |==============================================                        |  66%  |                                                                              |===============================================                       |  66%  |                                                                              |===============================================                       |  67%  |                                                                              |===============================================                       |  68%  |                                                                              |================================================                      |  68%  |                                                                              |================================================                      |  69%  |                                                                              |=================================================                     |  69%  |                                                                              |=================================================                     |  70%  |                                                                              |=================================================                     |  71%  |                                                                              |==================================================                    |  71%  |                                                                              |==================================================                    |  72%  |                                                                              |===================================================                   |  72%  |                                                                              |===================================================                   |  73%  |                                                                              |===================================================                   |  74%  |                                                                              |====================================================                  |  74%  |                                                                              |====================================================                  |  75%  |                                                                              |=====================================================                 |  75%  |                                                                              |=====================================================                 |  76%  |                                                                              |======================================================                |  76%  |                                                                              |======================================================                |  77%  |                                                                              |======================================================                |  78%  |                                                                              |=======================================================               |  78%  |                                                                              |=======================================================               |  79%  |                                                                              |========================================================              |  79%  |                                                                              |========================================================              |  80%  |                                                                              |========================================================              |  81%  |                                                                              |=========================================================             |  81%  |                                                                              |=========================================================             |  82%  |                                                                              |==========================================================            |  82%  |                                                                              |==========================================================            |  83%  |                                                                              |==========================================================            |  84%  |                                                                              |===========================================================           |  84%  |                                                                              |===========================================================           |  85%  |                                                                              |============================================================          |  85%  |                                                                              |============================================================          |  86%  |                                                                              |=============================================================         |  86%  |                                                                              |=============================================================         |  87%  |                                                                              |=============================================================         |  88%  |                                                                              |==============================================================        |  88%  |                                                                              |==============================================================        |  89%  |                                                                              |===============================================================       |  89%  |                                                                              |===============================================================       |  90%  |                                                                              |===============================================================       |  91%  |                                                                              |================================================================      |  91%  |                                                                              |================================================================      |  92%  |                                                                              |=================================================================     |  92%  |                                                                              |=================================================================     |  93%  |                                                                              |=================================================================     |  94%  |                                                                              |==================================================================    |  94%  |                                                                              |==================================================================    |  95%  |                                                                              |===================================================================   |  95%  |                                                                              |===================================================================   |  96%  |                                                                              |====================================================================  |  96%  |                                                                              |====================================================================  |  97%  |                                                                              |====================================================================  |  98%  |                                                                              |===================================================================== |  98%  |                                                                              |===================================================================== |  99%  |                                                                              |======================================================================|  99%  |                                                                              |======================================================================| 100%</code></pre>
-<pre class="r"><code>close(pb)</code></pre>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>
@@ -5121,6 +3116,217 @@ ggsave(file.path(OUTPUT_DIR, &quot;kOut_CTRL_vs_Inv4m_scatter.png&quot;),
        p_kout_scatter, width = 8, height = 8, dpi = 300)</code></pre>
 </div>
 </div>
+<div id="module-preservation-langfelder-2011-and-combined-stats-table" class="section level1">
+<h1>Module Preservation (Langfelder 2011) and Combined Stats Table</h1>
+<p>Run <code>modulePreservation()</code> for both gene sets (CTRL →
+Inv4m) to get Z_summary, Z_density, and Z_connectivity. Then compile a
+single table with all statistics for the supplementary material.</p>
+<pre class="r"><code># --- DEG modules: load existing results from 06_preservation ---
+# These were computed with power = 18 (the correct value)
+mp_deg_file &lt;- file.path(OUTPUT_DIR,
+                          &quot;modulePreservation_results.rds&quot;)
+mp_deg &lt;- readRDS(mp_deg_file)
+
+z_deg &lt;- mp_deg$preservation$Z$ref.CTRL$inColumnsAlsoPresentIn.Inv4m
+deg_pres &lt;- tibble(
+  module = rownames(z_deg),
+  Zsummary = round(z_deg[, &quot;Zsummary.pres&quot;], 2),
+  Zdensity = round(z_deg[, &quot;Zdensity.pres&quot;], 2),
+  Zconnectivity = round(z_deg[, &quot;Zconnectivity.pres&quot;], 2)
+) |&gt; filter(module != &quot;gold&quot;, module != &quot;grey&quot;)
+
+cat(&quot;=== DEG MODULE PRESERVATION (from 06_preservation) ===\n&quot;)</code></pre>
+<pre><code>## === DEG MODULE PRESERVATION (from 06_preservation) ===</code></pre>
+<pre class="r"><code>print(deg_pres |&gt; arrange(Zsummary))</code></pre>
+<pre><code>## # A tibble: 13 × 4
+##    module      Zsummary Zdensity Zconnectivity
+##    &lt;chr&gt;          &lt;dbl&gt;    &lt;dbl&gt;         &lt;dbl&gt;
+##  1 salmon          1.2      0.66          1.74
+##  2 tan             2.24     2.47          2.01
+##  3 greenyellow     2.96     3.51          2.41
+##  4 blue            3.11     1.86          4.37
+##  5 red             3.31     4.41          2.2 
+##  6 yellow          3.49     2.58          4.4 
+##  7 purple          3.84     4.42          3.26
+##  8 brown           3.85     3.93          3.77
+##  9 black           4.51     5.07          3.95
+## 10 green           5.01     7.82          2.21
+## 11 magenta         5.33     7.74          2.92
+## 12 pink            5.77     5.12          6.41
+## 13 turquoise       6.05     6.52          5.59</code></pre>
+<pre class="r"><code># --- Control modules: run modulePreservation ---
+# NOTE: modulePreservation uses Pearson correlation internally.
+# The joint analysis (TODO) will use power = 18 for both sets.
+multiExpr_ctrl &lt;- list(
+  CTRL = list(data = datExpr_control[ctrl_idx, ]),
+  Inv4m = list(data = datExpr_control[inv4m_idx, ])
+)
+multiColor_ctrl &lt;- list(CTRL = control_module_colors)
+
+mp_ctrl &lt;- modulePreservation(
+  multiData = multiExpr_ctrl,
+  multiColor = multiColor_ctrl,
+  referenceNetworks = 1,
+  testNetworks = 2,
+  nPermutations = 200,
+  networkType = &quot;signed&quot;,
+  verbose = 0
+)
+
+z_ctrl &lt;- mp_ctrl$preservation$Z$ref.CTRL$inColumnsAlsoPresentIn.Inv4m
+ctrl_pres &lt;- tibble(
+  module = rownames(z_ctrl),
+  Zsummary = round(z_ctrl[, &quot;Zsummary.pres&quot;], 2),
+  Zdensity = round(z_ctrl[, &quot;Zdensity.pres&quot;], 2),
+  Zconnectivity = round(z_ctrl[, &quot;Zconnectivity.pres&quot;], 2)
+) |&gt; filter(module != &quot;gold&quot;, module != &quot;grey&quot;)
+
+cat(&quot;\n=== CONTROL MODULE PRESERVATION ===\n&quot;)</code></pre>
+<pre><code>## 
+## === CONTROL MODULE PRESERVATION ===</code></pre>
+<pre class="r"><code>print(ctrl_pres |&gt; arrange(Zsummary))</code></pre>
+<pre><code>## # A tibble: 10 × 4
+##    module   Zsummary Zdensity Zconnectivity
+##    &lt;chr&gt;       &lt;dbl&gt;    &lt;dbl&gt;         &lt;dbl&gt;
+##  1 spring       1.62     0.93          2.31
+##  2 umber        1.84     1.4           2.27
+##  3 aqua         2.38     1.26          3.49
+##  4 rose         3.98     4.87          3.1 
+##  5 coral        4.11     3.53          4.69
+##  6 lavender     4.36     4.51          4.21
+##  7 peach        4.5      2.25          6.76
+##  8 jade         4.7      4.48          4.93
+##  9 mustard      5.04     5.25          4.83
+## 10 sky          6.6      6.32          6.88</code></pre>
+<div id="combined-statistics-table" class="section level2">
+<h2>Combined Statistics Table</h2>
+<pre class="r"><code># Load DEG preservation summary for LFP values
+preservation_summary &lt;- read_csv(
+  file.path(OUTPUT_DIR, &quot;preservation_summary.csv&quot;),
+  show_col_types = FALSE
+)
+
+# DEG table
+deg_table &lt;- deg_pres |&gt;
+  left_join(
+    tibble(
+      module = names(observed_delta),
+      delta_kWithin = round(observed_delta, 3),
+      kWithin_FDR = round(kw_fdr_deg[names(observed_delta)], 4),
+      delta_kOut = round(observed_delta_out, 3),
+      kOut_FDR = round(kout_fdr_deg[names(observed_delta_out)], 4)
+    ),
+    by = &quot;module&quot;
+  ) |&gt;
+  mutate(
+    gene_set = &quot;DEG&quot;,
+    n_genes = sapply(module, function(m)
+      sum(module_colors == m, na.rm = TRUE)),
+    LFP = round(sapply(module, function(m) {
+      pres_row &lt;- preservation_summary[
+        preservation_summary$color == m, ]
+      if (nrow(pres_row) &gt; 0) pres_row$ctrl_lfp[1]
+      else NA_real_
+    }), 3)
+  )
+
+# Control table
+ctrl_table &lt;- ctrl_pres |&gt;
+  left_join(
+    tibble(
+      module = names(observed_control),
+      delta_kWithin = round(observed_control, 3),
+      kWithin_FDR = round(
+        kw_fdr_ctrl[names(observed_control)], 4),
+      delta_kOut = round(observed_control_out, 3),
+      kOut_FDR = round(
+        kout_fdr_ctrl[names(observed_control_out)], 4)
+    ),
+    by = &quot;module&quot;
+  ) |&gt;
+  mutate(
+    gene_set = &quot;Control&quot;,
+    n_genes = sapply(module, function(m)
+      sum(control_module_colors == m)),
+    LFP = round(ctrl_lfp$mean_lfp[
+      match(module, ctrl_lfp$color)], 3)
+  )
+
+# Combine
+combined_table &lt;- bind_rows(deg_table, ctrl_table) |&gt;
+  dplyr::select(
+    gene_set, module, n_genes, LFP,
+    Zsummary, Zdensity, Zconnectivity,
+    delta_kWithin, kWithin_FDR,
+    delta_kOut, kOut_FDR
+  ) |&gt;
+  arrange(gene_set, kWithin_FDR)
+
+cat(&quot;=== COMBINED MODULE STATISTICS ===\n\n&quot;)</code></pre>
+<pre><code>## === COMBINED MODULE STATISTICS ===</code></pre>
+<pre class="r"><code>print(combined_table, n = 30, width = Inf)</code></pre>
+<pre><code>## # A tibble: 23 × 11
+##    gene_set module      n_genes   LFP Zsummary Zdensity Zconnectivity
+##    &lt;chr&gt;    &lt;chr&gt;         &lt;int&gt; &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;         &lt;dbl&gt;
+##  1 Control  lavender         19 0.58      4.36     4.51          4.21
+##  2 Control  aqua             15 0.617     2.38     1.26          3.49
+##  3 Control  jade             22 0.889     4.7      4.48          4.93
+##  4 Control  mustard          18 0.693     5.04     5.25          4.83
+##  5 Control  sky              38 0.465     6.6      6.32          6.88
+##  6 Control  umber            18 0.596     1.84     1.4           2.27
+##  7 Control  peach            31 0.771     4.5      2.25          6.76
+##  8 Control  coral            21 0.706     4.11     3.53          4.69
+##  9 Control  rose             16 0.618     3.98     4.87          3.1 
+## 10 Control  spring           10 0.482     1.62     0.93          2.31
+## 11 DEG      brown            46 0.683     3.85     3.93          3.77
+## 12 DEG      tan              12 0.684     2.24     2.47          2.01
+## 13 DEG      purple           22 0.74      3.84     4.42          3.26
+## 14 DEG      blue             51 0.795     3.11     1.86          4.37
+## 15 DEG      pink             30 0.715     5.77     5.12          6.41
+## 16 DEG      yellow           36 0.682     3.49     2.58          4.4 
+## 17 DEG      black            32 0.694     4.51     5.07          3.95
+## 18 DEG      greenyellow      16 0.798     2.96     3.51          2.41
+## 19 DEG      red              34 0.63      3.31     4.41          2.2 
+## 20 DEG      salmon           11 0.52      1.2      0.66          1.74
+## 21 DEG      green            36 0.688     5.01     7.82          2.21
+## 22 DEG      magenta          24 0.713     5.33     7.74          2.92
+## 23 DEG      turquoise        55 0.537     6.05     6.52          5.59
+##    delta_kWithin kWithin_FDR delta_kOut kOut_FDR
+##            &lt;dbl&gt;       &lt;dbl&gt;      &lt;dbl&gt;    &lt;dbl&gt;
+##  1        -4.18       0.128     -12.8      0.772
+##  2        -2.82       0.141     -14.2      0.838
+##  3        -3.05       0.204      -1.77     0.772
+##  4        -1.81       0.204      -6.02     0.772
+##  5        -9.82       0.204     -11.5      0.772
+##  6        -3.78       0.204      -7.65     0.772
+##  7        -4.33       0.225      -1.36     0.772
+##  8        -1.21       0.266       0.229    0.772
+##  9        -2.02       0.287      -8.16     0.772
+## 10        -0.004      0.529       4.79     0.412
+## 11        -2.36       0          -0.349    0.772
+## 12        -3.01       0.0127      1.09     0.772
+## 13        -1.11       0.0429     -1.34     0.772
+## 14        -1.64       0.0432      0.278    0.772
+## 15        -1.36       0.0432     -1.51     0.772
+## 16        -1.47       0.108      -0.725    0.772
+## 17        -0.801      0.204       0.222    0.772
+## 18        -0.631      0.204      -0.436    0.772
+## 19        -0.508      0.204       0.885    0.772
+## 20        -0.389      0.204       1.62     0.772
+## 21        -0.612      0.262       1.58     0.772
+## 22        -0.143      0.396       0.721    0.772
+## 23        -0.277      0.461       1.11     0.772</code></pre>
+<pre class="r"><code># Save
+write_csv(
+  combined_table,
+  file.path(OUTPUT_DIR,
+            &quot;combined_module_stats_table.csv&quot;)
+)
+cat(&quot;\nSaved: combined_module_stats_table.csv\n&quot;)</code></pre>
+<pre><code>## 
+## Saved: combined_module_stats_table.csv</code></pre>
+</div>
+</div>
 <div id="summary" class="section level1">
 <h1>Summary</h1>
 <pre class="r"><code>n_deg_sig &lt;- sum(all_results$type == &quot;DEG&quot; &amp; all_results$fdr &lt; 0.05)
@@ -5151,54 +3357,65 @@ cat(&quot;=== PERMUTATION TEST SUMMARY ===\n\n&quot;)</code></pre>
 <pre class="r"><code>n_deg_sig_out &lt;- sum(kout_fdr_deg &lt; 0.05)
 n_ctrl_sig_out &lt;- sum(kout_fdr_ctrl &lt; 0.05)
 
-cat(&quot;\n=== kOut (inter-modular) ===\n&quot;)</code></pre>
+cat(&quot;
+=== kOut (inter-modular) ===
+DEG modules with significant kOut gain (FDR &lt; 0.05):&quot;,
+    n_deg_sig_out, &quot;of&quot;, length(kout_fdr_deg), &quot;
+Control modules with significant kOut gain (FDR &lt; 0.05):&quot;,
+    n_ctrl_sig_out, &quot;of&quot;, length(kout_fdr_ctrl), &quot;
+
+=== CONCLUSIONS ===
+
+1. kWithin: DEG modules show significant intramodular
+   connectivity loss beyond the permutation null.
+   Control modules do not.
+
+2. kOut: No significant gain in inter-modular connectivity
+   for DEG or control modules. The perturbation degrades
+   within-module coexpression structure without causing
+   genes to gain spurious cross-module connections.
+
+3. This asymmetry (kWithin loss without kOut gain) argues
+   against a global artifact of mean expression shifts:
+   if the connectivity change were driven by correlated
+   mean shifts inflating all pairwise differences, both
+   kWithin and kOut would be affected. Instead, only
+   within-module relationships are disrupted, consistent
+   with degradation of specific coexpression programs.
+
+4. The linear model confirms this: |logFC| does not
+   predict delta kWithin (p = 0.65, R2 = 0.0004),
+   ruling out differential expression magnitude as a
+   driver of connectivity loss.
+&quot;)</code></pre>
 <pre><code>## 
-## === kOut (inter-modular) ===</code></pre>
-<pre class="r"><code>cat(&quot;DEG modules with significant kOut gain (FDR &lt; 0.05):&quot;,
-    n_deg_sig_out, &quot;of&quot;, length(kout_fdr_deg), &quot;\n&quot;)</code></pre>
-<pre><code>## DEG modules with significant kOut gain (FDR &lt; 0.05): 0 of 13</code></pre>
-<pre class="r"><code>cat(&quot;Control modules with significant kOut gain (FDR &lt; 0.05):&quot;,
-    n_ctrl_sig_out, &quot;of&quot;, length(kout_fdr_ctrl), &quot;\n&quot;)</code></pre>
-<pre><code>## Control modules with significant kOut gain (FDR &lt; 0.05): 0 of 10</code></pre>
-<pre class="r"><code>cat(&quot;\n=== CONCLUSIONS ===\n\n&quot;)</code></pre>
-<pre><code>## 
-## === CONCLUSIONS ===</code></pre>
-<pre class="r"><code>cat(&quot;1. kWithin: DEG modules show significant intramodular\n&quot;)</code></pre>
-<pre><code>## 1. kWithin: DEG modules show significant intramodular</code></pre>
-<pre class="r"><code>cat(&quot;   connectivity loss beyond the permutation null.\n&quot;)</code></pre>
-<pre><code>##    connectivity loss beyond the permutation null.</code></pre>
-<pre class="r"><code>cat(&quot;   Control modules do not.\n\n&quot;)</code></pre>
-<pre><code>##    Control modules do not.</code></pre>
-<pre class="r"><code>cat(&quot;2. kOut: No significant gain in inter-modular connectivity\n&quot;)</code></pre>
-<pre><code>## 2. kOut: No significant gain in inter-modular connectivity</code></pre>
-<pre class="r"><code>cat(&quot;   for DEG or control modules. The perturbation degrades\n&quot;)</code></pre>
-<pre><code>##    for DEG or control modules. The perturbation degrades</code></pre>
-<pre class="r"><code>cat(&quot;   within-module coexpression structure without causing\n&quot;)</code></pre>
-<pre><code>##    within-module coexpression structure without causing</code></pre>
-<pre class="r"><code>cat(&quot;   genes to gain spurious cross-module connections.\n\n&quot;)</code></pre>
-<pre><code>##    genes to gain spurious cross-module connections.</code></pre>
-<pre class="r"><code>cat(&quot;3. This asymmetry (kWithin loss without kOut gain) argues\n&quot;)</code></pre>
-<pre><code>## 3. This asymmetry (kWithin loss without kOut gain) argues</code></pre>
-<pre class="r"><code>cat(&quot;   against a global artifact of mean expression shifts:\n&quot;)</code></pre>
-<pre><code>##    against a global artifact of mean expression shifts:</code></pre>
-<pre class="r"><code>cat(&quot;   if the connectivity change were driven by correlated\n&quot;)</code></pre>
-<pre><code>##    if the connectivity change were driven by correlated</code></pre>
-<pre class="r"><code>cat(&quot;   mean shifts inflating all pairwise differences, both\n&quot;)</code></pre>
-<pre><code>##    mean shifts inflating all pairwise differences, both</code></pre>
-<pre class="r"><code>cat(&quot;   kWithin and kOut would be affected. Instead, only\n&quot;)</code></pre>
-<pre><code>##    kWithin and kOut would be affected. Instead, only</code></pre>
-<pre class="r"><code>cat(&quot;   within-module relationships are disrupted, consistent\n&quot;)</code></pre>
-<pre><code>##    within-module relationships are disrupted, consistent</code></pre>
-<pre class="r"><code>cat(&quot;   with degradation of specific coexpression programs.\n\n&quot;)</code></pre>
-<pre><code>##    with degradation of specific coexpression programs.</code></pre>
-<pre class="r"><code>cat(&quot;4. The linear model confirms this: |logFC| does not\n&quot;)</code></pre>
-<pre><code>## 4. The linear model confirms this: |logFC| does not</code></pre>
-<pre class="r"><code>cat(&quot;   predict delta kWithin (p = 0.65, R2 = 0.0004),\n&quot;)</code></pre>
-<pre><code>##    predict delta kWithin (p = 0.65, R2 = 0.0004),</code></pre>
-<pre class="r"><code>cat(&quot;   ruling out differential expression magnitude as a\n&quot;)</code></pre>
-<pre><code>##    ruling out differential expression magnitude as a</code></pre>
-<pre class="r"><code>cat(&quot;   driver of connectivity loss.\n&quot;)</code></pre>
-<pre><code>##    driver of connectivity loss.</code></pre>
+## === kOut (inter-modular) ===
+## DEG modules with significant kOut gain (FDR &lt; 0.05): 0 of 13 
+## Control modules with significant kOut gain (FDR &lt; 0.05): 0 of 10 
+## 
+## === CONCLUSIONS ===
+## 
+## 1. kWithin: DEG modules show significant intramodular
+##    connectivity loss beyond the permutation null.
+##    Control modules do not.
+## 
+## 2. kOut: No significant gain in inter-modular connectivity
+##    for DEG or control modules. The perturbation degrades
+##    within-module coexpression structure without causing
+##    genes to gain spurious cross-module connections.
+## 
+## 3. This asymmetry (kWithin loss without kOut gain) argues
+##    against a global artifact of mean expression shifts:
+##    if the connectivity change were driven by correlated
+##    mean shifts inflating all pairwise differences, both
+##    kWithin and kOut would be affected. Instead, only
+##    within-module relationships are disrupted, consistent
+##    with degradation of specific coexpression programs.
+## 
+## 4. The linear model confirms this: |logFC| does not
+##    predict delta kWithin (p = 0.65, R2 = 0.0004),
+##    ruling out differential expression magnitude as a
+##    driver of connectivity loss.</code></pre>
 </div>
 <div id="session-info" class="section level1">
 <h1>Session Info</h1>
