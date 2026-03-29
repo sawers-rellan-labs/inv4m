@@ -1,0 +1,248 @@
+---
+title: "Connectivity: Inv4m Proper vs Flanking vs Trans"
+author: "F. V. Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+```{r load, include=FALSE}
+library(here)
+library(tidyverse)
+library(WGCNA)
+library(patchwork)
+library(rstatix)
+
+allowWGCNAThreads()
+set.seed(42)
+
+source(here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+
+RUN_DIR <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+OUTPUT_DIR <- file.path(RUN_DIR, "06_preservation")
+
+expr_filtered <- readRDS(file.path(RUN_DIR, "02_gene_filter", "filtered_expression.rds"))
+sample_meta <- read_csv(file.path(RUN_DIR, "01_data_prep", "sample_metadata.csv"),
+                         show_col_types = FALSE)
+ctrl_modules <- read_csv(file.path(RUN_DIR, "04_consensus_networks", "ctrl",
+                                    "consensus_modules.csv"), show_col_types = FALSE)
+SOFT_POWER <- readRDS(file.path(RUN_DIR, "03_reference_network", "ctrl",
+                                 "selected_power.rds"))
+effects <- read_csv(file.path(paths$intermediate,
+                               "predictor_effects_leaf_interaction_model.csv"),
+                     show_col_types = FALSE)
+
+# Region classification
+inv4m_fx <- effects %>%
+  filter(grepl("Inv4m", predictor), !grepl(":", predictor)) %>%
+  select(gene, logFC, adj.P.Val, in_Inv4m, in_cis, in_flank, in_trans) %>%
+  distinct(gene, .keep_all = TRUE) %>%
+  mutate(region = factor(
+    case_when(in_Inv4m ~ "Inv4m proper", in_flank ~ "Flanking",
+              in_trans ~ "Trans", TRUE ~ "Other"),
+    levels = c("Inv4m proper", "Flanking", "Trans")
+  ))
+
+# kWithin
+module_colors <- setNames(ctrl_modules$color, ctrl_modules$gene)[rownames(expr_filtered)]
+all_samples <- sample_meta$sample_id
+true_labels <- setNames(sample_meta$Genotype, sample_meta$sample_id)
+ctrl_idx <- which(true_labels == "CTRL")
+inv4m_idx <- which(true_labels == "Inv4m")
+datExpr_all <- t(expr_filtered[, all_samples])
+
+adj_ctrl <- adjacency(datExpr_all[ctrl_idx, ], power = SOFT_POWER, type = "signed")
+adj_inv4m <- adjacency(datExpr_all[inv4m_idx, ], power = SOFT_POWER, type = "signed")
+k_ctrl <- intramodularConnectivity(adj_ctrl, module_colors)
+k_inv4m <- intramodularConnectivity(adj_inv4m, module_colors)
+
+gene_connectivity <- tibble(
+  gene = rownames(k_ctrl), module = module_colors[rownames(k_ctrl)],
+  kWithin_ctrl = k_ctrl$kWithin, kWithin_inv4m = k_inv4m$kWithin,
+  delta_kWithin = k_inv4m$kWithin - k_ctrl$kWithin
+) %>%
+  filter(module != "grey", !is.na(module)) %>%
+  left_join(inv4m_fx %>% select(gene, region), by = "gene") %>%
+  filter(!is.na(region))
+
+# Projected kME
+me_ctrl <- moduleEigengenes(datExpr_all[ctrl_idx, ], colors = module_colors)$eigengenes
+kme_ctrl_vals <- signedKME(datExpr_all[ctrl_idx, ], me_ctrl)
+modules_list <- unique(module_colors[module_colors != "grey" & !is.na(module_colors)])
+inv4m_expr <- datExpr_all[inv4m_idx, ]
+
+projected_me <- sapply(modules_list, function(m) {
+  gene_idx <- which(module_colors == m)
+  loadings <- kme_ctrl_vals[[paste0("kME", m)]][gene_idx]
+  loadings <- loadings / sqrt(sum(loadings^2))
+  as.numeric(inv4m_expr[, gene_idx, drop = FALSE] %*% loadings)
+})
+colnames(projected_me) <- paste0("ME", modules_list)
+kme_inv4m_vals <- signedKME(inv4m_expr, as.data.frame(projected_me))
+
+gene_names <- colnames(datExpr_all)
+non_grey_idx <- which(module_colors != "grey" & !is.na(module_colors))
+kme_ctrl_own <- numeric(length(non_grey_idx))
+kme_inv4m_own <- numeric(length(non_grey_idx))
+for (j in seq_along(non_grey_idx)) {
+  i <- non_grey_idx[j]
+  col <- paste0("kME", module_colors[i])
+  kme_ctrl_own[j] <- kme_ctrl_vals[i, col]
+  kme_inv4m_own[j] <- kme_inv4m_vals[i, col]
+}
+
+projected_kme <- tibble(
+  gene = gene_names[non_grey_idx], module = module_colors[non_grey_idx],
+  kme_ctrl = kme_ctrl_own, kme_inv4m = kme_inv4m_own,
+  delta_kme = kme_inv4m_own - kme_ctrl_own
+) %>%
+  left_join(inv4m_fx %>% select(gene, region), by = "gene") %>%
+  filter(!is.na(region))
+
+# Palette
+region_colors <- c("Inv4m proper" = "purple4", "Flanking" = "plum",
+                    "Trans" = "gold")
+```
+
+# kWithin by Region
+
+```{r kwithin_plots, fig.width=14, fig.height=5}
+library(ggpubr)
+
+p_ctrl <- ggplot(gene_connectivity, aes(x = region, y = kWithin_ctrl, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  stat_pvalue_manual(
+    tibble(group1 = "Flanking", group2 = "Trans", p.adj = 0.048,
+           y.position = max(gene_connectivity$kWithin_ctrl) * 1.05),
+    label = "BH p = {p.adj} *", tip.length = 0.02, size = 3.5
+  ) +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = expression(k[Within] ~ "(CTRL)"), title = "CTRL network")
+
+p_inv4m <- ggplot(gene_connectivity, aes(x = region, y = kWithin_inv4m, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = expression(k[Within] ~ "(Inv4m)"), title = "Inv4m network")
+
+p_delta <- ggplot(gene_connectivity, aes(x = region, y = delta_kWithin, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = expression(Delta ~ k[Within]), title = "Connectivity change")
+
+p_ctrl + p_inv4m + p_delta + plot_annotation(tag_levels = "A")
+```
+
+```{r kwithin_tests}
+gene_connectivity %>%
+  group_by(region) %>%
+  summarise(n = n(), mean_kWithin_ctrl = round(mean(kWithin_ctrl), 3),
+            mean_delta_kWithin = round(mean(delta_kWithin), 3),
+            pct_decreased = round(mean(delta_kWithin < 0) * 100, 1),
+            .groups = "drop")
+
+cat("--- kWithin CTRL ---\n")
+gene_connectivity %>%
+  wilcox_test(kWithin_ctrl ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+cat("\n--- kWithin Inv4m ---\n")
+gene_connectivity %>%
+  wilcox_test(kWithin_inv4m ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+cat("\n--- Delta kWithin ---\n")
+gene_connectivity %>%
+  wilcox_test(delta_kWithin ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+```
+
+# Projected kME by Region
+
+```{r kme_plots, fig.width=14, fig.height=5}
+p_kme_ctrl <- ggplot(projected_kme, aes(x = region, y = kme_ctrl, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = "kME (CTRL)", title = "CTRL eigenvector centrality")
+
+p_kme_inv4m <- ggplot(projected_kme, aes(x = region, y = kme_inv4m, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = "kME (Inv4m projected)", title = "Inv4m eigenvector centrality")
+
+p_kme_delta <- ggplot(projected_kme, aes(x = region, y = delta_kme, fill = region)) +
+  geom_boxplot(outlier.size = 0.8, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.5, alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_fill_manual(values = region_colors) +
+  theme_minimal(base_size = 14) + theme(legend.position = "none") +
+  labs(x = NULL, y = expression(Delta ~ "kME (projected)"),
+       title = "Eigenvector centrality change")
+
+p_kme_ctrl + p_kme_inv4m + p_kme_delta + plot_annotation(tag_levels = "A")
+```
+
+```{r kme_tests}
+projected_kme %>%
+  group_by(region) %>%
+  summarise(n = n(), mean_kme_ctrl = round(mean(kme_ctrl), 3),
+            mean_kme_inv4m = round(mean(kme_inv4m), 3),
+            mean_delta_kme = round(mean(delta_kme), 3),
+            pct_decreased = round(mean(delta_kme < 0) * 100, 1),
+            .groups = "drop")
+
+cat("--- kME CTRL ---\n")
+projected_kme %>%
+  wilcox_test(kme_ctrl ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+cat("\n--- kME Inv4m (projected) ---\n")
+projected_kme %>%
+  wilcox_test(kme_inv4m ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+cat("\n--- Delta kME (projected) ---\n")
+projected_kme %>%
+  wilcox_test(delta_kme ~ region) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```
