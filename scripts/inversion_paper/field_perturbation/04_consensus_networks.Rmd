@@ -399,7 +399,7 @@ cat("\nGenerated", N_ITERATIONS, "subsample configurations\n")
 cat("Subsample size:", subsample_size, "genes (", GENE_SUBSAMPLE_RATE * 100, "%)\n\n")
 
 # 3. Run parallel WGCNA iterations
-n_cores <- max(1, parallel::detectCores() - 1)
+n_cores <- max(1, parallel::detectCores(logical = FALSE) - 1L, na.rm = TRUE)
 plan(multisession, workers = n_cores)
 
 log_progress("CTRL: Starting ", N_ITERATIONS, " WGCNA iterations on ", n_cores, " cores")
