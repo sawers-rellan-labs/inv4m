@@ -32,7 +32,7 @@ via the shell script:
 
   ./scripts/inversion_paper/run_field_perturbation.sh \
     --resume {run_dir} \
-    --start 3 --end 7 --yes
+    --start 3 --end 6 --yes
 -->
 
 ```{r setup, include=FALSE}
@@ -68,7 +68,9 @@ This script:
    subsets the expression matrix, and saves `filtered_expression.rds` to
    `02_gene_filter/`
 
-After this script completes, run steps 3–7 via `run_field_perturbation.sh`.
+After this script completes, run steps 3–6 via `run_field_perturbation.sh`.
+Step 7 (module annotation) is skipped — it depends on DEG-specific files.
+GO enrichment for leaf gradient modules is done in `permutation_test_delta_kWithin.Rmd`.
 
 ---
 
@@ -302,8 +304,9 @@ cat("  Photosynthesis:", length(photo_control), "genes\n")
 cat("  Senescence:    ", length(sag_control),   "genes\n")
 cat("  Total:         ", length(leaf_genes),    "genes\n\n")
 cat("Photo-senescence correlation:", round(cor_ps, 3), "\n\n")
-cat("Next: run steps 3-7 via the pipeline shell script:\n\n")
+cat("Next: run steps 3-6 via the pipeline shell script:\n\n")
 cat("  ./scripts/inversion_paper/run_field_perturbation.sh \\\n")
 cat("    --resume", RUN_DIR, "\\\n")
-cat("    --start 3 --end 7 --yes\n")
+cat("    --start 3 --end 6 --yes\n")
+cat("\nNote: step 7 is skipped (DEG-specific). GO enrichment is in permutation_test_delta_kWithin.Rmd.\n")
 ```
