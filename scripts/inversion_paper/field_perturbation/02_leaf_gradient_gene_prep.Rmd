@@ -1,0 +1,309 @@
+---
+title: "Leaf Gradient Gene Preparation for Field Perturbation Pipeline"
+author: "Analysis Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  run_dir: "results/inversion_paper/field_perturbation/run_leaf_gradient"
+  source_run_dir: "results/inversion_paper/field_perturbation/run_20251231_201332"
+---
+
+<!--
+Replacement for 02_gene_filter.Rmd for the leaf gradient gene set (Ojeda 2026).
+Instead of filtering by FDR, this script selects photosynthesis and senescence
+hub genes from two pre-defined lists and subsets the expression matrix.
+
+Run this notebook first to populate the new run directory, then run steps 3-7
+via the shell script:
+
+  Rscript -e "rmarkdown::render(
+    'scripts/inversion_paper/field_perturbation/02_leaf_gradient_gene_prep.Rmd',
+    output_dir = '{run_dir}/02_gene_filter',
+    params = list(
+      run_dir        = '{run_dir}',
+      source_run_dir = 'results/inversion_paper/field_perturbation/run_20251231_201332'
+    )
+  )"
+
+  ./scripts/inversion_paper/run_field_perturbation.sh \
+    --resume {run_dir} \
+    --start 3 --end 7 --yes
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 8,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = here::here())
+
+source(here::here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+**Purpose**: Prepare the expression matrix and directory structure for the
+leaf gradient gene consensus pipeline (steps 3–7).
+
+Leaf gradient genes are photosynthesis and senescence hub genes from Ojeda 2026,
+identified as co-expressed along the leaf developmental gradient (young base =
+photosynthetic, old tip = senescing). These genes are NOT differentially expressed
+between CTRL and Inv4m genotypes, making them suitable as a topology control for
+the genotype-response module perturbation analysis.
+
+This script:
+1. Creates the new run directory structure
+2. Copies `sample_metadata.csv` and `combined_expression.rds` from the source
+   DEG run into `01_data_prep/` (these are identical — same experiment)
+3. Loads the Ojeda 2026 gene lists, excludes any overlap with Inv4m DEGs,
+   subsets the expression matrix, and saves `filtered_expression.rds` to
+   `02_gene_filter/`
+
+After this script completes, run steps 3–7 via `run_field_perturbation.sh`.
+
+---
+
+# Setup
+
+```{r load_packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+})
+```
+
+```{r setup_directories}
+RUN_DIR    <- here(params$run_dir)
+SOURCE_DIR <- here(params$source_run_dir)
+
+SOURCE_DATA_PREP   <- file.path(SOURCE_DIR, "01_data_prep")
+SOURCE_GENE_FILTER <- file.path(SOURCE_DIR, "02_gene_filter")
+
+TARGET_DATA_PREP   <- file.path(RUN_DIR, "01_data_prep")
+TARGET_GENE_FILTER <- file.path(RUN_DIR, "02_gene_filter")
+
+# Create run directory structure (mirrors what run_field_perturbation.sh creates)
+for (d in c(
+  "01_data_prep", "02_gene_filter",
+  "03_reference_network/ctrl", "03_reference_network/inv4m",
+  "04_consensus_networks/ctrl", "04_consensus_networks/inv4m",
+  "05_bootstrap_support/ctrl", "05_bootstrap_support/inv4m",
+  "06_preservation", "07_module_annotation", "logs"
+)) {
+  dir.create(file.path(RUN_DIR, d), recursive = TRUE, showWarnings = FALSE)
+}
+
+cat("Run directory:    ", RUN_DIR, "\n")
+cat("Source directory: ", SOURCE_DIR, "\n")
+
+# Verify source exists
+stopifnot(
+  "Source 01_data_prep not found" = dir.exists(SOURCE_DATA_PREP),
+  "Source 02_gene_filter not found" = dir.exists(SOURCE_GENE_FILTER)
+)
+```
+
+---
+
+# Copy Data Prep Outputs
+
+`sample_metadata.csv` and `combined_expression.rds` are identical to the DEG run
+— same PA2022 experiment, same 43 samples.
+
+```{r copy_data_prep}
+files_to_copy <- c("sample_metadata.csv", "combined_expression.rds")
+
+for (f in files_to_copy) {
+  src  <- file.path(SOURCE_DATA_PREP, f)
+  dest <- file.path(TARGET_DATA_PREP, f)
+  if (!file.exists(src)) {
+    stop("Source file not found: ", src)
+  }
+  file.copy(src, dest, overwrite = TRUE)
+  cat("Copied:", f, "\n")
+}
+```
+
+---
+
+# Load Expression Data
+
+```{r load_expression}
+sample_meta <- read_csv(
+  file.path(TARGET_DATA_PREP, "sample_metadata.csv"),
+  show_col_types = FALSE
+)
+
+full_expr_raw <- readRDS(file.path(TARGET_DATA_PREP, "combined_expression.rds"))
+full_expr_mat <- if (inherits(full_expr_raw, "EList")) full_expr_raw$E else as.matrix(full_expr_raw)
+
+cat("Expression matrix:", nrow(full_expr_mat), "genes x", ncol(full_expr_mat), "samples\n")
+cat("Samples:", nrow(sample_meta), "\n")
+print(table(sample_meta$Genotype))
+```
+
+---
+
+# Load Ojeda 2026 Gene Lists
+
+```{r load_ojeda_genes}
+photo_genes <- read.table(
+  file.path(paths$data, "photosynthesis_expression_index_genes_ojeda2026.txt"),
+  header = FALSE, stringsAsFactors = FALSE
+)$V1
+
+sag_genes <- read.table(
+  file.path(paths$data, "senesence_hubs_ojeda2026.tab"),
+  header = TRUE, sep = "\t", stringsAsFactors = FALSE
+)$gene
+
+cat("Photosynthesis genes (Ojeda 2026):", length(photo_genes), "\n")
+cat("Senescence genes (Ojeda 2026):    ", length(sag_genes), "\n")
+cat("Overlap between lists:             ",
+    length(intersect(photo_genes, sag_genes)), "\n")
+```
+
+---
+
+# Build Leaf Gradient Gene Set
+
+Exclude genes not present in the expression matrix and any overlap with Inv4m DEGs.
+
+```{r build_gene_set}
+# Load DEG list from source run to exclude overlaps
+deg_modules <- read_csv(
+  file.path(SOURCE_GENE_FILTER, "filtered_expression.rds") |>
+    (\(x) NULL)(),   # just for path check — load actual DEG list below
+  show_col_types = FALSE
+) |> invisible()
+
+# DEG gene names from source filtered expression
+deg_expr <- readRDS(file.path(SOURCE_GENE_FILTER, "filtered_expression.rds"))
+deg_genes <- rownames(deg_expr)
+
+cat("Inv4m DEGs (source run):", length(deg_genes), "\n\n")
+
+# Subset to genes present in expression matrix, exclude DEGs
+photo_in_matrix <- intersect(photo_genes, rownames(full_expr_mat))
+sag_in_matrix   <- intersect(sag_genes,   rownames(full_expr_mat))
+
+photo_control <- setdiff(photo_in_matrix, deg_genes)
+sag_control   <- setdiff(sag_in_matrix,   deg_genes)
+leaf_genes    <- unique(c(photo_control, sag_control))
+
+cat("=== GENE SET SUMMARY ===\n")
+cat("Photosynthesis — in matrix:", length(photo_in_matrix),
+    "| after DEG exclusion:", length(photo_control), "\n")
+cat("Senescence     — in matrix:", length(sag_in_matrix),
+    "| after DEG exclusion:", length(sag_control), "\n")
+cat("Combined leaf gradient genes:", length(leaf_genes), "\n")
+
+if (length(photo_genes) - length(photo_in_matrix) > 0)
+  cat("WARNING:", length(photo_genes) - length(photo_in_matrix),
+      "photosynthesis genes not found in expression matrix\n")
+if (length(sag_genes) - length(sag_in_matrix) > 0)
+  cat("WARNING:", length(sag_genes) - length(sag_in_matrix),
+      "senescence genes not found in expression matrix\n")
+```
+
+---
+
+# QC: Expression Distributions
+
+Check that the leaf gradient genes have reasonable expression levels and that
+the two programs are distinguishable.
+
+```{r expression_qc, fig.width=9, fig.height=4}
+leaf_gene_type <- c(
+  setNames(rep("photosynthesis", length(photo_control)), photo_control),
+  setNames(rep("senescence",     length(sag_control)),   sag_control)
+)
+
+# Mean expression across all samples
+mean_expr <- rowMeans(full_expr_mat[leaf_genes, ])
+
+tibble(
+  gene      = leaf_genes,
+  mean_expr = mean_expr,
+  program   = leaf_gene_type[leaf_genes]
+) |>
+  ggplot(aes(x = mean_expr, fill = program)) +
+  geom_histogram(bins = 30, alpha = 0.7, position = "identity") +
+  scale_fill_manual(values = c(photosynthesis = "forestgreen",
+                                senescence    = "goldenrod3")) +
+  theme_minimal(base_size = 13) +
+  labs(x = "Mean log-CPM across samples", y = "Gene count", fill = NULL,
+       title = "Leaf gradient gene expression levels")
+```
+
+```{r correlation_check, fig.width=5, fig.height=4}
+# Mean expression index per sample for each program
+photo_index <- colMeans(full_expr_mat[photo_control, sample_meta$sample_id])
+sag_index   <- colMeans(full_expr_mat[sag_control,   sample_meta$sample_id])
+
+cor_ps <- cor(photo_index, sag_index, method = "pearson")
+cat("Pearson correlation photosynthesis vs senescence indices:",
+    round(cor_ps, 3), "\n")
+cat("(Expected: negative — anti-correlated along leaf gradient)\n")
+
+tibble(photo = photo_index, senescence = sag_index) |>
+  ggplot(aes(x = photo, y = senescence)) +
+  geom_point(size = 2, alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, color = "grey40", linewidth = 0.7) +
+  theme_minimal(base_size = 13) +
+  labs(x = "Mean photosynthesis expression",
+       y = "Mean senescence expression",
+       title = sprintf("Photo vs senescence (r = %.3f)", cor_ps))
+```
+
+---
+
+# Save filtered_expression.rds
+
+```{r save_filtered_expression}
+leaf_expr <- full_expr_mat[leaf_genes, sample_meta$sample_id]
+
+cat("Saving filtered_expression.rds\n")
+cat("  Dimensions:", nrow(leaf_expr), "genes x", ncol(leaf_expr), "samples\n")
+
+saveRDS(leaf_expr,
+        file.path(TARGET_GENE_FILTER, "filtered_expression.rds"))
+
+# Save gene list with program annotation for reference
+gene_list_df <- tibble(
+  gene    = leaf_genes,
+  program = leaf_gene_type[leaf_genes]
+)
+write_csv(gene_list_df,
+          file.path(TARGET_GENE_FILTER, "leaf_gradient_gene_list.csv"))
+
+cat("  Saved to:", file.path(TARGET_GENE_FILTER, "filtered_expression.rds"), "\n")
+cat("  Gene list saved to:", file.path(TARGET_GENE_FILTER, "leaf_gradient_gene_list.csv"), "\n")
+```
+
+---
+
+# Summary
+
+```{r summary}
+cat("=== LEAF GRADIENT GENE PREP COMPLETE ===\n\n")
+cat("Run directory:", RUN_DIR, "\n\n")
+cat("Gene set:\n")
+cat("  Photosynthesis:", length(photo_control), "genes\n")
+cat("  Senescence:    ", length(sag_control),   "genes\n")
+cat("  Total:         ", length(leaf_genes),    "genes\n\n")
+cat("Photo-senescence correlation:", round(cor_ps, 3), "\n\n")
+cat("Next: run steps 3-7 via the pipeline shell script:\n\n")
+cat("  ./scripts/inversion_paper/run_field_perturbation.sh \\\n")
+cat("    --resume", RUN_DIR, "\\\n")
+cat("    --start 3 --end 7 --yes\n")
+```
