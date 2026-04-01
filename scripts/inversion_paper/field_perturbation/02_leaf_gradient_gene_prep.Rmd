@@ -181,14 +181,9 @@ cat("Overlap between lists:             ",
 Exclude genes not present in the expression matrix and any overlap with Inv4m DEGs.
 
 ```{r build_gene_set}
-# Load DEG list from source run to exclude overlaps
-deg_modules <- read_csv(
-  file.path(SOURCE_GENE_FILTER, "filtered_expression.rds") |>
-    (\(x) NULL)(),   # just for path check — load actual DEG list below
-  show_col_types = FALSE
-) |> invisible()
-
 # DEG gene names from source filtered expression
+stopifnot("Source filtered_expression.rds not found" =
+  file.exists(file.path(SOURCE_GENE_FILTER, "filtered_expression.rds")))
 deg_expr <- readRDS(file.path(SOURCE_GENE_FILTER, "filtered_expression.rds"))
 deg_genes <- rownames(deg_expr)
 
