@@ -1,0 +1,1085 @@
+---
+title: "Joint Consensus WGCNA: Genotype-Response and Leaf-Gradient Modules"
+author: "F. V. Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = TRUE
+)
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+# Overview
+
+The permutation test notebook builds genotype-response modules (Inv4m DEGs) via
+1000 consensus iterations (parameter sweeps + gene subsampling), but the topology
+control modules (photosynthesis + senescence genes from Ojeda 2026) are built with
+a single `cutreeDynamic` call. This asymmetry makes the LFP comparison unfair and
+may cause bimodality in the leaf-gradient kWithin null distributions, because
+photosynthesis and senescence genes are anti-correlated along the leaf developmental
+gradient and collapse into mixed modules under single-pass clustering.
+
+This notebook fixes the asymmetry by running the same consensus pipeline on the
+**combined gene set**: 465 genotype-response genes (Inv4m DEGs) + ~218 leaf-gradient
+genes (photosynthesis + senescence), ~683 total. Modules are classified post-hoc
+by gene-set composition.
+
+**Gene set terminology:**
+- **Genotype-response genes** — differentially expressed between CTRL and Inv4m
+  plants; coexpression driven by the Inv4m introgression.
+- **Leaf-gradient genes** — photosynthesis and senescence hub genes (Ojeda 2026);
+  coexpression driven by the leaf developmental gradient (young base = photosynthetic,
+  old tip = senescing), independent of Inv4m genotype.
+
+**Network:** built on CTRL plants only (reference), then tested for connectivity
+loss in Inv4m plants.
+
+Predictions:
+- Leaf-gradient modules should show **no** systematic kWithin loss between
+  CTRL and Inv4m genotypes.
+- Genotype-response modules should recapitulate the connectivity loss seen in
+  the main permutation test.
+- Joint clustering should better separate photosynthesis and senescence genes
+  into distinct modules, resolving the bimodality.
+
+**Fixed parameters (justified in permutation test notebook):**
+- Soft power = 18 (estimated for both CTRL and Inv4m DEG networks)
+- 1K consensus iterations (slow step)
+- 10K genotype label permutations
+
+# Setup
+
+```{r load_packages}
+library(here)
+library(tidyverse)
+library(WGCNA)
+library(ggridges)
+library(furrr)
+library(future)
+
+options(stringsAsFactors = FALSE)
+disableWGCNAThreads()
+set.seed(42)
+```
+
+```{r config}
+SOFT_POWER            <- 18
+N_CONSENSUS           <- 1000
+N_BOOT                <- 1000
+N_PERM                <- 10000
+GENE_SUBSAMPLE_RATE   <- 0.80
+MIN_MODULE_SIZE_RANGE <- c(10L, 15L, 20L, 25L, 30L, 35L)
+CONSENSUS_MIN_SIZE    <- min(MIN_MODULE_SIZE_RANGE)
+DEEP_SPLIT            <- 4L
+NETWORK_TYPE          <- "signed"
+LOG_FREQUENCY         <- 100L
+DEG_FRACTION_THRESH   <- 0.70   # fraction to call a module response- or gradient-dominated
+LFP_STABLE            <- 0.70   # LFP >= this: stable
+LFP_MODERATE          <- 0.50   # LFP >= this: moderate; < this: unstable
+
+RUN_DIR    <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+OUTPUT_DIR <- file.path(RUN_DIR, "joint_consensus")
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+FILTER_DIR    <- file.path(RUN_DIR, "02_gene_filter")
+DATA_PREP_DIR <- file.path(RUN_DIR, "01_data_prep")
+
+source(here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+
+cat("=== CONFIGURATION ===\n")
+cat("Soft power (fixed):", SOFT_POWER, "\n")
+cat("Consensus iterations:", N_CONSENSUS, "\n")
+cat("Bootstrap iterations:", N_BOOT, "\n")
+cat("Permutation iterations:", N_PERM, "\n")
+cat("Gene subsample rate:", GENE_SUBSAMPLE_RATE, "\n")
+cat("minModuleSize range:", paste(MIN_MODULE_SIZE_RANGE, collapse = ", "), "\n")
+cat("DEG fraction threshold:", DEG_FRACTION_THRESH, "\n")
+cat("Output directory:", OUTPUT_DIR, "\n")
+```
+
+# Load Data
+
+```{r load_data}
+# DEG-filtered expression (465 genes x 43 samples)
+expr_filtered <- readRDS(file.path(FILTER_DIR, "filtered_expression.rds"))
+
+# Full expression matrix (24k genes x 43 samples, PSU2022)
+full_expr_raw <- readRDS(file.path(DATA_PREP_DIR, "combined_expression.rds"))
+full_expr_mat <- if (inherits(full_expr_raw, "EList")) full_expr_raw$E else as.matrix(full_expr_raw)
+
+# Sample metadata
+sample_meta <- read_csv(file.path(DATA_PREP_DIR, "sample_metadata.csv"),
+                         show_col_types = FALSE)
+
+cat("DEG expression:", nrow(expr_filtered), "genes x", ncol(expr_filtered), "samples\n")
+cat("Full expression:", nrow(full_expr_mat), "genes x", ncol(full_expr_mat), "samples\n")
+```
+
+```{r load_control_genes}
+photo_genes <- read.table(
+  file.path(paths$data, "photosynthesis_expression_index_genes_ojeda2026.txt"),
+  header = FALSE, stringsAsFactors = FALSE
+)$V1
+
+sag_genes <- read.table(
+  file.path(paths$data, "senesence_hubs_ojeda2026.tab"),
+  header = TRUE, sep = "\t", stringsAsFactors = FALSE
+)$gene
+
+deg_genes <- rownames(expr_filtered)
+
+photo_control <- setdiff(intersect(photo_genes, rownames(full_expr_mat)), deg_genes)
+sag_control   <- setdiff(intersect(sag_genes,  rownames(full_expr_mat)), deg_genes)
+control_genes <- unique(c(photo_control, sag_control))
+
+cat("Photosynthesis (non-DEG, in matrix):", length(photo_control), "\n")
+cat("Senescence hubs (non-DEG, in matrix):", length(sag_control), "\n")
+cat("Combined control genes:", length(control_genes), "\n")
+```
+
+# Combine Expression Matrix
+
+```{r combine_expression}
+joint_genes <- c(deg_genes, control_genes)
+gene_type   <- c(
+  setNames(rep("genotype", length(deg_genes)),     deg_genes),
+  setNames(rep("leaf",     length(control_genes)), control_genes)
+)
+
+# Expression matrix for joint gene set (genes x samples)
+ctrl_samples  <- sample_meta |> filter(Genotype == "CTRL")  |> pull(sample_id)
+inv4m_samples <- sample_meta |> filter(Genotype == "Inv4m") |> pull(sample_id)
+all_samples   <- sample_meta$sample_id
+
+deg_expr <- expr_filtered[deg_genes, all_samples]
+ctrl_expr <- full_expr_mat[control_genes, all_samples]
+
+joint_expr_mat <- rbind(deg_expr, ctrl_expr)   # genes x samples
+
+# WGCNA format: samples x genes
+datExpr_joint <- t(joint_expr_mat[joint_genes, all_samples])
+datExpr_CTRL  <- datExpr_joint[ctrl_samples,  ]
+datExpr_Inv4m <- datExpr_joint[inv4m_samples, ]
+
+true_labels <- setNames(sample_meta$Genotype, sample_meta$sample_id)
+n_ctrl  <- length(ctrl_samples)
+n_inv4m <- length(inv4m_samples)
+n_total <- n_ctrl + n_inv4m
+
+cat("Joint expression:", nrow(joint_expr_mat), "genes x", ncol(joint_expr_mat), "samples\n")
+cat("  DEG genes:", length(deg_genes), "\n")
+cat("  Control genes:", length(control_genes), "\n")
+cat("WGCNA matrix: CTRL", n_ctrl, "samples | Inv4m", n_inv4m, "samples\n")
+```
+
+# Joint Consensus Network
+
+Build the consensus network on **CTRL samples only** (n = `r n_ctrl`), mirroring
+the approach in step 04 of the field perturbation pipeline.
+
+## Consensus Functions
+
+```{r define_consensus_functions}
+#' Run single WGCNA iteration on gene subsample
+run_subsample_wgcna <- function(datExpr, gene_indices, power,
+                                 min_module_size, deep_split = 4L,
+                                 network_type = "signed") {
+  expr_subset <- datExpr[, gene_indices]
+  net <- blockwiseModules(
+    expr_subset,
+    power          = power,
+    networkType    = network_type,
+    TOMType        = network_type,
+    minModuleSize  = min_module_size,
+    mergeCutHeight = 0,
+    reassignThreshold = 0,
+    maxBlockSize   = ncol(expr_subset),
+    numericLabels  = TRUE,
+    deepSplit      = deep_split,
+    verbose        = 0
+  )
+  data.frame(gene = colnames(expr_subset), module = net$colors,
+             stringsAsFactors = FALSE)
+}
+
+build_indicator_matrix <- function(subsample_configs, gene_names) {
+  n <- length(gene_names)
+  I <- matrix(0L, n, n, dimnames = list(gene_names, gene_names))
+  for (cfg in subsample_configs) {
+    g <- gene_names[cfg$gene_indices]
+    I[g, g] <- I[g, g] + 1L
+  }
+  I
+}
+
+build_coclustering_matrix <- function(module_results, gene_names) {
+  n <- length(gene_names)
+  C <- matrix(0L, n, n, dimnames = list(gene_names, gene_names))
+  for (res in module_results) {
+    assigned <- res[res$module != 0, ]
+    for (mod in unique(assigned$module)) {
+      g <- assigned$gene[assigned$module == mod]
+      if (length(g) > 1) C[g, g] <- C[g, g] + 1L
+    }
+  }
+  C
+}
+
+compute_consensus_adjacency <- function(C, I) {
+  A <- C / I
+  A[is.nan(A) | is.infinite(A)] <- 0
+  A
+}
+
+cut_consensus_tree <- function(A, min_module_size = 10L, deep_split = 4L) {
+  D    <- 1 - A
+  tree <- hclust(as.dist(D), method = "average")
+  invisible(capture.output(
+    mods <- cutreeDynamic(dendro = tree, distM = D,
+                           minClusterSize = min_module_size,
+                           deepSplit = deep_split, verbose = 0)
+  ))
+  names(mods) <- rownames(A)
+  list(tree = tree, modules = mods)
+}
+
+# File-based atomic counter for furrr workers
+increment_and_get_count <- function(counter_file, lock_file) {
+  tryCatch({
+    for (attempt in seq_len(100)) {
+      if (!file.exists(lock_file)) {
+        tryCatch(writeLines(as.character(Sys.getpid()), lock_file),
+                 error = function(e) NULL)
+        break
+      }
+      Sys.sleep(0.01 * sample(1:10, 1))
+    }
+    lines <- readLines(counter_file, warn = FALSE)
+    cnt   <- if (length(lines) > 0 && !is.na(suppressWarnings(as.integer(lines[1])))) {
+      as.integer(lines[1])
+    } else 0L
+    writeLines(as.character(cnt + 1L), counter_file)
+    tryCatch(unlink(lock_file), error = function(e) NULL)
+    cnt + 1L
+  }, error = function(e) NA_integer_)
+}
+
+cat("Consensus functions defined\n")
+```
+
+## Run 1K Consensus Iterations (CTRL samples)
+
+```{r consensus_iterations, cache=TRUE}
+n_joint <- ncol(datExpr_CTRL)
+subsample_size <- floor(GENE_SUBSAMPLE_RATE * n_joint)
+
+joint_configs <- lapply(seq_len(N_CONSENSUS), function(i) {
+  list(
+    iteration    = i,
+    gene_indices = sample(n_joint, subsample_size, replace = FALSE),
+    min_module_size = sample(MIN_MODULE_SIZE_RANGE, 1L)
+  )
+})
+
+n_cores <- max(1L, parallel::detectCores() - 1L)
+plan(multisession, workers = n_cores)
+
+counter_file <- file.path(OUTPUT_DIR, ".progress_counter")
+lock_file    <- file.path(OUTPUT_DIR, ".progress_lock")
+writeLines("0", counter_file)
+
+start_time <- Sys.time()
+
+joint_iter_results <- future_map(joint_configs, function(cfg) {
+  res <- run_subsample_wgcna(
+    datExpr_CTRL, cfg$gene_indices, SOFT_POWER,
+    cfg$min_module_size, DEEP_SPLIT, NETWORK_TYPE
+  )
+  cnt <- increment_and_get_count(counter_file, lock_file)
+  if (!is.na(cnt) && (cnt %% LOG_FREQUENCY == 0 || cnt == N_CONSENSUS)) {
+    elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+    eta     <- (N_CONSENSUS - cnt) * (elapsed / cnt)
+    cat(sprintf("[%s] Joint consensus: %d/%d (%.0f%%) | ETA: %.1f min\n",
+                format(Sys.time(), "%H:%M:%S"), cnt, N_CONSENSUS,
+                100 * cnt / N_CONSENSUS, eta / 60))
+  }
+  res
+}, .options = furrr_options(seed = TRUE), .progress = FALSE)
+
+plan(sequential)
+unlink(counter_file); unlink(lock_file)
+
+elapsed_min <- as.numeric(difftime(Sys.time(), start_time, units = "mins"))
+cat(sprintf("Consensus complete: %.1f minutes\n", elapsed_min))
+saveRDS(joint_iter_results, file.path(OUTPUT_DIR, "consensus_iter_results.rds"))
+```
+
+## Build Consensus Adjacency
+
+```{r consensus_adjacency, cache=TRUE}
+cat("Building indicator matrix...\n")
+I_joint <- build_indicator_matrix(joint_configs, colnames(datExpr_CTRL))
+saveRDS(I_joint, file.path(OUTPUT_DIR, "indicator_matrix.rds"))
+
+cat("Building co-clustering matrix...\n")
+C_joint <- build_coclustering_matrix(joint_iter_results, colnames(datExpr_CTRL))
+saveRDS(C_joint, file.path(OUTPUT_DIR, "coclustering_matrix.rds"))
+
+cat("Computing consensus adjacency...\n")
+A_joint <- compute_consensus_adjacency(C_joint, I_joint)
+saveRDS(A_joint, file.path(OUTPUT_DIR, "consensus_adjacency.rds"))
+
+cat("Indicator range:    [", min(I_joint), ",", max(I_joint), "]\n")
+cat("Co-clustering range:[", min(C_joint), ",", max(C_joint), "]\n")
+cat("Adjacency range:    [", round(min(A_joint), 3), ",", round(max(A_joint), 3), "]\n")
+```
+
+## Cut Consensus Tree
+
+```{r consensus_cut, cache=TRUE}
+cat("Cutting joint consensus tree...\n")
+joint_tree <- cut_consensus_tree(A_joint, CONSENSUS_MIN_SIZE, DEEP_SPLIT)
+
+raw_modules <- joint_tree$modules
+
+# Assign size-sorted consensus labels: consensus01 (largest) ... consensusN
+# This replaces stochastic WGCNA color names with stable index labels.
+mod_sizes <- sort(
+  table(raw_modules[raw_modules != 0]),
+  decreasing = TRUE
+)
+consensus_labels <- setNames(
+  sprintf("consensus%02d", seq_along(mod_sizes)),
+  names(mod_sizes)   # keys are character representations of integer module IDs
+)
+
+# Named vector: gene -> "consensus01" ... "consensusN" | "unassigned"
+joint_colors <- setNames(
+  ifelse(raw_modules == 0, "unassigned",
+         consensus_labels[as.character(raw_modules)]),
+  names(raw_modules)
+)
+
+joint_module_df <- data.frame(
+  gene      = names(raw_modules),
+  wgcna_int = raw_modules,         # original integer (for reference)
+  color     = joint_colors,        # "consensus01", ..., "unassigned"
+  stringsAsFactors = FALSE
+)
+
+saveRDS(joint_tree,      file.path(OUTPUT_DIR, "consensus_tree.rds"))
+saveRDS(consensus_labels, file.path(OUTPUT_DIR, "consensus_labels.rds"))
+write_csv(joint_module_df, file.path(OUTPUT_DIR, "joint_consensus_modules_raw.csv"))
+
+n_mods   <- length(unique(raw_modules[raw_modules != 0]))
+n_grey   <- sum(raw_modules == 0)
+n_assign <- sum(raw_modules != 0)
+
+cat("Modules found:", n_mods, "\n")
+cat("Assigned genes:", n_assign, "| Unassigned:", n_grey, "\n\n")
+print(table(joint_module_df$color))
+```
+
+# Module Classification
+
+Classify each module by the fraction of DEG vs control genes it contains.
+Threshold = `r DEG_FRACTION_THRESH`.
+
+```{r module_classification}
+joint_module_df <- joint_module_df |>
+  mutate(gene_type = gene_type[gene])
+
+module_composition <- joint_module_df |>
+  filter(color != "unassigned") |>
+  group_by(color) |>
+  summarise(
+    n_genes   = n(),
+    n_genotype = sum(gene_type == "genotype"),
+    n_leaf     = sum(gene_type == "leaf"),
+    frac_DEG   = n_genotype / n_genes,
+    .groups    = "drop"
+  ) |>
+  mutate(
+    module_type = case_when(
+      frac_DEG >= DEG_FRACTION_THRESH        ~ "genotype-dominated",
+      (1 - frac_DEG) >= DEG_FRACTION_THRESH  ~ "leaf-dominated",
+      TRUE                                    ~ "mixed"
+    )
+  ) |>
+  arrange(desc(frac_DEG))
+
+cat("=== MODULE COMPOSITION ===\n")
+print(module_composition)
+
+cat("\nModule counts by type:\n")
+print(table(module_composition$module_type))
+
+# Attach module_type to full gene-level table
+joint_module_df <- joint_module_df |>
+  left_join(module_composition |> select(color, module_type, frac_DEG),
+            by = "color")   # module_type: "genotype-dominated" | "leaf-dominated" | "mixed"
+
+write_csv(joint_module_df,
+          file.path(OUTPUT_DIR, "joint_consensus_modules.csv"))
+```
+
+```{r composition_barplot, fig.width=9, fig.height=4}
+module_composition |>
+  pivot_longer(c(n_genotype, n_leaf), names_to = "gene_set", values_to = "count") |>
+  mutate(
+    gene_set = recode(gene_set, n_genotype = "Genotype response", n_leaf = "Leaf gradient"),
+    color_ordered = fct_reorder(color, frac_DEG, .desc = TRUE)
+  ) |>
+  ggplot(aes(x = color_ordered, y = count, fill = gene_set)) +
+  geom_col(position = "stack") +
+  geom_text(
+    data = module_composition,
+    aes(x = fct_reorder(color, frac_DEG, .desc = TRUE),
+        y = n_genes + 2, label = module_type, fill = NULL),
+    size = 3, angle = 45, hjust = 0
+  ) +
+  scale_fill_manual(values = c("Genotype response" = "#3B528B", "Leaf gradient" = "#21908C")) +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Module", y = "Gene count", fill = NULL,
+       title = "Joint CTRL reference network: module composition")
+```
+
+# Palette Reassignment
+
+Map the temporary `consensus01`...`consensusN` index labels to the color palette
+used in the main analysis, so that downstream plots (bootstrap LFP, ridgeline
+distributions) share colors with Figure 6 and the permutation test notebook.
+
+- **Genotype-dominated modules** → matched to existing DEG consensus module colors
+  (`04_consensus_networks/ctrl/consensus_modules.csv`) by maximum Jaccard gene-set
+  overlap. These are the standard WGCNA color names (turquoise, blue, brown, ...).
+- **Leaf-dominated modules** → assigned the fixed leaf gradient palette used in
+  `permutation_test_delta_kWithin.Rmd` (`ctrl_color_remap`: sky, peach, jade, ...).
+  Chosen to not clash with WGCNA standard colors.
+- **Mixed modules** → grey70.
+
+After this chunk, `joint_colors` and `joint_module_df$color` use the reassigned
+palette for all downstream analysis.
+
+```{r palette_reassignment}
+# Existing DEG module assignments from main consensus pipeline
+CONSENSUS_DIR <- file.path(RUN_DIR, "04_consensus_networks")
+deg_ref_modules <- read_csv(
+  file.path(CONSENSUS_DIR, "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+
+# Leaf gradient palette (matches ctrl_color_remap in permutation_test notebook)
+LEAF_COLOR_HEX <- c(
+  sky      = "#5DA5DA",
+  peach    = "#FAA43A",
+  jade     = "#60BD68",
+  coral    = "#F15854",
+  lavender = "#B276B2",
+  umber    = "#8D4B08",
+  mustard  = "#DECF3F",
+  rose     = "#F17CB0"
+)
+
+jaccard <- function(a, b) length(intersect(a, b)) / length(union(a, b))
+
+# --- Genotype-dominated: match to DEG palette by Jaccard overlap ---
+geno_mods     <- module_composition |>
+  filter(module_type == "genotype-dominated") |> pull(color)
+deg_mod_colors <- unique(deg_ref_modules$color[deg_ref_modules$color != "grey"])
+
+geno_color_map <- setNames(
+  map_chr(geno_mods, function(cons_label) {
+    genes_joint <- names(joint_colors[joint_colors == cons_label])
+    j_scores <- sapply(deg_mod_colors, function(deg_col) {
+      jaccard(genes_joint, deg_ref_modules$gene[deg_ref_modules$color == deg_col])
+    })
+    best <- names(which.max(j_scores))
+    if (max(j_scores) < 0.05)
+      warning(cons_label, ": low best Jaccard = ", round(max(j_scores), 3))
+    best
+  }),
+  geno_mods
+)
+
+cat("=== GENOTYPE MODULE PALETTE ===\n")
+for (cm in geno_mods) {
+  g_j <- names(joint_colors[joint_colors == cm])
+  g_d <- deg_ref_modules$gene[deg_ref_modules$color == geno_color_map[cm]]
+  cat(sprintf("  %-14s -> %-12s  Jaccard=%.3f  n=%d\n",
+              cm, geno_color_map[cm], jaccard(g_j, g_d), length(g_j)))
+}
+
+# --- Leaf-dominated: assign fixed palette by descending module size ---
+leaf_mods <- module_composition |>
+  filter(module_type == "leaf-dominated") |>
+  arrange(desc(n_genes)) |> pull(color)
+if (length(leaf_mods) > length(LEAF_COLOR_HEX))
+  warning("More leaf modules (", length(leaf_mods),
+          ") than palette entries (", length(LEAF_COLOR_HEX), ")")
+leaf_color_map <- setNames(
+  names(LEAF_COLOR_HEX)[seq_along(leaf_mods)],
+  leaf_mods
+)
+
+cat("\n=== LEAF GRADIENT MODULE PALETTE ===\n")
+for (cm in leaf_mods)
+  cat(sprintf("  %-14s -> %-12s  n=%d\n",
+              cm, leaf_color_map[cm], sum(joint_colors == cm)))
+
+# --- Mixed: grey ---
+mixed_mods <- module_composition |>
+  filter(module_type == "mixed") |> pull(color)
+mixed_color_map <- setNames(rep("grey70", length(mixed_mods)), mixed_mods)
+
+# --- Build full palette map and hex lookup ---
+palette_map <- c(geno_color_map, leaf_color_map, mixed_color_map,
+                 unassigned = "unassigned")
+
+# Hex lookup for scale_fill_manual / scale_color_manual in all downstream plots.
+# Standard R color names (WGCNA DEG palette) are resolved via col2rgb.
+deg_hex <- setNames(
+  apply(col2rgb(geno_color_map), 2,
+        function(x) rgb(x[1], x[2], x[3], maxColorValue = 255)),
+  geno_color_map
+)
+color_hex <- c(deg_hex, LEAF_COLOR_HEX, grey70 = "#B3B3B3",
+               unassigned = "#FFFFFF")
+color_hex <- color_hex[!duplicated(names(color_hex))]
+
+cat("\n=== FULL PALETTE MAP ===\n")
+print(palette_map)
+
+# --- Update joint_colors and joint_module_df ---
+joint_colors_idx <- joint_colors   # keep consensusXX for reference
+joint_colors     <- unname(palette_map[joint_colors_idx])
+names(joint_colors) <- names(joint_colors_idx)
+
+joint_module_df <- joint_module_df |>
+  mutate(
+    consensus_id = color,           # original index label
+    color        = palette_map[color]
+  )
+module_composition <- module_composition |>
+  mutate(
+    consensus_id = color,
+    color        = palette_map[color]
+  )
+
+cat("\nPalette reassignment complete.",
+    "joint_colors and joint_module_df updated.\n")
+```
+
+# Bootstrap LFP
+
+Quantify module stability by resampling CTRL samples with replacement 1000 times,
+rebuilding the full adjacency + hierarchical clustering + `cutreeDynamic`, and
+computing the Largest Fragment Proportion (LFP) per module.
+
+```{r bootstrap_lfp, cache=TRUE}
+# Reference module assignments (numeric, non-grey)
+ref_modules <- setNames(joint_tree$modules, names(joint_tree$modules))
+
+boot_results_lfp <- vector("list", N_BOOT)
+
+for (b in seq_len(N_BOOT)) {
+  n_samp     <- nrow(datExpr_CTRL)
+  boot_idx   <- sample(n_samp, n_samp, replace = TRUE)
+  expr_boot  <- datExpr_CTRL[boot_idx, ]
+
+  adj_boot <- adjacency(expr_boot, power = SOFT_POWER, type = NETWORK_TYPE)
+  tree_boot <- hclust(as.dist(1 - adj_boot), method = "average")
+  invisible(capture.output(
+    mods_boot <- cutreeDynamic(
+      dendro        = tree_boot,
+      distM         = 1 - adj_boot,
+      deepSplit     = DEEP_SPLIT,
+      minClusterSize = CONSENSUS_MIN_SIZE
+    )
+  ))
+
+  boot_results_lfp[[b]] <- data.frame(
+    gene   = colnames(datExpr_CTRL),
+    module = mods_boot,
+    stringsAsFactors = FALSE
+  )
+
+  if (b %% 100 == 0) cat("Bootstrap:", b, "/", N_BOOT, "\n")
+}
+
+saveRDS(boot_results_lfp, file.path(OUTPUT_DIR, "bootstrap_results.rds"))
+cat("Bootstrap complete\n")
+```
+
+```{r compute_lfp, cache=TRUE}
+cons_ids <- sort(unique(joint_colors[joint_colors != "unassigned"]))
+
+lfp_results <- map_dfr(cons_ids, function(cons_label) {
+  mod_genes <- names(joint_colors[joint_colors == cons_label])
+
+  lfp_vals <- sapply(boot_results_lfp, function(boot) {
+    boot_sub <- boot[boot$gene %in% mod_genes, ]
+    counts   <- table(boot_sub$module)
+    counts_nz <- counts[names(counts) != "0"]
+    if (length(counts_nz) == 0) return(0)
+    max(counts_nz) / length(mod_genes)
+  })
+
+  tibble(
+    color   = cons_label,
+    n_genes = length(mod_genes),
+    mean_lfp   = mean(lfp_vals),
+    sd_lfp     = sd(lfp_vals),
+    se_lfp     = sd(lfp_vals) / sqrt(N_BOOT),
+    stability  = case_when(
+      mean(lfp_vals) >= LFP_STABLE   ~ "stable",
+      mean(lfp_vals) >= LFP_MODERATE ~ "moderate",
+      TRUE                            ~ "unstable"
+    )
+  )
+}) |>
+  left_join(module_composition |> select(color, module_type, frac_DEG), by = "color") |>
+  arrange(desc(mean_lfp))
+
+cat("=== BOOTSTRAP LFP ===\n")
+print(lfp_results)
+
+write_csv(lfp_results, file.path(OUTPUT_DIR, "bootstrap_lfp.csv"))
+```
+
+```{r lfp_plot, fig.width=7, fig.height=4}
+lfp_results |>
+  filter(!is.na(module_type)) |>
+  mutate(color_ordered = fct_reorder(color, mean_lfp)) |>
+  ggplot(aes(x = color_ordered, y = mean_lfp,
+             ymin = mean_lfp - se_lfp, ymax = mean_lfp + se_lfp,
+             color = module_type)) +
+  geom_pointrange() +
+  geom_hline(yintercept = c(LFP_MODERATE, LFP_STABLE), linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c(
+    "genotype-dominated" = "#3B528B",   # viridis D mid (temporary; no single color for a type)
+    "leaf-dominated"     = "#21908C",
+    "mixed"              = "grey70"
+  )) +
+  coord_flip() +
+  theme_minimal(base_size = 13) +
+  labs(x = NULL, y = "Mean LFP ± SE", color = "Module type",
+       title = "Bootstrap module stability (LFP) by module type")
+```
+
+# Permutation Test: Genotype Label Shuffling
+
+Shuffle genotype labels 10K times (keeping group sizes fixed: `r n_ctrl` CTRL,
+`r n_inv4m` Inv4m). Recompute mean $\Delta k_{Within}$ and $\Delta k_{Out}$
+per joint consensus module. Module definitions remain fixed throughout.
+
+The prediction: DEG-dominated modules show kWithin loss; control-dominated
+modules do not.
+
+## Helper Function
+
+```{r delta_k_helper}
+compute_module_delta_k <- function(datExpr_a, datExpr_b, power, mod_colors) {
+  adj_a <- adjacency(datExpr_a, power = power, type = "signed")
+  adj_b <- adjacency(datExpr_b, power = power, type = "signed")
+
+  k_a <- intramodularConnectivity(adj_a, mod_colors)
+  k_b <- intramodularConnectivity(adj_b, mod_colors)
+
+  delta_kWithin <- k_b$kWithin - k_a$kWithin
+  delta_kOut    <- k_b$kOut    - k_a$kOut
+
+  module_ids <- unique(mod_colors[mod_colors != "unassigned" & !is.na(mod_colors)])
+  list(
+    kWithin = sapply(module_ids, function(m) {
+      mean(delta_kWithin[mod_colors == m], na.rm = TRUE)
+    }),
+    kOut = sapply(module_ids, function(m) {
+      mean(delta_kOut[mod_colors == m], na.rm = TRUE)
+    })
+  )
+}
+```
+
+## Observed Delta kWithin
+
+```{r observed_delta}
+obs <- compute_module_delta_k(
+  datExpr_joint[ctrl_samples,  ],
+  datExpr_joint[inv4m_samples, ],
+  SOFT_POWER, joint_colors
+)
+
+cat("Observed mean delta kWithin per module (sorted):\n")
+print(round(sort(obs$kWithin), 4))
+cat("\nObserved mean delta kOut per module (sorted):\n")
+print(round(sort(obs$kOut), 4))
+```
+
+## Timing Probe
+
+Run 20 iterations first to measure actual per-iteration cost on this machine,
+then project the full run time before committing to 10K.
+
+```{r permutation_timing_probe}
+N_PROBE <- 20L
+
+probe_start <- proc.time()
+for (i in seq_len(N_PROBE)) {
+  perm_idx     <- sample(n_total)
+  pseudo_ctrl  <- perm_idx[seq_len(n_ctrl)]
+  pseudo_inv4m <- perm_idx[(n_ctrl + 1):n_total]
+  res <- compute_module_delta_k(
+    datExpr_joint[pseudo_ctrl,  ],
+    datExpr_joint[pseudo_inv4m, ],
+    SOFT_POWER, joint_colors
+  )
+}
+probe_elapsed <- (proc.time() - probe_start)[["elapsed"]]
+
+sec_per_iter <- probe_elapsed / N_PROBE
+projected_min <- sec_per_iter * N_PERM / 60
+
+cat(sprintf(
+  "Timing probe: %d iterations in %.1f s\n  -> %.3f s / iteration\n  -> %.1f min projected for N_PERM = %d\n",
+  N_PROBE, probe_elapsed, sec_per_iter, projected_min, N_PERM
+))
+```
+
+## Permutation Loop
+
+```{r permutation_loop, cache=TRUE}
+null_kWithin <- matrix(NA_real_, nrow = N_PERM, ncol = length(obs$kWithin),
+                        dimnames = list(NULL, names(obs$kWithin)))
+null_kOut    <- matrix(NA_real_, nrow = N_PERM, ncol = length(obs$kOut),
+                        dimnames = list(NULL, names(obs$kOut)))
+
+perm_start <- Sys.time()
+
+for (i in seq_len(N_PERM)) {
+  perm_idx      <- sample(n_total)
+  pseudo_ctrl   <- perm_idx[seq_len(n_ctrl)]
+  pseudo_inv4m  <- perm_idx[(n_ctrl + 1):n_total]
+
+  res <- compute_module_delta_k(
+    datExpr_joint[pseudo_ctrl,  ],
+    datExpr_joint[pseudo_inv4m, ],
+    SOFT_POWER, joint_colors
+  )
+  null_kWithin[i, ] <- res$kWithin
+  null_kOut[i, ]    <- res$kOut
+
+  if (i %% 500 == 0) {
+    elapsed <- as.numeric(difftime(Sys.time(), perm_start, units = "mins"))
+    eta     <- (N_PERM - i) * (elapsed / i)
+    cat(sprintf("[%s] %d/%d | %.1f min elapsed | ETA %.1f min\n",
+                format(Sys.time(), "%H:%M:%S"), i, N_PERM, elapsed, eta))
+  }
+}
+
+elapsed_total <- as.numeric(difftime(Sys.time(), perm_start, units = "mins"))
+cat(sprintf("Permutation test complete: %.1f min total\n", elapsed_total))
+```
+
+## ECDF P-values
+
+```{r ecdf_pvalues}
+# kWithin: one-tailed, test for loss (observed <= null)
+ecdf_pvals_kWithin <- sapply(names(obs$kWithin), function(m) {
+  mean(null_kWithin[, m] <= obs$kWithin[m])
+})
+
+# kOut: one-tailed, test for gain (observed >= null)
+ecdf_pvals_kOut <- sapply(names(obs$kOut), function(m) {
+  mean(null_kOut[, m] >= obs$kOut[m])
+})
+```
+
+## FDR Correction
+
+BH correction applied jointly across all module tests.
+
+```{r fdr_correction}
+n_genes_per_mod <- sapply(names(obs$kWithin), function(m) {
+  sum(joint_colors == m, na.rm = TRUE)
+})
+
+results_joint <- tibble(
+  color                  = names(obs$kWithin),
+  n_genes                = n_genes_per_mod,
+  observed_delta_kWithin = round(obs$kWithin, 4),
+  null_mean_kWithin      = round(colMeans(null_kWithin), 4),
+  null_sd_kWithin        = round(apply(null_kWithin, 2, sd), 4),
+  ecdf_p_kWithin         = round(ecdf_pvals_kWithin, 4),
+  observed_delta_kOut    = round(obs$kOut, 4),
+  null_mean_kOut         = round(colMeans(null_kOut), 4),
+  null_sd_kOut           = round(apply(null_kOut, 2, sd), 4),
+  ecdf_p_kOut            = round(ecdf_pvals_kOut, 4)
+) |>
+  left_join(module_composition |> select(color, module_type, n_genotype, n_leaf, frac_DEG),
+            by = "color") |>
+  mutate(
+    fdr_kWithin = round(p.adjust(ecdf_p_kWithin, method = "BH"), 4),
+    fdr_kOut    = round(p.adjust(ecdf_p_kOut,    method = "BH"), 4),
+    sig_kWithin = ifelse(fdr_kWithin < 0.05, "*", "")
+  ) |>
+  arrange(fdr_kWithin)
+
+cat("=== PERMUTATION TEST RESULTS ===\n\n")
+
+cat("Genotype-dominated modules:\n")
+results_joint |>
+  filter(module_type == "genotype-dominated") |>
+  select(color, n_genes, n_genotype, observed_delta_kWithin, ecdf_p_kWithin, fdr_kWithin, sig_kWithin) |>
+  print()
+
+cat("\nLeaf-dominated modules:\n")
+results_joint |>
+  filter(module_type == "leaf-dominated") |>
+  select(color, n_genes, n_leaf, observed_delta_kWithin, ecdf_p_kWithin, fdr_kWithin, sig_kWithin) |>
+  print()
+
+cat("\nMixed modules:\n")
+results_joint |>
+  filter(module_type == "mixed") |>
+  select(color, n_genes, n_genotype, n_leaf, observed_delta_kWithin, ecdf_p_kWithin, fdr_kWithin, sig_kWithin) |>
+  print()
+
+cat("\nSignificant at FDR < 0.05:", sum(results_joint$fdr_kWithin < 0.05, na.rm = TRUE),
+    "of", nrow(results_joint), "\n")
+```
+
+## Save Results
+
+```{r save_results}
+write_csv(results_joint, file.path(OUTPUT_DIR, "joint_permutation_results.csv"))
+
+saveRDS(
+  list(
+    observed_kWithin = obs$kWithin,
+    observed_kOut    = obs$kOut,
+    null_kWithin     = null_kWithin,
+    null_kOut        = null_kOut,
+    pvals_kWithin    = ecdf_pvals_kWithin,
+    pvals_kOut       = ecdf_pvals_kOut,
+    joint_colors     = joint_colors,
+    module_composition = module_composition,
+    control_genes    = control_genes,
+    deg_genes        = deg_genes
+  ),
+  file.path(OUTPUT_DIR, "joint_permutation_results.rds")
+)
+
+cat("Results saved to:", OUTPUT_DIR, "\n")
+```
+
+# Visualization
+
+## Ridgeline Density Plots
+
+Null distributions of $\Delta k_{Within}$ from 10K genotype label permutations.
+Red line = observed value. Modules ordered by observed delta within each type.
+
+```{r ridgeline_deg, fig.width=10, fig.height=7}
+deg_mods <- results_joint |>
+  filter(module_type == "genotype-dominated") |>
+  arrange(observed_delta_kWithin) |>
+  pull(color)
+
+if (length(deg_mods) > 0) {
+  deg_color_hex <- setNames(deg_mods, deg_mods)
+
+  null_deg_df <- map_dfr(deg_mods, function(m) {
+    tibble(module = m, z_value = null_kWithin[, m])
+  }) |>
+    mutate(module = factor(module, levels = deg_mods))
+
+  pts_deg <- results_joint |>
+    filter(color %in% deg_mods) |>
+    transmute(
+      module  = factor(color, levels = deg_mods),
+      z_observed = observed_delta_kWithin,
+      fdr     = fdr_kWithin
+    )
+
+  p_deg <- ggplot(null_deg_df, aes(x = z_value, y = module, fill = module)) +
+    geom_density_ridges(color = "grey40", alpha = 0.7, scale = 0.9,
+                         rel_min_height = 0.01) +
+    scale_fill_manual(values = color_hex) +
+    guides(fill = "none") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_segment(
+      data = pts_deg,
+      aes(x = z_observed, xend = z_observed,
+          y = as.numeric(module), yend = as.numeric(module) + 0.8),
+      color = "red", linewidth = 0.8, inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = pts_deg |> filter(fdr < 0.05),
+      aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
+          label = sprintf("FDR=%.3f", fdr)),
+      color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
+    ) +
+    theme_minimal(base_size = 14) +
+    labs(y = NULL, x = expression(Delta * k[Within]),
+         title = "Genotype-response modules: genotype label permutation null")
+  print(p_deg)
+} else {
+  cat("No genotype-dominated modules to plot\n")
+}
+```
+
+```{r ridgeline_control, fig.width=10, fig.height=5}
+ctrl_mods <- results_joint |>
+  filter(module_type == "leaf-dominated") |>
+  arrange(observed_delta_kWithin) |>
+  pull(color)
+
+if (length(ctrl_mods) > 0) {
+  null_ctrl_df <- map_dfr(ctrl_mods, function(m) {
+    tibble(module = m, z_value = null_kWithin[, m])
+  }) |>
+    mutate(module = factor(module, levels = ctrl_mods))
+
+  pts_ctrl <- results_joint |>
+    filter(color %in% ctrl_mods) |>
+    transmute(
+      module  = factor(color, levels = ctrl_mods),
+      z_observed = observed_delta_kWithin,
+      fdr     = fdr_kWithin
+    )
+
+  p_ctrl <- ggplot(null_ctrl_df, aes(x = z_value, y = module, fill = module)) +
+    geom_density_ridges(color = "grey40", alpha = 0.7,
+                         scale = 0.9, rel_min_height = 0.01) +
+    scale_fill_manual(values = color_hex) +
+    guides(fill = "none") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_segment(
+      data = pts_ctrl,
+      aes(x = z_observed, xend = z_observed,
+          y = as.numeric(module), yend = as.numeric(module) + 0.8),
+      color = "red", linewidth = 0.8, inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = pts_ctrl |> filter(fdr < 0.05),
+      aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
+          label = sprintf("FDR=%.3f", fdr)),
+      color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
+    ) +
+    theme_minimal(base_size = 14) +
+    labs(y = NULL, x = expression(Delta * k[Within]),
+         title = "Leaf gradient modules: genotype label permutation null")
+  print(p_ctrl)
+} else {
+  cat("No leaf-dominated modules to plot\n")
+}
+```
+
+## Bimodality Check: Control Gene kWithin Distributions
+
+Compare the kWithin distributions of photosynthesis vs senescence genes
+within each control-dominated module. This checks whether the joint
+clustering resolved the bimodality seen in single-pass clustering.
+
+```{r bimodality_check, fig.width=9, fig.height=4}
+ctrl_gene_info <- joint_module_df |>
+  filter(gene_type == "leaf", color != "unassigned") |>
+  mutate(
+    leaf_program = case_when(
+      gene %in% photo_control ~ "photosynthesis",
+      gene %in% sag_control   ~ "senescence",
+      TRUE                     ~ "other"
+    )
+  )
+
+adj_all_ctrl <- adjacency(datExpr_CTRL, power = SOFT_POWER, type = NETWORK_TYPE)
+k_ctrl_full <- intramodularConnectivity(
+  adj_all_ctrl,
+  joint_colors[rownames(adj_all_ctrl)]
+)
+
+ctrl_kw_df <- tibble(
+  gene        = names(joint_colors),
+  color       = joint_colors,
+  kWithin     = k_ctrl_full$kWithin
+) |>
+  filter(gene %in% control_genes, color != "unassigned") |>  # control_genes = leaf-gradient gene set
+  mutate(
+    leaf_program = case_when(
+      gene %in% photo_control ~ "photosynthesis",
+      gene %in% sag_control   ~ "senescence",
+      TRUE                     ~ "other"
+    )
+  )
+
+ggplot(ctrl_kw_df, aes(x = kWithin, fill = leaf_program)) +
+  geom_histogram(bins = 20, alpha = 0.7, position = "identity") +
+  facet_wrap(~color, scales = "free") +
+  scale_fill_manual(values = c(photosynthesis = "forestgreen",
+                                senescence    = "goldenrod3",
+                                other         = "grey60")) +
+  theme_minimal(base_size = 12) +
+  labs(x = expression(k[Within]), y = "Count", fill = "Leaf program",
+       title = "kWithin by leaf program within leaf gradient modules",
+       subtitle = "Bimodality = photosynthesis/senescence separation unresolved")
+```
+
+# Summary
+
+```{r summary}
+cat("=== JOINT CONSENSUS ANALYSIS SUMMARY ===\n\n")
+
+cat("Gene set sizes:\n")
+cat("  Genotype response genes:", length(deg_genes), "\n")
+cat("  Leaf gradient genes:    ", length(control_genes), "  (",
+    length(photo_control), "photosynthesis +",
+    length(sag_control), "senescence)\n")
+cat("  Joint total:            ", length(joint_genes), "\n\n")
+
+cat("Consensus network (CTRL samples, power =", SOFT_POWER, "):\n")
+cat("  Modules:", n_mods, " | Assigned:", n_assign, " | Grey:", n_grey, "\n\n")
+
+cat("Module classification (threshold =", DEG_FRACTION_THRESH, "):\n")
+print(module_composition |> select(color, n_genes, n_genotype, n_leaf, frac_DEG, module_type))
+
+cat("\nBootstrap LFP (stability):\n")
+print(lfp_results |> select(color, n_genes, mean_lfp, stability, module_type))
+
+cat("\nPermutation test (10K iterations):\n")
+cat("  Significant genotype-dominated (FDR < 0.05):",
+    results_joint |> filter(module_type == "genotype-dominated", fdr_kWithin < 0.05) |> nrow(), "\n")
+cat("  Significant leaf-dominated (FDR < 0.05):",
+    results_joint |> filter(module_type == "leaf-dominated", fdr_kWithin < 0.05) |> nrow(), "\n")
+cat("  Significant mixed (FDR < 0.05):",
+    results_joint |> filter(module_type == "mixed", fdr_kWithin < 0.05) |> nrow(), "\n")
+
+cat("\nConclusion: ",
+    if (results_joint |> filter(module_type == "leaf-dominated", fdr_kWithin < 0.05) |> nrow() == 0)
+      "Leaf gradient modules show no significant kWithin loss. Connectivity loss is specific to genotype response modules."
+    else
+      "Some leaf gradient modules show significant kWithin loss. Investigate further.",
+    "\n")
+```
