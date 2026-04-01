@@ -170,6 +170,7 @@ print_usage() {
     echo "  --gene-selection METHOD  Gene selection: 'fdr' (FDR<0.05) or 'pvalue' (P<0.005) (default: fdr)"
     echo "  --resume DIR             Resume from existing run directory"
     echo "  --skip-existing          Skip steps that have existing outputs"
+    echo "  --forced-power N         Force soft power β=N in step 3 (default: 0 = auto)"
     echo "  --yes                    Auto-confirm"
     echo "  --help                   Show this help"
     echo ""
@@ -299,6 +300,10 @@ while [[ $# -gt 0 ]]; do
         --skip-existing)
             SKIP_EXISTING=true
             shift
+            ;;
+        --forced-power)
+            FORCED_POWER="$2"
+            shift 2
             ;;
         --yes)
             AUTO_CONFIRM=true
