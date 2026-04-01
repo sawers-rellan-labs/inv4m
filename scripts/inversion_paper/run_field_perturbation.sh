@@ -102,6 +102,7 @@ DEEP_SPLIT=4
 STABILITY_THRESHOLD_STABLE=0.70
 STABILITY_THRESHOLD_MODERATE=0.50
 NETWORK_TYPE="signed"  # signed, unsigned, or signed hybrid
+FORCED_POWER=0       # 0 = auto-select; set to e.g. 18 to override pickSoftThreshold
 LOG_FREQUENCY=50  # Log progress every N iterations
 GENE_SELECTION="fdr"  # fdr (FDR < 0.05) or pvalue (P < 0.005)
 
@@ -436,6 +437,7 @@ for ((step=START_STEP; step<=END_STEP; step++)); do
             PARAMS="$PARAMS, min_module_size=$MIN_MODULE_SIZE"
             PARAMS="$PARAMS, deep_split=$DEEP_SPLIT"
             PARAMS="$PARAMS, network_type='$NETWORK_TYPE'"
+            PARAMS="$PARAMS, forced_power=$FORCED_POWER"
             ;;
         4)
             # Consensus networks: use params from reference network

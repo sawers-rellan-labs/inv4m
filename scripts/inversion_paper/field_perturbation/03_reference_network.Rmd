@@ -13,6 +13,7 @@ params:
   min_module_size: 25
   deep_split: 4
   network_type: "signed"
+  forced_power: 0
 ---
 
 <!--
@@ -187,8 +188,11 @@ par(mfrow = c(1, 1))
 ```
 
 ```{r ctrl_select_power}
-# Select power: powerEstimate > first R² > 0.80 > default 12
-if (!is.na(sft_ctrl$powerEstimate)) {
+# Select power: forced_power param overrides auto-selection when > 0
+if (!is.null(params$forced_power) && params$forced_power > 0) {
+  power_ctrl <- params$forced_power
+  cat("NOTE: Using forced soft power:", power_ctrl, "\n")
+} else if (!is.na(sft_ctrl$powerEstimate)) {
   power_ctrl <- sft_ctrl$powerEstimate
 } else {
   r2_idx <- which(sft_ctrl$fitIndices$SFT.R.sq > 0.80)
@@ -341,7 +345,10 @@ par(mfrow = c(1, 1))
 ```
 
 ```{r inv4m_select_power}
-if (!is.na(sft_inv4m$powerEstimate)) {
+if (!is.null(params$forced_power) && params$forced_power > 0) {
+  power_inv4m <- params$forced_power
+  cat("NOTE: Using forced soft power:", power_inv4m, "\n")
+} else if (!is.na(sft_inv4m$powerEstimate)) {
   power_inv4m <- sft_inv4m$powerEstimate
 } else {
   r2_idx <- which(sft_inv4m$fitIndices$SFT.R.sq > 0.80)
