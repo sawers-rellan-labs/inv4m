@@ -297,43 +297,31 @@ cat("CTRL:", n_ctrl, "| Inv4m:", n_inv4m, "\n")
 Two-panel figure showing CTRL consensus module bootstrap support (LFP)
 for both gene sets.
 
-```{r bootstrap_support_figure, fig.width=10, fig.height=10}
+```{r bootstrap_support_figure, fig.width=10, fig.height=8}
 STABILITY_STABLE   <- 0.70
 STABILITY_MODERATE <- 0.50
 
-# Panel A: Genotype-response modules (original WGCNA colors)
-p_gr_support <- ggplot(
-  gr_lfp |> filter(color != "grey"),
-  aes(x = reorder(color, mean_lfp), y = mean_lfp, fill = color)
-) +
-  geom_col(color = "black") +
-  geom_errorbar(
-    aes(ymin = pmax(0, mean_lfp - se_lfp),
-        ymax = pmin(1, mean_lfp + se_lfp)),
-    width = 0.3
-  ) +
-  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed",
-             color = "darkgreen") +
-  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed",
-             color = "orange") +
-  scale_fill_identity() +
-  coord_flip() +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = "Genotype-response modules",
-    x = "Module", y = "Mean Support (LFP)"
+# Combine both gene sets into one data frame
+gr_support_df <- gr_lfp |>
+  filter(color != "grey") |>
+  mutate(
+    display_color = color,
+    fill_hex = color,
+    gene_set = "Genotype-response"
   )
 
-# Panel B: Leaf-gradient modules (remapped colors)
-lg_lfp_remapped <- lg_lfp |>
+lg_support_df <- lg_lfp |>
   filter(color != "grey") |>
   mutate(
     display_color = lg_color_remap[color],
-    fill_hex = lg_color_hex[display_color]
+    fill_hex = lg_color_hex[lg_color_remap[color]],
+    gene_set = "Leaf-gradient"
   )
 
-p_lg_support <- ggplot(
-  lg_lfp_remapped,
+support_df <- bind_rows(gr_support_df, lg_support_df)
+
+p_support <- ggplot(
+  support_df,
   aes(x = reorder(display_color, mean_lfp), y = mean_lfp, fill = fill_hex)
 ) +
   geom_col(color = "black") +
@@ -348,20 +336,16 @@ p_lg_support <- ggplot(
              color = "orange") +
   scale_fill_identity() +
   coord_flip() +
+  facet_wrap(~gene_set, scales = "free_y") +
   theme_minimal(base_size = 14) +
-  labs(
-    title = "Leaf-gradient modules",
-    x = "Module", y = "Mean Support (LFP)"
-  )
+  labs(x = "Module", y = "Mean Support (LFP)")
 
-p_support_combined <- p_gr_support / p_lg_support +
-  plot_annotation(tag_levels = "A")
-print(p_support_combined)
+print(p_support)
 
 ggsave(file.path(paths$figures, "module_support_combined.pdf"),
-       p_support_combined, width = 10, height = 10)
+       p_support, width = 10, height = 8)
 ggsave(file.path(paths$figures, "module_support_combined.png"),
-       p_support_combined, width = 10, height = 10, dpi = 300)
+       p_support, width = 10, height = 8, dpi = 300)
 ```
 
 # Helper Function
@@ -388,81 +372,6 @@ compute_module_delta_k <- function(datExpr_a, datExpr_b, power, mod_colors) {
       mean(delta_kOut[idx], na.rm = TRUE)
     })
   )
-}
-
-# Density ridgeline panel constructor
-# points_df must have columns: module, z_observed, fdr
-# fill_color: "identity" OR named vector (module -> hex)
-# go_terms: optional named vector (module -> GO description)
-make_density_panel <- function(density_df, points_df, panel_title,
-                               fill_color = "identity",
-                               go_terms = NULL,
-                               module_sizes = NULL) {
-  mod_levels <- levels(density_df$module)
-  if (!is.null(module_sizes)) {
-    y_labels <- sapply(mod_levels, function(m) {
-      n <- module_sizes[m]
-      if (!is.na(n)) sprintf("%s (n=%d)", m, n) else m
-    })
-  } else {
-    y_labels <- setNames(mod_levels, mod_levels)
-  }
-
-  if (fill_color[1] == "identity") {
-    p <- ggplot(density_df, aes(x = z_value, y = module, fill = module)) +
-      geom_density_ridges(color = "grey40", alpha = 0.7,
-                          scale = 0.9, rel_min_height = 0.01) +
-      scale_fill_identity() +
-      guides(fill = "none")
-  } else {
-    p <- ggplot(density_df, aes(x = z_value, y = module, fill = module)) +
-      geom_density_ridges(color = "grey40", alpha = 0.7,
-                          scale = 0.9, rel_min_height = 0.01) +
-      scale_fill_manual(values = fill_color) +
-      guides(fill = "none")
-  }
-  p <- p +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
-    geom_segment(
-      data = points_df,
-      aes(x = z_observed, xend = z_observed,
-          y = as.numeric(module),
-          yend = as.numeric(module) + 0.8),
-      color = "red", linewidth = 0.8, inherit.aes = FALSE
-    ) +
-    geom_text(
-      data = points_df |> filter(fdr < 0.05),
-      aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
-          label = sprintf("FDR=%.3f", fdr)),
-      color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
-    ) +
-    scale_y_discrete(labels = y_labels) +
-    scale_x_continuous(limits = c(NA, 5),
-                       breaks = seq(-10, 10, 2),
-                       minor_breaks = seq(-10, 10, 2)) +
-    theme_minimal(base_size = 14) +
-    labs(y = NULL, x = expression(Z[Delta * k]), title = panel_title)
-
-  if (!is.null(go_terms)) {
-    go_df <- tibble(
-      module = names(go_terms),
-      go_desc = unname(go_terms)
-    ) |>
-      filter(module %in% levels(density_df$module)) |>
-      mutate(
-        module = factor(module, levels = levels(density_df$module)),
-        y_pos = as.numeric(module) + 0.35
-      )
-    p <- p +
-      geom_text(
-        data = go_df,
-        aes(x = 2.5, y = y_pos, label = go_desc),
-        hjust = 0, size = 14 * 0.8 / .pt, fontface = "italic",
-        inherit.aes = FALSE
-      )
-  }
-
-  p
 }
 ```
 
@@ -696,58 +605,102 @@ for (m in colnames(lg_null_z)) {
 }
 lg_obs_z <- (observed_lg_kw - lg_null_mean) / lg_null_sd
 
-# Genotype-response density data
+# Module sizes for y-axis labels
+gr_mod_sizes <- sapply(colnames(gr_null_z), function(m)
+  sum(gr_colors == m, na.rm = TRUE))
+lg_mod_sizes <- sapply(colnames(lg_null_z), function(m)
+  sum(lg_colors == m))
+
+# Build combined density data
 gr_density <- map_dfr(colnames(gr_null_z), function(m) {
-  tibble(module = m, z_value = gr_null_z[, m])
+  tibble(module = sprintf("%s (n=%d)", m, gr_mod_sizes[m]),
+         fill_hex = m, z_value = gr_null_z[, m],
+         gene_set = "Genotype-response")
 })
-gr_points <- tibble(
-  module = names(gr_obs_z),
-  z_observed = gr_obs_z,
-  fdr = kw_fdr_gr[names(gr_obs_z)]
-)
-gr_order <- gr_points |> arrange(z_observed) |> pull(module)
-gr_density$module <- factor(gr_density$module, levels = gr_order)
-gr_points$module  <- factor(gr_points$module, levels = gr_order)
-
-gr_mod_sizes <- sapply(levels(gr_density$module), function(m) {
-  sum(gr_colors == m, na.rm = TRUE)
-})
-
-# Leaf-gradient density data
 lg_density <- map_dfr(colnames(lg_null_z), function(m) {
-  tibble(module = m, z_value = lg_null_z[, m])
+  tibble(module = sprintf("%s (n=%d)", m, lg_mod_sizes[m]),
+         fill_hex = lg_color_hex[m], z_value = lg_null_z[, m],
+         gene_set = "Leaf-gradient")
 })
-lg_points <- tibble(
-  module = names(lg_obs_z),
-  z_observed = lg_obs_z,
-  fdr = kw_fdr_lg[names(lg_obs_z)]
+density_kw <- bind_rows(gr_density, lg_density)
+
+# Build combined points data
+gr_points <- tibble(
+  module = sprintf("%s (n=%d)", names(gr_obs_z), gr_mod_sizes[names(gr_obs_z)]),
+  fill_hex = names(gr_obs_z),
+  z_observed = gr_obs_z, fdr = kw_fdr_gr[names(gr_obs_z)],
+  gene_set = "Genotype-response"
 )
-lg_order <- lg_points |> arrange(z_observed) |> pull(module)
-lg_density$module <- factor(lg_density$module, levels = lg_order)
-lg_points$module  <- factor(lg_points$module, levels = lg_order)
+lg_points <- tibble(
+  module = sprintf("%s (n=%d)", names(lg_obs_z), lg_mod_sizes[names(lg_obs_z)]),
+  fill_hex = lg_color_hex[names(lg_obs_z)],
+  z_observed = lg_obs_z, fdr = kw_fdr_lg[names(lg_obs_z)],
+  gene_set = "Leaf-gradient"
+)
+points_kw <- bind_rows(gr_points, lg_points)
 
-lg_mod_sizes <- sapply(levels(lg_density$module), function(m) {
-  sum(lg_colors == m)
-})
+# Order modules by z_observed within each gene_set
+mod_order <- points_kw |> arrange(gene_set, z_observed) |> pull(module)
+density_kw$module <- factor(density_kw$module, levels = mod_order)
+points_kw$module  <- factor(points_kw$module, levels = mod_order)
 
-p_gr <- make_density_panel(gr_density, gr_points,
-                           "Genotype-response modules (kWithin)",
-                           fill_color = "identity",
-                           go_terms = gr_go_terms,
-                           module_sizes = gr_mod_sizes)
-p_lg <- make_density_panel(lg_density, lg_points,
-                           "Leaf-gradient modules (kWithin)",
-                           fill_color = lg_color_hex,
-                           go_terms = lg_go_terms,
-                           module_sizes = lg_mod_sizes)
+# Build fill color map (module label -> hex)
+fill_map <- setNames(points_kw$fill_hex, as.character(points_kw$module))
 
-p_kw_combined <- p_gr / p_lg + plot_annotation(tag_levels = "A")
-print(p_kw_combined)
+# GO term annotations
+gr_go_df <- if (!is.null(gr_go_terms)) {
+  tibble(
+    module = sprintf("%s (n=%d)", names(gr_go_terms),
+                     gr_mod_sizes[names(gr_go_terms)]),
+    go_desc = unname(gr_go_terms), gene_set = "Genotype-response"
+  ) |> filter(module %in% levels(density_kw$module))
+}
+lg_go_df <- if (!is.null(lg_go_terms)) {
+  tibble(
+    module = sprintf("%s (n=%d)", names(lg_go_terms),
+                     lg_mod_sizes[names(lg_go_terms)]),
+    go_desc = unname(lg_go_terms), gene_set = "Leaf-gradient"
+  ) |> filter(module %in% levels(density_kw$module))
+}
+go_df <- bind_rows(gr_go_df, lg_go_df) |>
+  mutate(module = factor(module, levels = levels(density_kw$module)),
+         y_pos = as.numeric(module) + 0.35)
+
+p_kw <- ggplot(density_kw, aes(x = z_value, y = module, fill = module)) +
+  geom_density_ridges(color = "grey40", alpha = 0.7,
+                      scale = 0.9, rel_min_height = 0.01) +
+  scale_fill_manual(values = fill_map) +
+  guides(fill = "none") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_segment(
+    data = points_kw,
+    aes(x = z_observed, xend = z_observed,
+        y = as.numeric(module), yend = as.numeric(module) + 0.8),
+    color = "red", linewidth = 0.8, inherit.aes = FALSE
+  ) +
+  geom_text(
+    data = points_kw |> filter(fdr < 0.05),
+    aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
+        label = sprintf("FDR=%.3f", fdr)),
+    color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
+  ) +
+  geom_text(
+    data = go_df,
+    aes(x = 2.5, y = y_pos, label = go_desc),
+    hjust = 0, size = 14 * 0.8 / .pt, fontface = "italic",
+    inherit.aes = FALSE
+  ) +
+  scale_x_continuous(limits = c(NA, 5), breaks = seq(-10, 10, 2)) +
+  facet_wrap(~gene_set, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(y = NULL, x = expression(Z[Delta * k[Within]]))
+
+print(p_kw)
 
 ggsave(file.path(OUTPUT_DIR, "zscore_density_kWithin.pdf"),
-       p_kw_combined, width = 10, height = 10)
+       p_kw, width = 10, height = 10)
 ggsave(file.path(OUTPUT_DIR, "zscore_density_kWithin.png"),
-       p_kw_combined, width = 10, height = 10, dpi = 300)
+       p_kw, width = 10, height = 10, dpi = 300)
 ```
 
 ## Z-score Ridge Plots (kOut)
@@ -772,50 +725,76 @@ for (m in colnames(lg_null_z_out)) {
 }
 lg_obs_z_out <- (observed_lg_out - lg_null_mean_out) / lg_null_sd_out
 
-# Genotype-response kOut
+# Build combined density data
 gr_density_out <- map_dfr(colnames(gr_null_z_out), function(m) {
-  tibble(module = m, z_value = gr_null_z_out[, m])
+  tibble(module = sprintf("%s (n=%d)", m, gr_mod_sizes[m]),
+         fill_hex = m, z_value = gr_null_z_out[, m],
+         gene_set = "Genotype-response")
 })
-gr_points_out <- tibble(
-  module = names(gr_obs_z_out),
-  z_observed = gr_obs_z_out,
-  fdr = kout_fdr_gr[names(gr_obs_z_out)]
-)
-gr_order_out <- gr_points_out |> arrange(z_observed) |> pull(module)
-gr_density_out$module <- factor(gr_density_out$module, levels = gr_order_out)
-gr_points_out$module  <- factor(gr_points_out$module, levels = gr_order_out)
-
-# Leaf-gradient kOut
 lg_density_out <- map_dfr(colnames(lg_null_z_out), function(m) {
-  tibble(module = m, z_value = lg_null_z_out[, m])
+  tibble(module = sprintf("%s (n=%d)", m, lg_mod_sizes[m]),
+         fill_hex = lg_color_hex[m], z_value = lg_null_z_out[, m],
+         gene_set = "Leaf-gradient")
 })
-lg_points_out <- tibble(
-  module = names(lg_obs_z_out),
-  z_observed = lg_obs_z_out,
-  fdr = kout_fdr_lg[names(lg_obs_z_out)]
+density_kout <- bind_rows(gr_density_out, lg_density_out)
+
+# Build combined points data
+gr_points_out <- tibble(
+  module = sprintf("%s (n=%d)", names(gr_obs_z_out), gr_mod_sizes[names(gr_obs_z_out)]),
+  fill_hex = names(gr_obs_z_out),
+  z_observed = gr_obs_z_out, fdr = kout_fdr_gr[names(gr_obs_z_out)],
+  gene_set = "Genotype-response"
 )
-lg_order_out <- lg_points_out |> arrange(z_observed) |> pull(module)
-lg_density_out$module <- factor(lg_density_out$module, levels = lg_order_out)
-lg_points_out$module  <- factor(lg_points_out$module, levels = lg_order_out)
+lg_points_out <- tibble(
+  module = sprintf("%s (n=%d)", names(lg_obs_z_out), lg_mod_sizes[names(lg_obs_z_out)]),
+  fill_hex = lg_color_hex[names(lg_obs_z_out)],
+  z_observed = lg_obs_z_out, fdr = kout_fdr_lg[names(lg_obs_z_out)],
+  gene_set = "Leaf-gradient"
+)
+points_kout <- bind_rows(gr_points_out, lg_points_out)
 
-p_gr_kout <- make_density_panel(gr_density_out, gr_points_out,
-                                "Genotype-response modules (kOut)",
-                                fill_color = "identity",
-                                go_terms = gr_go_terms,
-                                module_sizes = gr_mod_sizes)
-p_lg_kout <- make_density_panel(lg_density_out, lg_points_out,
-                                "Leaf-gradient modules (kOut)",
-                                fill_color = lg_color_hex,
-                                go_terms = lg_go_terms,
-                                module_sizes = lg_mod_sizes)
+# Order modules by z_observed within each gene_set
+mod_order_out <- points_kout |> arrange(gene_set, z_observed) |> pull(module)
+density_kout$module <- factor(density_kout$module, levels = mod_order_out)
+points_kout$module  <- factor(points_kout$module, levels = mod_order_out)
 
-p_kout_combined <- p_gr_kout / p_lg_kout + plot_annotation(tag_levels = "A")
-print(p_kout_combined)
+fill_map_out <- setNames(points_kout$fill_hex, as.character(points_kout$module))
+
+p_kout <- ggplot(density_kout, aes(x = z_value, y = module, fill = module)) +
+  geom_density_ridges(color = "grey40", alpha = 0.7,
+                      scale = 0.9, rel_min_height = 0.01) +
+  scale_fill_manual(values = fill_map_out) +
+  guides(fill = "none") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_segment(
+    data = points_kout,
+    aes(x = z_observed, xend = z_observed,
+        y = as.numeric(module), yend = as.numeric(module) + 0.8),
+    color = "red", linewidth = 0.8, inherit.aes = FALSE
+  ) +
+  geom_text(
+    data = points_kout |> filter(fdr < 0.05),
+    aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
+        label = sprintf("FDR=%.3f", fdr)),
+    color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
+  ) +
+  geom_text(
+    data = go_df,
+    aes(x = 2.5, y = y_pos, label = go_desc),
+    hjust = 0, size = 14 * 0.8 / .pt, fontface = "italic",
+    inherit.aes = FALSE
+  ) +
+  scale_x_continuous(limits = c(NA, 5), breaks = seq(-10, 10, 2)) +
+  facet_wrap(~gene_set, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(y = NULL, x = expression(Z[Delta * k[Out]]))
+
+print(p_kout)
 
 ggsave(file.path(OUTPUT_DIR, "zscore_density_kOut.pdf"),
-       p_kout_combined, width = 10, height = 10)
+       p_kout, width = 10, height = 10)
 ggsave(file.path(OUTPUT_DIR, "zscore_density_kOut.png"),
-       p_kout_combined, width = 10, height = 10, dpi = 300)
+       p_kout, width = 10, height = 10, dpi = 300)
 ```
 
 ## |logFC| vs Delta kWithin
