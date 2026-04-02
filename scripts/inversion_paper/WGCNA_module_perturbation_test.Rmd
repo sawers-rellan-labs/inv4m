@@ -135,6 +135,24 @@ lg_preservation <- read_csv(
 # Leaf-gradient expression matrix
 expr_lg <- readRDS(file.path(LG_RUN, "02_gene_filter", "filtered_expression.rds"))
 
+# Remap leaf-gradient colors to avoid collisions with genotype-response
+lg_color_remap <- c(
+  turquoise = "sky",
+  blue      = "peach",
+  brown     = "jade",
+  yellow    = "coral",
+  green     = "lavender",
+  grey      = "grey"
+)
+lg_color_hex <- c(
+  sky      = "#5DA5DA",
+  peach    = "#FAA43A",
+  jade     = "#60BD68",
+  coral    = "#F15854",
+  lavender = "#B276B2",
+  grey     = "grey"
+)
+
 cat("Leaf-gradient:", nrow(lg_modules), "genes,",
     n_distinct(lg_modules$color[lg_modules$color != "grey"]), "modules\n")
 ```
@@ -251,24 +269,6 @@ print(lg_top_bp)
 # Module color vectors
 gr_colors <- setNames(gr_modules$color, gr_modules$gene)
 gr_colors <- gr_colors[rownames(expr_gr)]
-
-# Remap leaf-gradient colors to avoid collisions with genotype-response
-lg_color_remap <- c(
-  turquoise = "sky",
-  blue      = "peach",
-  brown     = "jade",
-  yellow    = "coral",
-  green     = "lavender",
-  grey      = "grey"
-)
-lg_color_hex <- c(
-  sky      = "#5DA5DA",
-  peach    = "#FAA43A",
-  jade     = "#60BD68",
-  coral    = "#F15854",
-  lavender = "#B276B2",
-  grey     = "grey"
-)
 
 lg_colors <- lg_color_remap[lg_modules$color]
 names(lg_colors) <- lg_modules$gene
