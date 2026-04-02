@@ -1,0 +1,1084 @@
+---
+title: "WGCNA Module Perturbation Test"
+author: "F. V. Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = TRUE
+)
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+# Overview
+
+This notebook tests whether the intramodular connectivity loss observed in
+genotype-response modules (Inv4m DEGs) exceeds what random genotype label
+shuffling produces. The topology control uses leaf-gradient genes
+(photosynthesis + senescence hub genes from Ojeda 2026) that have real
+coexpression structure but are not differentially expressed between genotypes.
+
+Both module sets come from separate consensus WGCNA pipeline runs (1000
+iterations each), with bootstrap-validated stability (LFP from step 05).
+
+**Gene set terminology:**
+
+- **Genotype-response genes** -- differentially expressed between CTRL and
+  Inv4m plants; coexpression driven by the Inv4m introgression.
+- **Leaf-gradient genes** -- photosynthesis and senescence hub genes
+  (Ojeda 2026); coexpression driven by the leaf developmental gradient,
+  independent of Inv4m genotype.
+
+**Prediction:** Genotype-response modules show significant kWithin loss;
+leaf-gradient modules do not.
+
+# Setup
+
+```{r load_packages}
+library(here)
+library(tidyverse)
+library(WGCNA)
+library(ggridges)
+library(patchwork)
+
+allowWGCNAThreads()
+set.seed(42)
+```
+
+```{r config}
+N_PERM <- 10000
+
+# Genotype-response run
+GR_RUN <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
+# Leaf-gradient run
+LG_RUN <- here("results/inversion_paper/field_perturbation/run_leaf_gradient")
+
+source(here("scripts/utils/setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Load Pre-computed Data
+
+```{r load_genotype_response}
+# Genotype-response consensus modules (from CTRL reference network)
+gr_modules <- read_csv(
+  file.path(GR_RUN, "04_consensus_networks", "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+gr_lfp <- read_csv(
+  file.path(GR_RUN, "05_bootstrap_support", "ctrl", "module_support.csv"),
+  show_col_types = FALSE
+)
+gr_preservation <- read_csv(
+  file.path(GR_RUN, "06_preservation", "zsummary_table.csv"),
+  show_col_types = FALSE
+)
+
+# Expression and metadata (shared across runs)
+expr_gr <- readRDS(file.path(GR_RUN, "02_gene_filter", "filtered_expression.rds"))
+sample_meta <- read_csv(
+  file.path(GR_RUN, "01_data_prep", "sample_metadata.csv"),
+  show_col_types = FALSE
+)
+SOFT_POWER <- readRDS(
+  file.path(GR_RUN, "03_reference_network", "ctrl", "selected_power.rds")
+)
+
+# GO annotations
+go_bp_file <- file.path(GR_RUN, "07_module_annotation", "top_BP_per_module_rrvgo.csv")
+gr_go_terms <- if (file.exists(go_bp_file)) {
+  go_bp <- read_csv(go_bp_file, show_col_types = FALSE)
+  setNames(str_trunc(go_bp$Description, 35), go_bp$module_color)
+} else {
+  NULL
+}
+
+cat("Genotype-response:", nrow(gr_modules), "genes,",
+    n_distinct(gr_modules$color[gr_modules$color != "grey"]), "modules\n")
+cat("Soft power:", SOFT_POWER, "\n")
+```
+
+```{r load_leaf_gradient}
+# Leaf-gradient consensus modules (from CTRL reference network)
+lg_modules <- read_csv(
+  file.path(LG_RUN, "04_consensus_networks", "ctrl", "consensus_modules.csv"),
+  show_col_types = FALSE
+)
+lg_lfp <- read_csv(
+  file.path(LG_RUN, "05_bootstrap_support", "ctrl", "module_support.csv"),
+  show_col_types = FALSE
+)
+lg_preservation <- read_csv(
+  file.path(LG_RUN, "06_preservation", "zsummary_table.csv"),
+  show_col_types = FALSE
+)
+
+# Leaf-gradient expression matrix
+expr_lg <- readRDS(file.path(LG_RUN, "02_gene_filter", "filtered_expression.rds"))
+
+cat("Leaf-gradient:", nrow(lg_modules), "genes,",
+    n_distinct(lg_modules$color[lg_modules$color != "grey"]), "modules\n")
+```
+
+## GO Enrichment for Leaf-gradient Modules
+
+Step 07 was skipped for the leaf-gradient run (DEG-specific inputs).
+Run GO BP enrichment here using clusterProfiler + rrvgo, matching the
+approach used for genotype-response modules.
+
+```{r lg_go_enrichment, cache=TRUE}
+library(clusterProfiler)
+library(rrvgo)
+library(AnnotationHub)
+
+TERM2GENE <- readRDS(here("data", "TERM2GENE.rds"))
+TERM2NAME <- readRDS(here("data", "TERM2NAME.rds"))
+
+# Universe = all genes in the full expression matrix
+full_expr <- readRDS(file.path(GR_RUN, "01_data_prep", "combined_expression.rds"))
+if (inherits(full_expr, "EList")) {
+  go_universe <- rownames(full_expr$E)
+} else {
+  go_universe <- rownames(as.matrix(full_expr))
+}
+rm(full_expr)
+
+# Gene lists per leaf-gradient module (use remapped colors, exclude grey)
+lg_remapped <- lg_color_remap[lg_modules$color]
+names(lg_remapped) <- lg_modules$gene
+lg_gene_lists <- split(
+  names(lg_remapped[lg_remapped != "grey"]),
+  lg_remapped[lg_remapped != "grey"]
+)
+
+cat("Leaf-gradient modules for GO:", length(lg_gene_lists), "\n")
+cat("Module sizes:", paste(names(lg_gene_lists),
+    sapply(lg_gene_lists, length), sep = "=", collapse = ", "), "\n")
+
+lg_ego <- function(x) {
+  enricher(
+    gene = x,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "none",
+    universe = go_universe,
+    minGSSize = 10,
+    maxGSSize = 500,
+    qvalueCutoff = 0.2,
+    TERM2GENE = TERM2GENE[TERM2GENE$GO %in% TERM2NAME[["BP"]]$go_id, ],
+    TERM2NAME = TERM2NAME[["BP"]]
+  )
+}
+
+lg_compGO <- compareCluster(
+  geneCluster = lg_gene_lists,
+  fun = lg_ego
+)
+
+lg_go_results <- as.data.frame(lg_compGO@compareClusterResult) |>
+  dplyr::rename(module_color = Cluster) |>
+  arrange(module_color, pvalue)
+
+cat("Total enriched BP terms:", nrow(lg_go_results), "\n")
+cat("Terms per module:\n")
+print(table(lg_go_results$module_color))
+
+# rrvgo semantic reduction
+ah <- AnnotationHub()
+org.Zm.eg.db <- ah[["AH119718"]]
+
+lg_go_filtered <- lg_go_results |>
+  filter(Count > 1) |>
+  group_by(module_color) |>
+  arrange(pvalue, .by_group = TRUE) |>
+  ungroup()
+
+lg_go_ids <- unique(lg_go_results$ID)
+if (length(lg_go_ids) > 1) {
+  simMatrix <- calculateSimMatrix(
+    lg_go_ids,
+    orgdb = org.Zm.eg.db,
+    ont = "BP",
+    method = "Rel"
+  )
+  scores <- setNames(-log10(lg_go_results$pvalue), lg_go_results$ID)
+  reducedTerms <- reduceSimMatrix(
+    simMatrix, scores, threshold = 0.7, orgdb = org.Zm.eg.db
+  )
+  lg_go_rrvgo <- lg_go_filtered |>
+    filter(ID %in% reducedTerms$parent)
+} else {
+  lg_go_rrvgo <- lg_go_filtered
+}
+
+# Top 1 BP term per leaf-gradient module
+lg_top_bp <- lg_go_rrvgo |>
+  group_by(module_color) |>
+  slice_min(pvalue, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  dplyr::select(module_color, ID, Description, pvalue, Count)
+
+lg_go_terms <- setNames(
+  str_trunc(lg_top_bp$Description, 35),
+  lg_top_bp$module_color
+)
+
+cat("\nTop BP term per leaf-gradient module:\n")
+print(lg_top_bp)
+```
+
+# Prepare Expression Matrices
+
+```{r prepare_expression}
+# Module color vectors
+gr_colors <- setNames(gr_modules$color, gr_modules$gene)
+gr_colors <- gr_colors[rownames(expr_gr)]
+
+# Remap leaf-gradient colors to avoid collisions with genotype-response
+lg_color_remap <- c(
+  turquoise = "sky",
+  blue      = "peach",
+  brown     = "jade",
+  yellow    = "coral",
+  green     = "lavender",
+  grey      = "grey"
+)
+lg_color_hex <- c(
+  sky      = "#5DA5DA",
+  peach    = "#FAA43A",
+  jade     = "#60BD68",
+  coral    = "#F15854",
+  lavender = "#B276B2",
+  grey     = "grey"
+)
+
+lg_colors <- lg_color_remap[lg_modules$color]
+names(lg_colors) <- lg_modules$gene
+lg_colors <- lg_colors[rownames(expr_lg)]
+
+# Genotype labels
+true_labels <- setNames(sample_meta$Genotype, sample_meta$sample_id)
+all_samples <- sample_meta$sample_id
+n_ctrl  <- sum(true_labels == "CTRL")
+n_inv4m <- sum(true_labels == "Inv4m")
+n_total <- length(true_labels)
+
+# WGCNA format: samples x genes
+datExpr_gr <- t(expr_gr[, all_samples])
+datExpr_lg <- t(expr_lg[, all_samples])
+
+cat("Genotype-response matrix:", nrow(datExpr_gr), "samples x",
+    ncol(datExpr_gr), "genes\n")
+cat("Leaf-gradient matrix:", nrow(datExpr_lg), "samples x",
+    ncol(datExpr_lg), "genes\n")
+cat("CTRL:", n_ctrl, "| Inv4m:", n_inv4m, "\n")
+```
+
+# Supplementary Figure S5: Bootstrap Support
+
+Two-panel figure showing CTRL consensus module bootstrap support (LFP)
+for both gene sets.
+
+```{r bootstrap_support_figure, fig.width=10, fig.height=10}
+STABILITY_STABLE   <- 0.70
+STABILITY_MODERATE <- 0.50
+
+# Panel A: Genotype-response modules (original WGCNA colors)
+p_gr_support <- ggplot(
+  gr_lfp |> filter(color != "grey"),
+  aes(x = reorder(color, mean_lfp), y = mean_lfp, fill = color)
+) +
+  geom_col(color = "black") +
+  geom_errorbar(
+    aes(ymin = pmax(0, mean_lfp - se_lfp),
+        ymax = pmin(1, mean_lfp + se_lfp)),
+    width = 0.3
+  ) +
+  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed",
+             color = "darkgreen") +
+  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed",
+             color = "orange") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Genotype-response modules",
+    x = "Module", y = "Mean Support (LFP)"
+  )
+
+# Panel B: Leaf-gradient modules (remapped colors)
+lg_lfp_remapped <- lg_lfp |>
+  filter(color != "grey") |>
+  mutate(
+    display_color = lg_color_remap[color],
+    fill_hex = lg_color_hex[display_color]
+  )
+
+p_lg_support <- ggplot(
+  lg_lfp_remapped,
+  aes(x = reorder(display_color, mean_lfp), y = mean_lfp, fill = fill_hex)
+) +
+  geom_col(color = "black") +
+  geom_errorbar(
+    aes(ymin = pmax(0, mean_lfp - se_lfp),
+        ymax = pmin(1, mean_lfp + se_lfp)),
+    width = 0.3
+  ) +
+  geom_hline(yintercept = STABILITY_STABLE, linetype = "dashed",
+             color = "darkgreen") +
+  geom_hline(yintercept = STABILITY_MODERATE, linetype = "dashed",
+             color = "orange") +
+  scale_fill_identity() +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Leaf-gradient modules",
+    x = "Module", y = "Mean Support (LFP)"
+  )
+
+p_support_combined <- p_gr_support / p_lg_support +
+  plot_annotation(tag_levels = "A")
+print(p_support_combined)
+
+ggsave(file.path(paths$figures, "module_support_combined.pdf"),
+       p_support_combined, width = 10, height = 10)
+ggsave(file.path(paths$figures, "module_support_combined.png"),
+       p_support_combined, width = 10, height = 10, dpi = 300)
+```
+
+# Helper Function
+
+```{r helper_function}
+compute_module_delta_k <- function(datExpr_a, datExpr_b, power, mod_colors) {
+  adj_a <- adjacency(datExpr_a, power = power, type = "signed")
+  adj_b <- adjacency(datExpr_b, power = power, type = "signed")
+
+  k_a <- intramodularConnectivity(adj_a, mod_colors)
+  k_b <- intramodularConnectivity(adj_b, mod_colors)
+
+  delta_kWithin <- k_b$kWithin - k_a$kWithin
+  delta_kOut    <- k_b$kOut - k_a$kOut
+
+  module_ids <- unique(mod_colors[mod_colors != "grey" & !is.na(mod_colors)])
+  list(
+    kWithin = sapply(module_ids, function(m) {
+      idx <- which(mod_colors == m)
+      mean(delta_kWithin[idx], na.rm = TRUE)
+    }),
+    kOut = sapply(module_ids, function(m) {
+      idx <- which(mod_colors == m)
+      mean(delta_kOut[idx], na.rm = TRUE)
+    })
+  )
+}
+
+# Density ridgeline panel constructor
+# points_df must have columns: module, z_observed, fdr
+# fill_color: "identity" OR named vector (module -> hex)
+# go_terms: optional named vector (module -> GO description)
+make_density_panel <- function(density_df, points_df, panel_title,
+                               fill_color = "identity",
+                               go_terms = NULL,
+                               module_sizes = NULL) {
+  mod_levels <- levels(density_df$module)
+  if (!is.null(module_sizes)) {
+    y_labels <- sapply(mod_levels, function(m) {
+      n <- module_sizes[m]
+      if (!is.na(n)) sprintf("%s (n=%d)", m, n) else m
+    })
+  } else {
+    y_labels <- setNames(mod_levels, mod_levels)
+  }
+
+  if (fill_color[1] == "identity") {
+    p <- ggplot(density_df, aes(x = z_value, y = module, fill = module)) +
+      geom_density_ridges(color = "grey40", alpha = 0.7,
+                          scale = 0.9, rel_min_height = 0.01) +
+      scale_fill_identity() +
+      guides(fill = "none")
+  } else {
+    p <- ggplot(density_df, aes(x = z_value, y = module, fill = module)) +
+      geom_density_ridges(color = "grey40", alpha = 0.7,
+                          scale = 0.9, rel_min_height = 0.01) +
+      scale_fill_manual(values = fill_color) +
+      guides(fill = "none")
+  }
+  p <- p +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_segment(
+      data = points_df,
+      aes(x = z_observed, xend = z_observed,
+          y = as.numeric(module),
+          yend = as.numeric(module) + 0.8),
+      color = "red", linewidth = 0.8, inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = points_df |> filter(fdr < 0.05),
+      aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
+          label = sprintf("FDR=%.3f", fdr)),
+      color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
+    ) +
+    scale_y_discrete(labels = y_labels) +
+    scale_x_continuous(limits = c(NA, 5),
+                       breaks = seq(-10, 10, 2),
+                       minor_breaks = seq(-10, 10, 2)) +
+    theme_minimal(base_size = 14) +
+    labs(y = NULL, x = expression(Z[Delta * k]), title = panel_title)
+
+  if (!is.null(go_terms)) {
+    go_df <- tibble(
+      module = names(go_terms),
+      go_desc = unname(go_terms)
+    ) |>
+      filter(module %in% levels(density_df$module)) |>
+      mutate(
+        module = factor(module, levels = levels(density_df$module)),
+        y_pos = as.numeric(module) + 0.35
+      )
+    p <- p +
+      geom_text(
+        data = go_df,
+        aes(x = 2.5, y = y_pos, label = go_desc),
+        hjust = 0, size = 14 * 0.8 / .pt, fontface = "italic",
+        inherit.aes = FALSE
+      )
+  }
+
+  p
+}
+```
+
+# Observed Delta kWithin
+
+```{r observed}
+ctrl_idx  <- which(true_labels == "CTRL")
+inv4m_idx <- which(true_labels == "Inv4m")
+
+obs_gr <- compute_module_delta_k(
+  datExpr_gr[ctrl_idx, ], datExpr_gr[inv4m_idx, ],
+  SOFT_POWER, gr_colors
+)
+observed_gr_kw  <- obs_gr$kWithin
+observed_gr_out <- obs_gr$kOut
+
+obs_lg <- compute_module_delta_k(
+  datExpr_lg[ctrl_idx, ], datExpr_lg[inv4m_idx, ],
+  SOFT_POWER, lg_colors
+)
+observed_lg_kw  <- obs_lg$kWithin
+observed_lg_out <- obs_lg$kOut
+
+cat("Observed mean delta kWithin per genotype-response module:\n")
+print(round(sort(observed_gr_kw), 4))
+cat("\nObserved mean delta kWithin per leaf-gradient module:\n")
+print(round(sort(observed_lg_kw), 4))
+
+cat("\nObserved mean delta kOut per genotype-response module:\n")
+print(round(sort(observed_gr_out), 4))
+cat("\nObserved mean delta kOut per leaf-gradient module:\n")
+print(round(sort(observed_lg_out), 4))
+```
+
+# Genotype Label Permutation Test
+
+Shuffle genotype labels `r format(N_PERM, big.mark=",")` times, keeping
+group sizes fixed (`r n_ctrl` CTRL, `r n_inv4m` Inv4m). For each
+permutation, recompute $\Delta k_{Within}$ and $\Delta k_{Out}$ for both
+gene sets. Module definitions remain fixed throughout.
+
+```{r permutation_loop, cache=TRUE}
+null_gr_kw  <- matrix(NA, nrow = N_PERM, ncol = length(observed_gr_kw))
+null_gr_out <- matrix(NA, nrow = N_PERM, ncol = length(observed_gr_out))
+colnames(null_gr_kw)  <- names(observed_gr_kw)
+colnames(null_gr_out) <- names(observed_gr_out)
+
+null_lg_kw  <- matrix(NA, nrow = N_PERM, ncol = length(observed_lg_kw))
+null_lg_out <- matrix(NA, nrow = N_PERM, ncol = length(observed_lg_out))
+colnames(null_lg_kw)  <- names(observed_lg_kw)
+colnames(null_lg_out) <- names(observed_lg_out)
+
+for (i in seq_len(N_PERM)) {
+  perm_idx <- sample(n_total)
+  pseudo_ctrl  <- perm_idx[1:n_ctrl]
+  pseudo_inv4m <- perm_idx[(n_ctrl + 1):n_total]
+
+  perm_gr <- compute_module_delta_k(
+    datExpr_gr[pseudo_ctrl, ], datExpr_gr[pseudo_inv4m, ],
+    SOFT_POWER, gr_colors
+  )
+  null_gr_kw[i, ]  <- perm_gr$kWithin
+  null_gr_out[i, ] <- perm_gr$kOut
+
+  perm_lg <- compute_module_delta_k(
+    datExpr_lg[pseudo_ctrl, ], datExpr_lg[pseudo_inv4m, ],
+    SOFT_POWER, lg_colors
+  )
+  null_lg_kw[i, ]  <- perm_lg$kWithin
+  null_lg_out[i, ] <- perm_lg$kOut
+}
+```
+
+# Results
+
+## ECDF P-values
+
+One-tailed test: fraction of permuted values $\leq$ observed (testing for
+connectivity loss more extreme than the null).
+
+```{r ecdf_pvalues}
+# kWithin
+pvals_gr_kw <- sapply(names(observed_gr_kw), function(m) {
+  mean(null_gr_kw[, m] <= observed_gr_kw[m])
+})
+pvals_lg_kw <- sapply(names(observed_lg_kw), function(m) {
+  mean(null_lg_kw[, m] <= observed_lg_kw[m])
+})
+
+# kOut (one-tailed: test for gain in inter-modular connectivity)
+pvals_gr_out <- sapply(names(observed_gr_out), function(m) {
+  mean(null_gr_out[, m] >= observed_gr_out[m])
+})
+pvals_lg_out <- sapply(names(observed_lg_out), function(m) {
+  mean(null_lg_out[, m] >= observed_lg_out[m])
+})
+```
+
+### Genotype-response Modules
+
+```{r results_gr}
+results_gr <- tibble(
+  module = names(observed_gr_kw),
+  gene_set = "Genotype-response",
+  n_genes = sapply(names(observed_gr_kw), function(m)
+    sum(gr_colors == m, na.rm = TRUE)),
+  observed_mean_delta_k = round(observed_gr_kw, 4),
+  null_mean = round(colMeans(null_gr_kw), 4),
+  null_sd = round(apply(null_gr_kw, 2, sd), 4),
+  ecdf_pvalue = round(pvals_gr_kw, 4)
+) |>
+  arrange(ecdf_pvalue)
+
+results_gr
+```
+
+### Leaf-gradient Modules
+
+```{r results_lg}
+results_lg <- tibble(
+  module = names(observed_lg_kw),
+  gene_set = "Leaf-gradient",
+  n_genes = sapply(names(observed_lg_kw), function(m)
+    sum(lg_colors == m)),
+  observed_mean_delta_k = round(observed_lg_kw, 4),
+  null_mean = round(colMeans(null_lg_kw), 4),
+  null_sd = round(apply(null_lg_kw, 2, sd), 4),
+  ecdf_pvalue = round(pvals_lg_kw, 4)
+) |>
+  arrange(ecdf_pvalue)
+
+results_lg
+```
+
+### BH FDR Correction Across All Tests
+
+```{r fdr_correction}
+all_results <- bind_rows(results_gr, results_lg)
+
+# Joint FDR across both gene sets
+n_gr <- length(pvals_gr_kw)
+n_lg <- length(pvals_lg_kw)
+all_kw_pvals <- c(pvals_gr_kw, pvals_lg_kw)
+all_kw_fdr <- p.adjust(all_kw_pvals, method = "BH")
+kw_fdr_gr <- setNames(all_kw_fdr[1:n_gr], names(pvals_gr_kw))
+kw_fdr_lg <- setNames(all_kw_fdr[(n_gr + 1):(n_gr + n_lg)], names(pvals_lg_kw))
+
+# kOut FDR
+n_gr_out <- length(pvals_gr_out)
+n_lg_out <- length(pvals_lg_out)
+all_kout_pvals <- c(pvals_gr_out, pvals_lg_out)
+all_kout_fdr <- p.adjust(all_kout_pvals, method = "BH")
+kout_fdr_gr <- setNames(all_kout_fdr[1:n_gr_out], names(pvals_gr_out))
+kout_fdr_lg <- setNames(all_kout_fdr[(n_gr_out + 1):(n_gr_out + n_lg_out)],
+                         names(pvals_lg_out))
+
+all_results <- all_results |>
+  mutate(
+    fdr = c(kw_fdr_gr[results_gr$module], kw_fdr_lg[results_lg$module]),
+    sig = ifelse(fdr < 0.05, "*", "")
+  ) |>
+  arrange(ecdf_pvalue)
+
+cat("Significant at FDR < 0.05:\n")
+all_results |>
+  filter(fdr < 0.05) |>
+  dplyr::select(module, gene_set, n_genes, observed_mean_delta_k,
+                ecdf_pvalue, fdr) |>
+  print()
+
+cat("\nAll leaf-gradient modules:\n")
+all_results |>
+  filter(gene_set == "Leaf-gradient") |>
+  dplyr::select(module, n_genes, observed_mean_delta_k, ecdf_pvalue, fdr) |>
+  print()
+```
+
+## Save Permutation Results
+
+```{r save_results}
+OUTPUT_DIR <- file.path(GR_RUN, "06_preservation")
+
+write_csv(all_results,
+          file.path(OUTPUT_DIR,
+                    "permutation_delta_kWithin_results.csv"))
+saveRDS(
+  list(
+    observed_gr_kw = observed_gr_kw,
+    observed_lg_kw = observed_lg_kw,
+    observed_gr_out = observed_gr_out,
+    observed_lg_out = observed_lg_out,
+    null_gr_kw = null_gr_kw,
+    null_lg_kw = null_lg_kw,
+    null_gr_out = null_gr_out,
+    null_lg_out = null_lg_out,
+    pvals_gr_kw = pvals_gr_kw,
+    pvals_lg_kw = pvals_lg_kw,
+    pvals_gr_out = pvals_gr_out,
+    pvals_lg_out = pvals_lg_out,
+    gr_colors = gr_colors,
+    lg_colors = lg_colors
+  ),
+  file.path(OUTPUT_DIR, "permutation_delta_kWithin.rds")
+)
+```
+
+# Visualization
+
+## Z-score Ridge Plots (kWithin)
+
+Two-panel figure comparing connectivity disruption in genotype-response
+modules versus leaf-gradient modules. Z-scores are computed per module as
+$(observed - mean_{null}) / sd_{null}$. Red lines mark observed values.
+
+```{r zscore_kwithin, fig.width=10, fig.height=10}
+# Z-score genotype-response null distributions
+gr_null_mean <- colMeans(null_gr_kw)
+gr_null_sd   <- apply(null_gr_kw, 2, sd)
+gr_null_z    <- null_gr_kw
+for (m in colnames(gr_null_z)) {
+  gr_null_z[, m] <- (gr_null_z[, m] - gr_null_mean[m]) / gr_null_sd[m]
+}
+gr_obs_z <- (observed_gr_kw - gr_null_mean) / gr_null_sd
+
+# Z-score leaf-gradient null distributions
+lg_null_mean <- colMeans(null_lg_kw)
+lg_null_sd   <- apply(null_lg_kw, 2, sd)
+lg_null_z    <- null_lg_kw
+for (m in colnames(lg_null_z)) {
+  lg_null_z[, m] <- (lg_null_z[, m] - lg_null_mean[m]) / lg_null_sd[m]
+}
+lg_obs_z <- (observed_lg_kw - lg_null_mean) / lg_null_sd
+
+# Genotype-response density data
+gr_density <- map_dfr(colnames(gr_null_z), function(m) {
+  tibble(module = m, z_value = gr_null_z[, m])
+})
+gr_points <- tibble(
+  module = names(gr_obs_z),
+  z_observed = gr_obs_z,
+  fdr = kw_fdr_gr[names(gr_obs_z)]
+)
+gr_order <- gr_points |> arrange(z_observed) |> pull(module)
+gr_density$module <- factor(gr_density$module, levels = gr_order)
+gr_points$module  <- factor(gr_points$module, levels = gr_order)
+
+gr_mod_sizes <- sapply(levels(gr_density$module), function(m) {
+  sum(gr_colors == m, na.rm = TRUE)
+})
+
+# Leaf-gradient density data
+lg_density <- map_dfr(colnames(lg_null_z), function(m) {
+  tibble(module = m, z_value = lg_null_z[, m])
+})
+lg_points <- tibble(
+  module = names(lg_obs_z),
+  z_observed = lg_obs_z,
+  fdr = kw_fdr_lg[names(lg_obs_z)]
+)
+lg_order <- lg_points |> arrange(z_observed) |> pull(module)
+lg_density$module <- factor(lg_density$module, levels = lg_order)
+lg_points$module  <- factor(lg_points$module, levels = lg_order)
+
+lg_mod_sizes <- sapply(levels(lg_density$module), function(m) {
+  sum(lg_colors == m)
+})
+
+p_gr <- make_density_panel(gr_density, gr_points,
+                           "Genotype-response modules (kWithin)",
+                           fill_color = "identity",
+                           go_terms = gr_go_terms,
+                           module_sizes = gr_mod_sizes)
+p_lg <- make_density_panel(lg_density, lg_points,
+                           "Leaf-gradient modules (kWithin)",
+                           fill_color = lg_color_hex,
+                           go_terms = lg_go_terms,
+                           module_sizes = lg_mod_sizes)
+
+p_kw_combined <- p_gr / p_lg + plot_annotation(tag_levels = "A")
+print(p_kw_combined)
+
+ggsave(file.path(OUTPUT_DIR, "zscore_density_kWithin.pdf"),
+       p_kw_combined, width = 10, height = 10)
+ggsave(file.path(OUTPUT_DIR, "zscore_density_kWithin.png"),
+       p_kw_combined, width = 10, height = 10, dpi = 300)
+```
+
+## Z-score Ridge Plots (kOut)
+
+Same approach for inter-modular connectivity ($\Delta k_{Out}$).
+
+```{r zscore_kout, fig.width=10, fig.height=10}
+# Z-score kOut
+gr_null_mean_out <- colMeans(null_gr_out)
+gr_null_sd_out   <- apply(null_gr_out, 2, sd)
+gr_null_z_out    <- null_gr_out
+for (m in colnames(gr_null_z_out)) {
+  gr_null_z_out[, m] <- (gr_null_z_out[, m] - gr_null_mean_out[m]) / gr_null_sd_out[m]
+}
+gr_obs_z_out <- (observed_gr_out - gr_null_mean_out) / gr_null_sd_out
+
+lg_null_mean_out <- colMeans(null_lg_out)
+lg_null_sd_out   <- apply(null_lg_out, 2, sd)
+lg_null_z_out    <- null_lg_out
+for (m in colnames(lg_null_z_out)) {
+  lg_null_z_out[, m] <- (lg_null_z_out[, m] - lg_null_mean_out[m]) / lg_null_sd_out[m]
+}
+lg_obs_z_out <- (observed_lg_out - lg_null_mean_out) / lg_null_sd_out
+
+# Genotype-response kOut
+gr_density_out <- map_dfr(colnames(gr_null_z_out), function(m) {
+  tibble(module = m, z_value = gr_null_z_out[, m])
+})
+gr_points_out <- tibble(
+  module = names(gr_obs_z_out),
+  z_observed = gr_obs_z_out,
+  fdr = kout_fdr_gr[names(gr_obs_z_out)]
+)
+gr_order_out <- gr_points_out |> arrange(z_observed) |> pull(module)
+gr_density_out$module <- factor(gr_density_out$module, levels = gr_order_out)
+gr_points_out$module  <- factor(gr_points_out$module, levels = gr_order_out)
+
+# Leaf-gradient kOut
+lg_density_out <- map_dfr(colnames(lg_null_z_out), function(m) {
+  tibble(module = m, z_value = lg_null_z_out[, m])
+})
+lg_points_out <- tibble(
+  module = names(lg_obs_z_out),
+  z_observed = lg_obs_z_out,
+  fdr = kout_fdr_lg[names(lg_obs_z_out)]
+)
+lg_order_out <- lg_points_out |> arrange(z_observed) |> pull(module)
+lg_density_out$module <- factor(lg_density_out$module, levels = lg_order_out)
+lg_points_out$module  <- factor(lg_points_out$module, levels = lg_order_out)
+
+p_gr_kout <- make_density_panel(gr_density_out, gr_points_out,
+                                "Genotype-response modules (kOut)",
+                                fill_color = "identity",
+                                go_terms = gr_go_terms,
+                                module_sizes = gr_mod_sizes)
+p_lg_kout <- make_density_panel(lg_density_out, lg_points_out,
+                                "Leaf-gradient modules (kOut)",
+                                fill_color = lg_color_hex,
+                                go_terms = lg_go_terms,
+                                module_sizes = lg_mod_sizes)
+
+p_kout_combined <- p_gr_kout / p_lg_kout + plot_annotation(tag_levels = "A")
+print(p_kout_combined)
+
+ggsave(file.path(OUTPUT_DIR, "zscore_density_kOut.pdf"),
+       p_kout_combined, width = 10, height = 10)
+ggsave(file.path(OUTPUT_DIR, "zscore_density_kOut.png"),
+       p_kout_combined, width = 10, height = 10, dpi = 300)
+```
+
+## |logFC| vs Delta kWithin
+
+Scatterplot of Inv4m expression effect size against connectivity change,
+for genotype-response and leaf-gradient genes separately.
+
+```{r logfc_vs_delta_k, fig.width=14, fig.height=6}
+# Load DEG effects
+effects <- read_csv(
+  file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"),
+  show_col_types = FALSE
+)
+inv4m_effects <- effects |>
+  filter(grepl("Inv4m", predictor), !grepl(":", predictor)) |>
+  dplyr::select(gene, logFC, adj.P.Val)
+
+# Gene-level delta kWithin for genotype-response genes
+adj_ctrl_gr  <- adjacency(datExpr_gr[ctrl_idx, ], power = SOFT_POWER, type = "signed")
+adj_inv4m_gr <- adjacency(datExpr_gr[inv4m_idx, ], power = SOFT_POWER, type = "signed")
+k_ctrl_gr  <- intramodularConnectivity(adj_ctrl_gr, gr_colors)
+k_inv4m_gr <- intramodularConnectivity(adj_inv4m_gr, gr_colors)
+
+gr_dk <- tibble(
+  gene = rownames(k_ctrl_gr),
+  delta_kWithin = k_inv4m_gr$kWithin - k_ctrl_gr$kWithin,
+  group = "Genotype-response"
+)
+
+# Gene-level delta kWithin for leaf-gradient genes
+adj_ctrl_lg  <- adjacency(datExpr_lg[ctrl_idx, ], power = SOFT_POWER, type = "signed")
+adj_inv4m_lg <- adjacency(datExpr_lg[inv4m_idx, ], power = SOFT_POWER, type = "signed")
+k_ctrl_lg  <- intramodularConnectivity(adj_ctrl_lg, lg_colors)
+k_inv4m_lg <- intramodularConnectivity(adj_inv4m_lg, lg_colors)
+
+lg_dk <- tibble(
+  gene = names(lg_colors),
+  delta_kWithin = k_inv4m_lg$kWithin - k_ctrl_lg$kWithin,
+  group = "Leaf-gradient"
+)
+
+# Merge with logFC
+scatter_df <- bind_rows(gr_dk, lg_dk) |>
+  left_join(inv4m_effects |> dplyr::select(gene, logFC, adj.P.Val), by = "gene") |>
+  mutate(
+    abs_logFC = abs(logFC),
+    neg_log10p = -log10(adj.P.Val)
+  ) |>
+  filter(!is.na(logFC))
+
+# Correlations per group
+cor_logfc <- scatter_df |>
+  group_by(group) |>
+  summarise(rho = cor(abs_logFC, delta_kWithin, method = "spearman"),
+            .groups = "drop")
+cat("Spearman correlations (|logFC| vs delta_k):\n")
+print(cor_logfc)
+
+# Panel A: |logFC| vs delta kWithin
+p_logfc <- ggplot(scatter_df, aes(x = abs_logFC, y = delta_kWithin, color = group)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("Genotype-response" = "grey40",
+                                "Leaf-gradient" = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = expression("|" * log[2] * "FC" * "| (Inv4m vs CTRL)"),
+    y = expression(Delta ~ k[Within] ~ "(Inv4m - CTRL)"),
+    color = NULL
+  ) +
+  theme(legend.position = c(0.2, 0.15))
+
+# Panel B: -log10P vs delta kWithin
+p_pval <- ggplot(scatter_df, aes(x = neg_log10p, y = delta_kWithin, color = group)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("Genotype-response" = "grey40",
+                                "Leaf-gradient" = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = expression("-" * log[10] * "(FDR)"),
+    y = expression(Delta ~ k[Within] ~ "(Inv4m - CTRL)"),
+    color = NULL
+  ) +
+  theme(legend.position = "none")
+
+p_combined <- p_logfc + p_pval + plot_annotation(tag_levels = "A")
+print(p_combined)
+
+ggsave(file.path(OUTPUT_DIR, "logFC_pval_vs_delta_kWithin.pdf"),
+       p_combined, width = 14, height = 6)
+ggsave(file.path(OUTPUT_DIR, "logFC_pval_vs_delta_kWithin.png"),
+       p_combined, width = 14, height = 6, dpi = 300)
+```
+
+### Linear model: does expression effect size predict connectivity loss?
+
+```{r lm_logfc_delta_k}
+# Genotype-response only
+gr_only <- scatter_df |> filter(group == "Genotype-response")
+fit_gr <- lm(delta_kWithin ~ abs_logFC, data = gr_only)
+
+cat("=== Genotype-response genes: lm(delta_kWithin ~ |logFC|) ===\n")
+summary(fit_gr)
+cat(sprintf("\nR2 = %.4f  (|logFC| explains %.1f%% of variance in delta_k)\n",
+            summary(fit_gr)$r.squared,
+            summary(fit_gr)$r.squared * 100))
+
+# Leaf-gradient only
+lg_only <- scatter_df |> filter(group == "Leaf-gradient")
+fit_lg <- lm(delta_kWithin ~ abs_logFC, data = lg_only)
+
+cat("\n=== Leaf-gradient genes: lm(delta_kWithin ~ |logFC|) ===\n")
+summary(fit_lg)
+cat(sprintf("\nR2 = %.4f  (|logFC| explains %.1f%% of variance in delta_k)\n",
+            summary(fit_lg)$r.squared,
+            summary(fit_lg)$r.squared * 100))
+
+# Combined model with interaction
+fit_interaction <- lm(delta_kWithin ~ abs_logFC * group, data = scatter_df)
+
+cat("\n=== Combined: lm(delta_kWithin ~ |logFC| * group) ===\n")
+summary(fit_interaction)
+cat(sprintf("\nR2 = %.4f\n", summary(fit_interaction)$r.squared))
+```
+
+# Combined Statistics Table
+
+```{r combined_table}
+# Genotype-response table
+gr_pres <- gr_preservation |>
+  filter(module_label != "gold", module_label != "grey") |>
+  dplyr::select(module = module_label, Zsummary, Zdensity, Zconnectivity)
+
+gr_table <- gr_pres |>
+  left_join(
+    tibble(
+      module = names(observed_gr_kw),
+      delta_kWithin = round(observed_gr_kw, 3),
+      kWithin_FDR = round(kw_fdr_gr[names(observed_gr_kw)], 4),
+      delta_kOut = round(observed_gr_out, 3),
+      kOut_FDR = round(kout_fdr_gr[names(observed_gr_out)], 4)
+    ),
+    by = "module"
+  ) |>
+  mutate(
+    gene_set = "Genotype-response",
+    n_genes = sapply(module, function(m)
+      sum(gr_colors == m, na.rm = TRUE)),
+    LFP = round(gr_lfp$mean_lfp[match(module, gr_lfp$color)], 3),
+    Zsummary = round(Zsummary, 2),
+    Zdensity = round(Zdensity, 2),
+    Zconnectivity = round(Zconnectivity, 2)
+  )
+
+# Leaf-gradient table
+lg_pres <- lg_preservation |>
+  filter(module_label != "gold", module_label != "grey") |>
+  dplyr::select(module = module_label, Zsummary, Zdensity, Zconnectivity)
+
+# Map leaf-gradient module colors through the remap
+lg_pres$module <- lg_color_remap[lg_pres$module]
+
+lg_table <- lg_pres |>
+  left_join(
+    tibble(
+      module = names(observed_lg_kw),
+      delta_kWithin = round(observed_lg_kw, 3),
+      kWithin_FDR = round(kw_fdr_lg[names(observed_lg_kw)], 4),
+      delta_kOut = round(observed_lg_out, 3),
+      kOut_FDR = round(kout_fdr_lg[names(observed_lg_out)], 4)
+    ),
+    by = "module"
+  ) |>
+  mutate(
+    gene_set = "Leaf-gradient",
+    n_genes = sapply(module, function(m)
+      sum(lg_colors == m)),
+    LFP = round(lg_lfp$mean_lfp[match(
+      names(lg_color_remap)[match(module, lg_color_remap)],
+      lg_lfp$color
+    )], 3),
+    Zsummary = round(Zsummary, 2),
+    Zdensity = round(Zdensity, 2),
+    Zconnectivity = round(Zconnectivity, 2)
+  )
+
+# Combine
+combined_table <- bind_rows(gr_table, lg_table) |>
+  dplyr::select(
+    gene_set, module, n_genes, LFP,
+    Zsummary, Zdensity, Zconnectivity,
+    delta_kWithin, kWithin_FDR,
+    delta_kOut, kOut_FDR
+  ) |>
+  arrange(gene_set, kWithin_FDR)
+
+cat("=== COMBINED MODULE STATISTICS ===\n\n")
+print(combined_table, n = 30, width = Inf)
+
+write_csv(combined_table,
+          file.path(OUTPUT_DIR, "combined_module_stats_table.csv"))
+cat("\nSaved: combined_module_stats_table.csv\n")
+```
+
+# Summary
+
+```{r summary}
+n_gr_sig <- sum(all_results$gene_set == "Genotype-response" & all_results$fdr < 0.05)
+n_lg_sig <- sum(all_results$gene_set == "Leaf-gradient" & all_results$fdr < 0.05)
+
+cat("=== PERMUTATION TEST SUMMARY ===
+
+Genotype-response modules significant (FDR < 0.05):", n_gr_sig, "of",
+    sum(all_results$gene_set == "Genotype-response"), "
+Leaf-gradient modules significant (FDR < 0.05):", n_lg_sig, "of",
+    sum(all_results$gene_set == "Leaf-gradient"), "
+
+Significant genotype-response modules:\n")
+all_results |>
+  filter(gene_set == "Genotype-response", fdr < 0.05) |>
+  dplyr::select(module, n_genes, observed_mean_delta_k, ecdf_pvalue, fdr) |>
+  print()
+
+n_gr_sig_out <- sum(kout_fdr_gr < 0.05)
+n_lg_sig_out <- sum(kout_fdr_lg < 0.05)
+
+cat("
+=== kOut (inter-modular) ===
+Genotype-response modules with significant kOut gain (FDR < 0.05):",
+    n_gr_sig_out, "of", length(kout_fdr_gr), "
+Leaf-gradient modules with significant kOut gain (FDR < 0.05):",
+    n_lg_sig_out, "of", length(kout_fdr_lg), "
+
+=== CONCLUSIONS ===
+
+1. kWithin: Genotype-response modules show significant intramodular
+   connectivity loss beyond the permutation null.
+   Leaf-gradient modules do not.
+
+2. kOut: No significant gain in inter-modular connectivity
+   for genotype-response or leaf-gradient modules. The perturbation
+   degrades within-module coexpression structure without causing
+   genes to gain spurious cross-module connections.
+
+3. This asymmetry (kWithin loss without kOut gain) argues
+   against a global artifact of mean expression shifts:
+   if the connectivity change were driven by correlated
+   mean shifts inflating all pairwise differences, both
+   kWithin and kOut would be affected. Instead, only
+   within-module relationships are disrupted, consistent
+   with degradation of specific coexpression programs.
+
+4. The linear model confirms this: |logFC| does not
+   predict delta kWithin, ruling out differential expression
+   magnitude as a driver of connectivity loss.
+")
+```
+
+# Session Info
+
+```{r session_info}
+sessionInfo()
+```

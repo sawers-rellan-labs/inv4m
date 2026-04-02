@@ -377,8 +377,7 @@ if (file.exists(ctrl_cache_file)) {
   log_progress("=== STARTING CTRL BOOTSTRAP SUPPORT ===")
 
   # Configure parallelization
-  detected_cores <- parallel::detectCores()
-  n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
+  n_cores <- max(1L, as.integer(Sys.getenv("MC_CORES")), parallel::detectCores(), na.rm = TRUE)
   plan(multisession, workers = n_cores)
 
   log_progress("CTRL: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
@@ -493,8 +492,7 @@ if (file.exists(inv4m_cache_file)) {
   set.seed(456)  # Different seed
 
   # Configure parallelization (in case CTRL was cached and n_cores not set)
-  detected_cores <- parallel::detectCores()
-  n_cores <- if (is.na(detected_cores) || detected_cores < 2) 1 else detected_cores - 1
+  n_cores <- max(1L, as.integer(Sys.getenv("MC_CORES")), parallel::detectCores(), na.rm = TRUE)
   plan(multisession, workers = n_cores)
 
   log_progress("Inv4m: Starting ", N_BOOTSTRAP, " bootstrap iterations on ", n_cores, " cores")
