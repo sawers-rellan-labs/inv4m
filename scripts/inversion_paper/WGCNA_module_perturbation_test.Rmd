@@ -336,7 +336,7 @@ p_support <- ggplot(
              color = "orange") +
   scale_fill_identity() +
   coord_flip() +
-  facet_wrap(~gene_set, scales = "free_y") +
+  facet_wrap(~gene_set, scales = "free_y", ncol = 1) +
   theme_minimal(base_size = 14) +
   labs(x = "Module", y = "Mean Support (LFP)")
 
@@ -691,7 +691,7 @@ p_kw <- ggplot(density_kw, aes(x = z_value, y = module, fill = module)) +
     inherit.aes = FALSE
   ) +
   scale_x_continuous(limits = c(NA, 5), breaks = seq(-10, 10, 2)) +
-  facet_wrap(~gene_set, scales = "free_y") +
+  facet_wrap(~gene_set, scales = "free_y", ncol = 1) +
   theme_minimal(base_size = 14) +
   labs(y = NULL, x = expression(Z[Delta * k[Within]]))
 
@@ -785,7 +785,7 @@ p_kout <- ggplot(density_kout, aes(x = z_value, y = module, fill = module)) +
     inherit.aes = FALSE
   ) +
   scale_x_continuous(limits = c(NA, 5), breaks = seq(-10, 10, 2)) +
-  facet_wrap(~gene_set, scales = "free_y") +
+  facet_wrap(~gene_set, scales = "free_y", ncol = 1) +
   theme_minimal(base_size = 14) +
   labs(y = NULL, x = expression(Z[Delta * k[Out]]))
 
