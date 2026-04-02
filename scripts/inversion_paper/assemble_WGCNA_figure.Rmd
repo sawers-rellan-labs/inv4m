@@ -35,7 +35,7 @@ pre-generated panel RDS files.
 
 **Panels:**
 - **A**: CTRL consensus network dendrogram with module colors
-- **B**: Delta kWithin boxplot (connectivity change per module) with GO annotations
+- **B**: Z-score ridge plot (kWithin permutation test, genotype-response + leaf-gradient)
 - **C**: Hub gene connectivity scatter plot (CTRL vs Inv4m)
 
 ---
@@ -62,7 +62,7 @@ run_dir <- here("results/inversion_paper/field_perturbation/run_20251231_201332"
 # Panel paths
 panel_paths <- list(
   A = file.path(run_dir, "04_consensus_networks/ctrl/dendrogram_plot.rds"),
-  B = file.path(run_dir, "06_preservation/delta_kWithin_boxplot_annotated.rds"),
+  B = file.path(run_dir, "06_preservation/zscore_density_kWithin.rds"),
   C = file.path(run_dir, "07_module_annotation/hub_connectivity_plot.rds")
 )
 
@@ -97,7 +97,7 @@ cat("Panels loaded successfully.\n")
 print(p_A)
 ```
 
-## Panel B: Delta kWithin Boxplot
+## Panel B: kWithin Permutation Ridge Plot
 
 ```{r preview_B, fig.width=12, fig.height=10}
 print(p_B)
