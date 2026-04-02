@@ -54,6 +54,7 @@ library(ggpubr)
 library(ggfx)
 library(ggbeeswarm)
 library(limma)
+library(rstatix)
 library(here)
 ```
 
@@ -244,20 +245,39 @@ crow_effects %>% arrange(symbol, coefficient) %>% print(n = 20)
 
 ## Crow2020: SAM Samples by Donor and Temperature
 
-```{r crow_sam_plot, fig.width=12, fig.height=8}
+```{r crow_sam_plot, fig.width=14, fig.height=12}
 genotype_colors <- c("B73" = "gold", "Inv4m" = "#4a0f82")
 
 # Filter to SAM samples only
 sam_data <- expr_crow_long %>%
-  filter(tissue == "V3 SAM")
+  filter(tissue == "V3 SAM") %>%
+  mutate(
+    condition = interaction(temp, donor, sep = "\n"),
+    genotype = factor(genotype, levels = c("B73", "Inv4m"))
+  )
 
 cat("SAM samples:", nrow(sam_data) / length(genes_in_crow), "\n")
 cat("By donor x genotype x temp:\n")
 print(table(sam_data$donor, sam_data$genotype, sam_data$temp) / length(genes_in_crow))
 
+# T-tests: B73 vs Inv4m within each donor x temp combination, per gene
+stat_tests <- sam_data %>%
+  group_by(symbol, condition) %>%
+  t_test(logCPM ~ genotype) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance("p.adj") %>%
+  add_xy_position(x = "condition", dodge = 0.7)
+
+cat("\n=== T-test results (B73 vs Inv4m per condition) ===\n")
+print(
+  stat_tests %>%
+    dplyr::select(symbol, condition, statistic, p, p.adj, p.adj.signif),
+  n = 30
+)
+
 p_sam <- ggplot(
   sam_data,
-  aes(x = interaction(temp, donor, sep = "\n"), y = logCPM, color = genotype)
+  aes(x = condition, y = logCPM, color = genotype)
 ) +
   geom_boxplot(
     width = 0.6,
@@ -270,7 +290,14 @@ p_sam <- ggplot(
     alpha = 0.8,
     position = position_dodge(width = 0.7)
   ) +
-  facet_wrap(~ symbol, scales = "free_y", nrow = 1) +
+  stat_pvalue_manual(
+    stat_tests,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    hide.ns = TRUE,
+    size = 5
+  ) +
+  facet_wrap(~ symbol, scales = "free_y", ncol = 2) +
   scale_color_manual(values = genotype_colors, name = "Genotype") +
   theme_classic(base_size = 14) +
   theme(
@@ -293,17 +320,18 @@ p_sam <- ggplot(
 print(p_sam)
 ```
 
-## All Tissues: Crow2020 + PA2022
+## SAM (Cold) + PA2022 Leaves
 
 Faceted by gene (rows) and experiment (columns), matching JMJ plot style.
-Crow2020 data includes donor as point shape.
+Crow2020 SAM cold samples only; donor shown as point shape.
 
-```{r combined_plot, fig.width=16, fig.height=10}
-# Combine both experiments
+```{r combined_plot, fig.width=16, fig.height=20}
+# Combine Crow2020 SAM cold + PA2022 leaves
 combined <- bind_rows(
   expr_psu_long %>%
     dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment, donor),
   expr_crow_long %>%
+    filter(tissue == "V3 SAM", temp == "cold") %>%
     dplyr::select(gene, symbol, logCPM, genotype, tissue, experiment, donor)
 ) %>%
   mutate(
@@ -369,7 +397,7 @@ print(p_combined)
 
 ## Crow2020: SAM Only, Split by Donor
 
-```{r sam_by_donor, fig.width=14, fig.height=8}
+```{r sam_by_donor, fig.width=14, fig.height=16}
 sam_donor <- expr_crow_long %>%
   filter(tissue == "V3 SAM") %>%
   mutate(
@@ -476,13 +504,13 @@ write_csv(
 ggsave(
   file.path(paths$figures, "floral_candidates_SAM_by_donor.pdf"),
   p_sam_donor,
-  width = 14, height = 8
+  width = 14, height = 16
 )
 
 ggsave(
   file.path(paths$figures, "floral_candidates_all_tissues.pdf"),
   p_combined,
-  width = 16, height = 10
+  width = 16, height = 20
 )
 
 {

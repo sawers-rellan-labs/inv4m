@@ -1,7 +1,14 @@
+# MCP config
+.mcp.json
+
 # Data and Results
 data
 data/
 results/
+
+# Knitr cache directories
+*_cache/
+*_files/
 
 # R/HPC Outputs
 *.html
