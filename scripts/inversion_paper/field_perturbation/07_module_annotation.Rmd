@@ -392,54 +392,64 @@ if (!is.null(compGO_CC) && nrow(compGO_CC@compareClusterResult) > 0) {
 
 ## rrvgo Reduction for CC
 
-```{r rrvgo_cc}
-# Apply rrvgo semantic reduction to CC results
-if (nrow(go_results_cc) > 0) {
-  cat("\n=== APPLYING RRVGO TO CC ===\n")
+```{r rrvgo_cc, cache=TRUE}
+# Apply rrvgo semantic reduction to CC results (wrapped in tryCatch:
+# rrvgo::calculateSimMatrix can error with bad_weak_ptr on repeat calls;
+# CC rrvgo is only used for a secondary bubble plot, not required downstream)
+go_results_cc_rrvgo <- tryCatch({
+  if (nrow(go_results_cc) > 0) {
+    cat("\n=== APPLYING RRVGO TO CC ===\n")
 
-  filtered_cc_result <- go_results_cc %>%
-    filter(Count > 1) %>%
-    group_by(module_color) %>%
-    arrange(pvalue, .by_group = TRUE) %>%
-    ungroup()
+    filtered_cc_result <- go_results_cc %>%
+      filter(Count > 1) %>%
+      group_by(module_color) %>%
+      arrange(pvalue, .by_group = TRUE) %>%
+      ungroup()
 
-  go_terms_cc <- unique(go_results_cc$ID)
+    go_terms_cc <- unique(go_results_cc$ID)
 
-  if (length(go_terms_cc) > 1) {
-    cat("Calculating semantic similarity for", length(go_terms_cc), "CC terms...\n")
+    if (length(go_terms_cc) > 1) {
+      cat("Calculating semantic similarity for",
+          length(go_terms_cc), "CC terms...\n")
 
-    simMatrix_cc <- calculateSimMatrix(
-      go_terms_cc,
-      orgdb = org.Zm.eg.db,
-      ont = "CC",
-      method = "Rel"
+      simMatrix_cc <- calculateSimMatrix(
+        go_terms_cc,
+        orgdb = org.Zm.eg.db,
+        ont = "CC",
+        method = "Rel"
+      )
+
+      scores_cc <- setNames(-log10(go_results_cc$pvalue), go_results_cc$ID)
+
+      reducedTerms_cc <- reduceSimMatrix(
+        simMatrix_cc,
+        scores_cc,
+        threshold = 0.7,
+        orgdb = org.Zm.eg.db
+      )
+
+      out <- filtered_cc_result %>%
+        filter(ID %in% reducedTerms_cc$parent)
+
+      cat("CC terms after rrvgo:", nrow(out),
+          "(from", nrow(go_results_cc), ")\n")
+    } else {
+      out <- filtered_cc_result
+    }
+
+    write_csv(
+      out,
+      file.path(OUTPUT_DIR, "all_modules_GO_CC_rrvgo.csv")
     )
-
-    scores_cc <- setNames(-log10(go_results_cc$pvalue), go_results_cc$ID)
-
-    reducedTerms_cc <- reduceSimMatrix(
-      simMatrix_cc,
-      scores_cc,
-      threshold = 0.7,
-      orgdb = org.Zm.eg.db
-    )
-
-    go_results_cc_rrvgo <- filtered_cc_result %>%
-      filter(ID %in% reducedTerms_cc$parent)
-
-    cat("CC terms after rrvgo:", nrow(go_results_cc_rrvgo),
-        "(from", nrow(go_results_cc), ")\n")
+    out
   } else {
-    go_results_cc_rrvgo <- filtered_cc_result
+    tibble()
   }
-
-  write_csv(
-    go_results_cc_rrvgo,
-    file.path(OUTPUT_DIR, "all_modules_GO_CC_rrvgo.csv")
-  )
-} else {
-  go_results_cc_rrvgo <- tibble()
-}
+}, error = function(e) {
+  message("rrvgo_cc failed: ", conditionMessage(e),
+          " -- continuing with empty CC rrvgo table")
+  tibble()
+})
 ```
 
 ## Molecular Function (MF) Enrichment
@@ -492,54 +502,64 @@ if (!is.null(compGO_MF) && nrow(compGO_MF@compareClusterResult) > 0) {
 
 ## rrvgo Reduction for MF
 
-```{r rrvgo_mf}
-# Apply rrvgo semantic reduction to MF results
-if (nrow(go_results_mf) > 0) {
-  cat("\n=== APPLYING RRVGO TO MF ===\n")
+```{r rrvgo_mf, cache=TRUE}
+# Apply rrvgo semantic reduction to MF results (wrapped in tryCatch:
+# rrvgo::calculateSimMatrix can error with bad_weak_ptr on repeat calls;
+# MF rrvgo is only used for a secondary bubble plot, not required downstream)
+go_results_mf_rrvgo <- tryCatch({
+  if (nrow(go_results_mf) > 0) {
+    cat("\n=== APPLYING RRVGO TO MF ===\n")
 
-  filtered_mf_result <- go_results_mf %>%
-    filter(Count > 1) %>%
-    group_by(module_color) %>%
-    arrange(pvalue, .by_group = TRUE) %>%
-    ungroup()
+    filtered_mf_result <- go_results_mf %>%
+      filter(Count > 1) %>%
+      group_by(module_color) %>%
+      arrange(pvalue, .by_group = TRUE) %>%
+      ungroup()
 
-  go_terms_mf <- unique(go_results_mf$ID)
+    go_terms_mf <- unique(go_results_mf$ID)
 
-  if (length(go_terms_mf) > 1) {
-    cat("Calculating semantic similarity for", length(go_terms_mf), "MF terms...\n")
+    if (length(go_terms_mf) > 1) {
+      cat("Calculating semantic similarity for",
+          length(go_terms_mf), "MF terms...\n")
 
-    simMatrix_mf <- calculateSimMatrix(
-      go_terms_mf,
-      orgdb = org.Zm.eg.db,
-      ont = "MF",
-      method = "Rel"
+      simMatrix_mf <- calculateSimMatrix(
+        go_terms_mf,
+        orgdb = org.Zm.eg.db,
+        ont = "MF",
+        method = "Rel"
+      )
+
+      scores_mf <- setNames(-log10(go_results_mf$pvalue), go_results_mf$ID)
+
+      reducedTerms_mf <- reduceSimMatrix(
+        simMatrix_mf,
+        scores_mf,
+        threshold = 0.7,
+        orgdb = org.Zm.eg.db
+      )
+
+      out <- filtered_mf_result %>%
+        filter(ID %in% reducedTerms_mf$parent)
+
+      cat("MF terms after rrvgo:", nrow(out),
+          "(from", nrow(go_results_mf), ")\n")
+    } else {
+      out <- filtered_mf_result
+    }
+
+    write_csv(
+      out,
+      file.path(OUTPUT_DIR, "all_modules_GO_MF_rrvgo.csv")
     )
-
-    scores_mf <- setNames(-log10(go_results_mf$pvalue), go_results_mf$ID)
-
-    reducedTerms_mf <- reduceSimMatrix(
-      simMatrix_mf,
-      scores_mf,
-      threshold = 0.7,
-      orgdb = org.Zm.eg.db
-    )
-
-    go_results_mf_rrvgo <- filtered_mf_result %>%
-      filter(ID %in% reducedTerms_mf$parent)
-
-    cat("MF terms after rrvgo:", nrow(go_results_mf_rrvgo),
-        "(from", nrow(go_results_mf), ")\n")
+    out
   } else {
-    go_results_mf_rrvgo <- filtered_mf_result
+    tibble()
   }
-
-  write_csv(
-    go_results_mf_rrvgo,
-    file.path(OUTPUT_DIR, "all_modules_GO_MF_rrvgo.csv")
-  )
-} else {
-  go_results_mf_rrvgo <- tibble()
-}
+}, error = function(e) {
+  message("rrvgo_mf failed: ", conditionMessage(e),
+          " -- continuing with empty MF rrvgo table")
+  tibble()
+})
 ```
 
 ---
@@ -888,9 +908,10 @@ write_csv(
 
 ```{r hub_connectivity, fig.width=10, fig.height=8}
 if (nrow(hub_genes) > 0) {
-  # Add fontface column for jmj4 bold styling
+  # Add fontface column: jmj2 bold italic, others italic
   hub_genes <- hub_genes %>%
-    mutate(label_fontface = ifelse(display_label == "jmj4", "bold", "plain"))
+    mutate(label_fontface = ifelse(display_label == "jmj2",
+                                   "bold.italic", "italic"))
 
   p_hub <- ggplot(
     hub_genes,
@@ -919,7 +940,7 @@ if (nrow(hub_genes) > 0) {
     ) +
     labs(
       x = expression("kWithin (CTRL)"),
-      y = expression("kWithin (Inv4m)"),
+      y = expression("kWithin (" * italic("Inv4m") * ")"),
       size = expression("|logFC|")
     )
 

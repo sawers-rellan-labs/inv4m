@@ -700,23 +700,29 @@ p_kw <- ggplot(density_kw, aes(x = z_value, y = module, fill = module)) +
   geom_text(
     data = points_kw |> filter(fdr < 0.05),
     aes(x = z_observed - 0.6, y = facet_rank + 0.35,
-        label = sprintf("FDR=%.3f", fdr)),
+        label = sprintf("%.3f", fdr)),
     color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
   ) +
   geom_text(
     data = go_df,
     aes(x = 2, y = y_pos, label = go_desc),
-    hjust = 0, size = 14 * 0.8 / .pt, fontface = "italic",
+    hjust = 0, size = 14 * 0.8 / .pt,
     inherit.aes = FALSE
   ) +
   scale_x_continuous(limits = c(NA, 5), breaks = seq(-10, 10, 2)) +
-  facet_grid(gene_set ~ ., scales = "free_y", space = "free_y") +
+  facet_grid(gene_set ~ ., scales = "free_y", space = "free_y",
+             switch = "y") +
   theme_minimal(base_size = 20) +
   theme(panel.spacing.y = unit(1, "lines"),
-        strip.text.y = element_text(size = 20),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text.y.left = element_text(size = 20, face = "bold",
+                                         angle = 90),
         axis.text.y = element_text(lineheight = 0.8, vjust = 0.5),
         plot.margin = margin(t = 30, r = 5, b = 5, l = 5)) +
-  labs(y = NULL, x = expression(Delta * "kWithin" ~ "(Inv4m - CTRL, Z-score)"))
+  labs(y = NULL,
+       x = expression(Delta * "kWithin" ~ "(" * italic("Inv4m") *
+                      " - CTRL, Z-score)"))
 
 print(p_kw)
 

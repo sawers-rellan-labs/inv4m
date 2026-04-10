@@ -738,9 +738,9 @@ Only magenta ($p_{adj} = 0.126$) did not reach significance.
 Thus, although the relative hub structure within modules is partially retained, absolute connectivity is broadly diminished in \invfour.
 
 The pink module illustrates this pattern: despite high bootstrap support in CTRL (LFP $= 0.72$) and moderate structural preservation ($Z_{summary} = 5.8$), it showed significant connectivity loss (mean $\Delta k_{Within} = -1.36$, $p_{adj} = 2.6 \times 10^{-6}$), with 100\% of genes losing connectivity.
-Hub gene analysis showed that \jmjiv, highly connected in CTRL ($k_{Within} = 3.17$), dropped to peripheral status in \invfour ($k_{Within} = 0.61$), an 81\% reduction (Fig~\ref{fig:wgcna}C).
+Hub gene analysis showed that \jmjiv, a top-connected gene in CTRL ($k_{Within} = 3.17$), retained a similar rank within the pink module but lost 81\% of its absolute connectivity in \invfour ($k_{Within} = 0.61$; Fig~\ref{fig:wgcna}C).
 Similarly, \jmjii showed $k_{Within} = 3.33$ in CTRL versus $0.59$ in \invfour (82\% reduction).
-These JMJ genes transitioned from central network hubs to weakly connected nodes, consistent with their downregulation disrupting the coexpression relationships they normally coordinate.
+Rather than transitioning from central to peripheral, these JMJ genes---like the rest of the pink module ($Z_{connectivity} = 6.4$, all 30 genes losing connectivity)---experienced a global weakening of their coexpression, consistent with their downregulation attenuating (rather than rewiring) the gene pairs they normally coordinate.
 
 In contrast, the exocyst component \textit{sec6} ($\log_2 FC = +2.87$), located within \invfour, showed $k_{Within} = 0.81$ in CTRL but $< 0.001$ in \invfour, suggesting its upregulation decouples it from native coexpression partners.
 This bidirectional rewiring, connectivity loss for downregulated chromatin regulators and altered connectivity for upregulated genes, is consistent with the JMJ cluster functioning as a regulatory hub whose perturbation propagates through the transcriptome.
@@ -752,17 +752,17 @@ This bidirectional rewiring, connectivity loss for downregulated chromatin regul
 \textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules.
 We obtained module assignments from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35).
 Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
-\textbf{(B)} Change in standard intramodular connectivity ($\Delta k_{Within}$) between CTRL and \invfour genotypes, computed from signed weighted adjacency matrices (shared soft power $\beta = 18$).
-Each box represents a module, colored by module assignment.
-Negative values indicate connectivity loss in \invfour.
-Asterisks indicate significance from one-sample $t$-tests ($H_0$: $\Delta k_{Within} = 0$) with FDR correction: *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$.
-Twelve of 13 modules show significant connectivity loss.
-Annotations above each module show the top reduced Gene Ontology Biological Process term.
+\textbf{(B)} Permutation test of intramodular connectivity loss in \invfour relative to CTRL.
+Density ridges show the null distribution of $z$-scored $\Delta k_{Within}$ obtained by shuffling genotype labels across 1000 permutations; red vertical segments mark the observed $z$-score for each module.
+Modules are grouped by gene set: Genotype Response DEGs (top facet) and Leaf Gradient Hubs (bottom facet).
+$y$-axis labels show module color and sample size ($n$).
+FDR-corrected $p$-values are shown in red next to modules with significant connectivity loss.
+Text to the right of each ridge shows the top reduced Gene Ontology Biological Process term for that module.
 \textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis).
 Points represent top 5 hub genes per module, colored by module assignment.
 Point size indicates $|\log_2 FC|$.
 Points below the diagonal indicate hub genes that lost connectivity in \invfour.
-Labels show gene symbols where available.}
+Gene symbols are shown in italics where available; \jmjii is highlighted in bold italic.}
 \label{fig:wgcna}
 \end{figure*}
 
@@ -952,7 +952,7 @@ Our microsynteny analysis provides this structural explanation and, together wit
 
 The JMJ dosage reduction described above raised the question of whether it is associated with broader transcriptional reorganization.
 WGCNA analysis of the PA2022 leaf transcriptome identified 13 modules, of which 12 showed significant connectivity loss in \invfour relative to CTRL (one-sample $t$-test, $\textit{FDR} < 0.05$; Table~\ref{tab::preservation}).
-JMJ genes functioned more as network hubs in CTRL ($k_{Within} = 3.17$ to $3.33$) but became peripheral in \invfour ($k_{Within} = 0.59$ to $0.61$; Fig~\ref{fig:wgcna}C), consistent with the dosage reduction disrupting their coexpression relationships.
+The JMJ cluster, like the rest of the pink module, experienced substantial absolute connectivity loss in \invfour ($k_{Within}$ fell from $3.17$--$3.33$ in CTRL to $0.59$--$0.61$ in \invfour; Fig~\ref{fig:wgcna}C) despite the module's rank structure being partially preserved ($Z_{connectivity} = 6.4$; Table~\ref{tab::preservation}), consistent with the dosage reduction attenuating---rather than rewiring---their coexpression.
 The pink module, where jmj2 belongs, is enriched for ribosome biogenesis and growth regulation (Table~\ref{tab::pink_module}), and showed connectivity loss in all 30 genes (mean $\Delta k_{Within} = -1.36$, $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation ($Z_{summary} = 5.8$).
 The trans coexpression network independently linked JMJ genes to cell proliferation factors including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A), with edges assigned only when JMJ was the strongest correlated potential regulator within the 15 Mb inversion (see Methods).
 
