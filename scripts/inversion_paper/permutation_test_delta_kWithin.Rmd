@@ -455,7 +455,7 @@ make_density_panel <- function(density_df, points_df, panel_title,
   if (!is.null(module_sizes)) {
     y_labels <- sapply(mod_levels, function(m) {
       n <- module_sizes[m]
-      if (!is.na(n)) sprintf("%s (n=%d)", m, n) else m
+      if (!is.na(n)) sprintf("%s\n(n=%d)", m, n) else m
     })
   } else {
     y_labels <- setNames(mod_levels, mod_levels)
@@ -490,7 +490,7 @@ make_density_panel <- function(density_df, points_df, panel_title,
     geom_text(
       data = points_df |> filter(fdr < 0.05),
       aes(x = z_observed - 0.6, y = as.numeric(module) + 0.35,
-          label = sprintf("FDR=%.3f", fdr)),
+          label = sprintf("%.3f", fdr)),
       color = "red", size = 3, hjust = 0.5, inherit.aes = FALSE
     ) +
     scale_y_discrete(labels = y_labels) +

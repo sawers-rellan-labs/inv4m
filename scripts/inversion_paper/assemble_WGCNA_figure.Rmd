@@ -133,7 +133,7 @@ fig_combined <- plot_grid(
   ncol = 1,
   labels = c("A", ""),
   label_size = 35,
-  rel_heights = c(0.3, 0.7)
+  rel_heights = c(0.15, 0.85)
 )
 
 ggsave(
