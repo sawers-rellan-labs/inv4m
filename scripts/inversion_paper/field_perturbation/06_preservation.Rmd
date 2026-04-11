@@ -535,10 +535,13 @@ saveRDS(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.rds"))
 # Generate LaTeX Table
 
 ```{r latex_table}
-# Sorted by FDR p-value for manuscript Table S4
+# Sorted by FDR p-value. Includes Z_density and Z_connectivity
+# (component statistics from Langfelder & Horvath 2011) alongside Z_summary
+# so the text's claims about rank-structure preservation can be verified.
 preservation_latex <- preservation_summary %>%
   arrange(p_adj_fdr) %>%
-  dplyr::select(color, n_genes, Zsummary, median_delta_k, p_adj_fdr, ctrl_lfp)
+  dplyr::select(color, n_genes, Zdensity, Zconnectivity, Zsummary,
+                median_delta_k, p_adj_fdr, ctrl_lfp)
 
 format_pval_latex <- function(p) {
   if (is.na(p)) return("---")
@@ -553,30 +556,53 @@ format_pval_latex <- function(p) {
 
 latex_lines <- c(
   "\\begin{table}[!ht]",
-  paste0("\\caption{\\textbf{WGCNA module preservation statistics.} Modules sorted by FDR-corrected $p$-value from one-sample $t$-test of $\\Delta k_{Within} \\neq 0$. $Z_{summary}$ from \\texttt{modulePreservation()} with ", params$n_permutations, " permutations (Langfelder et al.\\ 2011): $< 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}"),
+  paste0(
+    "\\caption{\\textbf{WGCNA module preservation statistics.} ",
+    "Modules sorted by FDR-corrected $p$-value from one-sample ",
+    "$t$-test of $\\Delta k_{Within} \\neq 0$. ",
+    "$Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from ",
+    "\\texttt{modulePreservation()} with ", params$n_permutations,
+    " permutations \\cite{langfelder2011}: $Z_{summary} < 2$ = not ",
+    "preserved, $2$--$10$ = moderate, $> 10$ = strong. ",
+    "$Z_{connectivity}$ quantifies rank preservation of intramodular ",
+    "connectivity; $Z_{density}$ quantifies preservation of average ",
+    "connectivity strength. LFP = Largest Fragment Proportion ",
+    "(bootstrap support in CTRL).}"
+  ),
   "\\label{tab::preservation}",
   "\\centering",
   "\\small",
-  "\\begin{tabular}{@{}lrrrrrr@{}}",
+  "\\begin{tabular}{@{}lrrrrrrr@{}}",
   "\\toprule",
-  "\\textbf{Module} & \\textbf{Genes} & \\textbf{$Z_{summary}$} & \\textbf{$\\Delta k_{Within}$} & \\textbf{FDR} & \\textbf{LFP} \\\\",
+  paste(
+    "\\textbf{Module} & \\textbf{Genes}",
+    "& \\textbf{$Z_{density}$} & \\textbf{$Z_{connectivity}$}",
+    "& \\textbf{$Z_{summary}$}",
+    "& \\textbf{$\\Delta k_{Within}$} & \\textbf{FDR}",
+    "& \\textbf{LFP} \\\\"
+  ),
   "\\midrule"
 )
 
-for (i in 1:nrow(preservation_latex)) {
+for (i in seq_len(nrow(preservation_latex))) {
   row <- preservation_latex[i, ]
   p_formatted <- format_pval_latex(row$p_adj_fdr)
   latex_lines <- c(latex_lines, sprintf(
-    "%s & %d & %.1f & %.2f & %s & %.2f \\\\",
-    row$color, row$n_genes, round(row$Zsummary, 1),
-    round(row$median_delta_k, 2), p_formatted, round(row$ctrl_lfp, 2)
+    "%s & %d & %.1f & %.1f & %.1f & %.2f & %s & %.2f \\\\",
+    row$color, row$n_genes,
+    round(row$Zdensity, 1), round(row$Zconnectivity, 1),
+    round(row$Zsummary, 1),
+    round(row$median_delta_k, 2), p_formatted,
+    round(row$ctrl_lfp, 2)
   ))
 }
 
-latex_lines <- c(latex_lines, "\\bottomrule", "\\end{tabular}", "\\end{table}")
+latex_lines <- c(latex_lines, "\\bottomrule",
+                 "\\end{tabular}", "\\end{table}")
 
-writeLines(latex_lines, file.path(OUTPUT_DIR, "preservation_table.tex"))
-cat("Saved: preservation_table.tex\n")
+# Per project convention (CLAUDE.md), LaTeX tables live in paths$tables
+writeLines(latex_lines, file.path(paths$tables, "preservation_table.tex"))
+cat("Saved: ", file.path(paths$tables, "preservation_table.tex"), "\n")
 ```
 
 ---
