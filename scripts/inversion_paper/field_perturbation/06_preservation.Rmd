@@ -538,38 +538,84 @@ saveRDS(preservation_summary, file.path(OUTPUT_DIR, "preservation_summary.rds"))
 # Sorted by FDR p-value. Includes Z_density and Z_connectivity
 # (component statistics from Langfelder & Horvath 2011) alongside Z_summary
 # so the text's claims about rank-structure preservation can be verified.
+#
+# Detect which reference network this run represents. The Leaf Gradient
+# topological control set uses a distinct color relabeling (sky, peach,
+# jade, coral, lavender) to avoid confusion with the Genotype Response
+# modules. Output filename and LaTeX label differ accordingly.
+is_leaf_gradient <- grepl("leaf_gradient", params$run_dir, fixed = TRUE)
+
+if (is_leaf_gradient) {
+  out_filename <- "preservation_table_leaf_gradient.tex"
+  latex_label <- "tab::preservation_lg"
+  caption_title <- paste(
+    "WGCNA module preservation statistics for the Leaf Gradient",
+    "topological control set"
+  )
+  extra_caption <- paste(
+    "The Leaf Gradient set groups genes by expression along the leaf",
+    "developmental gradient and serves as an orthogonal control for",
+    "the Genotype Response modules in Table~\\ref{tab::preservation}."
+  )
+  color_relabel <- c(
+    turquoise = "sky",
+    blue      = "peach",
+    brown     = "jade",
+    yellow    = "coral",
+    green     = "lavender"
+  )
+} else {
+  out_filename <- "preservation_table.tex"
+  latex_label <- "tab::preservation"
+  caption_title <- paste(
+    "WGCNA module preservation statistics for the Genotype Response",
+    "(Inv4m DEG) reference network"
+  )
+  extra_caption <- ""
+  color_relabel <- NULL
+}
+
 preservation_latex <- preservation_summary %>%
   arrange(p_adj_fdr) %>%
-  dplyr::select(color, n_genes, Zdensity, Zconnectivity, Zsummary,
+  mutate(label_col = if (is.null(color_relabel)) {
+    as.character(color)
+  } else {
+    unname(color_relabel[as.character(color)])
+  }) %>%
+  dplyr::select(label_col, n_genes, Zdensity, Zconnectivity, Zsummary,
                 median_delta_k, p_adj_fdr, ctrl_lfp)
 
 format_pval_latex <- function(p) {
   if (is.na(p)) return("---")
   if (p < 0.001) {
-    exp <- floor(log10(p))
-    mant <- p / 10^exp
-    return(sprintf("$%.1f \\times 10^{%d}$", mant, exp))
+    exp_val <- floor(log10(p))
+    mant <- p / 10^exp_val
+    return(sprintf("$%.1f \\times 10^{%d}$", mant, exp_val))
   } else {
     return(sprintf("%.3f", p))
   }
 }
 
+caption_text <- paste0(
+  "\\caption{\\textbf{", caption_title, ".} ",
+  "Modules sorted by FDR-corrected $p$-value from one-sample ",
+  "$t$-test of $\\Delta k_{Within} \\neq 0$. ",
+  "$Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from ",
+  "\\texttt{modulePreservation()} with ", params$n_permutations,
+  " permutations \\cite{langfelder2011}: $Z_{summary} < 2$ = not ",
+  "preserved, $2$--$10$ = moderate, $> 10$ = strong. ",
+  "$Z_{connectivity}$ quantifies rank preservation of intramodular ",
+  "connectivity; $Z_{density}$ quantifies preservation of average ",
+  "connectivity strength. LFP = Largest Fragment Proportion ",
+  "(bootstrap support in CTRL).",
+  if (nzchar(extra_caption)) paste0(" ", extra_caption) else "",
+  "}"
+)
+
 latex_lines <- c(
   "\\begin{table}[!ht]",
-  paste0(
-    "\\caption{\\textbf{WGCNA module preservation statistics.} ",
-    "Modules sorted by FDR-corrected $p$-value from one-sample ",
-    "$t$-test of $\\Delta k_{Within} \\neq 0$. ",
-    "$Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from ",
-    "\\texttt{modulePreservation()} with ", params$n_permutations,
-    " permutations \\cite{langfelder2011}: $Z_{summary} < 2$ = not ",
-    "preserved, $2$--$10$ = moderate, $> 10$ = strong. ",
-    "$Z_{connectivity}$ quantifies rank preservation of intramodular ",
-    "connectivity; $Z_{density}$ quantifies preservation of average ",
-    "connectivity strength. LFP = Largest Fragment Proportion ",
-    "(bootstrap support in CTRL).}"
-  ),
-  "\\label{tab::preservation}",
+  caption_text,
+  paste0("\\label{", latex_label, "}"),
   "\\centering",
   "\\small",
   "\\begin{tabular}{@{}lrrrrrrr@{}}",
@@ -589,7 +635,7 @@ for (i in seq_len(nrow(preservation_latex))) {
   p_formatted <- format_pval_latex(row$p_adj_fdr)
   latex_lines <- c(latex_lines, sprintf(
     "%s & %d & %.1f & %.1f & %.1f & %.2f & %s & %.2f \\\\",
-    row$color, row$n_genes,
+    row$label_col, row$n_genes,
     round(row$Zdensity, 1), round(row$Zconnectivity, 1),
     round(row$Zsummary, 1),
     round(row$median_delta_k, 2), p_formatted,
@@ -601,8 +647,9 @@ latex_lines <- c(latex_lines, "\\bottomrule",
                  "\\end{tabular}", "\\end{table}")
 
 # Per project convention (CLAUDE.md), LaTeX tables live in paths$tables
-writeLines(latex_lines, file.path(paths$tables, "preservation_table.tex"))
-cat("Saved: ", file.path(paths$tables, "preservation_table.tex"), "\n")
+out_path <- file.path(paths$tables, out_filename)
+writeLines(latex_lines, out_path)
+cat("Saved:", out_path, "\n")
 ```
 
 ---
