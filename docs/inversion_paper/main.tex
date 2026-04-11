@@ -1830,11 +1830,13 @@ Internode 2 shows the largest difference ($-4.12$ cm, $-18.5\%$; FDR $= 3.7 \tim
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=\linewidth]{figs/module_support.png}
-\caption{\textbf{WGCNA consensus module bootstrap support.}
-Horizontal bars show mean bootstrap support (Label Fraction Present, LFP) for each CTRL consensus module across 1000 iterations with 80\% gene subsampling.
+\caption{\textbf{WGCNA consensus module bootstrap support for the Genotype Response and Leaf Gradient reference networks.}
+Horizontal bars show mean bootstrap support (Largest Fragment Proportion, LFP) for each CTRL consensus module across 1000 iterations with 80\% gene subsampling.
 Error bars indicate standard error of the mean.
 Dashed lines indicate stability thresholds: green ($\geq 0.70$, Stable) and orange ($\geq 0.50$, Moderate).
-Most modules achieve stable or moderate support, indicating robust module assignments in the CTRL reference network.}
+\textit{Top:} The 13 modules from the Genotype Response reference network, built from the 465 \invfour DEGs (FDR $< 0.05$); bars are ordered by mean LFP.
+\textit{Bottom:} The 5 modules from the Leaf Gradient reference network (coral, jade, peach, sky, lavender), which groups genes by their expression along the leaf developmental gradient and serves as an orthogonal control set of connectivity hubs.
+Most Genotype Response modules achieve moderate to stable support, and all Leaf Gradient modules reach stable support ($\geq 0.70$), indicating robust module assignments in both CTRL reference networks.}
 \label{fig::module_support}
 \end{figure}
 

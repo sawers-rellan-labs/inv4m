@@ -347,9 +347,9 @@ p_support <- ggplot(
 
 print(p_support)
 
-ggsave(file.path(paths$figures, "module_support_combined.pdf"),
+ggsave(file.path(paths$figures, "module_support.pdf"),
        p_support, width = 10, height = 5.5)
-ggsave(file.path(paths$figures, "module_support_combined.png"),
+ggsave(file.path(paths$figures, "module_support.png"),
        p_support, width = 10, height = 8, dpi = 300)
 ```
 
