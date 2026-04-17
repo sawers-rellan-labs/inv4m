@@ -71,14 +71,14 @@ reliable <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
 # Read spatially corrected mineral concentrations (includes ionome data)
 ionome <- read.csv(file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments_with_ionome.csv"))
 
-# Rename for consistency and filter for Inv4m and CTRL genotypes only
+# Rename for consistency and filter for Inv4m and CTRL genotypes only.
+# Fe_stover > 800 and Mn_stover > 75 outliers are masked upstream in
+# spatial_correction_for_INV4MXP.Rmd before SpATS fitting, so no further
+# masking is needed here.
 ionome <- ionome %>%
   rename(Genotype = genotype) %>%
   filter(Genotype %in% c("CTRL", "Inv4m")) %>%
   droplevels()
-
-ionome$Fe_stover[ionome$Fe_stover > 800] <- NA
-ionome$Mn_stover[ionome$Mn_stover > 75] <- NA
 
 # Ensure proper factor levels
 ionome$Treatment <- factor(ionome$Treatment, levels = c("+P", "-P"))
