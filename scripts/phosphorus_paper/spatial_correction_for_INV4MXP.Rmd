@@ -104,7 +104,8 @@ ear_data <- ear_data_raw %>%
 
 field_data_complete <- field_data %>%
   left_join(ear_data, by = "rowid") %>%
-  mutate(HI = TKW / STWHV) %>%
+  mutate(HI = TKW / STWHV,
+         biomass_HI_frac = TKW / (TKW + STWHV)) %>%
   mutate(
     Plot_Column = case_when(
       Plot == "PlotVIII" ~ Plot_Column + 10,
@@ -115,10 +116,69 @@ field_data_complete <- field_data %>%
   filter(!is.na(PH)) %>%
   droplevels()
 
+# Load raw ICP-OES ionome data (one row per tissue x rowid) and reshape to
+# one row per plot with {mineral}_seed and {mineral}_stover columns. Apply
+# the same concentration outlier masks used in PSU2022_ionome.Rmd so that
+# content derivations stay consistent with the concentration analyses.
+ionome_csv <- file.path(paths$data, "PSU_inv4m_ionome_all.csv")
+reliable_minerals <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
+
+ionome_wide <- read.csv(ionome_csv, na.strings = c("", "NA")) %>%
+  mutate(tissue = recode(tissue, "stalk" = "stover")) %>%
+  select(tissue, rowid, all_of(reliable_minerals)) %>%
+  pivot_wider(
+    id_cols = rowid,
+    names_from = tissue,
+    values_from = all_of(reliable_minerals),
+    names_glue = "{.value}_{tissue}"
+  )
+
+ionome_wide$Fe_stover[ionome_wide$Fe_stover > 800] <- NA
+ionome_wide$Mn_stover[ionome_wide$Mn_stover > 75]  <- NA
+
+field_data_complete <- field_data_complete %>%
+  left_join(ionome_wide, by = "rowid")
+
+# Derive per-plant mineral content and mineral harvest index for each
+# reliable mineral at the raw plot level. These flow through the SpATS
+# loop below as first-class traits (same way HI does), so that the
+# corrected content variables are detrended as a single trait rather than
+# reconstructed from two independently-corrected inputs.
+for (ion in reliable_minerals) {
+  seed_col   <- paste0(ion, "_seed")
+  stover_col <- paste0(ion, "_stover")
+  field_data_complete[[paste0(ion, "_grain_mg")]] <-
+    field_data_complete$TKW * field_data_complete[[seed_col]] / 1000
+  field_data_complete[[paste0(ion, "_stover_mg")]] <-
+    field_data_complete$STWHV * field_data_complete[[stover_col]] / 1000
+  field_data_complete[[paste0(ion, "_total_mg")]] <-
+    field_data_complete[[paste0(ion, "_grain_mg")]] +
+    field_data_complete[[paste0(ion, "_stover_mg")]]
+  field_data_complete[[paste0(ion, "_HI")]] <-
+    field_data_complete[[paste0(ion, "_grain_mg")]] /
+    field_data_complete[[paste0(ion, "_total_mg")]]
+}
+
 # Define phenotypes
 base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
-ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
-all_phenotypes <- unique(c(base_phenotypes, ear_phenotypes))
+ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN",
+                    "HI", "biomass_HI_frac")
+
+ionome_conc_phenotypes <- c(
+  paste0(reliable_minerals, "_seed"),
+  paste0(reliable_minerals, "_stover")
+)
+
+ionome_content_phenotypes <- c(
+  paste0(reliable_minerals, "_grain_mg"),
+  paste0(reliable_minerals, "_stover_mg"),
+  paste0(reliable_minerals, "_total_mg"),
+  paste0(reliable_minerals, "_HI")
+)
+
+all_phenotypes <- unique(c(base_phenotypes, ear_phenotypes,
+                           ionome_conc_phenotypes,
+                           ionome_content_phenotypes))
 
 plot_data <- field_data_complete %>%
   group_by(rowid, Rep, Plot_Row, Plot_Column, Genotype, Treatment) %>%
@@ -801,7 +861,8 @@ print(effect_summary %>%
 
 ```{r export-results}
 # Export the combined spatially corrected dataset
-combined_output_file <- file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments.csv")
+combined_output_file <- file.path(paths$intermediate,
+  "PSU2022_spatially_corrected_both_treatments_with_ionome.csv")
 write.csv(sp_corrected_combined, combined_output_file, row.names = FALSE)
 
 # Export all model coefficients

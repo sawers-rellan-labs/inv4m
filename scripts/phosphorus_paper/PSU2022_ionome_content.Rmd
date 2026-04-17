@@ -1,0 +1,452 @@
+---
+title: "Inv4m Per-Plant Mineral Content (Biomass × Concentration)"
+author: "Fausto Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8
+)
+
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
+```
+
+## Overview
+
+Companion to `PSU2022_ionome.Rmd`. That workbook analyzes mineral
+**concentration** (ppm in grain and stover). This one analyzes per-plant
+mineral **content** (mg per plant):
+
+- `grain_content_mg  = TKW_g   × conc_seed_ppm   / 1000`
+- `stover_content_mg = STWHV_g × conc_stover_ppm / 1000`
+- `total_content_mg  = grain_content + stover_content`
+- `mineral_HI        = grain_content / total_content`
+
+These quantities are derived at the raw plot level inside
+`spatial_correction_for_INV4MXP.Rmd` and fit by SpATS as first-class
+traits (same way `HI = TKW / STWHV` is handled). This workbook reads the
+already-corrected content and mineral-HI columns and analyzes them;
+nothing is re-derived here.
+
+Content separates two processes the concentration-only analysis confounds:
+net uptake (total content) and partitioning (mineral HI). This directly
+addresses Miguel Piñeros' MP3 ask (processes behind mineral-concentration
+changes) and Sawers' L176 question on per-plant flux rather than per-unit
+grain.
+
+## Load libraries
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tibble)
+library(ggpubr)
+library(ggbeeswarm)
+library(ggfx)
+library(rstatix)
+library(ggtext)
+library(ggh4x)
+```
+
+## Load spatially corrected data
+
+```{r load-data}
+ionome <- read.csv(
+  file.path(
+    paths$intermediate,
+    "PSU2022_spatially_corrected_both_treatments_with_ionome.csv"
+  )
+) %>%
+  rename(Genotype = genotype) %>%
+  filter(Genotype %in% c("CTRL", "Inv4m")) %>%
+  droplevels()
+
+ionome$Treatment <- factor(ionome$Treatment, levels = c("+P", "-P"))
+ionome$Genotype  <- factor(ionome$Genotype,  levels = c("CTRL", "Inv4m"))
+
+reliable <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
+
+content_vars <- c(
+  paste0(reliable, "_grain_mg"),
+  paste0(reliable, "_stover_mg"),
+  paste0(reliable, "_total_mg"),
+  paste0(reliable, "_HI")
+)
+
+# Alias: downstream chunks work against `content`. Nothing is derived here;
+# all content + HI columns come from the upstream SpATS-corrected CSV.
+content <- ionome
+
+cat("Sample sizes:\n")
+ionome %>% count(Genotype, Treatment) %>% print()
+```
+
+## Unit check: biomass and concentration ranges
+
+Sanity-check the inputs before computing content. Expected:
+
+- `TKW`: tens to hundreds of grams per plant (range roughly 30–300 g).
+- `STWHV`: tens to hundreds of grams per plant.
+- Concentrations: P/K in the thousands (ppm), Zn/Fe/Mn in the tens,
+  Ca in hundreds to low thousands depending on tissue.
+
+```{r unit-check-biomass}
+ionome %>%
+  select(Genotype, Treatment, TKW, STWHV) %>%
+  pivot_longer(c(TKW, STWHV), names_to = "variable", values_to = "value") %>%
+  group_by(variable, Genotype, Treatment) %>%
+  summarise(
+    n      = sum(!is.na(value)),
+    min    = round(min(value, na.rm = TRUE), 1),
+    median = round(median(value, na.rm = TRUE), 1),
+    mean   = round(mean(value, na.rm = TRUE), 1),
+    max    = round(max(value, na.rm = TRUE), 1),
+    .groups = "drop"
+  )
+```
+
+```{r unit-check-concentrations}
+conc_cols <- c(
+  paste0(reliable, "_seed"),
+  paste0(reliable, "_stover")
+)
+
+ionome %>%
+  select(all_of(conc_cols)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  group_by(variable) %>%
+  summarise(
+    n      = sum(!is.na(value)),
+    min    = round(min(value, na.rm = TRUE), 1),
+    median = round(median(value, na.rm = TRUE), 1),
+    mean   = round(mean(value, na.rm = TRUE), 1),
+    max    = round(max(value, na.rm = TRUE), 1),
+    .groups = "drop"
+  ) %>%
+  arrange(variable)
+```
+
+## Content summary per mineral × genotype × treatment
+
+```{r content-summary}
+content %>%
+  select(Genotype, Treatment, all_of(content_vars)) %>%
+  pivot_longer(all_of(content_vars), names_to = "variable", values_to = "value") %>%
+  separate(variable, into = c("mineral", "pool"), sep = "_", extra = "merge") %>%
+  mutate(
+    pool = recode(pool,
+                  grain_mg = "grain (mg)",
+                  stover_mg = "stover (mg)",
+                  total_mg = "total (mg)",
+                  HI = "mineral HI")
+  ) %>%
+  group_by(mineral, pool, Genotype, Treatment) %>%
+  summarise(
+    n      = sum(!is.na(value)),
+    median = signif(median(value, na.rm = TRUE), 3),
+    mean   = signif(mean(value, na.rm = TRUE), 3),
+    sd     = signif(sd(value, na.rm = TRUE), 3),
+    .groups = "drop"
+  ) %>%
+  arrange(mineral, pool, Genotype, Treatment) %>%
+  print(n = Inf)
+```
+
+## Biomass HI vs mineral HI per mineral
+
+Rapid visual sanity check: does mineral HI track biomass HI, or does
+it depart (true partitioning signal beyond biomass reallocation)?
+
+```{r biomass-vs-mineral-hi, fig.width=10, fig.height=6}
+# Order minerals by median total content per plant (descending): highest-flux
+# first, so the eye lands on the dominant pools.
+mineral_order <- content %>%
+  select(all_of(paste0(reliable, "_total_mg"))) %>%
+  pivot_longer(everything(), names_to = "mineral", values_to = "total_mg") %>%
+  mutate(mineral = sub("_total_mg$", "", mineral)) %>%
+  group_by(mineral) %>%
+  summarise(median_total = median(total_mg, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(median_total)) %>%
+  pull(mineral)
+
+cat("Facet order (median total mg/plant, descending):\n")
+print(mineral_order)
+
+hi_long <- content %>%
+  select(Genotype, Treatment, biomass_HI_frac,
+         all_of(paste0(reliable, "_HI"))) %>%
+  pivot_longer(ends_with("_HI"), names_to = "mineral", values_to = "mineral_HI") %>%
+  mutate(
+    mineral = sub("_HI$", "", mineral),
+    mineral = factor(mineral, levels = mineral_order)
+  ) %>%
+  filter(!is.na(mineral_HI), !is.na(biomass_HI_frac))
+
+ggplot(hi_long, aes(biomass_HI_frac, mineral_HI,
+                    color = Treatment, shape = Genotype)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  geom_point(alpha = 0.7, size = 1.5) +
+  facet_wrap(~ mineral, scales = "free_y") +
+  scale_color_manual(values = c("+P" = "gold", "-P" = "purple4")) +
+  labs(
+    x = "Biomass harvest index  [TKW / (TKW + STWHV)]",
+    y = "Mineral HI  [grain content / total content]"
+  ) +
+  theme_classic(base_size = 12)
+```
+
+## Fit linear models across content + HI variables
+
+```{r fit-models}
+effects <- lapply(content_vars, function(x) {
+  n_obs <- sum(!is.na(content[[x]]))
+  if (n_obs < 20) return(NULL)
+
+  model <- tryCatch(
+    lm(as.formula(paste(x, "~ Genotype * Treatment")), data = content),
+    error = function(e) NULL
+  )
+  if (is.null(model)) return(NULL)
+
+  out <- coef(summary(model)) %>%
+    as.data.frame() %>%
+    rownames_to_column("predictor")
+  colnames(out)[3] <- "Std.Error"
+  colnames(out)[5] <- "p.value"
+  out$response <- x
+  out %>% select(response, everything())
+}) %>%
+  bind_rows() %>%
+  mutate(p.adjust = p.adjust(p.value, method = "fdr")) %>%
+  arrange(p.adjust)
+
+cat("Total models fitted:", length(unique(effects$response)), "\n")
+cat("Total effects tested:", nrow(effects), "\n")
+
+cat("\n=== Significant effects (FDR < 0.05, no Intercept) ===\n")
+effects %>%
+  filter(p.adjust < 0.05, !grepl("Intercept", predictor)) %>%
+  select(response, predictor, Estimate, p.value, p.adjust) %>%
+  as_tibble() %>%
+  print(n = Inf)
+```
+
+```{r interaction-effects}
+interaction_effects <- effects %>%
+  filter(grepl(":", predictor)) %>%
+  separate(response, into = c("mineral", "pool"),
+           sep = "_", extra = "merge", remove = FALSE) %>%
+  mutate(
+    signif = case_when(
+      p.adjust < 0.001 ~ "***",
+      p.adjust < 0.01  ~ "**",
+      p.adjust < 0.05  ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  arrange(p.adjust)
+
+cat("Genotype x Treatment interactions tested:", nrow(interaction_effects), "\n")
+cat("Significant (FDR < 0.05):", sum(interaction_effects$p.adjust < 0.05), "\n")
+
+if (any(interaction_effects$p.adjust < 0.05)) {
+  interaction_effects %>%
+    filter(p.adjust < 0.05) %>%
+    select(mineral, pool, Estimate, p.value, p.adjust, signif) %>%
+    print()
+}
+```
+
+## Prepare long-format content for plotting + t-tests
+
+```{r to-plot-content}
+to_plot_content <- content %>%
+  select(Genotype, Treatment,
+         all_of(paste0(reliable, "_grain_mg")),
+         all_of(paste0(reliable, "_stover_mg"))) %>%
+  pivot_longer(
+    cols = -c(Genotype, Treatment),
+    names_to = "mineral_pool",
+    values_to = "mg"
+  ) %>%
+  mutate(
+    mineral = sub("_(grain|stover)_mg$", "", mineral_pool),
+    pool    = sub("^.+_(grain|stover)_mg$", "\\1", mineral_pool)
+  ) %>%
+  select(-mineral_pool) %>%
+  filter(!is.na(mg)) %>%
+  mutate(
+    pool     = factor(pool, levels = c("stover", "grain")),
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  )
+```
+
+```{r treatment-ttests}
+treatment.t.test <- to_plot_content %>%
+  group_by(pool, Genotype, mineral) %>%
+  rstatix::t_test(mg ~ Treatment) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12)
+
+cat("\n=== Treatment t-tests (FDR < 0.05) ===\n")
+treatment.t.test %>%
+  filter(p.adj < 0.05) %>%
+  select(mineral, pool, Genotype, statistic, p, p.adj, p.adj.signif) %>%
+  arrange(p.adj) %>%
+  as_tibble() %>%
+  print(n = Inf)
+```
+
+## Per-mineral content plot function
+
+```{r plot-mineral-content}
+pal <- c("+P" = "gold", "-P" = "purple4")
+
+plot_mineral_content <- function(mineral_name) {
+  plot_data <- to_plot_content %>%
+    filter(mineral == mineral_name)
+
+  ttest_subset <- treatment.t.test %>%
+    filter(mineral == mineral_name)
+
+  ggplot(plot_data, aes(x = Treatment, y = mg, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    stat_pvalue_manual(
+      ttest_subset,
+      label = "p.adj.signif",
+      size = 5,
+      bracket.size = 0.5,
+      hide.ns = TRUE
+    ) +
+    scale_color_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
+    labs(title = mineral_name, x = NULL, y = "Content [mg / plant]") +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank(),
+      panel.spacing = unit(0.1, "lines"),
+      ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5)
+    )
+}
+```
+
+## Main content figure (P, Zn, Ca, S)
+
+```{r main-content-figure, fig.width=12, fig.height=4}
+p_P  <- plot_mineral_content("P")
+p_Zn <- plot_mineral_content("Zn")
+p_Ca <- plot_mineral_content("Ca")
+p_S  <- plot_mineral_content("S")
+
+p_main_content <- ggarrange(
+  p_P,
+  p_Zn + ggpubr::rremove("ylab"),
+  p_Ca + ggpubr::rremove("ylab"),
+  p_S  + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+print(p_main_content)
+```
+
+## Supplementary content figure (Mg, Mn, K, Fe)
+
+```{r supp-content-figure, fig.width=12, fig.height=4}
+p_Mg <- plot_mineral_content("Mg")
+p_Mn <- plot_mineral_content("Mn")
+p_K  <- plot_mineral_content("K")
+p_Fe <- plot_mineral_content("Fe")
+
+p_supp_content <- ggarrange(
+  p_Mg,
+  p_Mn + ggpubr::rremove("ylab"),
+  p_K  + ggpubr::rremove("ylab"),
+  p_Fe + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+print(p_supp_content)
+```
+
+## Save results
+
+Per-plant corrected content is already in the upstream
+`PSU2022_spatially_corrected_both_treatments_with_ionome.csv`, so this
+chunk saves only the model outputs, t-tests, and figures unique to this
+analysis.
+
+```{r save-derived}
+write.csv(
+  effects,
+  file.path(paths$intermediate, "ionome_content_linear_model_effects.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  interaction_effects,
+  file.path(paths$intermediate, "ionome_content_interaction_effects.csv"),
+  row.names = FALSE
+)
+
+# Drop list columns so add_y_position() output serializes cleanly.
+treatment_export <- treatment.t.test %>% select(where(~ !is.list(.)))
+write.csv(
+  treatment_export,
+  file.path(paths$intermediate, "ionome_content_treatment_ttests.csv"),
+  row.names = FALSE
+)
+
+ggsave(
+  file.path(paths$figures, "ionome_content_main_figure.pdf"),
+  plot = p_main_content, width = 12, height = 4, units = "in"
+)
+ggsave(
+  file.path(paths$figures, "ionome_content_main_figure.png"),
+  plot = p_main_content, width = 12, height = 4, units = "in", dpi = 300
+)
+ggsave(
+  file.path(paths$figures, "ionome_content_supplementary_figure.pdf"),
+  plot = p_supp_content, width = 12, height = 4, units = "in"
+)
+ggsave(
+  file.path(paths$figures, "ionome_content_supplementary_figure.png"),
+  plot = p_supp_content, width = 12, height = 4, units = "in", dpi = 300
+)
+```
+
+## Session info
+
+```{r session-info}
+sessionInfo()
+```
