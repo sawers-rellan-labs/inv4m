@@ -88,7 +88,6 @@ reliable <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
 content_vars <- c(
   paste0(reliable, "_grain_mg"),
   paste0(reliable, "_stover_mg"),
-  paste0(reliable, "_total_mg"),
   paste0(reliable, "_HI")
 )
 
@@ -156,7 +155,6 @@ content %>%
     pool = recode(pool,
                   grain_mg = "grain (mg)",
                   stover_mg = "stover (mg)",
-                  total_mg = "total (mg)",
                   HI = "mineral HI")
   ) %>%
   group_by(mineral, pool, Genotype, Treatment) %>%
@@ -177,14 +175,17 @@ Rapid visual sanity check: does mineral HI track biomass HI, or does
 it depart (true partitioning signal beyond biomass reallocation)?
 
 ```{r biomass-vs-mineral-hi, fig.width=10, fig.height=6}
-# Order minerals by median total content per plant (descending): highest-flux
-# first, so the eye lands on the dominant pools.
+# Order minerals by median (grain + stover) content per plant, descending:
+# highest-flux first so the eye lands on the dominant pools. Sum of two
+# SpATS-corrected pools, not the SpATS-corrected total (we don't test total
+# anywhere in the paper, so it's not a corrected response).
 mineral_order <- content %>%
-  select(all_of(paste0(reliable, "_total_mg"))) %>%
-  pivot_longer(everything(), names_to = "mineral", values_to = "total_mg") %>%
-  mutate(mineral = sub("_total_mg$", "", mineral)) %>%
+  select(all_of(paste0(reliable, "_grain_mg")),
+         all_of(paste0(reliable, "_stover_mg"))) %>%
+  pivot_longer(everything(), names_to = "var", values_to = "mg") %>%
+  mutate(mineral = sub("_(grain|stover)_mg$", "", var)) %>%
   group_by(mineral) %>%
-  summarise(median_total = median(total_mg, na.rm = TRUE), .groups = "drop") %>%
+  summarise(median_total = median(mg, na.rm = TRUE), .groups = "drop") %>%
   arrange(desc(median_total)) %>%
   pull(mineral)
 
@@ -276,6 +277,68 @@ if (any(interaction_effects$p.adjust < 0.05)) {
 }
 ```
 
+## lm-based pre-selection for figure brackets
+
+Hierarchical convention: the **lm with global FDR** controls the
+family-wise error rate across all coefficients (Treatment + Genotype +
+interaction over all 48 responses; conservative). Brackets in the
+figures illustrate **only the lm-significant effects** as pairwise Welch
+*t*-tests with **nominal** p-values. No secondary FDR is applied to the
+brackets — the lm's correction is the test, the brackets are the
+illustration. Methods describes the hierarchy.
+
+```{r lm-preselection}
+# Concentration lm effects come from PSU2022_ionome.Rmd's separate fit
+conc_eff_path <- file.path(paths$intermediate,
+                           "ionome_linear_model_effects.csv")
+if (file.exists(conc_eff_path)) {
+  conc_lm <- read.csv(conc_eff_path)
+} else {
+  warning("Concentration lm effects not found; concentration brackets ",
+          "will be empty. Render PSU2022_ionome.Rmd first.")
+  conc_lm <- tibble::tibble(predictor = character(),
+                            response = character(),
+                            p.adjust = numeric())
+}
+
+# Pre-selected response variables per panel family
+treatment_lm_conc <- conc_lm %>%
+  filter(predictor == "Treatment-P", p.adjust < 0.05) %>%
+  pull(response)
+
+treatment_lm_content <- effects %>%
+  filter(predictor == "Treatment-P", p.adjust < 0.05,
+         grepl("_grain_mg$|_stover_mg$", response)) %>%
+  pull(response)
+
+treatment_lm_hi <- effects %>%
+  filter(predictor == "Treatment-P", p.adjust < 0.05,
+         grepl("_HI$", response)) %>%
+  pull(response)
+
+genotype_lm_content <- effects %>%
+  filter(predictor == "GenotypeInv4m", p.adjust < 0.05,
+         grepl("_grain_mg$|_stover_mg$", response)) %>%
+  pull(response)
+
+genotype_lm_hi <- effects %>%
+  filter(predictor == "GenotypeInv4m", p.adjust < 0.05,
+         grepl("_HI$", response)) %>%
+  pull(response)
+
+cat("=== lm pre-selection summary ===\n")
+cat("Concentration Treatment effects (Panel A):       ",
+    length(treatment_lm_conc), "\n")
+cat("Content      Treatment effects (Panel B):       ",
+    length(treatment_lm_content), "\n")
+cat("Mineral HI   Treatment effects (Panel C):       ",
+    length(treatment_lm_hi), "\n")
+cat("Content      Genotype  effects (Inv4m supp):    ",
+    length(genotype_lm_content), "\n")
+cat("Mineral HI   Genotype  effects (Inv4m supp):    ",
+    length(genotype_lm_hi), "\n")
+```
+
 ## Prepare long-format content for plotting + t-tests
 
 ```{r to-plot-content}
@@ -306,15 +369,15 @@ to_plot_content <- content %>%
 treatment.t.test <- to_plot_content %>%
   group_by(pool, Genotype, mineral) %>%
   rstatix::t_test(mg ~ Treatment) %>%
-  rstatix::adjust_pvalue(method = "fdr") %>%
-  rstatix::add_significance() %>%
-  rstatix::add_y_position(scales = "free_y", step.increase = 0.12)
+  rstatix::add_significance("p") %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12) %>%
+  mutate(lm_response = paste0(mineral, "_", pool, "_mg")) %>%
+  filter(lm_response %in% treatment_lm_content)
 
-cat("\n=== Treatment t-tests (FDR < 0.05) ===\n")
+cat("\n=== Treatment content t-tests (lm-preselected, nominal p) ===\n")
 treatment.t.test %>%
-  filter(p.adj < 0.05) %>%
-  select(mineral, pool, Genotype, statistic, p, p.adj, p.adj.signif) %>%
-  arrange(p.adj) %>%
+  select(mineral, pool, Genotype, statistic, p, p.signif) %>%
+  arrange(p) %>%
   as_tibble() %>%
   print(n = Inf)
 ```
@@ -347,9 +410,10 @@ to_plot_conc <- content %>%
 treatment.conc.ttest <- to_plot_conc %>%
   group_by(pool, Genotype, mineral) %>%
   rstatix::t_test(ppm ~ Treatment) %>%
-  rstatix::adjust_pvalue(method = "fdr") %>%
-  rstatix::add_significance() %>%
-  rstatix::add_y_position(scales = "free_y", step.increase = 0.12)
+  rstatix::add_significance("p") %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12) %>%
+  mutate(lm_response = paste0(mineral, "_", pool)) %>%
+  filter(lm_response %in% treatment_lm_conc)
 ```
 
 ## Mineral HI long-format + treatment t-tests (Panel C)
@@ -374,8 +438,7 @@ treatment.hi.ttest <- to_plot_hi %>%
   group_by(Genotype, mineral) %>%
   filter(n() >= 6) %>%
   rstatix::t_test(hi ~ Treatment) %>%
-  rstatix::adjust_pvalue(method = "fdr") %>%
-  rstatix::add_significance()
+  rstatix::add_significance("p")
 
 if (nrow(treatment.hi.ttest) > 0) {
   treatment.hi.ttest <- treatment.hi.ttest %>%
@@ -391,7 +454,9 @@ if (nrow(treatment.hi.ttest) > 0) {
         )
     }) %>%
     ungroup() %>%
-    filter(!is.na(y.position), is.finite(y.position))
+    filter(!is.na(y.position), is.finite(y.position)) %>%
+    mutate(lm_response = paste0(mineral, "_HI")) %>%
+    filter(lm_response %in% treatment_lm_hi)
 }
 ```
 
@@ -414,7 +479,7 @@ plot_mineral_content <- function(mineral_name) {
     with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
     stat_pvalue_manual(
       ttest_subset,
-      label = "p.adj.signif",
+      label = "p.signif",
       size = 5,
       bracket.size = 0.5,
       hide.ns = TRUE
@@ -462,14 +527,14 @@ plot_mineral_conc <- function(mineral_name, log_scale = FALSE) {
         expand = expansion(mult = c(0.05, 0.15))
       ) +
       stat_pvalue_manual(
-        ttest_log, label = "p.adj.signif",
+        ttest_log, label = "p.signif",
         size = 5, bracket.size = 0.5, hide.ns = TRUE
       )
   } else {
     p <- p +
       scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
       stat_pvalue_manual(
-        ttest_subset, label = "p.adj.signif",
+        ttest_subset, label = "p.signif",
         size = 5, bracket.size = 0.5, hide.ns = TRUE
       )
   }
@@ -518,7 +583,7 @@ plot_mineral_HI <- function(mineral_name) {
 
   if (nrow(ttest_subset) > 0) {
     p <- p + stat_pvalue_manual(
-      ttest_subset, label = "p.adj.signif",
+      ttest_subset, label = "p.signif",
       size = 5, bracket.size = 0.5, hide.ns = TRUE
     )
   }
@@ -609,6 +674,174 @@ print(p_supp_3panel)
 ```
 
 
+## Inv4m-effects supplementary figure
+
+The lm Genotype(Inv4m) effect is estimated pooled across P treatments
+(interaction lm with non-significant GxE). Visualization pools too: one
+Inv4m vs CTRL contrast per (mineral, pool) for content, and per mineral
+for HI. Brackets come from Welch *t*-tests on the pooled data at
+nominal *p*, illustrating the lm-certified effects.
+
+```{r genotype-content-ttests}
+genotype.content.ttest <- to_plot_content %>%
+  group_by(pool, mineral) %>%
+  filter(n() >= 4, var(mg, na.rm = TRUE) > 0) %>%
+  rstatix::t_test(mg ~ Genotype) %>%
+  rstatix::add_significance("p") %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12) %>%
+  mutate(lm_response = paste0(mineral, "_", pool, "_mg")) %>%
+  filter(lm_response %in% genotype_lm_content)
+
+genotype.hi.ttest <- to_plot_hi %>%
+  group_by(mineral) %>%
+  filter(n() >= 4, var(hi, na.rm = TRUE) > 0) %>%
+  rstatix::t_test(hi ~ Genotype) %>%
+  rstatix::add_significance("p")
+
+if (nrow(genotype.hi.ttest) > 0) {
+  genotype.hi.ttest <- genotype.hi.ttest %>%
+    group_by(mineral) %>%
+    group_modify(~ {
+      sub_data <- to_plot_hi %>% filter(mineral == .y$mineral)
+      .x %>%
+        rstatix::add_y_position(
+          data = sub_data, formula = hi ~ Genotype,
+          step.increase = 0.12
+        )
+    }) %>%
+    ungroup() %>%
+    filter(!is.na(y.position), is.finite(y.position)) %>%
+    mutate(lm_response = paste0(mineral, "_HI")) %>%
+    filter(lm_response %in% genotype_lm_hi)
+}
+
+cat("\n=== Inv4m content t-tests (pooled across treatment, lm-preselected) ===\n")
+genotype.content.ttest %>%
+  select(mineral, pool, statistic, p, p.signif) %>%
+  arrange(p) %>% as_tibble() %>% print(n = Inf)
+
+cat("\n=== Inv4m HI t-tests (pooled across treatment, lm-preselected) ===\n")
+genotype.hi.ttest %>%
+  select(mineral, statistic, p, p.signif) %>%
+  arrange(p) %>% as_tibble() %>% print(n = Inf)
+```
+
+```{r plot-genotype-panels}
+pal_geno <- c("CTRL" = "gold", "Inv4m" = "purple4")
+
+make_content_panel <- function(mineral_name) {
+  d <- to_plot_content %>%
+    filter(mineral == mineral_name) %>%
+    mutate(Genotype = gsub("<i>|</i>", "", as.character(Genotype)),
+           Genotype = factor(Genotype, levels = c("CTRL", "Inv4m")))
+  s <- genotype.content.ttest %>%
+    filter(mineral == mineral_name) %>%
+    mutate(group1 = gsub("<i>|</i>", "", group1),
+           group2 = gsub("<i>|</i>", "", group2))
+
+  p <- ggplot(d, aes(x = Genotype, y = mg, colour = Genotype)) +
+    ggtitle(mineral_name) +
+    ylab("Content [mg / plant]") +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_colour_manual(values = pal_geno) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "<i>Inv4m</i>")) +
+    facet_wrap(~ pool, scales = "free_y") +
+    theme_classic(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 22, hjust = 0.5),
+      axis.title.y = element_text(face = "bold", size = 13),
+      axis.title.x = element_blank(),
+      axis.text.x = element_markdown(size = 14, face = "bold", color = "black"),
+      strip.background = element_blank(),
+      strip.text = element_markdown(face = "bold", size = 14),
+      legend.position = "none"
+    )
+
+  if (nrow(s) > 0) {
+    p <- p + stat_pvalue_manual(
+      s, label = "p.signif",
+      size = 7, bracket.size = 0.6, hide.ns = FALSE
+    )
+  }
+  p
+}
+
+make_hi_panel <- function(mineral_name) {
+  d <- to_plot_hi %>%
+    filter(mineral == mineral_name) %>%
+    mutate(Genotype = gsub("<i>|</i>", "", as.character(Genotype)),
+           Genotype = factor(Genotype, levels = c("CTRL", "Inv4m")))
+  s <- genotype.hi.ttest %>%
+    filter(mineral == mineral_name) %>%
+    mutate(group1 = gsub("<i>|</i>", "", group1),
+           group2 = gsub("<i>|</i>", "", group2))
+
+  p <- ggplot(d, aes(x = Genotype, y = hi, colour = Genotype)) +
+    ggtitle(mineral_name) +
+    ylab("Mineral HI [grain / total]") +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_colour_manual(values = pal_geno) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "<i>Inv4m</i>")) +
+    theme_classic(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 22, hjust = 0.5),
+      axis.title.y = element_text(face = "bold", size = 13),
+      axis.title.x = element_blank(),
+      axis.text.x = element_markdown(size = 14, face = "bold", color = "black"),
+      strip.background = element_blank(),
+      strip.text = element_markdown(face = "bold", size = 14),
+      legend.position = "none"
+    )
+
+  if (nrow(s) > 0) {
+    p <- p + stat_pvalue_manual(
+      s, label = "p.signif",
+      size = 7, bracket.size = 0.6, hide.ns = FALSE
+    )
+  }
+  p
+}
+```
+
+```{r inv4m-figure, fig.width=16, fig.height=10}
+# Minerals with any lm-significant Genotype effect (content or HI).
+inv4m_minerals <- c("Ca", "Zn", "Fe", "K")
+
+row_content <- ggarrange(
+  plotlist = lapply(inv4m_minerals, function(m) {
+    p <- make_content_panel(m)
+    if (m != inv4m_minerals[1]) p <- p + ggpubr::rremove("ylab")
+    p
+  }),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+row_hi <- ggarrange(
+  plotlist = lapply(inv4m_minerals, function(m) {
+    p <- make_hi_panel(m)
+    if (m != inv4m_minerals[1]) p <- p + ggpubr::rremove("ylab")
+    p
+  }),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+p_inv4m_effects <- ggarrange(
+  row_content, row_hi,
+  ncol = 1, nrow = 2,
+  heights = c(1, 1),
+  labels = c("A", "B"),
+  font.label = list(size = 30)
+)
+
+print(p_inv4m_effects)
+```
+
 ## Save results
 
 Per-plant corrected content is already in the upstream
@@ -639,9 +872,11 @@ write_ttest <- function(x, name) {
   )
 }
 
-write_ttest(treatment.t.test,     "ionome_content_treatment_ttests.csv")
-write_ttest(treatment.conc.ttest, "ionome_content_conc_treatment_ttests.csv")
-write_ttest(treatment.hi.ttest,   "ionome_content_hi_treatment_ttests.csv")
+write_ttest(treatment.t.test,       "ionome_content_treatment_ttests.csv")
+write_ttest(treatment.conc.ttest,   "ionome_content_conc_treatment_ttests.csv")
+write_ttest(treatment.hi.ttest,     "ionome_content_hi_treatment_ttests.csv")
+write_ttest(genotype.content.ttest, "ionome_content_genotype_ttests.csv")
+write_ttest(genotype.hi.ttest,      "ionome_content_hi_genotype_ttests.csv")
 
 ggsave(
   file.path(paths$figures, "ionome_3panel_main_figure.pdf"),
@@ -658,6 +893,14 @@ ggsave(
 ggsave(
   file.path(paths$figures, "ionome_3panel_supplementary_figure.png"),
   plot = p_supp_3panel, width = 14, height = 12, units = "in", dpi = 300
+)
+ggsave(
+  file.path(paths$figures, "ionome_inv4m_effects_figure.pdf"),
+  plot = p_inv4m_effects, width = 16, height = 10, units = "in"
+)
+ggsave(
+  file.path(paths$figures, "ionome_inv4m_effects_figure.png"),
+  plot = p_inv4m_effects, width = 16, height = 10, units = "in", dpi = 300
 )
 ```
 
