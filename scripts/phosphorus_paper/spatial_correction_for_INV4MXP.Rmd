@@ -104,8 +104,10 @@ ear_data <- ear_data_raw %>%
 
 field_data_complete <- field_data %>%
   left_join(ear_data, by = "rowid") %>%
-  mutate(HI = TKW / STWHV,
-         biomass_HI_frac = TKW / (TKW + STWHV)) %>%
+  # Bender 2013-style harvest index: grain biomass / total above-ground
+  # biomass = TKW / (TKW + STWHV). Bounded [0, 1], matches the mineral HI
+  # convention (grain content / total content) used downstream.
+  mutate(HI = TKW / (TKW + STWHV)) %>%
   mutate(
     Plot_Column = case_when(
       Plot == "PlotVIII" ~ Plot_Column + 10,
@@ -161,8 +163,7 @@ for (ion in reliable_minerals) {
 
 # Define phenotypes
 base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
-ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN",
-                    "HI", "biomass_HI_frac")
+ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
 
 ionome_conc_phenotypes <- c(
   paste0(reliable_minerals, "_seed"),

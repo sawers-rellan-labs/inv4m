@@ -108,7 +108,7 @@ pheno_theme3 <- theme_classic2(base_size = 20) +
 ### Load spatially corrected data
 
 ```{r load_corrected_data}
-sp_corrected_file <- file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments.csv")
+sp_corrected_file <- file.path(paths$intermediate, "PSU2022_spatially_corrected_both_treatments_with_ionome.csv")
 
 sp_corrected_combined <- read.csv(sp_corrected_file) %>%
   mutate(
