@@ -319,6 +319,82 @@ treatment.t.test %>%
   print(n = Inf)
 ```
 
+## Concentration long-format + treatment t-tests (Panel A)
+
+```{r to-plot-conc}
+to_plot_conc <- content %>%
+  select(Genotype, Treatment,
+         all_of(paste0(reliable, "_seed")),
+         all_of(paste0(reliable, "_stover"))) %>%
+  pivot_longer(
+    cols = -c(Genotype, Treatment),
+    names_to = "mineral_pool",
+    values_to = "ppm"
+  ) %>%
+  mutate(
+    mineral = sub("_(seed|stover)$", "", mineral_pool),
+    pool    = sub("^.+_(seed|stover)$", "\\1", mineral_pool)
+  ) %>%
+  select(-mineral_pool) %>%
+  filter(!is.na(ppm)) %>%
+  mutate(
+    pool      = factor(pool, levels = c("stover", "seed")),
+    Genotype  = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype  = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  )
+
+treatment.conc.ttest <- to_plot_conc %>%
+  group_by(pool, Genotype, mineral) %>%
+  rstatix::t_test(ppm ~ Treatment) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance() %>%
+  rstatix::add_y_position(scales = "free_y", step.increase = 0.12)
+```
+
+## Mineral HI long-format + treatment t-tests (Panel C)
+
+```{r to-plot-hi}
+to_plot_hi <- content %>%
+  select(Genotype, Treatment, all_of(paste0(reliable, "_HI"))) %>%
+  pivot_longer(
+    cols = -c(Genotype, Treatment),
+    names_to = "mineral",
+    values_to = "hi"
+  ) %>%
+  mutate(
+    mineral   = sub("_HI$", "", mineral),
+    Genotype  = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype  = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  ) %>%
+  filter(!is.na(hi), is.finite(hi))
+
+treatment.hi.ttest <- to_plot_hi %>%
+  group_by(Genotype, mineral) %>%
+  filter(n() >= 6) %>%
+  rstatix::t_test(hi ~ Treatment) %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance()
+
+if (nrow(treatment.hi.ttest) > 0) {
+  treatment.hi.ttest <- treatment.hi.ttest %>%
+    group_by(Genotype, mineral) %>%
+    group_modify(~ {
+      sub_data <- to_plot_hi %>%
+        filter(Genotype == .y$Genotype, mineral == .y$mineral)
+      .x %>%
+        rstatix::add_y_position(
+          data = sub_data,
+          formula = hi ~ Treatment,
+          step.increase = 0.12
+        )
+    }) %>%
+    ungroup() %>%
+    filter(!is.na(y.position), is.finite(y.position))
+}
+```
+
 ## Per-mineral content plot function
 
 ```{r plot-mineral-content}
@@ -361,43 +437,177 @@ plot_mineral_content <- function(mineral_name) {
 }
 ```
 
-## Main content figure (P, Zn, Ca, S)
+## Per-mineral concentration plot function (Panel A)
 
-```{r main-content-figure, fig.width=12, fig.height=4}
-p_P  <- plot_mineral_content("P")
-p_Zn <- plot_mineral_content("Zn")
-p_Ca <- plot_mineral_content("Ca")
-p_S  <- plot_mineral_content("S")
+```{r plot-mineral-conc}
+plot_mineral_conc <- function(mineral_name, log_scale = FALSE) {
+  plot_data <- to_plot_conc %>% filter(mineral == mineral_name)
+  ttest_subset <- treatment.conc.ttest %>% filter(mineral == mineral_name)
 
-p_main_content <- ggarrange(
-  p_P,
-  p_Zn + ggpubr::rremove("ylab"),
-  p_Ca + ggpubr::rremove("ylab"),
-  p_S  + ggpubr::rremove("ylab"),
+  p <- ggplot(plot_data, aes(x = Treatment, y = ppm, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = pal) +
+    labs(title = mineral_name, x = NULL, y = "Concentration [mg / kg]")
+
+  if (log_scale) {
+    ttest_log <- ttest_subset
+    ttest_log$y.position <- log2(ttest_log$y.position)
+    p <- p +
+      scale_y_continuous(
+        trans = "log2",
+        breaks = c(5, 10, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400),
+        expand = expansion(mult = c(0.05, 0.15))
+      ) +
+      stat_pvalue_manual(
+        ttest_log, label = "p.adj.signif",
+        size = 5, bracket.size = 0.5, hide.ns = TRUE
+      )
+  } else {
+    p <- p +
+      scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+      stat_pvalue_manual(
+        ttest_subset, label = "p.adj.signif",
+        size = 5, bracket.size = 0.5, hide.ns = TRUE
+      )
+  }
+
+  p +
+    ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank(),
+      panel.spacing = unit(0.1, "lines"),
+      ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5)
+    )
+}
+```
+
+## Per-mineral HI plot function (Panel C)
+
+```{r plot-mineral-hi}
+plot_mineral_HI <- function(mineral_name) {
+  plot_data <- to_plot_hi %>% filter(mineral == mineral_name)
+  ttest_subset <- treatment.hi.ttest %>% filter(mineral == mineral_name)
+
+  p <- ggplot(plot_data, aes(x = Treatment, y = hi, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    labs(title = mineral_name, x = NULL, y = "Mineral HI [grain / total]") +
+    facet_wrap(~ Genotype) +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank()
+    )
+
+  if (nrow(ttest_subset) > 0) {
+    p <- p + stat_pvalue_manual(
+      ttest_subset, label = "p.adj.signif",
+      size = 5, bracket.size = 0.5, hide.ns = TRUE
+    )
+  }
+  p
+}
+```
+
+## Main 3-panel figure (P, Zn, Ca, S): A concentration / B content / C HI
+
+Panels A-row includes log y-axis for Ca (stover/seed concentration range) to
+match the concentration workbook.
+
+```{r main-3panel-figure, fig.width=14, fig.height=12}
+# Row A: concentrations
+rowA_main <- ggarrange(
+  plot_mineral_conc("P"),
+  plot_mineral_conc("Zn") + ggpubr::rremove("ylab"),
+  plot_mineral_conc("Ca", log_scale = TRUE) + ggpubr::rremove("ylab"),
+  plot_mineral_conc("S")  + ggpubr::rremove("ylab"),
   ncol = 4, nrow = 1, align = "h"
 )
 
-print(p_main_content)
-```
-
-## Supplementary content figure (Mg, Mn, K, Fe)
-
-```{r supp-content-figure, fig.width=12, fig.height=4}
-p_Mg <- plot_mineral_content("Mg")
-p_Mn <- plot_mineral_content("Mn")
-p_K  <- plot_mineral_content("K")
-p_Fe <- plot_mineral_content("Fe")
-
-p_supp_content <- ggarrange(
-  p_Mg,
-  p_Mn + ggpubr::rremove("ylab"),
-  p_K  + ggpubr::rremove("ylab"),
-  p_Fe + ggpubr::rremove("ylab"),
+# Row B: contents (drop titles since Row A already labels each column)
+rowB_main <- ggarrange(
+  plot_mineral_content("P")  + labs(title = NULL),
+  plot_mineral_content("Zn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_content("Ca") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_content("S")  + labs(title = NULL) + ggpubr::rremove("ylab"),
   ncol = 4, nrow = 1, align = "h"
 )
 
-print(p_supp_content)
+# Row C: mineral HI (drop titles, same reason)
+rowC_main <- ggarrange(
+  plot_mineral_HI("P")  + labs(title = NULL),
+  plot_mineral_HI("Zn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_HI("Ca") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_HI("S")  + labs(title = NULL) + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+p_main_3panel <- ggarrange(
+  rowA_main, rowB_main, rowC_main,
+  ncol = 1, nrow = 3,
+  heights = c(1, 1, 1),
+  labels = c("A", "B", "C"),
+  font.label = list(size = 30)
+)
+
+print(p_main_3panel)
 ```
+
+## Supplementary 3-panel figure (Mg, Mn, K, Fe)
+
+```{r supp-3panel-figure, fig.width=14, fig.height=12}
+rowA_supp <- ggarrange(
+  plot_mineral_conc("Mg"),
+  plot_mineral_conc("Mn", log_scale = TRUE) + ggpubr::rremove("ylab"),
+  plot_mineral_conc("K")  + ggpubr::rremove("ylab"),
+  plot_mineral_conc("Fe") + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+rowB_supp <- ggarrange(
+  plot_mineral_content("Mg") + labs(title = NULL),
+  plot_mineral_content("Mn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_content("K")  + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_content("Fe") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+rowC_supp <- ggarrange(
+  plot_mineral_HI("Mg") + labs(title = NULL),
+  plot_mineral_HI("Mn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_HI("K")  + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_HI("Fe") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+p_supp_3panel <- ggarrange(
+  rowA_supp, rowB_supp, rowC_supp,
+  ncol = 1, nrow = 3,
+  heights = c(1, 1, 1),
+  labels = c("A", "B", "C"),
+  font.label = list(size = 30)
+)
+
+print(p_supp_3panel)
+```
+
 
 ## Save results
 
@@ -420,28 +630,34 @@ write.csv(
 )
 
 # Drop list columns so add_y_position() output serializes cleanly.
-treatment_export <- treatment.t.test %>% select(where(~ !is.list(.)))
-write.csv(
-  treatment_export,
-  file.path(paths$intermediate, "ionome_content_treatment_ttests.csv"),
-  row.names = FALSE
-)
+write_ttest <- function(x, name) {
+  if (nrow(x) == 0) return(invisible(NULL))
+  write.csv(
+    x %>% select(where(~ !is.list(.))),
+    file.path(paths$intermediate, name),
+    row.names = FALSE
+  )
+}
+
+write_ttest(treatment.t.test,     "ionome_content_treatment_ttests.csv")
+write_ttest(treatment.conc.ttest, "ionome_content_conc_treatment_ttests.csv")
+write_ttest(treatment.hi.ttest,   "ionome_content_hi_treatment_ttests.csv")
 
 ggsave(
-  file.path(paths$figures, "ionome_content_main_figure.pdf"),
-  plot = p_main_content, width = 12, height = 4, units = "in"
+  file.path(paths$figures, "ionome_3panel_main_figure.pdf"),
+  plot = p_main_3panel, width = 14, height = 12, units = "in"
 )
 ggsave(
-  file.path(paths$figures, "ionome_content_main_figure.png"),
-  plot = p_main_content, width = 12, height = 4, units = "in", dpi = 300
+  file.path(paths$figures, "ionome_3panel_main_figure.png"),
+  plot = p_main_3panel, width = 14, height = 12, units = "in", dpi = 300
 )
 ggsave(
-  file.path(paths$figures, "ionome_content_supplementary_figure.pdf"),
-  plot = p_supp_content, width = 12, height = 4, units = "in"
+  file.path(paths$figures, "ionome_3panel_supplementary_figure.pdf"),
+  plot = p_supp_3panel, width = 14, height = 12, units = "in"
 )
 ggsave(
-  file.path(paths$figures, "ionome_content_supplementary_figure.png"),
-  plot = p_supp_content, width = 12, height = 4, units = "in", dpi = 300
+  file.path(paths$figures, "ionome_3panel_supplementary_figure.png"),
+  plot = p_supp_3panel, width = 14, height = 12, units = "in", dpi = 300
 )
 ```
 
