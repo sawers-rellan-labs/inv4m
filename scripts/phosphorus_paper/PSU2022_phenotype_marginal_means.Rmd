@@ -403,6 +403,11 @@ contrasts %>%
   select(trait, label, contrast_level, statistic, p, p.adj) %>%
   arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
 
+# CTRL +P mean as common reference baseline for all percent-change calculations
+ctrl_plus_p_means <- vapply(vars, function(v) {
+  mean(pheno[[v]][pheno$Genotype == "CTRL" & pheno$Treatment == "+P"], na.rm = TRUE)
+}, numeric(1)) |> (\(x) data.frame(trait = names(x), ctrl_plus_p_mean = x))()
+
 bracket_contrasts <- contrasts %>%
   transmute(
     trait,
@@ -410,11 +415,25 @@ bracket_contrasts <- contrasts %>%
     contrast_level,
     group1        = "+P",
     group2        = "-P",
+    estimate,
+    SE,
     statistic,
     p,
     p.adj,
     p.adj.signif  = rstatix::add_significance(tibble(p.adj = p.adj), "p.adj")$p.adj.signif
-  )
+  ) %>%
+  left_join(ctrl_plus_p_means, by = "trait") %>%
+  mutate(
+    estimate_pct = estimate / ctrl_plus_p_mean * 100,
+    SE_pct       = SE       / ctrl_plus_p_mean * 100
+  ) %>%
+  select(-ctrl_plus_p_mean)
+
+cat("±P contrasts with % change over CTRL +P mean:\n")
+bracket_contrasts %>%
+  filter(contrast_level == "per_Genotype") %>%
+  select(trait, Genotype, estimate_pct, SE_pct, p.adj, p.adj.signif) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
 
 write.csv(bracket_contrasts,
   file.path(paths$intermediate, "PSU2022_fig1_bracket_contrasts.csv"),
@@ -1050,173 +1069,93 @@ if (exists("combined_plot") && exists("p_stw")) {
 }
 ```
 
-# supplementary figure
-```{r supp_inv4m_by_treatment_color_fixed, fig.width=14, fig.height=10}
-# Define a compatible theme (no element_markdown for strip.text)
-pheno_theme_supp <- theme_classic2(base_size = 20) +
-  theme(
-    plot.title = element_markdown(hjust = 0.5, face = "bold"),
-    axis.title.y = element_markdown(),
-    axis.title.x = element_blank(),
-    axis.text.x = element_text(size = 25, face = "bold", color = "black"),
-    strip.background = element_blank(),
-    strip.text = element_text(size = 25, face = "bold"),  # ✅ same class, bold
-    legend.position = "none"
+## Supplementary Figure S2: Stover Dry Weight Growth Curves and Derived Parameters
+
+```{r supp_biomass, fig.width=12, fig.height=12}
+if (exists("p_gc") && exists("p_stw_lag")) {
+  growth_supp_figure <- ggarrange(
+    p_gc,
+    p_stw_lag,
+    nrow = 2, ncol = 1,
+    labels = LETTERS[1:2],
+    font.label = list(size = 35),
+    heights = c(0.75, 1)
   )
 
+  print(growth_supp_figure)
 
-# ------------------------------------------------------------
-# STEP 1: Identify ALL numeric phenotypes (as in your pipeline)
-# ------------------------------------------------------------
-meta_cols <- c("plotId", "Genotype", "Genotype_label", "Treatment")
-all_pheno_cols <- setdiff(colnames(pheno), meta_cols)
-numeric_pheno_cols <- all_pheno_cols[sapply(pheno[all_pheno_cols], is.numeric)]
+  ggsave(
+    filename = file.path(paths$figures, "biomass.png"),
+    plot = growth_supp_figure,
+    height = 16, width = 12,
+    units = "in", dpi = 150
+  )
+} else {
+  cat("Skipping Figure S2 — run PSU2022_growthcurves.Rmd first.\n")
+}
+```
 
-cat("Performing tests on", length(numeric_pheno_cols), "phenotypes.\n")
+## Inv4m differences in Anthesis and Plant Height
+```{r supp_inv4m_by_treatment_color_fixed, fig.width=14, fig.height=7}
+pal_geno <- c("CTRL" = "gold", "Inv4m" = "purple4")
 
-# ------------------------------------------------------------
-# STEP 2: Long-format data for ALL traits
-# ------------------------------------------------------------
-long_all <- pheno %>%
-  select(Genotype, Treatment, all_of(numeric_pheno_cols)) %>%
-  pivot_longer(cols = all_of(numeric_pheno_cols), names_to = "trait", values_to = "value") %>%
-  filter(!is.na(value))
+# Inv4m - CTRL contrasts at each Treatment level for DTA and PH
+geno_contrasts <- lapply(c("DTA", "PH"), function(v) {
+  m <- lm(as.formula(paste(v, "~ Genotype * Treatment")), data = pheno)
+  pairs(emmeans(m, ~ Genotype | Treatment), reverse = TRUE) %>%
+    as_tibble() %>%
+    mutate(trait = v)
+}) %>%
+  bind_rows() %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(group1 = "CTRL", group2 = "<i>Inv4m</i>") %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance("p.adj")
 
-# ------------------------------------------------------------
-# STEP 3: Run t-tests for EVERY trait within each Treatment
-#         (CTRL vs Inv4m, ref = CTRL)
-# ------------------------------------------------------------
-all_tests_raw <- long_all %>%
-  group_by(Treatment, trait) %>%
-  # Skip groups with insufficient data or zero variance
-  filter(n() >= 4, var(value) > 0) %>%
-  do({
-    # Ensure both genotypes present
-    if (!all(c("CTRL", "Inv4m") %in% .$Genotype)) {
-      return(tibble::tibble())
-    }
-    tryCatch({
-      .x <- .
-      .x %>%
-        t_test(value ~ Genotype, ref.group = "CTRL")
-    }, error = function(e) {
-      tibble::tibble()
-    })
-  }) %>%
-  ungroup()
+cat("=== Inv4m - CTRL contrasts at each Treatment level ===\n")
+print(as_tibble(geno_contrasts) %>%
+  select(trait, Treatment, estimate, SE, statistic, p, p.adj, p.adj.signif))
 
-if (nrow(all_tests_raw) == 0) stop("No valid tests performed.")
+supp_geno_panel <- function(trait_name, ylab_text, y_limits, y_breaks) {
+  d <- pheno %>% select(Genotype, Genotype_label, Treatment,
+                         value = all_of(trait_name)) %>%
+    filter(!is.na(value))
 
-# ------------------------------------------------------------
-# STEP 4: SINGLE FDR CORRECTION ACROSS ALL TESTS
-#         (matches your original pipeline)
-# ------------------------------------------------------------
-all_tests_fdr <- all_tests_raw %>%
-  adjust_pvalue(method = "fdr") %>%
-  add_significance() 
+  s <- geno_contrasts %>%
+    filter(trait == trait_name) %>%
+    group_by(Treatment) %>%
+    mutate(y.position = max(d$value[d$Treatment == Treatment], na.rm = TRUE) +
+                        0.08 * diff(range(d$value[d$Treatment == Treatment], na.rm = TRUE))) %>%
+    ungroup()
 
-# ------------------------------------------------------------
-# STEP 5: Compute y.position PER PANEL using LOCAL data range
-#         (exactly like your plot_treatment_effect function)
-# ------------------------------------------------------------
-y_stats_per_panel <- long_all %>%
-  group_by(Treatment, trait) %>%
-  summarise(
-    y_max = max(value, na.rm = TRUE),
-    y_min = min(value, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(y_range = y_max - y_min)
-
-all_tests_fdr <- all_tests_fdr %>%
-  left_join(y_stats_per_panel, by = c("Treatment", "trait")) %>%
-  mutate(y.position = y_max + 0.08 * y_range)
-
-# ------------------------------------------------------------
-# STEP 6: Subset to traits you want to PLOT
-# ------------------------------------------------------------
-traits_to_plot <- c("DTA", "DTS", "PH", "STWHV")
-plot_data <- long_all %>% filter(trait %in% traits_to_plot)
-plot_stats <- all_tests_fdr %>% filter(trait %in% traits_to_plot)
-
-# ------------------------------------------------------------
-# STEP 7: Trait metadata (with your original y-limits)
-# ------------------------------------------------------------
-trait_meta <- tibble::tribble(
-  ~trait, ~title, ~ylab,      ~y_limits,        ~y_breaks,
-  "DTA", "Anthesis", "Days", c(69, 80),         69:80,
-  "DTS", "Silking", "Days",  c(69, 80),         69:80,
-  "PH", "Plant Height", "cm", c(140, 180),       seq(150, 190, by = 5),
-  "STWHV", "Stover Dry Weight <br> at Harvest", "g", c(50, 175), NULL
-)
-
-# ------------------------------------------------------------
-# STEP 8: Plot function — YOUR EXACT STYLE
-# ------------------------------------------------------------
-make_panel <- function(trait_name) {
-  meta <- trait_meta %>% filter(trait == !!trait_name)
-  d <- plot_data %>% filter(trait == !!trait_name)
-  s <- plot_stats %>% filter(trait == !!trait_name)
-  
-  p <- ggplot(d, aes(x = Genotype, y = value, colour = Genotype)) +
-    ggtitle(meta$title) +
-    ylab(meta$ylab) +
-    # Your geoms
-    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>% 
+  ggplot(d, aes(x = Genotype_label, y = value, colour = Genotype)) +
+    ggtitle(trait_name) +
+    ylab(ylab_text) +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
       with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-    geom_quasirandom(size = 2) %>% 
+    geom_quasirandom(size = 2) %>%
       with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-    # Your color palette (mapped to Genotype)
-    scale_colour_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
-    # Facet by P treatment (as requested)
+    scale_colour_manual(values = pal_geno) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "<i>Inv4m</i>" = "<i>Inv4m</i>")) +
     facet_wrap(~ Treatment) +
-    # Italicize Inv4m on x-axis
-    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "<i>Inv4m</i>")) +
-    # Your theme
-     pheno_theme_supp +
-    # Enforce bold, size-25 strip text and x-axis
+    stat_pvalue_manual(s, label = "p.adj.signif",
+                       size = 10, bracket.size = 0.8, hide.ns = FALSE) +
+    scale_y_continuous(breaks = y_breaks, limits = y_limits,
+                       expand = expansion(mult = 0)) +
+    pheno_theme2 +
     theme(
-      axis.text.x = element_markdown(size = 25, face = "bold", color = "black"),
-      strip.text = element_text(size = 25, face = "bold")
+      axis.text.x  = element_markdown(size = 25, face = "bold", color = "black"),
+      strip.text   = element_markdown(size = 25, face = "bold")
     )
-  
-  # Add significance (using globally FDR-corrected p-values)
-  if (nrow(s) > 0) {
-    p <- p + stat_pvalue_manual(
-      s,
-      label = "p.adj.signif",
-      y.position = s$y.position,
-      size = 10,
-      bracket.size = 0.8,
-      hide.ns = FALSE
-    )
-  }
-  
-if (!is.null(meta$y_limits[[1]])) {
-  p <- p + scale_y_continuous(
-    breaks = meta$y_breaks[[1]],
-    limits = meta$y_limits[[1]]
-  )
-}
-  
-  # ✅✅✅ ADD THIS LINE TO GET 1-DAY TICKS ✅✅✅
-  if (!is.null(meta$y_breaks[[1]])) {
-    p <- p + scale_y_continuous(breaks = meta$y_breaks[[1]])
-  }
-  
-  return(p)
 }
 
-# ------------------------------------------------------------
-# STEP 9: Build and arrange
-# ------------------------------------------------------------
-panels <- map(traits_to_plot, make_panel)
+p_dta <- supp_geno_panel("DTA", "Days", c(69, 80), 69:80)
+p_ph  <- supp_geno_panel("PH",  "cm",   c(150, 185), seq(150, 185, by = 5))
 
-# Note: you're only plotting DTA and PH here (panels[c(1,3)])
 supp_global_fdr_plot <- ggarrange(
-  plotlist = panels[c(1,3)],  # DTA = 1, PH = 3
+  p_dta, p_ph,
   nrow = 1,
-  labels = LETTERS[1:2],      # Only 2 panels → A, B
+  labels = c("A", "B"),
   font.label = list(size = 30)
 )
 
@@ -1226,7 +1165,7 @@ ggsave(file.path(paths$figures, "supp_global_fdr.png"), supp_global_fdr_plot,
 print(supp_global_fdr_plot)
 ```
 
-## Supplementary figure: marginal Treatment effects for PH, KW50, TKN, TKW
+## Marginal effects of phosphorus deficiency on plant height and kernel traits
 
 Boxplots pool CTRL and Inv4m; bracket labels come from the marginal emmeans contrast
 FDR (48-contrast D pool). PH has a robust marginal Treatment effect and non-significant
@@ -1269,6 +1208,8 @@ supp_panel <- function(trait_name, ylab_text, y_limits = NULL) {
     )
 
   if (!is.null(y_limits)) p <- p + coord_cartesian(ylim = y_limits)
+
+  p <- p + scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))
 
   if (nrow(s) > 0)
     p <- p + stat_pvalue_manual(s, label = "p.adj.signif",
