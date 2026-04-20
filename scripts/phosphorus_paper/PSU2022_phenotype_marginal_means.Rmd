@@ -372,6 +372,57 @@ cat(paste(treatment_traits, collapse = ", "), "\n")
 cat("Total:", length(treatment_traits), "traits\n")
 ```
 
+### Stage 3: Pairwise ±P contrasts for figure brackets
+
+For each trait, per-Genotype and marginal ±P contrasts are estimated from
+`lm(y ~ Genotype * Treatment)` via emmeans. All 48 contrasts (16 traits ×
+3: CTRL, Inv4m, marginal) are FDR-adjusted in a single pool and saved to
+`PSU2022_fig1_bracket_contrasts.csv` for use by the plotting scripts.
+
+```{r pairwise-contrasts}
+contrasts <- bind_rows(
+  lapply(vars, function(v) {
+    if (sum(!is.na(pheno[[v]])) < 20) return(NULL)
+    m <- tryCatch(lm(as.formula(paste(v, "~ Genotype * Treatment")), data = pheno),
+                  error = function(e) NULL)
+    if (is.null(m)) return(NULL)
+    bind_rows(
+      pairs(emmeans(m, ~ Treatment | Genotype), reverse = TRUE) %>%
+        as_tibble() %>% mutate(trait = v, contrast_level = "per_Genotype"),
+      pairs(emmeans(m, ~ Treatment),            reverse = TRUE) %>%
+        as_tibble() %>% mutate(trait = v, contrast_level = "marginal")
+    )
+  })
+) %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  rstatix::adjust_pvalue(method = "fdr")
+
+cat("±P contrasts — per-Genotype and marginal, FDR across 48:\n")
+contrasts %>%
+  mutate(label = ifelse(is.na(Genotype), "marginal", as.character(Genotype))) %>%
+  select(trait, label, contrast_level, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+
+bracket_contrasts <- contrasts %>%
+  transmute(
+    trait,
+    Genotype      = ifelse(is.na(Genotype), NA_character_, as.character(Genotype)),
+    contrast_level,
+    group1        = "+P",
+    group2        = "-P",
+    statistic,
+    p,
+    p.adj,
+    p.adj.signif  = rstatix::add_significance(tibble(p.adj = p.adj), "p.adj")$p.adj.signif
+  )
+
+write.csv(bracket_contrasts,
+  file.path(paths$intermediate, "PSU2022_fig1_bracket_contrasts.csv"),
+  row.names = FALSE)
+
+cat("Saved", nrow(bracket_contrasts), "contrasts to PSU2022_fig1_bracket_contrasts.csv\n")
+```
+
 ---
 
 ## 3. Pairwise Comparisons for Visualization
@@ -386,8 +437,7 @@ to_t_test <- pheno %>%
   ) %>%
   filter(trait %in% treatment_traits)
 
-brackets_d <- read.csv(file.path(paths$intermediate,
-                                  "PSU2022_fig1_bracket_contrasts.csv"))
+brackets_d <- bracket_contrasts
 
 if (length(treatment_traits) > 0) {
   y_pos <- to_t_test %>%
@@ -788,47 +838,27 @@ print(stover_effects %>%
 ### Fit regressions
 
 ```{r fit_regressions}
-
-lm(estimate_pct ~ predictor*DAP_numeric , data = stover_effects %>%
-       filter(predictor %in% c("Genotype","Treatment")) 
-) %>% summary()
-
-minus_p_data <- stover_effects %>%
-  filter(predictor == "Treatment") 
-
-lm_minus_p <- lm(estimate_pct ~ DAP_numeric, data = minus_p_data)
-r_squared_minus_p <- summary(lm_minus_p)$r.squared
-p_value_minus_p <- summary(lm_minus_p)$coefficients[2, 4]
-
-inv4m_data <- stover_effects %>%
+minus_p_data <- stover_effects %>% filter(predictor == "Treatment")
+inv4m_data   <- stover_effects %>%
   filter(predictor == "Genotype") %>%
   mutate(DAP_numeric = as.numeric(as.character(DAP)))
 
-lm_inv4m <- lm(estimate_pct ~ DAP_numeric, data = inv4m_data)
-r_squared_inv4m <- summary(lm_inv4m)$r.squared
-p_value_inv4m <- summary(lm_inv4m)$coefficients[2, 4]
+lm_minus_p <- lm(estimate_pct ~ DAP_numeric, data = minus_p_data)
+lm_inv4m   <- lm(estimate_pct ~ DAP_numeric, data = inv4m_data)
+
+r_squared_minus_p <- summary(lm_minus_p)$r.squared
+p_value_minus_p   <- summary(lm_minus_p)$coefficients[2, 4]
+r_squared_inv4m   <- summary(lm_inv4m)$r.squared
+p_value_inv4m     <- summary(lm_inv4m)$coefficients[2, 4]
 
 regression_label_minus_p <- sprintf(
   "italic(R)^2 == %.3f~~italic(p) == %.3f",
-  r_squared_minus_p,
-  p_value_minus_p
+  r_squared_minus_p, p_value_minus_p
 )
-
 regression_label_inv4m <- sprintf(
   "italic(R)^2 == %.3f~~italic(p) == %.3f",
-  r_squared_inv4m,
-  p_value_inv4m
+  r_squared_inv4m, p_value_inv4m
 )
-
-cat("\n=== Regression Statistics ===\n")
-cat("Treatment effect:\n")
-cat("  R² =", round(r_squared_minus_p, 4), "\n")
-cat("  p-value =", format.pval(p_value_minus_p, digits = 3), "\n")
-cat("  Slope =", round(coef(lm_minus_p)[2], 4), "% per day\n\n")
-cat("Genotype effect:\n")
-cat("  R² =", round(r_squared_inv4m, 4), "\n")
-cat("  p-value =", format.pval(p_value_inv4m, digits = 3), "\n")
-cat("  Slope =", round(coef(lm_inv4m)[2], 4), "% per day\n")
 ```
 
 ### Plot biomass trajectory
@@ -1194,6 +1224,71 @@ ggsave(file.path(paths$figures, "supp_global_fdr.png"), supp_global_fdr_plot,
        width = 12, height = 6, units = "in", dpi = 150)
 
 print(supp_global_fdr_plot)
+```
+
+## Supplementary figure: marginal Treatment effects for PH, KW50, TKN, TKW
+
+Boxplots pool CTRL and Inv4m; bracket labels come from the marginal emmeans contrast
+FDR (48-contrast D pool). PH has a robust marginal Treatment effect and non-significant
+Genotype × Treatment interaction. KW50, TKN, and TKW are shown together to address
+Sawers' Figure 1 comment: under $-P$ the plant trades kernel size for kernel number
+(KW50 drops significantly, TKN rises significantly in the pooled marginal contrast),
+leaving total kernel weight (TKW) statistically unchanged.
+
+```{r supp-marginal-figure, fig.width=18, fig.height=6}
+pal_trt     <- c("+P" = "gold", "-P" = "purple4")
+supp_traits <- c("PH", "KW50", "TKN", "TKW")
+
+marg_stats <- bracket_contrasts %>%
+  filter(contrast_level == "marginal", trait %in% supp_traits)
+
+supp_panel <- function(trait_name, ylab_text, y_limits = NULL) {
+  d <- pheno %>%
+    select(Treatment, value = all_of(trait_name)) %>%
+    filter(!is.na(value))
+
+  s <- marg_stats %>%
+    filter(trait == trait_name) %>%
+    mutate(y.position = max(d$value, na.rm = TRUE) +
+                        0.08 * diff(range(d$value, na.rm = TRUE)))
+
+  p <- ggplot(d, aes(x = Treatment, y = value, colour = Treatment)) +
+    ggtitle(trait_name) +
+    ylab(ylab_text) +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_colour_manual(values = pal_trt) +
+    theme_classic2(base_size = 20) +
+    theme(
+      plot.title      = element_markdown(hjust = 0.5, face = "bold"),
+      axis.title.x    = element_blank(),
+      axis.text.x     = element_text(size = 25, face = "bold", color = "black"),
+      legend.position = "none"
+    )
+
+  if (!is.null(y_limits)) p <- p + coord_cartesian(ylim = y_limits)
+
+  if (nrow(s) > 0)
+    p <- p + stat_pvalue_manual(s, label = "p.adj.signif",
+                                size = 10, bracket.size = 0.8, hide.ns = FALSE)
+  p
+}
+
+p_PH   <- supp_panel("PH",   "Plant Height (cm)")
+p_KW50 <- supp_panel("KW50", "50-kernel weight (g)")
+p_TKN  <- supp_panel("TKN",  "Total Kernel Number")
+p_TKW  <- supp_panel("TKW",  "Total Kernel Weight (g)")
+
+supp_marginal <- ggarrange(
+  p_PH, p_KW50, p_TKN, p_TKW,
+  nrow = 1, ncol = 4, align = "h",
+  labels = c("A", "B", "C", "D"),
+  font.label = list(size = 30)
+)
+
+print(supp_marginal)
 ```
 
 ## Session Info
