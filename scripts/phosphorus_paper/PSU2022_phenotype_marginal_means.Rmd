@@ -386,27 +386,35 @@ to_t_test <- pheno %>%
   ) %>%
   filter(trait %in% treatment_traits)
 
+brackets_d <- read.csv(file.path(paths$intermediate,
+                                  "PSU2022_fig1_bracket_contrasts.csv"))
+
 if (length(treatment_traits) > 0) {
-  treatment_pairwise <- to_t_test %>%
-    group_by(Genotype, trait) %>%
-    t_test(value ~ Treatment, ref.group = "+P") %>%
-    adjust_pvalue(method = "fdr") %>%
-    add_significance() %>%
-    add_x_position(x = "Treatment") %>%
-    add_y_position(scales = "free") %>%
+  y_pos <- to_t_test %>%
+    group_by(trait, Genotype) %>%
+    summarise(y_max   = max(value, na.rm = TRUE),
+              y_range = diff(range(value, na.rm = TRUE)),
+              .groups = "drop") %>%
+    mutate(y.position = y_max + 0.08 * y_range)
+
+  treatment_pairwise <- brackets_d %>%
+    filter(contrast_level == "per_Genotype",
+           trait %in% treatment_traits) %>%
     mutate(
       Genotype_label = factor(
         case_when(
-          Genotype == "CTRL" ~ "CTRL",
+          Genotype == "CTRL"  ~ "CTRL",
           Genotype == "Inv4m" ~ "<i>Inv4m</i>",
           TRUE ~ as.character(Genotype)
         ),
         levels = c("CTRL", "<i>Inv4m</i>")
       )
-    )
-  
-  cat("\n=== Pairwise t-test summary ===\n")
-  print(treatment_pairwise %>% select(trait, Genotype, statistic, p.adj,p.adj.signif), n=20)
+    ) %>%
+    left_join(y_pos, by = c("trait", "Genotype")) %>%
+    add_x_position(x = "Treatment")
+
+  cat("\n=== Approach D contrast summary ===\n")
+  print(as_tibble(treatment_pairwise) %>% select(trait, Genotype, statistic, p.adj, p.adj.signif), n = 20)
 } else {
   treatment_pairwise <- NULL
   cat("No traits with treatment effects for visualization\n")
@@ -429,24 +437,6 @@ plot_treatment_effect <- function(trait_name,
   if (!is.null(treatment_pairwise)) {
     t_test_data <- treatment_pairwise %>%
       filter(trait == trait_name)
-    
-    if (!is.null(t_test_data) && nrow(t_test_data) > 0) {
-      if (!is.null(y_limits)) {
-        y_range <- diff(y_limits)
-        y_max <- y_limits[2]
-        t_test_data <- t_test_data %>%
-          mutate(y.position = y_max - (bracket_nudge * y_range))
-      } else {
-        data_range <- pheno %>%
-          filter(!is.na(.data[[trait_name]])) %>%
-          pull(.data[[trait_name]]) %>%
-          range()
-        y_range <- diff(data_range)
-        y_max <- max(data_range)
-        t_test_data <- t_test_data %>%
-          mutate(y.position = y_max + (bracket_nudge * y_range))
-      }
-    }
   }
   
   p <- pheno %>%
@@ -658,35 +648,45 @@ dw_raw <- pheno %>%
 ### Time-point specific t-tests
 
 ```{r timeseries_ttests}
-treatment_timeseries_test <- dw_raw %>%
-  ungroup() %>%
+y_pos_ts <- dw_raw %>%
   filter(DAP > 1) %>%
-  mutate(DAP = as.factor(DAP)) %>%
   group_by(Genotype, DAP) %>%
-  t_test(STW ~ Treatment, ref.group = "+P") %>%
-  adjust_pvalue(method = "fdr") %>%
-  add_significance() %>%
-  add_y_position(scales = "free_y") %>%
-  add_x_position(x = "DAP", group = NULL, dodge = 1) %>%
+  summarise(y_max   = max(STW, na.rm = TRUE),
+            y_range = diff(range(STW, na.rm = TRUE)),
+            .groups = "drop") %>%
+  mutate(y.position = y_max + 0.08 * y_range,
+         DAP        = factor(DAP))
+
+treatment_timeseries_test <- brackets_d %>%
+  filter(contrast_level == "per_Genotype",
+         trait %in% c("STW40", "STW50", "STW60", "STWHV")) %>%
   mutate(
+    DAP = factor(case_when(
+      trait == "STW40" ~ 40,
+      trait == "STW50" ~ 50,
+      trait == "STW60" ~ 60,
+      trait == "STWHV" ~ 121
+    )),
     Genotype_label = factor(
       case_when(
-        Genotype == "CTRL" ~ "CTRL",
+        Genotype == "CTRL"  ~ "CTRL",
         Genotype == "Inv4m" ~ "<i>Inv4m</i>",
         TRUE ~ as.character(Genotype)
       ),
       levels = c("CTRL", "<i>Inv4m</i>")
     )
+  ) %>%
+  left_join(y_pos_ts, by = c("Genotype", "DAP")) %>%
+  mutate(
+    x      = as.numeric(DAP),
+    xmin   = as.numeric(DAP) - 0.25,
+    xmax   = as.numeric(DAP) + 0.25,
+    group1 = as.character(DAP),
+    group2 = as.character(DAP)
   )
 
-data_range <- range(dw_raw$STW[dw_raw$DAP > 1], na.rm = TRUE)
-y_range <- diff(data_range)
-
-treatment_timeseries_test <- treatment_timeseries_test %>%
-  mutate(y.position = y.position + (0.08 * y_range))
-
-cat("\n=== Time-series t-test summary ===\n")
-print(treatment_timeseries_test %>% 
+cat("\n=== Time-series contrast summary (Approach D) ===\n")
+print(as_tibble(treatment_timeseries_test) %>%
       select(Genotype, DAP, statistic, p, p.adj, p.adj.signif))
 ```
 
@@ -1194,44 +1194,6 @@ ggsave(file.path(paths$figures, "supp_global_fdr.png"), supp_global_fdr_plot,
        width = 12, height = 6, units = "in", dpi = 150)
 
 print(supp_global_fdr_plot)
-```
-
-# Combine supplement
-```{r, combined_stw_supp, fig.width=15, fig.height=15}
-
-if (exists("p_gc") && exists("p_stw_lag") && exists("supp_global_fdr_plot")) {
-  growth_supp_figure <- ggarrange(
-    p_gc,
-    p_stw_lag,
-    nrow = 2,
-    ncol = 1,
-    labels = LETTERS[3:4],
-    font.label = list(size = 35),
-    heights= c(0.75,1)
-  )
-
-  full_supp_figure <- ggarrange(
-    supp_global_fdr_plot,
-    growth_supp_figure,
-    ncol = 1,
-    nrow = 2,
-    heights= c(0.5,1),
-    font.label = list(size = 35)
-  )
-
-  print(full_supp_figure)
-
-  ggsave(
-    filename = file.path(paths$figures, "biomass.png"),
-    plot = full_supp_figure,
-    height = 16,
-    width = 12,
-    units = "in",
-    dpi = 150
-  )
-} else {
-  cat("Skipping supplementary figure - required plots not available. Run PSU2022_growthcurves.Rmd first.\n")
-}
 ```
 
 ## Session Info

@@ -707,29 +707,37 @@ to_t_test <- pheno %>%
   ) %>%
   filter(trait %in% other_traits_viz)
 
+brackets_d <- read.csv(file.path(paths$intermediate,
+                                  "PSU2022_fig1_bracket_contrasts.csv"))
+
 if (length(other_traits_viz) > 0) {
-  treatment_pairwise <- to_t_test %>%
-    group_by(Genotype, trait) %>%
-    t_test(value ~ Treatment, ref.group = "+P") %>%
-    adjust_pvalue(method = "fdr") %>%
-    add_significance() %>%
-    add_x_position(x = "Treatment") %>%
-    add_y_position(scales = "free") %>%
+  y_pos <- to_t_test %>%
+    group_by(trait, Genotype) %>%
+    summarise(y_max   = max(value, na.rm = TRUE),
+              y_range = diff(range(value, na.rm = TRUE)),
+              .groups = "drop") %>%
+    mutate(y.position = y_max + 0.08 * y_range)
+
+  treatment_pairwise <- brackets_d %>%
+    filter(contrast_level == "per_Genotype",
+           trait %in% other_traits_viz) %>%
     mutate(
       Genotype_label = factor(
         case_when(
-          Genotype == "CTRL" ~ "CTRL",
+          Genotype == "CTRL"  ~ "CTRL",
           Genotype == "Inv4m" ~ "<i>Inv4m</i>",
           TRUE ~ as.character(Genotype)
         ),
         levels = c("CTRL", "<i>Inv4m</i>")
       )
-    )
-  
-  cat("\n=== Pairwise t-test summary (non-growth traits) ===\n")
+    ) %>%
+    left_join(y_pos, by = c("trait", "Genotype")) %>%
+    add_x_position(x = "Treatment")
+
+  cat("\n=== Approach D contrast summary (non-growth traits) ===\n")
   print(
-    treatment_pairwise %>% 
-      select(trait, Genotype, statistic, p.adj, p.adj.signif), 
+    as_tibble(treatment_pairwise) %>%
+      select(trait, Genotype, statistic, p.adj, p.adj.signif),
     n = 20
   )
 } else {
@@ -741,36 +749,46 @@ if (length(other_traits_viz) > 0) {
 ### Time-series t-tests for stover weight
 
 ```{r timeseries_ttests}
-treatment_timeseries_test <- dw_raw %>%
-  ungroup() %>%
+y_pos_ts <- dw_raw %>%
   filter(DAP > 1) %>%
-  mutate(DAP = as.factor(DAP)) %>%
   group_by(Genotype, DAP) %>%
-  t_test(STW ~ Treatment, ref.group = "+P") %>%
-  adjust_pvalue(method = "fdr") %>%
-  add_significance() %>%
-  add_y_position(scales = "free_y") %>%
-  add_x_position(x = "DAP", group = NULL, dodge = 1) %>%
+  summarise(y_max   = max(STW, na.rm = TRUE),
+            y_range = diff(range(STW, na.rm = TRUE)),
+            .groups = "drop") %>%
+  mutate(y.position = y_max + 0.08 * y_range,
+         DAP        = factor(DAP))
+
+treatment_timeseries_test <- brackets_d %>%
+  filter(contrast_level == "per_Genotype",
+         trait %in% c("STW40", "STW50", "STW60", "STWHV")) %>%
   mutate(
+    DAP = factor(case_when(
+      trait == "STW40" ~ 40,
+      trait == "STW50" ~ 50,
+      trait == "STW60" ~ 60,
+      trait == "STWHV" ~ 121
+    )),
     Genotype_label = factor(
       case_when(
-        Genotype == "CTRL" ~ "CTRL",
+        Genotype == "CTRL"  ~ "CTRL",
         Genotype == "Inv4m" ~ "<i>Inv4m</i>",
         TRUE ~ as.character(Genotype)
       ),
       levels = c("CTRL", "<i>Inv4m</i>")
     )
+  ) %>%
+  left_join(y_pos_ts, by = c("Genotype", "DAP")) %>%
+  mutate(
+    x      = as.numeric(DAP),
+    xmin   = as.numeric(DAP) - 0.25,
+    xmax   = as.numeric(DAP) + 0.25,
+    group1 = as.character(DAP),
+    group2 = as.character(DAP)
   )
 
-data_range <- range(dw_raw$STW[dw_raw$DAP > 1], na.rm = TRUE)
-y_range <- diff(data_range)
-
-treatment_timeseries_test <- treatment_timeseries_test %>%
-  mutate(y.position = y.position + (0.08 * y_range))
-
-cat("\n=== Time-series t-test summary ===\n")
+cat("\n=== Time-series contrast summary (Approach D) ===\n")
 print(
-  treatment_timeseries_test %>% 
+  as_tibble(treatment_timeseries_test) %>%
     select(Genotype, DAP, statistic, p, p.adj, p.adj.signif)
 )
 ```

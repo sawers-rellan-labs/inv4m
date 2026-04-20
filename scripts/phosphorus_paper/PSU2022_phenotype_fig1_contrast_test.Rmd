@@ -1,0 +1,338 @@
+---
+title: "Figure 1 contrast convention test (Welch t-test vs lm-emmeans, conditional vs marginal)"
+author: "Fausto Rodriguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "phosphorus_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+source(here::here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("phosphorus_paper")
+```
+
+## Goal
+
+Compare four conventions for the brackets in Figure 1 (Phosphorus
+Starvation Response). Each convention is applied **without lm pre-selection**
+and **without grouping FDR pools** beyond the natural contrast family.
+
+| Approach | Test | Contrast level | FDR pool |
+|---|---|---|---|
+| **A** | Welch t-test (current Fig 1) | per-Genotype | across all (Genotype × trait) |
+| **B** | emmeans on `lm(y ~ Genotype * Treatment)` | per-Genotype | across all (Genotype × trait) |
+| **C** | emmeans on same lm | marginal (pooled over Genotype) | across all traits |
+| **D** | emmeans on same lm | per-Genotype **AND** marginal | combined pool |
+
+Reported: raw p, FDR-adjusted p, and survival at FDR < 0.05 for each
+trait × contrast.
+
+## Load libraries and data
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(rstatix)
+library(emmeans)
+library(here)
+```
+
+```{r load-data}
+pheno <- read.csv(file.path(paths$intermediate,
+  "PSU2022_spatially_corrected_both_treatments_with_ionome.csv")) %>%
+  rename(Genotype = genotype) %>%
+  filter(Genotype %in% c("CTRL", "Inv4m")) %>%
+  mutate(Treatment = factor(Treatment, levels = c("+P", "-P")),
+         Genotype  = factor(Genotype, levels = c("CTRL", "Inv4m"))) %>%
+  droplevels()
+
+base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
+ear_phenotypes  <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
+vars <- intersect(c(base_phenotypes, ear_phenotypes), colnames(pheno))
+cat("Phenotypes tested:", length(vars), "\n", paste(vars, collapse = ", "), "\n")
+```
+
+## Approach A — Welch per-Genotype + FDR
+
+```{r approach-a}
+to_long <- pheno %>%
+  select(Genotype, Treatment, all_of(vars)) %>%
+  pivot_longer(all_of(vars), names_to = "trait", values_to = "value") %>%
+  filter(!is.na(value))
+
+A <- to_long %>%
+  group_by(Genotype, trait) %>%
+  filter(n() >= 4, var(value) > 0) %>%
+  rstatix::t_test(value ~ Treatment, ref.group = "+P") %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  mutate(approach = "A_Welch_perGeno", contrast_level = "per_Genotype")
+
+cat("Approach A — Welch per-Genotype, FDR across all (Genotype x trait):\n")
+A %>% select(trait, Genotype, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+```
+
+## Approach B — per-Genotype emmeans on lm
+
+```{r approach-b}
+B_raw <- lapply(vars, function(v) {
+  if (sum(!is.na(pheno[[v]])) < 20) return(NULL)
+  m <- tryCatch(lm(as.formula(paste(v, "~ Genotype * Treatment")),
+                   data = pheno),
+                error = function(e) NULL)
+  if (is.null(m)) return(NULL)
+  pairs(emmeans(m, ~ Treatment | Genotype), reverse = TRUE) %>%
+    as_tibble() %>%
+    mutate(trait = v)
+}) %>% bind_rows()
+
+B <- B_raw %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(approach = "B_emmeans_perGeno", contrast_level = "per_Genotype") %>%
+  rstatix::adjust_pvalue(method = "fdr")
+
+cat("Approach B — emmeans per-Genotype, FDR across all (Genotype x trait):\n")
+B %>% select(trait, Genotype, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+```
+
+## Approach C — marginal emmeans on lm
+
+```{r approach-c}
+C_raw <- lapply(vars, function(v) {
+  if (sum(!is.na(pheno[[v]])) < 20) return(NULL)
+  m <- tryCatch(lm(as.formula(paste(v, "~ Genotype * Treatment")),
+                   data = pheno),
+                error = function(e) NULL)
+  if (is.null(m)) return(NULL)
+  pairs(emmeans(m, ~ Treatment), reverse = TRUE) %>%
+    as_tibble() %>%
+    mutate(trait = v)
+}) %>% bind_rows()
+
+C <- C_raw %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(approach = "C_emmeans_marginal", contrast_level = "marginal") %>%
+  rstatix::adjust_pvalue(method = "fdr")
+
+cat("Approach C — emmeans marginal, FDR across traits:\n")
+C %>% select(trait, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+```
+
+## Approach D — per-Genotype + marginal combined
+
+```{r approach-d}
+D_pre <- bind_rows(
+  B %>% select(trait, Genotype, statistic, p, contrast_level),
+  C %>% select(trait, statistic, p, contrast_level)
+)
+
+D <- D_pre %>%
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  mutate(approach = "D_combined")
+
+cat("Approach D — per-Genotype + marginal combined, FDR across all:\n")
+D %>%
+  mutate(label = ifelse(is.na(Genotype), "marginal", as.character(Genotype))) %>%
+  select(trait, label, contrast_level, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+```
+
+## Side-by-side comparison
+
+```{r side-by-side}
+A_pivot <- A %>%
+  select(trait, Genotype, p_A_Welch_perGeno = p, padj_A_Welch_perGeno = p.adj) %>%
+  mutate(Genotype = as.character(Genotype))
+
+B_pivot <- B %>%
+  select(trait, Genotype, p_B_emm_perGeno = p, padj_B_emm_perGeno = p.adj) %>%
+  mutate(Genotype = as.character(Genotype))
+
+C_pivot <- C %>%
+  select(trait, p_C_emm_marginal = p, padj_C_emm_marginal = p.adj) %>%
+  mutate(Genotype = "marginal")
+
+D_geno <- D %>%
+  filter(contrast_level == "per_Genotype") %>%
+  select(trait, Genotype, padj_D_combined = p.adj) %>%
+  mutate(Genotype = as.character(Genotype))
+
+D_marg <- D %>%
+  filter(contrast_level == "marginal") %>%
+  select(trait, padj_D_combined = p.adj) %>%
+  mutate(Genotype = "marginal")
+
+geno_combined <- A_pivot %>%
+  full_join(B_pivot, by = c("trait", "Genotype")) %>%
+  full_join(D_geno,  by = c("trait", "Genotype"))
+
+marg_combined <- C_pivot %>%
+  full_join(D_marg, by = c("trait", "Genotype"))
+
+cat("\n=== Per-Genotype contrasts (Approaches A, B, D-conditional) ===\n")
+geno_combined %>%
+  arrange(trait, Genotype) %>%
+  mutate(across(starts_with("p"), ~ signif(.x, 3))) %>%
+  as_tibble() %>%
+  print(n = Inf)
+
+cat("\n=== Marginal contrasts (Approaches C, D-marginal) ===\n")
+marg_combined %>%
+  arrange(trait) %>%
+  mutate(across(starts_with("p"), ~ signif(.x, 3))) %>%
+  as_tibble() %>%
+  print(n = Inf)
+```
+
+## Survival summary
+
+```{r survival}
+summary_table <- bind_rows(
+  A %>% transmute(trait, Genotype = as.character(Genotype),
+                  contrast = "per_Genotype", approach = "A_Welch", padj = p.adj),
+  B %>% transmute(trait, Genotype = as.character(Genotype),
+                  contrast = "per_Genotype", approach = "B_emm",   padj = p.adj),
+  C %>% transmute(trait, Genotype = "marginal",
+                  contrast = "marginal",     approach = "C_emm",   padj = p.adj),
+  D %>% transmute(trait,
+                  Genotype = ifelse(is.na(Genotype), "marginal", as.character(Genotype)),
+                  contrast = contrast_level,
+                  approach = "D_combined", padj = p.adj)
+)
+
+cat("\n=== Total significant brackets at FDR < 0.05 ===\n")
+summary_table %>%
+  group_by(approach) %>%
+  summarise(n_significant = sum(padj < 0.05, na.rm = TRUE),
+            total_tests   = n(),
+            .groups = "drop") %>%
+  print()
+
+cat("\n=== TKN, KW50, TKW survival under each approach ===\n")
+summary_table %>%
+  filter(trait %in% c("TKN", "KW50", "TKW")) %>%
+  arrange(trait, contrast, approach) %>%
+  mutate(padj = signif(padj, 3),
+         signif_at_0.05 = ifelse(padj < 0.05, "*", "ns")) %>%
+  print(n = Inf)
+```
+
+## Supplementary figure: marginal Treatment effects for PH, KW50, TKN, TKW
+
+Boxplots pool CTRL and Inv4m; bracket labels come from the marginal
+emmeans contrast FDR (48-contrast D pool). PH is included as a
+phenotype with a robust marginal Treatment effect and non-significant
+Genotype × Treatment interaction. KW50, TKN, and TKW are included
+together to address Sawers' Figure 1 comment: under $-P$ the plant
+trades kernel size for kernel number (KW50 drops significantly, TKN
+rises significantly in the pooled marginal contrast), leaving total
+kernel weight per plant (TKW) statistically unchanged.
+
+```{r supp-marginal-figure, fig.width=18, fig.height=6}
+library(ggplot2)
+library(ggpubr)
+library(ggbeeswarm)
+library(ggfx)
+library(ggtext)
+
+pal_trt <- c("+P" = "gold", "-P" = "purple4")
+
+supp_traits <- c("PH", "KW50", "TKN", "TKW")
+
+# Pull the marginal p.adj for the four traits from the 48-contrast pool
+marg_stats <- D %>%
+  filter(contrast_level == "marginal", trait %in% supp_traits) %>%
+  transmute(trait, group1 = "+P", group2 = "-P",
+            p.adj = p.adj, p.adj.signif = add_significance(tibble(p.adj),
+                                                           "p.adj")$p.adj.signif)
+
+supp_panel <- function(trait_name, ylab_text, y_limits = NULL) {
+  d <- pheno %>%
+    select(Treatment, value = all_of(trait_name)) %>%
+    filter(!is.na(value))
+
+  s <- marg_stats %>% filter(trait == trait_name) %>%
+    mutate(y.position = max(d$value, na.rm = TRUE) +
+                        0.08 * diff(range(d$value, na.rm = TRUE)))
+
+  p <- ggplot(d, aes(x = Treatment, y = value, colour = Treatment)) +
+    ggtitle(trait_name) +
+    ylab(ylab_text) +
+    geom_boxplot(width = 0.25, linewidth = 1, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_colour_manual(values = pal_trt) +
+    theme_classic2(base_size = 20) +
+    theme(
+      plot.title = element_markdown(hjust = 0.5, face = "bold"),
+      axis.title.x = element_blank(),
+      axis.text.x = element_text(size = 25, face = "bold", color = "black"),
+      legend.position = "none"
+    )
+
+  if (!is.null(y_limits)) p <- p + coord_cartesian(ylim = y_limits)
+
+  if (nrow(s) > 0) {
+    p <- p + stat_pvalue_manual(
+      s, label = "p.adj.signif",
+      size = 10, bracket.size = 0.8,
+      hide.ns = FALSE
+    )
+  }
+  p
+}
+
+p_PH   <- supp_panel("PH",   "Plant Height (cm)")
+p_KW50 <- supp_panel("KW50", "50-kernel weight (g)")
+p_TKN  <- supp_panel("TKN",  "Total Kernel Number")
+p_TKW  <- supp_panel("TKW",  "Total Kernel Weight (g)")
+
+supp_marginal <- ggarrange(
+  p_PH, p_KW50, p_TKN, p_TKW,
+  nrow = 1, ncol = 4, align = "h",
+  labels = c("A", "B", "C", "D"),
+  font.label = list(size = 30)
+)
+
+print(supp_marginal)
+```
+
+## Save Approach D contrasts for figure bracket wiring
+
+```{r save-approach-d}
+D_out <- D %>%
+  mutate(
+    Genotype     = ifelse(is.na(Genotype), NA_character_, as.character(Genotype)),
+    group1       = "+P",
+    group2       = "-P",
+    p.adj.signif = rstatix::add_significance(tibble(p.adj = p.adj), "p.adj")$p.adj.signif
+  ) %>%
+  select(trait, Genotype, contrast_level, group1, group2, statistic, p, p.adj, p.adj.signif)
+
+write.csv(D_out,
+  file.path(paths$intermediate, "PSU2022_fig1_bracket_contrasts.csv"),
+  row.names = FALSE)
+
+cat("Saved", nrow(D_out), "contrasts to PSU2022_fig1_bracket_contrasts.csv\n")
+print(D_out, n = Inf)
+```
+
+## Session info
+
+```{r session-info}
+sessionInfo()
+```
