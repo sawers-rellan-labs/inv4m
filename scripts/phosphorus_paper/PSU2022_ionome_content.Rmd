@@ -93,6 +93,8 @@ conc_vars <- c(
   paste0(reliable, "_stover")
 )
 
+ratio_vars <- paste0(reliable, "_ratio")
+
 content <- ionome
 
 cat("Sample sizes:\n")
@@ -129,12 +131,13 @@ to_plot_conc <- content %>%
                names_to = "mineral_pool", values_to = "ppm") %>%
   mutate(
     mineral = sub("_(seed|stover)$", "", mineral_pool),
-    pool    = sub("^.+_(seed|stover)$", "\\1", mineral_pool)
+    pool    = sub("^.+_(seed|stover)$", "\\1", mineral_pool),
+    pool    = ifelse(pool == "seed", "grain", pool)
   ) %>%
   select(-mineral_pool) %>%
   filter(!is.na(ppm)) %>%
   mutate(
-    pool      = factor(pool, levels = c("stover", "seed")),
+    pool      = factor(pool, levels = c("stover", "grain")),
     Genotype  = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
     Genotype  = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
     Treatment = factor(Treatment, levels = c("+P", "-P"))
@@ -151,12 +154,25 @@ to_plot_hi <- content %>%
     Treatment = factor(Treatment, levels = c("+P", "-P"))
   ) %>%
   filter(!is.na(hi), is.finite(hi))
+
+to_plot_ratio <- content %>%
+  select(Genotype, Treatment, all_of(paste0(reliable, "_ratio"))) %>%
+  pivot_longer(cols = -c(Genotype, Treatment),
+               names_to = "mineral", values_to = "ratio") %>%
+  mutate(
+    mineral   = sub("_ratio$", "", mineral),
+    Genotype  = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
+    Genotype  = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+    Treatment = factor(Treatment, levels = c("+P", "-P"))
+  ) %>%
+  filter(!is.na(ratio), is.finite(ratio))
 ```
 
 ## Fit lms per response (kept for emmeans)
 
 ```{r fit-lms}
 # Fit lm per response and keep model objects. Same model spec everywhere.
+# Results are cached to RDS; delete the RDS to force a refit.
 fit_per_response <- function(responses, data) {
   models <- lapply(responses, function(resp) {
     if (!resp %in% colnames(data)) return(NULL)
@@ -170,15 +186,31 @@ fit_per_response <- function(responses, data) {
   models[!sapply(models, is.null)]
 }
 
-models_conc    <- fit_per_response(conc_vars, content)
-models_content <- fit_per_response(paste0(reliable, c(rep("_grain_mg", 8),
-                                                     rep("_stover_mg", 8))),
-                                   content)
-models_hi      <- fit_per_response(paste0(reliable, "_HI"), content)
+models_rds <- file.path(paths$intermediate, "ionome_content_models.rds")
+if (file.exists(models_rds)) {
+  cat("Loading cached lm models from", models_rds, "\n")
+  .ml <- readRDS(models_rds)
+  models_conc    <- .ml$conc
+  models_content <- .ml$content
+  models_hi      <- .ml$hi
+  models_ratio   <- .ml$ratio
+  rm(.ml)
+} else {
+  models_conc    <- fit_per_response(conc_vars, content)
+  models_content <- fit_per_response(paste0(reliable, c(rep("_grain_mg", 8),
+                                                       rep("_stover_mg", 8))),
+                                     content)
+  models_hi      <- fit_per_response(paste0(reliable, "_HI"), content)
+  models_ratio   <- fit_per_response(ratio_vars, content)
+  saveRDS(list(conc = models_conc, content = models_content,
+               hi = models_hi, ratio = models_ratio), models_rds)
+  cat("Saved lm models to", models_rds, "\n")
+}
 
 cat("Fitted lms — conc:", length(models_conc),
     "content:", length(models_content),
-    "HI:", length(models_hi), "\n")
+    "HI:", length(models_hi),
+    "ratio:", length(models_ratio), "\n")
 ```
 
 ## Effect table (lm coefficients, FDR across all)
@@ -201,7 +233,8 @@ extract_coefs <- function(models, family) {
 effects <- bind_rows(
   extract_coefs(models_conc,    "conc"),
   extract_coefs(models_content, "content"),
-  extract_coefs(models_hi,      "hi")
+  extract_coefs(models_hi,      "hi"),
+  extract_coefs(models_ratio,   "ratio")
 ) %>%
   mutate(p.adjust = p.adjust(p.value, method = "fdr")) %>%
   arrange(p.adjust)
@@ -240,6 +273,18 @@ contrasts_genotype_pooled <- function(models) {
     m <- models[[resp]]
     emm <- emmeans(m, ~ Genotype)
     pairs(emm, reverse = TRUE) %>%   # Inv4m - CTRL
+      as_tibble() %>%
+      mutate(response = resp)
+  }) %>% bind_rows()
+}
+
+# Marginal Treatment contrast (pooled across Genotype). Returns one row per
+# response. Use only when Genotype x Treatment interaction is ns.
+contrasts_treatment_marginal <- function(models) {
+  lapply(names(models), function(resp) {
+    m <- models[[resp]]
+    emm <- emmeans(m, ~ Treatment)
+    pairs(emm, reverse = TRUE) %>%   # (-P) - (+P)
       as_tibble() %>%
       mutate(response = resp)
   }) %>% bind_rows()
@@ -292,7 +337,8 @@ split_conc <- function(df) {
   df %>% mutate(
     mineral = sub("_(seed|stover)$", "", response),
     pool    = sub("^.+_(seed|stover)$", "\\1", response),
-    pool    = factor(pool, levels = c("stover", "seed"))
+    pool    = ifelse(pool == "seed", "grain", pool),
+    pool    = factor(pool, levels = c("stover", "grain"))
   )
 }
 split_hi <- function(df) {
@@ -300,30 +346,90 @@ split_hi <- function(df) {
     mineral = sub("_HI$", "", response)
   )
 }
+split_ratio <- function(df) {
+  df %>% mutate(
+    mineral = sub("_ratio$", "", response)
+  )
+}
 
-# Content treatment contrasts
-treatment.t.test <- contrasts_treatment_per_geno(models_content) %>%
-  format_treatment_contrast(split_content, "mg")
+# Cache raw emmeans outputs (before formatting) to avoid refitting on every
+# render. Delete the RDS to force a refresh when models change.
+emmeans_rds <- file.path(paths$intermediate, "ionome_content_emmeans.rds")
+if (file.exists(emmeans_rds)) {
+  cat("Loading cached emmeans contrasts from", emmeans_rds, "\n")
+  .em <- readRDS(emmeans_rds)
+  ct_conc    <- .em$ct_conc
+  ct_content <- .em$ct_content
+  ct_hi      <- .em$ct_hi
+  ct_ratio   <- .em$ct_ratio
+  rm(.em)
+} else {
+  ct_conc    <- contrasts_treatment_per_geno(models_conc)
+  ct_content <- contrasts_treatment_per_geno(models_content)
+  ct_hi      <- contrasts_treatment_per_geno(models_hi)
+  ct_ratio   <- contrasts_treatment_per_geno(models_ratio)
+  saveRDS(list(ct_conc = ct_conc, ct_content = ct_content,
+               ct_hi = ct_hi, ct_ratio = ct_ratio), emmeans_rds)
+  cat("Saved emmeans contrasts to", emmeans_rds, "\n")
+}
 
-treatment.t.test <- treatment.t.test %>%
-  group_by(pool, mineral, Genotype) %>%
-  group_modify(~ {
-    sub <- to_plot_content %>%
-      filter(pool == .y$pool, mineral == .y$mineral, Genotype == .y$Genotype)
-    .x %>%
-      rstatix::add_y_position(
-        data = sub, formula = mg ~ Treatment,
-        step.increase = 0.12
-      )
-  }) %>%
-  ungroup() %>%
-  filter(!is.na(y.position), is.finite(y.position))
+# Unified FDR pool across every bracket drawn on the 4-panel figure:
+#   - Panel A conc (per-Genotype)
+#   - Panel B ratio (per-Genotype)
+#   - Panel C content (per-Genotype)
+#   - Panel D HI (per-Genotype)
+raw_conc <- ct_conc %>%
+  split_conc() %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(
+    .y. = "ppm", group1 = "+P", group2 = "-P", metric = "conc",
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", as.character(Genotype)),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
 
-# Concentration treatment contrasts
-treatment.conc.ttest <- contrasts_treatment_per_geno(models_conc) %>%
-  format_treatment_contrast(split_conc, "ppm")
+raw_ratio <- ct_ratio %>%
+  split_ratio() %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(
+    .y. = "ratio", group1 = "+P", group2 = "-P", metric = "ratio",
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", as.character(Genotype)),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
 
-treatment.conc.ttest <- treatment.conc.ttest %>%
+raw_content <- ct_content %>%
+  split_content() %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(
+    .y. = "mg", group1 = "+P", group2 = "-P", metric = "content",
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", as.character(Genotype)),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
+
+raw_hi <- ct_hi %>%
+  split_hi() %>%
+  rename(p = p.value, statistic = t.ratio) %>%
+  mutate(
+    .y. = "hi", group1 = "+P", group2 = "-P", metric = "hi",
+    Genotype = gsub("Inv4m", "<i>Inv4m</i>", as.character(Genotype)),
+    Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
+  )
+
+unified_bracket_pool <- bind_rows(raw_conc, raw_ratio, raw_content,
+                                  raw_hi) %>%
+  mutate(p.adj = p.adjust(p, method = "fdr")) %>%
+  rstatix::add_significance("p.adj")
+
+cat("\n=== Unified FDR pool (n =", nrow(unified_bracket_pool),
+    " | conc =", sum(unified_bracket_pool$metric == "conc"),
+    "| ratio =", sum(unified_bracket_pool$metric == "ratio"),
+    "| content =", sum(unified_bracket_pool$metric == "content"),
+    "| hi =", sum(unified_bracket_pool$metric == "hi"),
+    ") ===\n")
+
+treatment.conc.ttest <- unified_bracket_pool %>%
+  filter(metric == "conc") %>%
+  mutate(Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+         pool = factor(pool, levels = c("stover", "grain"))) %>%
   group_by(pool, mineral, Genotype) %>%
   group_modify(~ {
     sub <- to_plot_conc %>%
@@ -337,11 +443,48 @@ treatment.conc.ttest <- treatment.conc.ttest %>%
   ungroup() %>%
   filter(!is.na(y.position), is.finite(y.position))
 
-# HI treatment contrasts
-treatment.hi.ttest <- contrasts_treatment_per_geno(models_hi) %>%
-  format_treatment_contrast(split_hi, "hi")
+treatment.ratio.ttest <- unified_bracket_pool %>%
+  filter(metric == "ratio") %>%
+  mutate(Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))) %>%
+  group_by(mineral, Genotype) %>%
+  group_modify(~ {
+    sub <- to_plot_ratio %>%
+      filter(mineral == .y$mineral, Genotype == .y$Genotype)
+    .x %>%
+      rstatix::add_y_position(
+        data = sub, formula = ratio ~ Treatment,
+        step.increase = 0.12
+      )
+  }) %>%
+  ungroup() %>%
+  filter(!is.na(y.position), is.finite(y.position))
 
-treatment.hi.ttest <- treatment.hi.ttest %>%
+treatment.t.test <- unified_bracket_pool %>%
+  filter(metric == "content") %>%
+  mutate(Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
+         pool = factor(pool, levels = c("stover", "grain"))) %>%
+  group_by(pool, mineral, Genotype) %>%
+  group_modify(~ {
+    sub <- to_plot_content %>%
+      filter(pool == .y$pool, mineral == .y$mineral, Genotype == .y$Genotype)
+    .x %>%
+      rstatix::add_y_position(
+        data = sub, formula = mg ~ Treatment,
+        step.increase = 0.20
+      )
+  }) %>%
+  ungroup() %>%
+  filter(!is.na(y.position), is.finite(y.position)) %>%
+  mutate(y.position = case_when(
+    mineral == "Ca" & pool == "grain" ~ y.position + 35,
+    mineral == "Mn"                   ~ y.position + 0.2,
+    mineral == "K"                    ~ y.position + 100,
+    TRUE                              ~ y.position
+  ))
+
+treatment.hi.ttest <- unified_bracket_pool %>%
+  filter(metric == "hi") %>%
+  mutate(Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))) %>%
   group_by(mineral, Genotype) %>%
   group_modify(~ {
     sub <- to_plot_hi %>%
@@ -355,17 +498,22 @@ treatment.hi.ttest <- treatment.hi.ttest %>%
   ungroup() %>%
   filter(!is.na(y.position), is.finite(y.position))
 
-cat("\n=== Treatment content contrasts (lm-emmeans, FDR < 0.05) ===\n")
-treatment.t.test %>% filter(p.adj < 0.05) %>%
-  select(mineral, pool, Genotype, statistic, p, p.adj, p.adj.signif) %>%
-  arrange(p.adj) %>% print(n = Inf)
-
-cat("\n=== Treatment concentration contrasts (lm-emmeans, FDR < 0.05) ===\n")
+cat("\n=== Treatment concentration contrasts (unified FDR, p.adj < 0.05) ===\n")
 treatment.conc.ttest %>% filter(p.adj < 0.05) %>%
   select(mineral, pool, Genotype, statistic, p, p.adj, p.adj.signif) %>%
   arrange(p.adj) %>% print(n = Inf)
 
-cat("\n=== Treatment HI contrasts (lm-emmeans, FDR < 0.05) ===\n")
+cat("\n=== Treatment ratio contrasts (unified FDR, p.adj < 0.05) ===\n")
+treatment.ratio.ttest %>% filter(p.adj < 0.05) %>%
+  select(mineral, Genotype, statistic, p, p.adj, p.adj.signif) %>%
+  arrange(p.adj) %>% print(n = Inf)
+
+cat("\n=== Treatment content contrasts (unified FDR, p.adj < 0.05) ===\n")
+treatment.t.test %>% filter(p.adj < 0.05) %>%
+  select(mineral, pool, Genotype, statistic, p, p.adj, p.adj.signif) %>%
+  arrange(p.adj) %>% print(n = Inf)
+
+cat("\n=== Treatment HI contrasts (unified FDR, p.adj < 0.05) ===\n")
 treatment.hi.ttest %>% filter(p.adj < 0.05) %>%
   select(mineral, Genotype, statistic, p, p.adj, p.adj.signif) %>%
   arrange(p.adj) %>% print(n = Inf)
@@ -374,7 +522,26 @@ treatment.hi.ttest %>% filter(p.adj < 0.05) %>%
 ## Genotype contrasts (pooled) → t-test-style tibbles for the supp figure
 
 ```{r genotype-contrasts}
-genotype.content.ttest <- contrasts_genotype_pooled(models_content) %>%
+# Cache raw pooled-Genotype emmeans outputs.
+geno_emmeans_rds <- file.path(paths$intermediate,
+                              "ionome_content_geno_emmeans.rds")
+if (file.exists(geno_emmeans_rds)) {
+  cat("Loading cached pooled-Genotype contrasts from", geno_emmeans_rds, "\n")
+  .gm <- readRDS(geno_emmeans_rds)
+  gp_content <- .gm$gp_content
+  gp_conc    <- .gm$gp_conc
+  gp_hi      <- .gm$gp_hi
+  rm(.gm)
+} else {
+  gp_content <- contrasts_genotype_pooled(models_content)
+  gp_conc    <- contrasts_genotype_pooled(models_conc)
+  gp_hi      <- contrasts_genotype_pooled(models_hi)
+  saveRDS(list(gp_content = gp_content, gp_conc = gp_conc, gp_hi = gp_hi),
+          geno_emmeans_rds)
+  cat("Saved pooled-Genotype contrasts to", geno_emmeans_rds, "\n")
+}
+
+genotype.content.ttest <- gp_content %>%
   format_genotype_contrast(split_content, "mg")
 
 # Pooled across treatment → use full pool/mineral data for y.position
@@ -396,7 +563,7 @@ genotype.content.ttest <- genotype.content.ttest %>%
   ungroup() %>%
   filter(!is.na(y.position), is.finite(y.position))
 
-genotype.conc.ttest <- contrasts_genotype_pooled(models_conc) %>%
+genotype.conc.ttest <- gp_conc %>%
   format_genotype_contrast(split_conc, "ppm")
 
 to_plot_conc_clean <- to_plot_conc %>%
@@ -417,7 +584,7 @@ genotype.conc.ttest <- genotype.conc.ttest %>%
   ungroup() %>%
   filter(!is.na(y.position), is.finite(y.position))
 
-genotype.hi.ttest <- contrasts_genotype_pooled(models_hi) %>%
+genotype.hi.ttest <- gp_hi %>%
   format_genotype_contrast(split_hi, "hi")
 
 to_plot_hi_clean <- to_plot_hi %>%
@@ -470,7 +637,7 @@ plot_mineral_content <- function(mineral_name) {
     stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
                        size = 5, bracket.size = 0.5, hide.ns = TRUE) +
     scale_color_manual(values = pal) +
-    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))) +
     ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
     labs(title = mineral_name, x = NULL, y = "Content [mg / plant]") +
     theme_classic(base_size = 14) +
@@ -527,6 +694,62 @@ plot_mineral_conc <- function(mineral_name, log_scale = FALSE) {
     )
 }
 
+plot_mineral_ratio <- function(mineral_name) {
+  plot_data <- to_plot_ratio %>% filter(mineral == mineral_name)
+  ttest_subset <- treatment.ratio.ttest %>% filter(mineral == mineral_name)
+
+  ggplot(plot_data, aes(x = Treatment, y = ratio, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
+                       size = 5, bracket.size = 0.5, hide.ns = TRUE) +
+    scale_color_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    facet_wrap(~ Genotype, nrow = 1) +
+    labs(title = mineral_name, x = NULL, y = "Grain / stover ratio") +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank(),
+      panel.spacing = unit(0.1, "lines")
+    )
+}
+
+plot_mineral_HI_marginal <- function(mineral_name) {
+  plot_data <- to_plot_hi %>% filter(mineral == mineral_name)
+  ttest_subset <- treatment.hi.marginal.ttest %>% filter(mineral == mineral_name)
+
+  p <- ggplot(plot_data, aes(x = Treatment, y = hi, color = Treatment)) +
+    geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 1) %>%
+    with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    labs(title = mineral_name, x = NULL, y = "Mineral HI [grain / total]") +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(color = "black", face = "bold", size = 15),
+      axis.title.y = element_text(face = "bold", size = 13),
+      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = 13),
+      strip.background = element_blank()
+    )
+
+  if (nrow(ttest_subset) > 0) {
+    p <- p + stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
+                                size = 5, bracket.size = 0.5, hide.ns = TRUE)
+  }
+  p
+}
+
 plot_mineral_HI <- function(mineral_name) {
   plot_data <- to_plot_hi %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.hi.ttest %>% filter(mineral == mineral_name)
@@ -558,9 +781,9 @@ plot_mineral_HI <- function(mineral_name) {
 }
 ```
 
-## Main 3-panel figure
+## Main 4-panel figure
 
-```{r main-3panel-figure, fig.width=14, fig.height=12}
+```{r main-4panel-figure, fig.width=14, fig.height=16}
 rowA_main <- ggarrange(
   plot_mineral_conc("P"),
   plot_mineral_conc("Zn") + ggpubr::rremove("ylab"),
@@ -570,6 +793,16 @@ rowA_main <- ggarrange(
 )
 
 rowB_main <- ggarrange(
+  plot_mineral_ratio("P") + labs(title = NULL) +
+    scale_y_continuous(breaks = 1:5,
+                       expand = expansion(mult = c(0.05, 0.15))),
+  plot_mineral_ratio("Zn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_ratio("Ca") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_ratio("S")  + labs(title = NULL) + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+rowC_main <- ggarrange(
   plot_mineral_content("P")  + labs(title = NULL),
   plot_mineral_content("Zn") + labs(title = NULL) + ggpubr::rremove("ylab"),
   plot_mineral_content("Ca") + labs(title = NULL) + ggpubr::rremove("ylab"),
@@ -577,7 +810,7 @@ rowB_main <- ggarrange(
   ncol = 4, nrow = 1, align = "h"
 )
 
-rowC_main <- ggarrange(
+rowD_main <- ggarrange(
   plot_mineral_HI("P")  + labs(title = NULL),
   plot_mineral_HI("Zn") + labs(title = NULL) + ggpubr::rremove("ylab"),
   plot_mineral_HI("Ca") + labs(title = NULL) + ggpubr::rremove("ylab"),
@@ -586,19 +819,19 @@ rowC_main <- ggarrange(
 )
 
 p_main_3panel <- ggarrange(
-  rowA_main, rowB_main, rowC_main,
-  ncol = 1, nrow = 3,
-  heights = c(1, 1, 1),
-  labels = c("A", "B", "C"),
-  font.label = list(size = 30)
+  rowA_main, rowB_main, rowC_main, rowD_main,
+  ncol = 1, nrow = 4,
+  heights = c(1, 0.8, 0.9, 0.8),
+  labels = c("A", "B", "C", "D"),
+  font.label = list(size = 30),
+  align = "hv"
 )
-
 print(p_main_3panel)
 ```
 
-## Supplementary 3-panel figure
+## Supplementary 4-panel figure
 
-```{r supp-3panel-figure, fig.width=14, fig.height=12}
+```{r supp-4panel-figure, fig.width=14, fig.height=16}
 rowA_supp <- ggarrange(
   plot_mineral_conc("Mg"),
   plot_mineral_conc("Mn", log_scale = TRUE) + ggpubr::rremove("ylab"),
@@ -608,6 +841,14 @@ rowA_supp <- ggarrange(
 )
 
 rowB_supp <- ggarrange(
+  plot_mineral_ratio("Mg") + labs(title = NULL),
+  plot_mineral_ratio("Mn") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_ratio("K")  + labs(title = NULL) + ggpubr::rremove("ylab"),
+  plot_mineral_ratio("Fe") + labs(title = NULL) + ggpubr::rremove("ylab"),
+  ncol = 4, nrow = 1, align = "h"
+)
+
+rowC_supp <- ggarrange(
   plot_mineral_content("Mg") + labs(title = NULL),
   plot_mineral_content("Mn") + labs(title = NULL) + ggpubr::rremove("ylab"),
   plot_mineral_content("K")  + labs(title = NULL) + ggpubr::rremove("ylab"),
@@ -615,7 +856,7 @@ rowB_supp <- ggarrange(
   ncol = 4, nrow = 1, align = "h"
 )
 
-rowC_supp <- ggarrange(
+rowD_supp <- ggarrange(
   plot_mineral_HI("Mg") + labs(title = NULL),
   plot_mineral_HI("Mn") + labs(title = NULL) + ggpubr::rremove("ylab"),
   plot_mineral_HI("K")  + labs(title = NULL) + ggpubr::rremove("ylab"),
@@ -624,13 +865,13 @@ rowC_supp <- ggarrange(
 )
 
 p_supp_3panel <- ggarrange(
-  rowA_supp, rowB_supp, rowC_supp,
-  ncol = 1, nrow = 3,
-  heights = c(1, 1, 1),
-  labels = c("A", "B", "C"),
-  font.label = list(size = 30)
+  rowA_supp, rowB_supp, rowC_supp, rowD_supp,
+  ncol = 1, nrow = 4,
+  heights = c(1, 0.8, 0.9, 0.8),
+  labels = c("A", "B", "C", "D"),
+  font.label = list(size = 30),
+  align = "hv"
 )
-
 print(p_supp_3panel)
 ```
 
@@ -694,7 +935,7 @@ make_inv4m_panel <- function(metric, mineral_name, pool_name = NULL) {
 blank <- ggplot() + theme_void()
 
 row_conc <- ggarrange(
-  make_inv4m_panel("conc", "Mg", "seed"),
+  make_inv4m_panel("conc", "Mg", "grain"),
   make_inv4m_panel("conc", "Ca", "stover"),
   blank, blank,
   ncol = 4, nrow = 1, align = "h"
@@ -751,16 +992,10 @@ write_ttest(genotype.conc.ttest,    "ionome_content_conc_genotype_ttests.csv")
 write_ttest(genotype.content.ttest, "ionome_content_genotype_ttests.csv")
 write_ttest(genotype.hi.ttest,      "ionome_content_hi_genotype_ttests.csv")
 
-ggsave(file.path(paths$figures, "ionome_3panel_main_figure.pdf"),
-       plot = p_main_3panel, width = 14, height = 12, units = "in")
 ggsave(file.path(paths$figures, "ionome_3panel_main_figure.png"),
-       plot = p_main_3panel, width = 14, height = 12, units = "in", dpi = 300)
-ggsave(file.path(paths$figures, "ionome_3panel_supplementary_figure.pdf"),
-       plot = p_supp_3panel, width = 14, height = 12, units = "in")
+       plot = p_main_3panel, width = 14, height = 16, units = "in", dpi = 150)
 ggsave(file.path(paths$figures, "ionome_3panel_supplementary_figure.png"),
-       plot = p_supp_3panel, width = 14, height = 12, units = "in", dpi = 300)
-ggsave(file.path(paths$figures, "ionome_inv4m_effects_figure.pdf"),
-       plot = p_inv4m_effects, width = 16, height = 10, units = "in")
+       plot = p_supp_3panel, width = 14, height = 16, units = "in", dpi = 150)
 ggsave(file.path(paths$figures, "ionome_inv4m_effects_figure.png"),
        plot = p_inv4m_effects, width = 16, height = 10, units = "in", dpi = 300)
 ```

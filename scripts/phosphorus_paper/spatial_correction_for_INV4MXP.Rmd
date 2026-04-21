@@ -159,6 +159,9 @@ for (ion in reliable_minerals) {
   field_data_complete[[paste0(ion, "_HI")]] <-
     field_data_complete[[paste0(ion, "_grain_mg")]] /
     field_data_complete[[paste0(ion, "_total_mg")]]
+  field_data_complete[[paste0(ion, "_ratio")]] <-
+    field_data_complete[[seed_col]] /
+    field_data_complete[[stover_col]]
 }
 
 # Define phenotypes
@@ -174,7 +177,8 @@ ionome_content_phenotypes <- c(
   paste0(reliable_minerals, "_grain_mg"),
   paste0(reliable_minerals, "_stover_mg"),
   paste0(reliable_minerals, "_total_mg"),
-  paste0(reliable_minerals, "_HI")
+  paste0(reliable_minerals, "_HI"),
+  paste0(reliable_minerals, "_ratio")
 )
 
 all_phenotypes <- unique(c(base_phenotypes, ear_phenotypes,
