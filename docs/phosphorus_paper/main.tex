@@ -308,7 +308,7 @@ Multiple transcription factors such as $\textit{zim25}$ ($-\log_{10}{FDR}=4.2$, 
 
 \subsection*{Elevated triglycerides and reduced phosphoglycerolipids are driven by phosphorus starvation and leaf age.}
 
-Aggregate lipid class composition reveals the expected dominance of PC, MGDG, DGDG, and SQDG in membrane lipids, with phosphorus deficiency causing notable decreases in phosphoglycerolipids across all leaf stages and contrasting developmental trajectories for neutral lipids under $+$P versus $-$P conditions (\ref{supp:Figure_S6}).
+Aggregate lipid class composition reveals the expected dominance of PC, MGDG, DGDG, and SQDG in membrane lipids, with phosphorus deficiency causing notable decreases in phosphoglycerolipids across all leaf stages and contrasting developmental trajectories for neutral lipids under $+$P versus $-$P conditions (\ref{supp:Figure_S7}).
 Lipid profiling shows typical changes associated with both leaf aging and phosphorus starvation (Fig~\ref{fig:Figure_3}C-D, \ref{table::leaf_lipids}, \ref{table::phosphorus_lipids}).
 A multidimensional scaling of lipid abundance shows a marked difference between Leaf 1 and older leaves across MDS dimension 3 (17\% of variance explained, Fig~\ref{fig:Figure_3}C).
 Older leaves were depleted in the digalactosyl diacylglicerol lipid $\text{DGDG36:2}$ (($\log_2\text{FC}=0.67 \pm 0.15, \text{FDR}=0.044$), and  accumulated  the diacylglyceryl glucuronide DGGA36:3 ($\log_2\text{FC}=0.67 \pm 0.15, \text{FDR}=0.044$).
@@ -525,7 +525,7 @@ In older $-$P leaves, the transcriptional program for sulfolipid biosynthesis (\
 \subsection*{$\invfour$ does not alter phosphorus starvation responses}
 
 Despite the strong developmental dependency of phosphorus responses, we found minimal evidence that the \invfour chromosomal inversion modulates these interactions.
-The three genes showing significant genotype-by-phosphorus interactions (\textit{aldh2}, \textit{gras80}, and \textit{flz22}, \ref{supp:Figure_S5}) are located outside the inversion boundaries and did not show additional interactions with leaf stage.
+The three genes showing significant genotype-by-phosphorus interactions (\textit{aldh2}, \textit{gras80}, and \textit{flz22}, \ref{supp:Figure_S6}) are located outside the inversion boundaries and did not show additional interactions with leaf stage.
 % Lipidomic analysis detected subtle \invfour effects on specific monogalactosyldiacylglycerol species MGDG34:2 and MGDG34:3 that varied with both phosphorus availability and leaf age, but these effects were restricted to a small number of lipid classes and did not alter the overall pattern of age-dependent stress responses.
 
 The primary effects of \invfour on flowering time and plant height operated independently of both phosphorus treatment and leaf developmental stage.
@@ -670,7 +670,7 @@ u_c \sim \mathcal{N}(0, \sigma^2_u), \quad \varepsilon_{ijrs} \sim \mathcal{N}(0
 where $\text{Leaf}_s$ represents the centered continuous leaf stage variable ($s \in \{1,2,3,4\}$, centered at mean 2.5), such that $\beta_2$ represents the rate of change per leaf stage increment.
 The term $u_c$ is a random effect for plot column nested within treatment, accounting for spatial autocorrelation.
 The residual variance $\phi_{ijrs}\sigma^2$ incorporates heteroscedastic precision weights from \textit{voom}.
-Lipid models additionally included MS injection order as a technical covariate (\ref{supp:Figure_S7}).
+Lipid models additionally included MS injection order as a technical covariate (\ref{supp:Figure_S8}).
 Empirical Bayes moderation was applied using \texttt{eBayes} to stabilize variance estimates across genes or lipids.
 
 We adjusted p-values for multiple testing as false discovery rates (FDR).
@@ -791,6 +791,19 @@ Effect sizes and exact \textit{p values} are reported in Table.}
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=\linewidth]{figs/Figure_S5.png}
+\caption{\textbf{$\invfour$ effects on the ionome, pooled across phosphorus treatments.}
+For each of five minerals (Mg, Ca, Zn, Fe, K; columns), boxplots contrast control (CTRL) and \invfour plants on four metrics: \textbf{(A)} mineral concentration (mg/kg), \textbf{(B)} grain/stover concentration ratio, \textbf{(C)} per-plant mineral content (mg/plant), and \textbf{(D)} mineral harvest index (HI, grain/total).
+For concentration and content, a single pool is shown per cell: the pool where the \invfour vs CTRL contrast is significant under the unified FDR, or \textit{stover} when neither pool is significant.
+The selected pool is indicated on the facet strip.
+Brackets correspond to the \invfour $-$ CTRL contrast from \texttt{emmeans} on the per response linear model $y \sim \text{Genotype} \times \text{Treatment}$, pooled across phosphorus treatments, with Benjamini and Hochberg \textit{FDR} applied once across all 20 cells: $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***), $< 0.0001$ (****); non significant brackets are not drawn.}
+\label{supp:Figure_S5}
+\end{figure*}
+
+\pagebreak
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/Figure_S6.png}
 \caption{
 (\textbf{A}) \textbf{Manhattan plot for differentially expressed genes (DEGs) under $-\text{P}$}. 
 %A total of $\textbf{10,606}$ DEGs were identified for the main effect of P deficiency. 
@@ -801,7 +814,7 @@ Loci associated with key P-starvation response genes, such as $\textit{pilncr1}$
 (\textbf{D}) Volcano plot for differentially abundant lipids (DALs) under Leaf $\mathbf{\times} -\mathbf{P}$ interaction. 
 %Only two lipids, $\textbf{PC34:2}$ and $\textbf{TG:54:9}$, are identified as significantly differentially abundant, showing a significant interaction between leaf developmental stage and P deficiency treatment. 
 }
-\label{supp:Figure_S5}
+\label{supp:Figure_S6}
 \end{figure*}
 
 \pagebreak
@@ -809,7 +822,7 @@ Loci associated with key P-starvation response genes, such as $\textit{pilncr1}$
 
 \begin{figure}[!htb]
 \centering
-\includegraphics[width=\linewidth]{figs/Figure_S6.png}
+\includegraphics[width=\linewidth]{figs/Figure_S7.png}
 \caption{
 \textbf{Lipid class composition, and effect of leaf developmental stages and phosphorus treatments.} of
 \textbf{(A)} Membrane lipid composition (Ion \%, log scale) is dominated by PC, MGDG, DGDG, and SQDG, while LPE, PI and DGGA (in +P) represent minor components (<1\%, necessitating log scale). 
@@ -820,14 +833,14 @@ Loci associated with key P-starvation response genes, such as $\textit{pilncr1}$
 %The general trend of increased glycoglycerolipids and decreased phosphoglycerolipids under -P appears additive to developmental effects.
 Error bars indicate standard error of the mean.
 }
-\label{supp:Figure_S6}
+\label{supp:Figure_S7}
 \end{figure}
 
 \pagebreak
 
 \begin{figure}[!htb]
 \centering
-\includegraphics[width=\linewidth]{figs/Figure_S7.png}
+\includegraphics[width=\linewidth]{figs/Figure_S8.png}
 \caption{
 \textbf{Mass spectrometry injection order confounds lipid profile variation.}
 \textbf{(A)} Multidimensional scaling (MDS) of lipid profiles. 
@@ -840,7 +853,7 @@ The injection order was used as a covariate in the \textit{limma} mixed linear m
 %There is no  obvious sample clustering by genotype (bottom left),
 %collection time (middle left), or batch effects between collectors (top right), 
 }
-\label{supp:Figure_S7}
+\label{supp:Figure_S8}
 \end{figure}
 
 \begin{table}[h!]

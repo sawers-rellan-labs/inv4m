@@ -648,7 +648,7 @@ plot_mineral_content <- function(mineral_name, base_size = 18) {
     geom_quasirandom(size = 1) %>%
     with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
     stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
-                       size = 5, bracket.size = 0.5, hide.ns = TRUE) +
+                       size = 8, bracket.size = 1, hide.ns = TRUE) +
     scale_color_manual(values = pal) +
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))) +
     ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
@@ -686,11 +686,11 @@ plot_mineral_conc <- function(mineral_name, log_scale = FALSE, base_size = 18) {
         breaks = c(5, 10, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400),
         expand = expansion(mult = c(0.05, 0.15))) +
       stat_pvalue_manual(ttest_log, label = "p.adj.signif",
-                         size = 5, bracket.size = 0.5, hide.ns = TRUE)
+                         size = 8, bracket.size = 1, hide.ns = TRUE)
   } else {
     p <- p + scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
       stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
-                         size = 5, bracket.size = 0.5, hide.ns = TRUE)
+                         size = 8, bracket.size = 1, hide.ns = TRUE)
   }
 
   p + ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
@@ -717,7 +717,7 @@ plot_mineral_ratio <- function(mineral_name, base_size = 18) {
     geom_quasirandom(size = 1) %>%
     with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
     stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
-                       size = 5, bracket.size = 0.5, hide.ns = TRUE) +
+                       size = 8, bracket.size = 1, hide.ns = TRUE) +
     scale_color_manual(values = pal) +
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     facet_wrap(~ Genotype, nrow = 1) +
@@ -758,7 +758,7 @@ plot_mineral_HI_marginal <- function(mineral_name, base_size = 18) {
 
   if (nrow(ttest_subset) > 0) {
     p <- p + stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
-                                size = 5, bracket.size = 0.5, hide.ns = TRUE)
+                                size = 8, bracket.size = 1, hide.ns = TRUE)
   }
   p
 }
@@ -788,7 +788,7 @@ plot_mineral_HI <- function(mineral_name, base_size = 18) {
 
   if (nrow(ttest_subset) > 0) {
     p <- p + stat_pvalue_manual(ttest_subset, label = "p.adj.signif",
-                                size = 5, bracket.size = 0.5, hide.ns = TRUE)
+                                size = 8, bracket.size = 1, hide.ns = TRUE)
   }
   p
 }
@@ -937,7 +937,9 @@ plot_inv4m_cell <- function(mineral_name, metric, pool_name = NULL,
     scale_colour_manual(values = pal_geno) +
     scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "<i>Inv4m</i>")) +
     labs(
-      title = if (show_title) mineral_name else NULL,
+      title = if (show_title) mineral_name
+              else if (metric %in% c("hi", "ratio")) " "
+              else NULL,
       x = NULL,
       y = if (show_ylab) ylab_text else NULL
     )
@@ -957,7 +959,7 @@ plot_inv4m_cell <- function(mineral_name, metric, pool_name = NULL,
   if (nrow(s) > 0) {
     p <- p + stat_pvalue_manual(
       s, label = "p.adj.signif",
-      size = 6, bracket.size = 0.5, hide.ns = TRUE
+      size = 8, bracket.size = 1, hide.ns = TRUE
     )
   }
 
@@ -1006,7 +1008,7 @@ p_inv4m_effects <- ggarrange(
   ggarrange(plotlist = row_C, ncol = 5, align = "h"),
   ggarrange(plotlist = row_D, ncol = 5, align = "h"),
   ncol = 1, nrow = 4,
-  heights = c(1.1, 1, 1, 1),
+  heights = c(1, 1, 1, 1),
   labels = c("A", "B", "C", "D"),
   font.label = list(size = 30)
 )
