@@ -37,10 +37,10 @@ data and focuses on:
 
 1. **Main Figure** (`p_main_combined`): P, Zn, Ca, and S responses arranged in 4 columns
 2. **Supplementary Figure** (`p_supp_combined`): Remaining minerals (Mg, Mn, K, Fe) in 4 columns
-3. **Ratio Analysis**: Seed:Stover ratios for each mineral
+3. **Ratio Analysis**: Grain:Stover ratios for each mineral
 4. **Interaction Analysis**: Genotype × Treatment interactions
 
-Each mineral plot uses nested facets showing: Tissue (stover/seed) > Genotype (CTRL/Inv4m), with Treatment on the x-axis.
+Each mineral plot uses nested facets showing: Tissue (stover/grain) > Genotype (CTRL/Inv4m), with Treatment on the x-axis.
 
 ## Load Libraries
 ```{r libraries}
@@ -89,18 +89,18 @@ ionome %>%
   count(Genotype, Treatment)
 ```
 
-## Calculate Seed:Stover Ratios
+## Calculate Grain:Stover Ratios
 ```{r calculate-ratios}
 # Calculate ratios for each reliable mineral
 for (ion in reliable) {
-  ionome[[paste0(ion, "_ratio")]] <- 
-    ionome[[paste0(ion, "_seed")]] / ionome[[paste0(ion, "_stover")]]
+  ionome[[paste0(ion, "_ratio")]] <-
+    ionome[[paste0(ion, "_grain")]] / ionome[[paste0(ion, "_stover")]]
 }
 
 # Create list of all mineral-tissue combinations
 reliable_by_tissue <- paste(
   rep(reliable, each = 2),
-  rep(c("seed", "stover"), times = length(reliable)),
+  rep(c("grain", "stover"), times = length(reliable)),
   sep = "_"
 )
 
@@ -122,9 +122,9 @@ to_plot <- ionome %>%
     names = c("mineral", "tissue"),
     delim = "_"
   ) %>%
-  filter(tissue %in% c("seed", "stover")) %>%
+  filter(tissue %in% c("grain", "stover")) %>%
   mutate(
-    tissue = factor(tissue, levels = c("stover", "seed")),
+    tissue = factor(tissue, levels = c("stover", "grain")),
     Genotype = gsub("Inv4m", "<i>Inv4m</i>", Genotype),
     Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>"))
   )
@@ -375,10 +375,10 @@ plot_mineral <- function(mineral_name, log_scale = FALSE) {
   plot_data <- to_plot %>%
     filter(
       mineral == mineral_name,
-      tissue %in% c("seed", "stover")
+      tissue %in% c("grain", "stover")
     ) %>%
     mutate(
-      tissue = factor(tissue, levels = c("stover", "seed")),
+      tissue = factor(tissue, levels = c("stover", "grain")),
       Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
       Treatment = factor(Treatment, levels = c("+P", "-P"))
     )
@@ -495,7 +495,7 @@ plot_ratio <- function(mineral_name) {
     facet_wrap(~ Genotype) +
     labs(
       x = NULL,
-      y = "Seed/Stover Ratio"
+      y = "Grain/Stover Ratio"
     ) + 
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     theme_classic(base_size = 14) +
@@ -784,8 +784,8 @@ if (nrow(ratio.t.test) > 0) {
 pal_geno <- c("CTRL" = "gold", "<i>Inv4m</i>" = "#4a0f82")
 
 # Filter data for the two significant mineral-tissue combinations
-mg_seed_data <- to_plot %>%
-  filter(mineral == "Mg", tissue == "seed") %>%
+mg_grain_data <- to_plot %>%
+  filter(mineral == "Mg", tissue == "grain") %>%
   mutate(
     Genotype = factor(Genotype, levels = c("CTRL", "<i>Inv4m</i>")),
     Treatment = factor(Treatment, levels = c("+P", "-P"))
@@ -800,7 +800,7 @@ ca_stover_data <- to_plot %>%
 
 # T-tests comparing genotypes within each treatment
 genotype.t.test <- bind_rows(
-  mg_seed_data %>% mutate(mineral_tissue = "Mg_seed"),
+  mg_grain_data %>% mutate(mineral_tissue = "Mg_grain"),
   ca_stover_data %>% mutate(mineral_tissue = "Ca_stover")
 ) %>%
   group_by(mineral_tissue, Treatment) %>%
@@ -813,8 +813,8 @@ if (nrow(genotype.t.test) > 0) {
   genotype.t.test <- genotype.t.test %>%
     group_by(mineral_tissue, Treatment) %>%
     group_modify(~ {
-      if (.y$mineral_tissue == "Mg_seed") {
-        test_data <- mg_seed_data %>%
+      if (.y$mineral_tissue == "Mg_grain") {
+        test_data <- mg_grain_data %>%
           filter(Treatment == .y$Treatment)
       } else {
         test_data <- ca_stover_data %>%
@@ -840,15 +840,15 @@ if (nrow(genotype.t.test) > 0) {
 }
 
 # Split tests by mineral
-mg_seed_genotype_test <- genotype.t.test %>%
-  filter(mineral_tissue == "Mg_seed")
+mg_grain_genotype_test <- genotype.t.test %>%
+  filter(mineral_tissue == "Mg_grain")
 
 ca_stover_genotype_test <- genotype.t.test %>%
   filter(mineral_tissue == "Ca_stover")
 
-# Plot for Mg seed
-p_mg_seed_genotype <- ggplot(
-  mg_seed_data, 
+# Plot for Mg grain
+p_mg_grain_genotype <- ggplot(
+  mg_grain_data, 
   aes(x = Genotype, y = ppm, color = Genotype)
 ) +
   geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA) %>%
@@ -856,7 +856,7 @@ p_mg_seed_genotype <- ggplot(
   geom_quasirandom(size = 2) %>%
   with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
   stat_pvalue_manual(
-    mg_seed_genotype_test,
+    mg_grain_genotype_test,
     label = "p.adj.signif",
     size = 5,
     bracket.size = 0.5,
@@ -865,7 +865,7 @@ p_mg_seed_genotype <- ggplot(
   scale_color_manual(values = pal_geno) +
   facet_wrap(~ Treatment) +
   labs(
-    title = "Mg (Seed)",
+    title = "Mg (Grain)",
     x = NULL,
     y = "ppm [mg/kg]"
   ) +
@@ -918,7 +918,7 @@ p_ca_stover_genotype <- ggplot(
 
 # Combine both plots
 p_genotype_effects <- ggarrange(
-  p_mg_seed_genotype,
+  p_mg_grain_genotype,
   p_ca_stover_genotype + rremove("ylab"),
   ncol = 2,
   nrow = 1,
@@ -928,8 +928,8 @@ p_genotype_effects <- ggarrange(
 print(p_genotype_effects)
 
 # Display test results
-cat("\n=== Genotype Effects on Mg (Seed) ===\n")
-print(mg_seed_genotype_test)
+cat("\n=== Genotype Effects on Mg (Grain) ===\n")
+print(mg_grain_genotype_test)
 
 cat("\n=== Genotype Effects on Ca (Stover) ===\n")
 print(ca_stover_genotype_test)

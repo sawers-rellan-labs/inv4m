@@ -89,7 +89,7 @@ content_vars <- c(
 )
 
 conc_vars <- c(
-  paste0(reliable, "_seed"),
+  paste0(reliable, "_grain"),
   paste0(reliable, "_stover")
 )
 
@@ -125,14 +125,13 @@ to_plot_content <- content %>%
 
 to_plot_conc <- content %>%
   select(Genotype, Treatment,
-         all_of(paste0(reliable, "_seed")),
+         all_of(paste0(reliable, "_grain")),
          all_of(paste0(reliable, "_stover"))) %>%
   pivot_longer(cols = -c(Genotype, Treatment),
                names_to = "mineral_pool", values_to = "ppm") %>%
   mutate(
-    mineral = sub("_(seed|stover)$", "", mineral_pool),
-    pool    = sub("^.+_(seed|stover)$", "\\1", mineral_pool),
-    pool    = ifelse(pool == "seed", "grain", pool)
+    mineral = sub("_(grain|stover)$", "", mineral_pool),
+    pool    = sub("^.+_(grain|stover)$", "\\1", mineral_pool)
   ) %>%
   select(-mineral_pool) %>%
   filter(!is.na(ppm)) %>%
@@ -335,9 +334,8 @@ split_content <- function(df) {
 }
 split_conc <- function(df) {
   df %>% mutate(
-    mineral = sub("_(seed|stover)$", "", response),
-    pool    = sub("^.+_(seed|stover)$", "\\1", response),
-    pool    = ifelse(pool == "seed", "grain", pool),
+    mineral = sub("_(grain|stover)$", "", response),
+    pool    = sub("^.+_(grain|stover)$", "\\1", response),
     pool    = factor(pool, levels = c("stover", "grain"))
   )
 }
@@ -625,7 +623,7 @@ genotype.hi.ttest %>% filter(p.adj < 0.05) %>%
 ```{r plot-functions}
 pal <- c("+P" = "gold", "-P" = "purple4")
 
-plot_mineral_content <- function(mineral_name) {
+plot_mineral_content <- function(mineral_name, base_size = 18) {
   plot_data <- to_plot_content %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.t.test %>% filter(mineral == mineral_name)
 
@@ -640,20 +638,20 @@ plot_mineral_content <- function(mineral_name) {
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))) +
     ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
     labs(title = mineral_name, x = NULL, y = "Content [mg / plant]") +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(color = "black", face = "bold", size = 15),
-      axis.title.y = element_text(face = "bold", size = 13),
-      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
-      strip.text = element_markdown(face = "bold", size = 13),
+      axis.text.x = element_text(color = "black", face = "bold", size = rel(1.0)),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = rel(0.9)),
       strip.background = element_blank(),
       panel.spacing = unit(0.1, "lines"),
       ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5)
     )
 }
 
-plot_mineral_conc <- function(mineral_name, log_scale = FALSE) {
+plot_mineral_conc <- function(mineral_name, log_scale = FALSE, base_size = 18) {
   plot_data <- to_plot_conc %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.conc.ttest %>% filter(mineral == mineral_name)
 
@@ -681,20 +679,20 @@ plot_mineral_conc <- function(mineral_name, log_scale = FALSE) {
   }
 
   p + ggh4x::facet_nested(~ pool + Genotype, scales = "free_y") +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(color = "black", face = "bold", size = 15),
-      axis.title.y = element_text(face = "bold", size = 13),
-      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
-      strip.text = element_markdown(face = "bold", size = 13),
+      axis.text.x = element_text(color = "black", face = "bold", size = rel(1.0)),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = rel(0.9)),
       strip.background = element_blank(),
       panel.spacing = unit(0.1, "lines"),
       ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5)
     )
 }
 
-plot_mineral_ratio <- function(mineral_name) {
+plot_mineral_ratio <- function(mineral_name, base_size = 18) {
   plot_data <- to_plot_ratio %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.ratio.ttest %>% filter(mineral == mineral_name)
 
@@ -709,19 +707,19 @@ plot_mineral_ratio <- function(mineral_name) {
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     facet_wrap(~ Genotype, nrow = 1) +
     labs(title = mineral_name, x = NULL, y = "Grain / stover ratio") +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(color = "black", face = "bold", size = 15),
-      axis.title.y = element_text(face = "bold", size = 13),
-      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
-      strip.text = element_markdown(face = "bold", size = 13),
+      axis.text.x = element_text(color = "black", face = "bold", size = rel(1.0)),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = rel(0.9)),
       strip.background = element_blank(),
       panel.spacing = unit(0.1, "lines")
     )
 }
 
-plot_mineral_HI_marginal <- function(mineral_name) {
+plot_mineral_HI_marginal <- function(mineral_name, base_size = 18) {
   plot_data <- to_plot_hi %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.hi.marginal.ttest %>% filter(mineral == mineral_name)
 
@@ -733,13 +731,13 @@ plot_mineral_HI_marginal <- function(mineral_name) {
     scale_color_manual(values = pal) +
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     labs(title = mineral_name, x = NULL, y = "Mineral HI [grain / total]") +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(color = "black", face = "bold", size = 15),
-      axis.title.y = element_text(face = "bold", size = 13),
-      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
-      strip.text = element_markdown(face = "bold", size = 13),
+      axis.text.x = element_text(color = "black", face = "bold", size = rel(1.0)),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = rel(0.9)),
       strip.background = element_blank()
     )
 
@@ -750,7 +748,7 @@ plot_mineral_HI_marginal <- function(mineral_name) {
   p
 }
 
-plot_mineral_HI <- function(mineral_name) {
+plot_mineral_HI <- function(mineral_name, base_size = 18) {
   plot_data <- to_plot_hi %>% filter(mineral == mineral_name)
   ttest_subset <- treatment.hi.ttest %>% filter(mineral == mineral_name)
 
@@ -763,13 +761,13 @@ plot_mineral_HI <- function(mineral_name) {
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     labs(title = mineral_name, x = NULL, y = "Mineral HI [grain / total]") +
     facet_wrap(~ Genotype) +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(color = "black", face = "bold", size = 15),
-      axis.title.y = element_text(face = "bold", size = 13),
-      plot.title = element_text(face = "bold", size = 28, hjust = 0.5),
-      strip.text = element_markdown(face = "bold", size = 13),
+      axis.text.x = element_text(color = "black", face = "bold", size = rel(1.0)),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      strip.text = element_markdown(face = "bold", size = rel(0.9)),
       strip.background = element_blank()
     )
 
@@ -818,7 +816,7 @@ rowD_main <- ggarrange(
   ncol = 4, nrow = 1, align = "h"
 )
 
-p_main_3panel <- ggarrange(
+p_main_4panel <- ggarrange(
   rowA_main, rowB_main, rowC_main, rowD_main,
   ncol = 1, nrow = 4,
   heights = c(1, 0.8, 0.9, 0.8),
@@ -826,7 +824,7 @@ p_main_3panel <- ggarrange(
   font.label = list(size = 30),
   align = "hv"
 )
-print(p_main_3panel)
+print(p_main_4panel)
 ```
 
 ## Supplementary 4-panel figure
@@ -864,7 +862,7 @@ rowD_supp <- ggarrange(
   ncol = 4, nrow = 1, align = "h"
 )
 
-p_supp_3panel <- ggarrange(
+p_supp_4panel <- ggarrange(
   rowA_supp, rowB_supp, rowC_supp, rowD_supp,
   ncol = 1, nrow = 4,
   heights = c(1, 0.8, 0.9, 0.8),
@@ -872,7 +870,7 @@ p_supp_3panel <- ggarrange(
   font.label = list(size = 30),
   align = "hv"
 )
-print(p_supp_3panel)
+print(p_supp_4panel)
 ```
 
 ## Inv4m supp figure (significant-effects only, ragged-right)
@@ -880,26 +878,25 @@ print(p_supp_3panel)
 ```{r plot-inv4m-panel-helper}
 pal_geno <- c("CTRL" = "gold", "Inv4m" = "purple4")
 
-make_inv4m_panel <- function(metric, mineral_name, pool_name = NULL) {
+make_inv4m_panel <- function(metric, mineral_name, pool_name = NULL,
+                             base_size = 18) {
   if (metric == "conc") {
     d <- to_plot_conc %>% filter(mineral == mineral_name, pool == pool_name)
     s <- genotype.conc.ttest %>% filter(mineral == mineral_name, pool == pool_name)
     y_var <- "ppm"
     ylab_text <- "Concentration [mg / kg]"
-    title_text <- paste0(mineral_name, " ", pool_name, " conc")
   } else if (metric == "content") {
     d <- to_plot_content %>% filter(mineral == mineral_name, pool == pool_name)
     s <- genotype.content.ttest %>% filter(mineral == mineral_name, pool == pool_name)
     y_var <- "mg"
     ylab_text <- "Content [mg / plant]"
-    title_text <- paste0(mineral_name, " ", pool_name, " content")
   } else {
     d <- to_plot_hi %>% filter(mineral == mineral_name)
     s <- genotype.hi.ttest %>% filter(mineral == mineral_name)
     y_var <- "hi"
     ylab_text <- "Mineral HI [grain / total]"
-    title_text <- paste0(mineral_name, " HI")
   }
+  title_text <- mineral_name
 
   d <- d %>%
     mutate(Genotype = gsub("<i>|</i>", "", as.character(Genotype)),
@@ -914,12 +911,12 @@ make_inv4m_panel <- function(metric, mineral_name, pool_name = NULL) {
       with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
     scale_colour_manual(values = pal_geno) +
     scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "<i>Inv4m</i>")) +
-    theme_classic(base_size = 14) +
+    theme_classic(base_size = base_size) +
     theme(
-      plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
-      axis.title.y = element_text(face = "bold", size = 12),
+      plot.title = element_text(face = "bold", size = rel(1.55), hjust = 0.5),
+      axis.title.y = element_text(face = "bold", size = rel(0.9)),
       axis.title.x = element_blank(),
-      axis.text.x = element_markdown(size = 13, face = "bold", color = "black"),
+      axis.text.x = element_markdown(face = "bold", size = rel(1.0), color = "black"),
       legend.position = "none"
     )
 
@@ -992,10 +989,10 @@ write_ttest(genotype.conc.ttest,    "ionome_content_conc_genotype_ttests.csv")
 write_ttest(genotype.content.ttest, "ionome_content_genotype_ttests.csv")
 write_ttest(genotype.hi.ttest,      "ionome_content_hi_genotype_ttests.csv")
 
-ggsave(file.path(paths$figures, "ionome_3panel_main_figure.png"),
-       plot = p_main_3panel, width = 14, height = 16, units = "in", dpi = 150)
-ggsave(file.path(paths$figures, "ionome_3panel_supplementary_figure.png"),
-       plot = p_supp_3panel, width = 14, height = 16, units = "in", dpi = 150)
+ggsave(file.path(paths$figures, "ionome_4panel_main_figure.png"),
+       plot = p_main_4panel, width = 15, height = 16, units = "in", dpi = 300)
+ggsave(file.path(paths$figures, "ionome_4panel_supplementary_figure.png"),
+       plot = p_supp_4panel, width = 15, height = 16, units = "in", dpi = 300)
 ggsave(file.path(paths$figures, "ionome_inv4m_effects_figure.png"),
        plot = p_inv4m_effects, width = 16, height = 10, units = "in", dpi = 300)
 ```

@@ -119,14 +119,14 @@ field_data_complete <- field_data %>%
   droplevels()
 
 # Load raw ICP-OES ionome data (one row per tissue x rowid) and reshape to
-# one row per plot with {mineral}_seed and {mineral}_stover columns. Apply
+# one row per plot with {mineral}_grain and {mineral}_stover columns. Apply
 # the same concentration outlier masks used in PSU2022_ionome.Rmd so that
 # content derivations stay consistent with the concentration analyses.
 ionome_csv <- file.path(paths$data, "PSU_inv4m_ionome_all.csv")
 reliable_minerals <- c("Ca", "Fe", "K", "Mg", "Mn", "P", "S", "Zn")
 
 ionome_wide <- read.csv(ionome_csv, na.strings = c("", "NA")) %>%
-  mutate(tissue = recode(tissue, "stalk" = "stover")) %>%
+  mutate(tissue = recode(tissue, "stalk" = "stover", "seed" = "grain")) %>%
   select(tissue, rowid, all_of(reliable_minerals)) %>%
   pivot_wider(
     id_cols = rowid,
@@ -147,10 +147,10 @@ field_data_complete <- field_data_complete %>%
 # corrected content variables are detrended as a single trait rather than
 # reconstructed from two independently-corrected inputs.
 for (ion in reliable_minerals) {
-  seed_col   <- paste0(ion, "_seed")
+  grain_col  <- paste0(ion, "_grain")
   stover_col <- paste0(ion, "_stover")
   field_data_complete[[paste0(ion, "_grain_mg")]] <-
-    field_data_complete$TKW * field_data_complete[[seed_col]] / 1000
+    field_data_complete$TKW * field_data_complete[[grain_col]] / 1000
   field_data_complete[[paste0(ion, "_stover_mg")]] <-
     field_data_complete$STWHV * field_data_complete[[stover_col]] / 1000
   field_data_complete[[paste0(ion, "_total_mg")]] <-
@@ -160,7 +160,7 @@ for (ion in reliable_minerals) {
     field_data_complete[[paste0(ion, "_grain_mg")]] /
     field_data_complete[[paste0(ion, "_total_mg")]]
   field_data_complete[[paste0(ion, "_ratio")]] <-
-    field_data_complete[[seed_col]] /
+    field_data_complete[[grain_col]] /
     field_data_complete[[stover_col]]
 }
 
@@ -169,7 +169,7 @@ base_phenotypes <- c("PH", "DTA", "DTS", "STW40", "STW50", "STW60", "STWHV")
 ear_phenotypes <- c("EW", "EL", "ED", "KRN", "CD", "TKW", "KW50", "TKN", "HI")
 
 ionome_conc_phenotypes <- c(
-  paste0(reliable_minerals, "_seed"),
+  paste0(reliable_minerals, "_grain"),
   paste0(reliable_minerals, "_stover")
 )
 
