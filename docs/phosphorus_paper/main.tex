@@ -177,7 +177,7 @@ Phosphorus starvation led to delayed anthesis \textbf{(C)} and silking \textbf{(
 Cob diameter \textbf{(F)} showed the only significant $\invfour$ genotype dependency, resulting in thinner cobs under phosphorus deficiency.
 \textbf{(G)} Time course of stover dry weight shows lower biomass accumulation under $-P$ across all sampling dates for both genotypes.
 \textbf{(H)} Fitted logistic growth curve, each line corresponds to a plot.
-BH-adjusted thresholds: \textit{n.s.}\ non significant, $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***), $< 0.0001$ (****).
+\textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
 }
 \label{fig:Figure_1}
 \end{figure*}
@@ -610,12 +610,10 @@ The fixed effects coefficients represent the overall mean ($\beta_0$), the effec
 The residuals $\varepsilon_{ijr} \sim \mathcal{N}(0, \sigma_\varepsilon^2)$ capture remaining variation after spatial correction.
 We adjusted p-values for multiple testing using the false discovery rate method and report effects with FDR $< 0.05$.
 
-Significance brackets in Figure~\ref{fig:Figure_1} and in the ionome figures (Figures \ref{fig:Figure_2}, \ref{supp:Figure_S4}, \ref{supp:Figure_S5}) are pairwise contrasts from the same linear model (Equation~\ref{eq:pheno_model}), extracted with the \texttt{emmeans} package \cite{lenth2023}.
-For the phenotype figure, we computed three $-$P vs $+$P contrasts per trait: the simple effect within each genotype, and the effect marginalised over genotypes.
-All 48 contrasts (16 traits $\times$ 3) were pooled for a single Benjamini and Hochberg adjustment; per genotype contrasts are drawn in Figure~\ref{fig:Figure_1} and the marginal contrasts in Supplementary Figure~\ref{supp:Figure_S1}.
-For the ionome figures, each of eight minerals was modelled separately across four metric families: concentration in grain and in stover (16 models), per plant content in grain and in stover (16 models), grain/stover concentration ratio (8 models), and mineral harvest index (8 models).
-From every model we extracted the $-$P vs $+$P simple effect within each genotype, yielding 96 contrasts that were FDR-pooled across all four metric families and displayed as brackets in Figure~\ref{fig:Figure_2} (P, Zn, Ca, S) and Supplementary Figure~\ref{supp:Figure_S4} (Mg, Mn, K, Fe).
-Supplementary Figure~\ref{supp:Figure_S5} instead shows the marginal \invfour vs CTRL contrast (48 contrasts, one per ionome model) FDR-pooled across the same four metric families.
+Within-genotype $-$P vs $+$P contrasts (\texttt{emmeans} \cite{lenth2023}) from Eq.~\ref{eq:pheno_model}, FDR-corrected across 48 tests, are plotted in Figure~\ref{fig:Figure_1}; marginal $\pm$P contrasts from the same model in Supplementary Figure~\ref{supp:Figure_S1}.
+The same model was fit independently to each mineral $\times$ metric family combination (concentration, content, grain/stover ratio, harvest index).
+Within-genotype $-$P vs $+$P ionome contrasts, FDR-corrected across 96 tests, are plotted in Figure~\ref{fig:Figure_2} and Supplementary Figure~\ref{supp:Figure_S4}.
+Marginal \invfour vs CTRL ionome contrasts, FDR-corrected across 48 tests, are plotted in Supplementary Figure~\ref{supp:Figure_S5}.
 
 \subsection*{Tissue sampling, RNA extraction, and sequencing}
 
@@ -752,7 +750,7 @@ with a kernel size-to-number trade-off that collectively preserved total kernel 
 \textbf{(D)} Total kernel weight per plant was statistically unchanged under $-$P,
 indicating that kernel mass per plant was maintained at the expense of individual
 kernel size.
-BH-adjusted thresholds: $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***), $< 0.0001$ (****); non significant brackets are not shown.
+\textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
 }
 \label{supp:Figure_S1}
 \end{figure*}
@@ -766,7 +764,7 @@ BH-adjusted thresholds: $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***
 \textbf{(A)} Days to anthesis. $\invfour$ reached anthesis significantly earlier than CTRL under both phosphorus sufficient (+P) and deficient (-P) conditions.
 \textbf{(B)} Plant height at sampling. $\invfour$ plants were significantly taller than CTRL plants under both +P and -P treatments.
 Yellow boxplots represent CTRL, purple boxplots represent $\invfour$.
-\textit{FDR} adjusted significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***).
+\textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
 }
 \label{supp:Figure_S2}
 \end{figure*}
@@ -782,7 +780,7 @@ Yellow boxplots represent CTRL, purple boxplots represent $\invfour$.
 Phosphorus deficiency significantly reduced the Area Under the Curve (AUC) for empirical data \textbf{(B)} and logistic model \textbf{(C)}, prolonged the time to reach half maximum stover weight (T$_{1/2}$) (D), and decreased the maximum stover weight (STW$_{\text{max}}$) (E).
 %Crucially, no significant genotype-by-phosphorus interactions were observed for any of these growth parameters, indicating that \invfour did not modulate the plant's response to phosphorus availability.
 %Furthermore, there were no significant main effects of the \invfour genotype on these stover grotwh parameters.
-\textit{FDR} adjusted \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
+\textit{FDR} adjusted Welch's \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
 }
 \label{supp:Figure_S3}
 \end{figure}
@@ -795,7 +793,7 @@ Phosphorus deficiency significantly reduced the Area Under the Curve (AUC) for e
 \caption{\textbf{Secondary ionomic responses of \invfour and control (CTRL) maize lines under phosphorus sufficiency (+P) and deficiency ($-$P).}
 Boxplots for magnesium (Mg), manganese (Mn), potassium (K), and iron (Fe) show, per genotype, \textbf{(A)} element concentrations (mg/kg) in stover and grain, \textbf{(B)} grain/stover concentration ratios, \textbf{(C)} per plant content (mg/plant) in stover and grain, and \textbf{(D)} mineral harvest index (HI, grain/total).
 %Phosphorus deficiency ($-P$) caused a significant reduction in seed Mg (A) and seed Mn (B). No significant effects of either phosphorus treatment or the \invfour genotype were detected for K, Fe, or the seed/stover partition ratios (B) for any of the four elements.
-BH-adjusted thresholds: $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***), $< 0.0001$ (****); non significant brackets are not shown.
+\textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
 Effect sizes and exact $p$ values are reported in Table.}
 \label{supp:Figure_S4}
 \end{figure*}
@@ -809,16 +807,19 @@ Effect sizes and exact $p$ values are reported in Table.}
 For each of five minerals (Mg, Ca, Zn, Fe, K; columns), boxplots contrast control (CTRL) and \invfour plants on four metrics: \textbf{(A)} mineral concentration (mg/kg), \textbf{(B)} grain/stover concentration ratio, \textbf{(C)} per-plant mineral content (mg/plant), and \textbf{(D)} mineral harvest index (HI, grain/total).
 For concentration and content, a single pool is shown per cell: the pool where the \invfour vs CTRL contrast is significant under the unified FDR, or \textit{stover} when neither pool is significant.
 The selected pool is indicated on the facet strip.
-BH-adjusted thresholds: $\textit{FDR} < 0.05$ (*), $< 0.01$ (**), $< 0.001$ (***), $< 0.0001$ (****); non significant brackets are not shown.}
+\textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).}
 \label{supp:Figure_S5}
 \end{figure*}
+
+\clearpage
+
 
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=0.8\linewidth]{figs/Figure_S6.png}
 \caption{
 (\textbf{A}) Euler diagram showing the major two-way intersections among DEGs from the effects of leaf position (Leaf Up/Leaf Down), phosphorus deficiency (-P Up / -P Down), and interaction (Negative and  Positive). Circle sizes represent set sizes, and numbers indicate the counts in each intersection. 
-(\textbf{B}) Upset plot highlighting high-confidence DEG intersections that are significantly enriched relative to expectation (FDR <0.05), the first and second intersections are depicted in A, the third  (Leaf Down $\cap$ -P Down) is not,due to its small size. 
+(\textbf{B}) Upset plot highlighting high-confidence DEG intersections that are significantly enriched relative to expectation (FDR <0.05), the first and second intersections are depicted in A, the third  (Leaf Down $\cap$ -P Down) is not, due to its small size.
 (\textbf{C}) Summary of high-confidence DEGs and their GO Biological Process (BP) annotation. Black numbers indicate the total number of high-confidence DEGs per group; white numbers denote the subset annotated with significantly enriched BP terms. Neg L$\times$–P: negative Leaf $\times$ –P interaction effect, and Pos L$\times$–P: positive interaction.
 (\textbf{D}) Euler diagram showing overlap among the high-confidence BP annotated DEG sets, illustrating shared and unique functional responses across leaf position, phosphorus deficiency, and their interaction.
 }
