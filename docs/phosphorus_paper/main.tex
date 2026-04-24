@@ -271,11 +271,11 @@ Conversely, genes associated with phosphorus-intensive processes and photosynthe
 (\textbf{A}) Multidimensional scaling of transcripts. The MDS plot of $\log_{2}(\text{CPM})$. %Leaves tend to cluster by developmental stage and P treatment, showing more differentiation between P groups with increasing age.
 (\textbf{B}) Volcano Plots of Transcriptomic Main Effects. 
 \textit{Right}: Main transcriptional effect of leaf stage (per-stage increase). 
-A total of 1,431 high-confidence DEGs were identified. 
+A total of 1,431 strong DEGs were identified. 
 %Key genes related to development include $\textit{umc1690}$ (Transcription factor PCF7), $\textit{ntf2}$ (NTF2 domain-containing protein), and $\textit{sgrl1}$ (Protein STAY-GREEN LIKE), all significantly downregulated. 
 The x-axis represents the $\log_{2}(\text{Fold Change})$ and the y-axis represents the $-\log_{10}(\text{FDR})$.
 \textit{Left}: Main transcriptional effect of Phosphorus deficiency ($-\text{P}$ treatment). 
-%A total of \textbf{794} high-confidence DEGs were identified.
+%A total of \textbf{794} strong DEGs were identified.
 %This response highlights key P-starvation mechanisms:
 %\textbf{Upregulated genes} promoting P mobilization and signaling include $\textit{pilncr1}$ ($\log_2\text{FC}=7.34$), a precursor to the P response master regulator $\textit{miR399}$ and $\textit{pap19}$ ($\log_2\text{FC}=5.99$), a purple acid phosphatase.
 %The lipid-remodeling enzyme $\textit{mgd2}$ ($\log_2\text{FC}=4.83$) was also highly upregulated.
@@ -284,10 +284,10 @@ The x-axis represents the $\log_{2}(\text{Fold Change})$ and the y-axis represen
 %Dimension 2 tends to separate leaves by P treatment, and dimension 3 separates leaf stage 1 from the older samples.
 (\textbf{D}) Volcano plots of lipidomic main effects.
 \textit{Left}: Main effect of leaf stage on lipids.
-%A total of \textbf{11} high-confidence DALs were identified. 
+%A total of \textbf{11} strong DALs were identified. 
 The axes and thresholds are analogous to those in panel B, highlighting lipids whose abundance is significantly altered by each factor independently of the other.
 \textit{Right:} Main effect of phosphorus deficiency on lipids.
-%A total of \textbf{23} high-confidence DALs were identified.
+%A total of \textbf{23} strong DALs were identified.
 (\textbf{E}) Mass Spectrometry signal profiles of the most differentially abundant lipids. 
 %The most significantly depleted lipids (indicating the membrane remodeling response) include the phospholipids \textbf{PC34:2} ($\log_2\text{FC}=-1.60$), \textbf{LPE18:2} ($\log_2\text{FC}=-2.69$), \textbf{LPC16:1} ($\log_2\text{FC}=-3.50$), \textbf{PC32:2} ($\log_2\text{FC}=-2.58$), and \textbf{PG32:0} ($\log_2\text{FC}=-1.61$). 
 }
@@ -302,7 +302,7 @@ Sulfur metabolism was also affected: the chromosome 9 cysteine synthase gene clu
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=0.85\linewidth]{figs/Figure_4.png}
-\caption{Controlled vocabulary enrichment. Overrepresentation analysis for (A) Gene ontology Biological Process, in parentheses, the total number of high confidence DEGs in each  category, the sum of annotated genes in all overrepresented terms per category is illustrated in \ref{supp:Figure_S6}~C-D,
+\caption{Controlled vocabulary enrichment. Overrepresentation analysis for (A) Gene ontology Biological Process, in parentheses, the total number of strong DEGs in each  category, the sum of annotated genes in all overrepresented terms per category is illustrated in \ref{supp:Figure_S6}~C-D,
 (B) KEGG Pathways, C) Lion lipids.
 }
 \label{fig:Figure_4}
@@ -340,7 +340,7 @@ Error bars represent SEM.
 \end{figure*}
 Concomitantly, phosphorus starvation leads to a storage response through the accumulation of triacylglycerols (TAGs), evidenced by the highly upregulated TG56:6 ($\log_2\text{FC}=12.71 \pm 0.62, \text{FDR}=0.018$) (Fig~\ref{fig:Figure_3}D)
 LION lipid enrichment analysis confirms these systemic changes, showing an extremely strong enrichment of triacylglycerols ($\text{FDR}=1.06 \times 10^{-11}$, $\text{ES}=0.80$) and associated lipid storage terms, alongside a highly significant decrease in glycerophospholipids ($\text{FDR}=1.46 \times 10^{-8}$, $\text{ES}=-0.60$) and membrane components ($\text{FDR}=4.03 \times 10^{-11}$, $\text{ES}=-0.76$) (Fig~\ref{fig:Figure_3}C)
-\invfour shows no apparent high-confidence main effect on differential lipid production at this level.
+We did not detect strong DALs for the \invfour main effect.
 % Add  KEGGenrichemnt stats galactolipid biosynthetic process
 \subsection*{Phosphorus starvation promotes senescence-associated  transcription and the shutdown of light-dependent photosynthesis reaction genes}
 
@@ -373,7 +373,7 @@ Using gene set transcriptomic indices, we corroborated that chlorophyll biosynth
 And in particular, Magnesium chelatase \textit{chlh1} (\textit{Zm00001eb433610}), glutamyl-tRNA reductase \textit{gtr3} (\textit{Zm00001eb044210}), and uroporphyrinogen decarboxylase \textit{urod} (\textit{Zm00001eb358510}) consistently decreased expression with each successive sample downwards, while the pheophytinase \textit{pph} (\textit{Zm00001eb231810}) showed the opposite pattern. 
 Simultaneously, the photosynthesis genes \textit{pep1} and \textit{ssu1} (pep carboxylase and rubisco small subunit, respectively)  were downregulated, while the senescence-associated genes \textit{salt1} (\textit{Zm00001eb130570}) and \textit{mir3}  (\textit{Zm00001eb068400}) were upregulated.
 While chlorophyll degradation enzyme \textit{pph} showed positive correlation with leaf age,  \textit{sgrl1} (\textit{Zm00001eb076680}) was downregulated, potentially shifting chlorophyll catabolism towards PPH  from the chlorophyllase pathway, which has been reported to mediate  87\% chlorophyll degradation in maize \cite{wei2025}.
-% All these genes surpassed our statistical and effect size cutoffs for high-confidence DEGs (Supplementary Table \ref{table::}).
+% All these genes surpassed our statistical and effect size cutoffs for strong DEGs (Supplementary Table \ref{table::}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \section{Discussion}
@@ -391,14 +391,14 @@ Gene Ontology enrichment confirmed activation of galactolipid biosynthetic proce
 Downregulated genes included \textit{peamt2} (\textit{Zm00001eb294690}), which catalyzes phosphoethanolamine methylation in the Kennedy pathway for PC biosynthesis, photosynthesis genes \textit{rca3} (\textit{Zm00001eb164380}) and \textit{lhcb10} (\textit{Zm00001eb357740}), and transcription factors \textit{zim25} (\textit{Zm00001eb278320}), \textit{nactf132} (\textit{Zm00001eb324550}), and \textit{bzip81} (\textit{Zm00001eb198410}).
 These patterns validate the canonical phosphorus starvation response documented in previous studies \cite{wang2020a,he2022}.
 
-We detected 555 high-confidence DEGs with a significant and strong interaction between leaf stage and phosphorus treatment Fig~\ref{fig:Figure_4}A-B, meaning that their phosphorus responses increased or decreased linearly with leaf position.
+We detected 555 strong DEGs with a significant and strong interaction between leaf stage and phosphorus treatment Fig~\ref{fig:Figure_4}A-B, meaning that their phosphorus responses increased or decreased linearly with leaf position.
 Our statistical modelling was designed to detect two functionally distinct trajectories.
 Genes with negative interaction terms (194), including light-harvesting proteins \textit{cab}, \textit{psad1}, and \textit{ndho1}, showed increased negative responses to phosphorus starvation in older leaves, corresponding to selective shutdown of the thylakoid light-capture machinery.
 Gene Ontology enrichment for this set highlighted terms related to photosynthesis and the light-harvesting complex, and KEGG analysis identified both Photosynthesis -- antenna proteins (zma00196) and Carbon fixation by Calvin cycle (zma00710) as strongly enriched in the Leaf:$-$P downregulated cluster, with both pathways gaining substantially more DEGs in the interaction cluster than in the $-$P main effect cluster (Fig~\ref{fig:Figure_4}A-B).
 Both light-harvesting and carbon-fixation capacity are therefore progressively shut down in older leaves under phosphorus limitation, pointing to a coordinated decommissioning of the photosynthetic machinery rather than a split between components that are uniformly regulated across leaf stages and components whose regulation is amplified with leaf age.
 
 Genes with positive interaction terms (Fig~\ref{fig:Figure_4}A-B) i.e. with increased slope of $log_2{\text{FC}}>0.5$ per leaf stage under phosphorus limitation, showed amplified phosphorus-starvation responses in older leaves, corresponding to enhanced senescence and nutrient remobilization signatures.
-Out of 361 high-confidence DEGs with positive interaction with leaf age, 20 genes were annotated with "cellular response to phosphate starvation" and presented in the \ref{table:goleafxP_genes}.
+Out of 361 strong DEGs with positive interaction with leaf age, 20 genes were annotated with "cellular response to phosphate starvation" and presented in the \ref{table:goleafxP_genes}.
 These genes can be classified into more specific functional groups.
 The glycolytic enzymes, \textit{pfk1}, together with \textit{pep2} and its activating kinase \textit{ppck3}.
 The galactolypid byiosynthetic enzymes \textit{mgd3}, \textit{sqd2}, and \textit{sqd3}, were strongly up-regulated, indicating accelerated replacement of phospholipids with sulfo- and galactolipids in ageing plastids.
@@ -470,7 +470,7 @@ The age-dependent amplification of TAG accumulation in our dataset is compatible
 \subsection{Leaf senescence transcription accelerates under phosphorus limitation}
 
 The coordination of developmental senescence with phosphorus starvation might be an adaptive strategy in maize, where leaf age influences the magnitude of nutrient stress responses. 
-Five \textit{Arabidopsis} ortholog genes (SAGs) in~\cite{zhang2014c} are high-confidence DEGs for the effect of leaf stage, providing support for our observed leaf developmental gradient. 
+Five \textit{Arabidopsis} ortholog genes (SAGs) in~\cite{zhang2014c} are strong DEGs for the effect of leaf stage, providing support for our observed leaf developmental gradient. 
 The NAC transcription factor \textit{nactf108} (\textit{Zm00001eb135910}, ORE1/ANAC092), a regulator known to activate SAG targets during early senescence, was found to increase with leaf position. 
 Similarly, transcripts for chlorophyll degradation enzymes \textit{pph} (\textit{Zm00001eb231810}) (pheophytinase) and \textit{nye1} (\textit{Zm00001eb319560},SGR/STAY-GREEN), along with proteolytic machinery including \textit{see2b} (\textit{Zm00001eb162210}, gamma vacuolar processing enzyme) and \textit{clpb1} (\textit{Zm00001eb242420}, ERD1/SAG15), progressively increased from young to old leaves. 
 This expression pattern is consistent with the canonical progression of natural leaf aging during vegetative growth, establishing a baseline for interpreting stress-induced deviations.
@@ -482,7 +482,7 @@ This interaction extends to \textit{csap} (\textit{Zm00001eb402430}, \textit{chl
 We identified 24 genes within this Leaf $\times$ $-$P interaction term that reveal potential functional specialization. 
 Three hub genes, \textit{rns}, \textit{mybr105} (\textit{Zm00001eb081290}, a protein-binding MYB), and \textit{lkrsdh1} (\textit{Zm00001eb192910}) (involved in lysine catabolism), appear central to these nutrient salvage operations, while transport genes (e.g., the carbohydrate transporter \textit{sweet2} (\textit{Zm00001eb342040}) and \textit{ppt1} (\textit{Zm00001eb097690}) and cell wall remodeling enzymes, \textit{aga2} (\textit{Zm00001eb281720}) and \textit{irx15} (\textit{Zm00001eb068410}),  are upregulated, consistent with nutrient remobilization.
 
-To map the regulatory architecture governing these processes, we compiled a list of SAGs by cross-referencing our high-confidence DEGs with manually curated sources \cite{zhang2014c,liu2011,ojeda2026,berardini2015,durinck2005}, resulting in a total of 110 genes (\nameref{S1_File}). 
+To map the regulatory architecture governing these processes, we compiled a list of SAGs by cross-referencing our strong DEGs with manually curated sources \cite{zhang2014c,liu2011,ojeda2026,berardini2015,durinck2005}, resulting in a total of 110 genes (\nameref{S1_File}). 
 Almost half of these, 53, were transcription factors. 
 They are distributed across 13 families, with the NAC (16 members), WRKY (7), G2-like (5), AP2-EREBP (5), MYB (5), and bHLH (5) families representing the dominant regulatory nodes. 
 Within the NAC family, we observed complex, context-dependent expression patterns. 
@@ -682,7 +682,7 @@ Lipid models additionally included MS injection order as a technical covariate (
 Empirical Bayes moderation was applied using \texttt{eBayes} to stabilize variance estimates across genes or lipids.
 
 We adjusted p-values for multiple testing as false discovery rates (FDR).
-For phosphorus treatment and \invfour genotype main effects, genes or lipids with FDR $< 0.05$ and $|\log_2(\text{FC})| > 1.5$ were classified as high-confidence differentially expressed or abundant.
+For phosphorus treatment and \invfour genotype main effects, genes or lipids with FDR $< 0.05$ and $|\log_2(\text{FC})| > 1.5$ were classified as strong DEGs or strong DALs.
 For leaf stage and interaction effects, we used a threshold of $|\log_2(\text{FC})| > 0.5$, equivalent to $|\log_2(\text{FC})| > 1.5$ between leaf stages 1 and 4.
 R scripts and expression data are available at the \href{https://github.com/sawers-rellan-labs/inv4m}{inv4m GitHub repository}.
 
@@ -822,9 +822,9 @@ The selected pool is indicated on the facet strip.
 \includegraphics[width=0.8\linewidth]{figs/Figure_S6.png}
 \caption{
 (\textbf{A}) Euler diagram showing the major two-way intersections among DEGs from the effects of leaf position (Leaf Up/Leaf Down), phosphorus deficiency (-P Up / -P Down), and interaction (Negative and  Positive). Circle sizes represent set sizes, and numbers indicate the counts in each intersection. 
-(\textbf{B}) Upset plot highlighting high-confidence DEG intersections that are significantly enriched relative to expectation (FDR <0.05), the first and second intersections are depicted in A, the third  (Leaf Down $\cap$ -P Down) is not, due to its small size.
-(\textbf{C}) Summary of high-confidence DEGs and their GO Biological Process (BP) annotation. Black numbers indicate the total number of high-confidence DEGs per group; white numbers denote the subset annotated with significantly enriched BP terms. Neg L$\times$–P: negative Leaf $\times$ –P interaction effect, and Pos L$\times$–P: positive interaction.
-(\textbf{D}) Euler diagram showing overlap among the high-confidence BP annotated DEG sets, illustrating shared and unique functional responses across leaf position, phosphorus deficiency, and their interaction.
+(\textbf{B}) Upset plot highlighting strong DEG intersections that are significantly enriched relative to expectation (FDR <0.05), the first and second intersections are depicted in A, the third  (Leaf Down $\cap$ -P Down) is not, due to its small size.
+(\textbf{C}) Summary of strong DEGs and their GO Biological Process (BP) annotation. Black numbers indicate the total number of strong DEGs per group; white numbers denote the subset annotated with significantly enriched BP terms. Neg L$\times$–P: negative Leaf $\times$ –P interaction effect, and Pos L$\times$–P: positive interaction.
+(\textbf{D}) Euler diagram showing overlap among the strong BP annotated DEG sets, illustrating shared and unique functional responses across leaf position, phosphorus deficiency, and their interaction.
 }
 \label{supp:Figure_S6}
 \end{figure*}
@@ -1042,7 +1042,7 @@ Zm00001eb138960 &  &  & 2.1 & -2.11\\
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{High-confidence -P upregulated DEGs annotated with GO:0016036 "cellular response to phosphate starvation" (\cite{fattel2024})}
+\caption{Strong -P upregulated DEGs annotated with GO:0016036 "cellular response to phosphate starvation" (\cite{fattel2024})}
 \label{table::PSRupDEGs}
 \begin{tabular}{ccp{7.5cm}cc}
 \hline
@@ -1092,7 +1092,7 @@ Zm00001eb202100 & pap14 & purple acid phosphatase14 & 1.54 & 2.82\\
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{High-confidence Positive Leaf $\times$ -P DEGs annotated with GO:0016036 "cellular response to phosphate starvation" (\cite{fattel2024}) }
+\caption{Strong DEGs with positive Leaf $\times$ -P interaction annotated with GO:0016036 "cellular response to phosphate starvation" (\cite{fattel2024}) }
 \label{table:goleafxP_genes}
 \begin{tabular}{ccp{7.5cm}cc}
 \hline
@@ -1130,7 +1130,7 @@ Zm00001eb361620 & ppa2 & Inorganic pyrophosphatase 1 & 1.31 & 0.62\\
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{High-confidence differentially abundant lipids for leaf main effect.}
+\caption{Strong DALs for leaf main effect.}
 \label{table::leaf_lipids}
 \begin{tabular}{cccc}
 \hline
@@ -1168,7 +1168,7 @@ DGDG36:1 & glycolipid & 1.6 & -4.09\\
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{High-confidence differentially abundant lipids under phosphorus deficiency and its interaction with leaf stage.}
+\caption{Strong DALs under phosphorus deficiency and its interaction with leaf stage.}
 \label{table::phosphorus_lipids}
 \begin{tabular}{cccc}
 \hline
@@ -1231,7 +1231,7 @@ PC34:2 & phospholipid & 2.6 & -0.55\\
 \def\@currentlabelname{S1 File.}
 \makeatother
 \label{S1_File}
-\textbf{High Confidence Senescence Associated DEGs.} High Confidence DEGs that have been reported to be associated with senescence, they might respond to any of the experimental predictors in this study: -P, Leaf, \invfour genotype.
+\textbf{Strong DEGs Associated with Senescence.} Strong DEGs that have been reported to be associated with senescence; they might respond to any of the experimental predictors in this study: -P, Leaf, \invfour genotype.
 
 \end{document}
 
