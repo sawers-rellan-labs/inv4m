@@ -119,7 +119,7 @@ Genes are classified as:
 Three levels of stringency for different analyses:
 
 - **Significant DEGs**: for Manhattan plots, FDR < 0.05 (`is_DEG`).
-- **High-confidence DEGs**: for GO enrichment, FDR < 0.05 AND $\log_2FC > \pm1.5$ (`is_hiconf_DEG`).
+- **Strong DEGs**: for GO enrichment, FDR < 0.05 AND $\log_2FC > \pm1.5$ (`is_strong_DEG`).
 - **Selected DEGs**: for manuscript main tables, the union ($\cup$) of the top 20 by significance and the top 20 by Mahalanobis distance (`is_selected_DEG`).
 
 # Libraries
@@ -964,7 +964,7 @@ This first tier identifies all genes that pass the statistical significance thre
 }
 ```
 
-## High-Confidence DEGs
+## Strong DEGs
 
 The second tier filters the significant DEGs further by applying the custom large effect size thresholds.
 
@@ -980,15 +980,15 @@ is_large_effect[is_interaction & abs(effects_df$logFC) > 0.5] <- TRUE
 is_large_effect[!is_leaf & abs(effects_df$logFC) > 1.5] <- TRUE
 
 effects_df <- effects_df %>%
-  mutate(is_hiconf_DEG = is_DEG & is_large_effect)
+  mutate(is_strong_DEG = is_DEG & is_large_effect)
 
 {
-  cat("\nHigh-Confidence DEGs (is_hiconf_DEG) Count:\n")
-  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+  cat("\nStrong DEGs (is_strong_DEG) Count:\n")
+  print(with(effects_df, table(predictor, is_strong_DEG)))
   print(
     with(
-      effects_df %>% filter(is_hiconf_DEG),
-      table(predictor, regulation, is_hiconf_DEG)
+      effects_df %>% filter(is_strong_DEG),
+      table(predictor, regulation, is_strong_DEG)
     ) %>%
       as_tibble() %>%
       arrange(desc(predictor), desc(regulation))
@@ -1004,15 +1004,15 @@ The final tier, `is_selected_DEG`, selects the most interesting genes for visual
 rank_threshold <- 10
 
 effects_df <- effects_df %>%
-  group_by(is_hiconf_DEG, predictor, regulation) %>%
+  group_by(is_strong_DEG, predictor, regulation) %>%
   mutate(
     pval_rank = row_number(dplyr::desc(neglogP)),
     mahal_rank = row_number(dplyr::desc(mahalanobis))
   ) %>%
   ungroup() %>%
   mutate(
-    is_selected_DEG = (pval_rank <= rank_threshold & is_hiconf_DEG) |
-      (mahal_rank <= rank_threshold & is_hiconf_DEG)
+    is_selected_DEG = (pval_rank <= rank_threshold & is_strong_DEG) |
+      (mahal_rank <= rank_threshold & is_strong_DEG)
   )
 
 {
@@ -1220,36 +1220,36 @@ deg_tests <- bind_rows(
 }
 ```
 
-## High-Confidence DEG Enrichment
+## Strong DEG Enrichment
 
-```{r fisher_tests_hiconf_degs}
-hiconf_deg_tests <- bind_rows(
-  run_fisher(Region_effects, "in_cis", "is_hiconf_DEG") %>%
+```{r fisher_tests_strong_degs}
+strong_deg_tests <- bind_rows(
+  run_fisher(Region_effects, "in_cis", "is_strong_DEG") %>%
     mutate(comparison = "Shared introgression vs Outside"),
   run_fisher(
     Region_effects %>% filter(in_flank | outside),
     "in_flank",
-    "is_hiconf_DEG"
+    "is_strong_DEG"
   ) %>%
     mutate(comparison = "Flanking vs Outside"),
   run_fisher(
     Region_effects %>% filter(in_Inv4m | outside),
     "in_Inv4m",
-    "is_hiconf_DEG"
+    "is_strong_DEG"
   ) %>%
     mutate(comparison = "Inv4m vs Outside"),
   run_fisher(
     Region_effects %>% filter(in_cis),
     "in_Inv4m",
-    "is_hiconf_DEG"
+    "is_strong_DEG"
   ) %>%
     mutate(comparison = "Inv4m vs Flanking")
 ) %>%
   dplyr::select(comparison, everything())
 
 {
-  cat("\nHigh-confidence DEG Enrichment (FDR < 0.05, |logFC| > 1.5):\n")
-  print(hiconf_deg_tests)
+  cat("\nStrong DEG Enrichment (FDR < 0.05, |logFC| > 1.5):\n")
+  print(strong_deg_tests)
 }
 ```
 
@@ -1260,7 +1260,7 @@ hiconf_deg_tests <- bind_rows(
   cat("\n=== Key Findings ===\n")
   cat("1. DEGs are enriched in Inv4m region vs genome-wide\n")
   cat("2. Both Inv4m and flanking show enrichment vs outside\n")
-  cat("3. Regional enrichment pattern observed for high-confidence DEGs\n")
+  cat("3. Regional enrichment pattern observed for strong DEGs\n")
   cat("\nInterpretation: The introgression region (inversion + flanking)\n")
   cat("shows elevated differential expression patterns.\n")
 }
@@ -1323,7 +1323,7 @@ overall_summary <- effects_df %>%
     total_genes = n(),
     n_significant = sum(is_DEG),
     n_DEG = sum(is_DEG),
-    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_strong_DEG = sum(is_strong_DEG),
     n_selected_DEG = sum(is_selected_DEG),
     pct_DEG = round(100 * n_DEG / total_genes, 2)
   )
@@ -1450,9 +1450,9 @@ interaction_selected <- selected_degs %>%
 # Load normalized expression data
 voomR <- readRDS(file.path(paths$intermediate, "normalized_expression_voom_object_leaf_trt.rds"))
 
-# Define genes of interest - High_confidence interaction genes
+# Define genes of interest - strong interaction genes
 interaction_highconf <- effects_df %>%
-  filter(is_hiconf_DEG & predictor == "Leaf:-P")
+  filter(is_strong_DEG & predictor == "Leaf:-P")
 
 interaction_genes <- interaction_highconf %>%
   pull(gene) %>%
@@ -1909,7 +1909,7 @@ This analysis identified differentially expressed genes across four main effects
 ## Three-tier classification:
 
 - **Significant DEGs** (FDR < 0.05): 17354 genes
-- **High-confidence DEGs** (FDR < 0.05, |logFC| > 1.5): 2937 genes
+- **Strong DEGs** (FDR < 0.05, |logFC| > 1.5): 2937 genes
 - **Selected DEGs** (top 10 by significance/Mahalanobis): 122 genes
 
 ## Output Files

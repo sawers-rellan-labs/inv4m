@@ -11,7 +11,7 @@
 
 <meta name="author" content="Fausto Rodríguez Zapata" />
 
-<meta name="date" content="2026-03-21" />
+<meta name="date" content="2026-04-24" />
 
 <title>Differential Gene Expression Analysis: Leaf-Treatment Interaction Model</title>
 
@@ -1588,7 +1588,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">Differential Gene Expression Analysis:
 Leaf-Treatment Interaction Model</h1>
 <h4 class="author">Fausto Rodríguez Zapata</h4>
-<h4 class="date">2026-03-21</h4>
+<h4 class="date">2026-04-24</h4>
 
 </div>
 
@@ -1782,9 +1782,9 @@ inversion + flanking)</li>
 <ul>
 <li><strong>Significant DEGs</strong>: for Manhattan plots, FDR &lt;
 0.05 (<code>is_DEG</code>).</li>
-<li><strong>High-confidence DEGs</strong>: for GO enrichment, FDR &lt;
-0.05 AND <span class="math inline">\(\log_2FC &gt; \pm1.5\)</span>
-(<code>is_hiconf_DEG</code>).</li>
+<li><strong>Strong DEGs</strong>: for GO enrichment, FDR &lt; 0.05 AND
+<span class="math inline">\(\log_2FC &gt; \pm1.5\)</span>
+(<code>is_strong_DEG</code>).</li>
 <li><strong>Selected DEGs</strong>: for manuscript main tables, the
 union (<span class="math inline">\(\cup\)</span>) of the top 20 by
 significance and the top 20 by Mahalanobis distance
@@ -2851,8 +2851,8 @@ significance threshold, regardless of effect size.</p>
 ##   Inv4m:-P   24249     0
 ##   Leaf:Inv4m 24248     1</code></pre>
 </div>
-<div id="high-confidence-degs" class="section level2">
-<h2>High-Confidence DEGs</h2>
+<div id="strong-degs" class="section level2">
+<h2>Strong DEGs</h2>
 <p>The second tier filters the significant DEGs further by applying the
 custom large effect size thresholds.</p>
 <pre class="r"><code>is_large_effect &lt;- rep(FALSE, nrow(effects_df))
@@ -2866,23 +2866,23 @@ is_large_effect[is_interaction &amp; abs(effects_df$logFC) &gt; 0.5] &lt;- TRUE
 is_large_effect[!is_leaf &amp; abs(effects_df$logFC) &gt; 1.5] &lt;- TRUE
 
 effects_df &lt;- effects_df %&gt;%
-  mutate(is_hiconf_DEG = is_DEG &amp; is_large_effect)
+  mutate(is_strong_DEG = is_DEG &amp; is_large_effect)
 
 {
-  cat(&quot;\nHigh-Confidence DEGs (is_hiconf_DEG) Count:\n&quot;)
-  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+  cat(&quot;\nStrong DEGs (is_strong_DEG) Count:\n&quot;)
+  print(with(effects_df, table(predictor, is_strong_DEG)))
   print(
     with(
-      effects_df %&gt;% filter(is_hiconf_DEG),
-      table(predictor, regulation, is_hiconf_DEG)
+      effects_df %&gt;% filter(is_strong_DEG),
+      table(predictor, regulation, is_strong_DEG)
     ) %&gt;%
       as_tibble() %&gt;%
       arrange(desc(predictor), desc(regulation))
   )
 }</code></pre>
 <pre><code>## 
-## High-Confidence DEGs (is_hiconf_DEG) Count:
-##             is_hiconf_DEG
+## Strong DEGs (is_strong_DEG) Count:
+##             is_strong_DEG
 ## predictor    FALSE  TRUE
 ##   Leaf       22770  1479
 ##   -P         23545   704
@@ -2891,7 +2891,7 @@ effects_df &lt;- effects_df %&gt;%
 ##   Inv4m:-P   24249     0
 ##   Leaf:Inv4m 24248     1
 ## # A tibble: 12 × 4
-##    predictor  regulation    is_hiconf_DEG     n
+##    predictor  regulation    is_strong_DEG     n
 ##    &lt;chr&gt;      &lt;chr&gt;         &lt;chr&gt;         &lt;int&gt;
 ##  1 Leaf:Inv4m Upregulated   TRUE              0
 ##  2 Leaf:Inv4m Downregulated TRUE              1
@@ -2913,15 +2913,15 @@ interesting genes for visualization and detailed annotation.</p>
 <pre class="r"><code>rank_threshold &lt;- 10
 
 effects_df &lt;- effects_df %&gt;%
-  group_by(is_hiconf_DEG, predictor, regulation) %&gt;%
+  group_by(is_strong_DEG, predictor, regulation) %&gt;%
   mutate(
     pval_rank = row_number(dplyr::desc(neglogP)),
     mahal_rank = row_number(dplyr::desc(mahalanobis))
   ) %&gt;%
   ungroup() %&gt;%
   mutate(
-    is_selected_DEG = (pval_rank &lt;= rank_threshold &amp; is_hiconf_DEG) |
-      (mahal_rank &lt;= rank_threshold &amp; is_hiconf_DEG)
+    is_selected_DEG = (pval_rank &lt;= rank_threshold &amp; is_strong_DEG) |
+      (mahal_rank &lt;= rank_threshold &amp; is_strong_DEG)
   )
 
 {
@@ -3151,38 +3151,38 @@ deg_tests &lt;- bind_rows(
 ## 4 Inv4m vs F…           114             253         158           355       1.02
 ## # ℹ 2 more variables: p_value &lt;dbl&gt;, enrichment &lt;dbl&gt;</code></pre>
 </div>
-<div id="high-confidence-deg-enrichment" class="section level2">
-<h2>High-Confidence DEG Enrichment</h2>
-<pre class="r"><code>hiconf_deg_tests &lt;- bind_rows(
-  run_fisher(Region_effects, &quot;in_cis&quot;, &quot;is_hiconf_DEG&quot;) %&gt;%
+<div id="strong-deg-enrichment" class="section level2">
+<h2>Strong DEG Enrichment</h2>
+<pre class="r"><code>strong_deg_tests &lt;- bind_rows(
+  run_fisher(Region_effects, &quot;in_cis&quot;, &quot;is_strong_DEG&quot;) %&gt;%
     mutate(comparison = &quot;Shared introgression vs Outside&quot;),
   run_fisher(
     Region_effects %&gt;% filter(in_flank | outside),
     &quot;in_flank&quot;,
-    &quot;is_hiconf_DEG&quot;
+    &quot;is_strong_DEG&quot;
   ) %&gt;%
     mutate(comparison = &quot;Flanking vs Outside&quot;),
   run_fisher(
     Region_effects %&gt;% filter(in_Inv4m | outside),
     &quot;in_Inv4m&quot;,
-    &quot;is_hiconf_DEG&quot;
+    &quot;is_strong_DEG&quot;
   ) %&gt;%
     mutate(comparison = &quot;Inv4m vs Outside&quot;),
   run_fisher(
     Region_effects %&gt;% filter(in_cis),
     &quot;in_Inv4m&quot;,
-    &quot;is_hiconf_DEG&quot;
+    &quot;is_strong_DEG&quot;
   ) %&gt;%
     mutate(comparison = &quot;Inv4m vs Flanking&quot;)
 ) %&gt;%
   dplyr::select(comparison, everything())
 
 {
-  cat(&quot;\nHigh-confidence DEG Enrichment (FDR &lt; 0.05, |logFC| &gt; 1.5):\n&quot;)
-  print(hiconf_deg_tests)
+  cat(&quot;\nStrong DEG Enrichment (FDR &lt; 0.05, |logFC| &gt; 1.5):\n&quot;)
+  print(strong_deg_tests)
 }</code></pre>
 <pre><code>## 
-## High-confidence DEG Enrichment (FDR &lt; 0.05, |logFC| &gt; 1.5):
+## Strong DEG Enrichment (FDR &lt; 0.05, |logFC| &gt; 1.5):
 ## # A tibble: 4 × 8
 ##   comparison  in_region_DEG in_region_total outside_DEG outside_total odds_ratio
 ##   &lt;chr&gt;               &lt;int&gt;           &lt;int&gt;       &lt;int&gt;         &lt;int&gt;      &lt;dbl&gt;
@@ -3198,7 +3198,7 @@ deg_tests &lt;- bind_rows(
   cat(&quot;\n=== Key Findings ===\n&quot;)
   cat(&quot;1. DEGs are enriched in Inv4m region vs genome-wide\n&quot;)
   cat(&quot;2. Both Inv4m and flanking show enrichment vs outside\n&quot;)
-  cat(&quot;3. Regional enrichment pattern observed for high-confidence DEGs\n&quot;)
+  cat(&quot;3. Regional enrichment pattern observed for strong DEGs\n&quot;)
   cat(&quot;\nInterpretation: The introgression region (inversion + flanking)\n&quot;)
   cat(&quot;shows elevated differential expression patterns.\n&quot;)
 }</code></pre>
@@ -3206,7 +3206,7 @@ deg_tests &lt;- bind_rows(
 ## === Key Findings ===
 ## 1. DEGs are enriched in Inv4m region vs genome-wide
 ## 2. Both Inv4m and flanking show enrichment vs outside
-## 3. Regional enrichment pattern observed for high-confidence DEGs
+## 3. Regional enrichment pattern observed for strong DEGs
 ## 
 ## Interpretation: The introgression region (inversion + flanking)
 ## shows elevated differential expression patterns.</code></pre>
@@ -3275,16 +3275,16 @@ deg_tests &lt;- bind_rows(
 ## # Groups:   predictor, regulation [9]
 ##    predictor regulation gene  locus_symbol desc_merged logFC neglogP mahalanobis
 ##    &lt;fct&gt;     &lt;chr&gt;      &lt;chr&gt; &lt;chr&gt;        &lt;chr&gt;       &lt;dbl&gt;   &lt;dbl&gt;       &lt;dbl&gt;
-##  1 Inv4m     Downregul… Zm00… jmj2         JUMONJI-tr… -3.49    21.9      36226.
-##  2 Inv4m     Downregul… Zm00… jmj4         JUMONJI-tr… -2.84    19.7      29490.
-##  3 Inv4m     Downregul… Zm00… &lt;NA&gt;         Methionyl-… -2.86    17.5      23077.
-##  4 Inv4m     Downregul… Zm00… &lt;NA&gt;         SUMO-activ… -1.98    17.5      23602.
-##  5 Inv4m     Upregulat… Zm00… &lt;NA&gt;         &lt;NA&gt;         6.50    16.9      31320.
-##  6 Inv4m     Upregulat… Zm00… &lt;NA&gt;         Exocyst co…  2.87    16.5      25470.
-##  7 Inv4m     Downregul… Zm00… IDP4515      DnaJ-like … -1.50    15.9      19735.
-##  8 Inv4m     Downregul… Zm00… &lt;NA&gt;         CCT-alpha   -1.69    15.8      19281.
-##  9 Inv4m     Downregul… Zm00… cl19648_2a   ADP-ribosy… -2.78    15.8      18568.
-## 10 Inv4m     Upregulat… Zm00… cl19799_1    &lt;NA&gt;         1.97    15.6      22010.
+##  1 Inv4m     Downregul… Zm00… jmj2         JUMONJI-tr… -3.49    21.9      36194.
+##  2 Inv4m     Downregul… Zm00… jmj4         JUMONJI-tr… -2.84    19.7      29464.
+##  3 Inv4m     Downregul… Zm00… &lt;NA&gt;         Methionyl-… -2.86    17.5      23056.
+##  4 Inv4m     Downregul… Zm00… &lt;NA&gt;         SUMO-activ… -1.98    17.5      23582.
+##  5 Inv4m     Upregulat… Zm00… &lt;NA&gt;         &lt;NA&gt;         6.50    16.9      31312.
+##  6 Inv4m     Upregulat… Zm00… &lt;NA&gt;         Exocyst co…  2.87    16.5      25457.
+##  7 Inv4m     Downregul… Zm00… IDP4515      DnaJ-like … -1.50    15.9      19719.
+##  8 Inv4m     Downregul… Zm00… &lt;NA&gt;         CCT-alpha   -1.69    15.8      19265.
+##  9 Inv4m     Downregul… Zm00… cl19648_2a   ADP-ribosy… -2.78    15.8      18551.
+## 10 Inv4m     Upregulat… Zm00… cl19799_1    &lt;NA&gt;         1.97    15.6      21997.
 ## # ℹ 71 more rows</code></pre>
 </div>
 <div id="deg-summary-statistics" class="section level2">
@@ -3296,7 +3296,7 @@ overall_summary &lt;- effects_df %&gt;%
     total_genes = n(),
     n_significant = sum(is_DEG),
     n_DEG = sum(is_DEG),
-    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_strong_DEG = sum(is_strong_DEG),
     n_selected_DEG = sum(is_selected_DEG),
     pct_DEG = round(100 * n_DEG / total_genes, 2)
   )
@@ -3316,7 +3316,7 @@ inv4m_region_summary &lt;- effects_df %&gt;%
 <pre><code>## 
 ## === DEG Summary Statistics ===
 ## # A tibble: 6 × 7
-##   predictor  total_genes n_significant n_DEG n_hiconf_DEG n_selected_DEG pct_DEG
+##   predictor  total_genes n_significant n_DEG n_strong_DEG n_selected_DEG pct_DEG
 ##   &lt;fct&gt;            &lt;int&gt;         &lt;int&gt; &lt;int&gt;        &lt;int&gt;          &lt;int&gt;   &lt;dbl&gt;
 ## 1 Leaf             24011          8159  8159         1469             36   34.0 
 ## 2 -P               24011          6515  6515          704             31   27.1 
@@ -3508,9 +3508,9 @@ description.</p>
 <pre class="r"><code># Load normalized expression data
 voomR &lt;- readRDS(file.path(paths$intermediate, &quot;normalized_expression_voom_object_leaf_trt.rds&quot;))
 
-# Define genes of interest - High_confidence interaction genes
+# Define genes of interest - strong interaction genes
 interaction_highconf &lt;- effects_df %&gt;%
-  filter(is_hiconf_DEG &amp; predictor == &quot;Leaf:-P&quot;)
+  filter(is_strong_DEG &amp; predictor == &quot;Leaf:-P&quot;)
 
 interaction_genes &lt;- interaction_highconf %&gt;%
   pull(gene) %&gt;%
@@ -3993,8 +3993,8 @@ regions</li>
 <h2>Three-tier classification:</h2>
 <ul>
 <li><strong>Significant DEGs</strong> (FDR &lt; 0.05): 17354 genes</li>
-<li><strong>High-confidence DEGs</strong> (FDR &lt; 0.05, |logFC| &gt;
-1.5): 2937 genes</li>
+<li><strong>Strong DEGs</strong> (FDR &lt; 0.05, |logFC| &gt; 1.5): 2937
+genes</li>
 <li><strong>Selected DEGs</strong> (top 10 by significance/Mahalanobis):
 122 genes</li>
 </ul>
