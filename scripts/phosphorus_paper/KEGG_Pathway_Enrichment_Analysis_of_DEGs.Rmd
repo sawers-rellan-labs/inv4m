@@ -66,7 +66,7 @@ cat("Loaded", nrow(id_map), "gene ID mappings\n")
 # Prepare DEG Lists
 ```{r prepare_deg_lists}
 # Extract gene lists
-redundant_DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+redundant_DEGs <- with(effects_df %>% filter(is_strong_DEG), {
   list(
     Leaf.Down = gene[predictor == "Leaf" & regulation == "Downregulated"],
     Leaf.Up = gene[predictor == "Leaf" & regulation == "Upregulated"],

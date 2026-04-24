@@ -67,7 +67,7 @@ library(ggrepel)
 
 ## Load Core Data
 ```{r load_data}
-effects_df <- read.csv(file.path(paths$data, "DEG_effects.csv"))
+effects_df <- read.csv(file.path(paths$intermediate, "predictor_effects_leaf_interaction_model.csv"))
 
 curated <- read.csv(file.path(paths$data, "selected_DEGs_curated_locus_label_2.csv")) %>%
   select(gene, locus_label)
@@ -340,8 +340,8 @@ extract_xpindex_stats <- function(model_list) {
 
 # Phase 1: Exploration
 
-**Purpose**: Systematic exploration of senescence-associated gene lists from 
-multiple sources, comparing them with high-confidence DEGs from current study.
+**Purpose**: Systematic exploration of senescence-associated gene lists from
+multiple sources, comparing them with strong DEGs from current study.
 
 **Gene list sources**:
 
@@ -397,7 +397,7 @@ cat("Total SAG orthologs (Zhang 2014):",
 ```{r check_sag_zhang2014_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% sag_orthologs_Zhang2014$v5
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -436,7 +436,7 @@ cat("Total SAG GWAS genes (Sekhon 2019):",
 ```{r check_sag_gwas_sekhon2019_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% sag_gwas_Sekhon2019$v5
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -467,7 +467,7 @@ cat("Total stay-green network genes:",
 ```{r check_staygreen_network_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% staygreen_network$v5
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -496,7 +496,7 @@ cat("Total natural senescence genes:",
 ```{r check_natural_senescence_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% natural_senescence$v5
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -544,7 +544,7 @@ sag_hubs <- sag_hub_ojeda2026 %>%
   dplyr::select(v3,v4,gene,everything()) %>%
   inner_join (effects_df %>%
     filter(
-      is_hiconf_DEG,
+      is_strong_DEG,
       gene %in% sag_hub_ojeda2026$gene
     ) 
   ) %>%
@@ -555,7 +555,7 @@ sag_hubs <- sag_hub_ojeda2026 %>%
   arrange(predictor, regulation, adj.P.Val) 
 
 write.csv(sag_hubs,
-          file.path(paths$intermediate, "sag_hub_ojeda2026_hiconf_degs.csv"),
+          file.path(paths$intermediate, "sag_hub_ojeda2026_strong_degs.csv"),
           row.names = FALSE)
 nrow(sag_hubs)
 ```
@@ -579,7 +579,7 @@ cat("Total photosynthesis genes (Ojeda 2026):",
 ```{r check_photosynthesis_ojeda2026_degs}
 photo_ojeda2026 <- effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% photosynthesis_ojeda2026$gene
   ) %>%
   select(predictor, regulation, gene,locus_label, logFC,  adj.P.Val, 
@@ -589,7 +589,7 @@ photo_ojeda2026 <- effects_df %>%
   arrange(predictor, regulation, adj.P.Val) 
 
 write.csv(photo_ojeda2026,
-          file.path(paths$intermediate, "photo_ojeda2026_hiconf_degs.csv"),
+          file.path(paths$intermediate, "photo_ojeda2026_strong_degs.csv"),
           row.names = FALSE)
 nrow(photo_ojeda2026)
 
@@ -622,7 +622,7 @@ cat("GO leaf senescence genes:", length(leaf_senescence_genes), "\n")
 ```{r check_go_photosynthesis_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% photosynthesis_genes
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -635,7 +635,7 @@ effects_df %>%
 ```{r check_go_senescence_degs}
 effects_df %>%
   filter(
-    is_hiconf_DEG,
+    is_strong_DEG,
     gene %in% leaf_senescence_genes
   ) %>%
   select(predictor, regulation, gene:logFC,  adj.P.Val, 
@@ -780,7 +780,7 @@ corncyc_summary <- summarize_xpindex(
 )
 
 effects_df %>%
-  filter(is_hiconf_DEG,
+  filter(is_strong_DEG,
          predictor=="Leaf", 
          gene %in% corncyc_gene_sets$chlorophyll) %>%
   select(gene:logFC,adj.P.Val,desc_merged) %>% tibble()
@@ -1414,12 +1414,12 @@ test_custom_enrichment <- function(deg_lists, annotation, universe) {
 #' @param annotation_id Term ID to filter
 #' @param gene_term_df Data frame with gene-term mappings
 #' @param effects_data DEG results
-#' @param filter_hiconf Filter to high-confidence DEGs
+#' @param filter_strong Filter to strong DEGs
 #' @return Tibble with DEG statistics
 get_annotation_degs <- function(annotation_id,
                                 gene_term_df,
                                 effects_data,
-                                filter_hiconf = TRUE) {
+                                filter_strong = TRUE) {
   genes_in_category <- gene_term_df %>%
     filter(ID == annotation_id) %>%
     pull(gene)
@@ -1427,8 +1427,8 @@ get_annotation_degs <- function(annotation_id,
   result <- effects_data %>%
     filter(gene %in% genes_in_category)
   
-  if (filter_hiconf) {
-    result <- result %>% filter(is_hiconf_DEG)
+  if (filter_strong) {
+    result <- result %>% filter(is_strong_DEG)
   }
   
   result %>%
@@ -1469,7 +1469,7 @@ custom_annotation <- c(
 ## Run Enrichment Tests
 
 ```{r run_enrichment}
-DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+DEGs <- with(effects_df %>% filter(is_strong_DEG), {
   list(
     Leaf.Down = unique(gene[
       predictor == "Leaf" & regulation == "Downregulated"
@@ -1515,7 +1515,7 @@ genes_in_custom_terms <- custom_enrichment_results %>%
     annotation_id = "natural",
     gene_term_df = genes_in_custom_terms,
     effects_data = effects_df,
-    filter_hiconf = TRUE
+    filter_strong = TRUE
   ) %>%
     filter(predictor == "Leaf") %>%
     print(n = 50)
@@ -1595,7 +1595,7 @@ chloro_gene_sets <- list(
 
 
 effects_df %>%
-  filter(#is_hiconf_DEG,
+  filter(#is_strong_DEG,
          predictor=="Leaf:-P", 
          gene %in% chloro_degradation_genes) %>%
   select(gene:logFC,adj.P.Val,desc_merged) %>% tibble()

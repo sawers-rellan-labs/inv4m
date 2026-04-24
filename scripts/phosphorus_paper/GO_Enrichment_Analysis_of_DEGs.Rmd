@@ -141,7 +141,7 @@ cat("Universe size:", length(universe), "genes\n")
 # Prepare DEG Lists
 ```{r prepare_deg_lists}
 # Extract gene lists by predictor and regulation direction
-redundant_DEGs <- with(effects_df %>% filter(is_hiconf_DEG), {
+redundant_DEGs <- with(effects_df %>% filter(is_strong_DEG), {
   list(
     Leaf.Down = gene[predictor == "Leaf" & regulation == "Downregulated"],
     Leaf.Up = gene[predictor == "Leaf" & regulation == "Upregulated"],
@@ -468,7 +468,7 @@ p_coverage <- ggplot(coverage_plot_data, aes(x = Cluster_label, y = Count, fill 
   scale_fill_identity() +
   coord_flip(clip = "off") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.15))) +
-  labs(x = NULL, y = "Number of genes", title = "High confidence DEGs\nin enriched GO BP terms") +
+  labs(x = NULL, y = "Number of genes", title = "Strong DEGs\nin enriched GO BP terms") +
   theme_classic(base_size = 25) +
   theme(
     plot.title = element_text(size = 28, face = "bold", hjust = 0.5),
@@ -483,7 +483,7 @@ p_coverage <- ggplot(coverage_plot_data, aes(x = Cluster_label, y = Count, fill 
 # ===================================================================================
 
 p_venn_annotated_gg <- as.ggplot(p_venn_annotated) +
-  labs(title = sprintf("High confidence DEGs\nin enriched GO BP terms", 
+  labs(title = sprintf("Strong DEGs\nin enriched GO BP terms", 
                        total_annotated, total_original, coverage_overall)) +
   theme(
     plot.title = element_text(size = 28, face = "bold", hjust = 0.5),
@@ -491,7 +491,7 @@ p_venn_annotated_gg <- as.ggplot(p_venn_annotated) +
   )
 
 p_venn_gg <- as.ggplot(v) +
-  labs(title = "High confidence DEGs") +
+  labs(title = "Strong DEGs") +
   theme(plot.title = element_text(size = 28, face = "bold", hjust = 0.5))
 
 combined_top <- plot_grid(p_venn_gg, p_upset, ncol = 2, rel_widths = c(1.5, 1), labels = c("A", "B"), label_size = 35)
@@ -577,7 +577,7 @@ to_plot <- slim_comp@compareClusterResult %>%
 
 # Prepare gene metadata
 effects_gene_label <- effects_df %>%
-  filter(is_hiconf_DEG) %>%
+  filter(is_strong_DEG) %>%
   mutate(Cluster = case_when(
     regulation == "Upregulated" ~ paste(predictor, "Up", sep = "."),
     regulation == "Downregulated" ~ paste(predictor, "Down", sep = ".")
@@ -717,7 +717,7 @@ p_annotation <- go_plot_data %>% filter(Description=="cellular response to phosp
 
 
 minusP_0016036 <- effects_df %>%
-  filter(is_hiconf_DEG,gene %in% p_annotation$geneID & predictor=="-P") %>%
+  filter(is_strong_DEG,gene %in% p_annotation$geneID & predictor=="-P") %>%
   dplyr::select(predictor, regulation,gene,locus_label, logFC, neglogP, desc_merged)
 
 write.csv(
@@ -727,7 +727,7 @@ write.csv(
 )
 
 leafxP_0016036 <- effects_df %>%
-  filter(is_hiconf_DEG,gene %in% p_annotation$geneID & predictor=="Leaf:-P") %>%
+  filter(is_strong_DEG,gene %in% p_annotation$geneID & predictor=="Leaf:-P") %>%
   dplyr::select(predictor, regulation,gene,locus_label, logFC, neglogP, desc_merged)
 
 write.csv(

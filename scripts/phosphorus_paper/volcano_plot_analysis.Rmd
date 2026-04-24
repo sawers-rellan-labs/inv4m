@@ -187,8 +187,8 @@ all predictors.
 # Custom formatting function for y-axis
 scaleFUN <- function(x) sprintf("%.0f", x)
 
-# Set regulation based on high-confidence DEG flag
-effects_df$regulation[!effects_df$is_hiconf_DEG] <- "Unregulated"
+# Set regulation based on strong DEG flag
+effects_df$regulation[!effects_df$is_strong_DEG] <- "Unregulated"
 to_plot <- to_plot %>% filter(
   !(predictor=="Leaf" & regulation=="Upregulated" & neglogP < 2.5)
   )
