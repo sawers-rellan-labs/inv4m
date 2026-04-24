@@ -227,7 +227,7 @@ Crucially, no significant genotype-by-phosphorus interactions were detected for 
 Boxplots for phosphorus (P), zinc (Zn), calcium (Ca), and sulfur (S) show, per genotype, \textbf{(A)} element concentrations in stover and grain, \textbf{(B)} grain/stover concentration ratios, \textbf{(C)} content in stover and grain per plant, and \textbf{(D)} mineral harvest index (HI, grain/total content).
 Ca concentrations are plotted on a log scale.
 \textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
-Effect sizes and exact $p$ values are reported in Table.}
+Effect sizes and exact $p$ values are reported in \ref{table::ionome_contrasts}.}
 \label{fig:Figure_2}
 \end{figure*}
 
@@ -802,7 +802,7 @@ Phosphorus deficiency significantly reduced the Area Under the Curve (AUC) for e
 Boxplots for magnesium (Mg), manganese (Mn), potassium (K), and iron (Fe) show, per genotype, \textbf{(A)} element concentrations (mg/kg) in stover and grain, \textbf{(B)} grain/stover concentration ratios, \textbf{(C)} per plant content (mg/plant) in stover and grain, and \textbf{(D)} mineral harvest index (HI, grain/total).
 %Phosphorus deficiency ($-P$) caused a significant reduction in seed Mg (A) and seed Mn (B). No significant effects of either phosphorus treatment or the \invfour genotype were detected for K, Fe, or the seed/stover partition ratios (B) for any of the four elements.
 \textit{FDR} adjusted contrast \textit{t-test} significance: \textit{n.s.} not significant, $p < 0.05$ (*), $p < 0.01$ (**), $p < 0.001$ (***), $p < 0.0001$ (****).
-Effect sizes and exact $p$ values are reported in Table.}
+Effect sizes and exact $p$ values are reported in \ref{table::ionome_contrasts}.}
 \label{supp:Figure_S4}
 \end{figure*}
 
@@ -891,6 +891,61 @@ The injection order was used as a covariate in the \textit{limma} mixed linear m
 }
 \label{supp:Figure_S9}
 \end{figure}
+
+\begin{table*}[!ht]
+\centering
+\small
+\caption{\textbf{Within-genotype $-$P vs $+$P ionome contrasts at $\textit{FDR} < 0.05$.}
+Significant rows from the 96-test \texttt{emmeans} family (48 mineral $\times$ metric responses $\times$ 2 within-genotype contrasts) underlying Figure~\ref{fig:Figure_2} and Supplementary Figure~\ref{supp:Figure_S4}.
+Estimates are $-$P vs $+$P marginal-mean differences in the native unit of each metric (ppm for concentration, mg/plant for content, dimensionless for grain/stover ratio and harvest index).
+Benjamini--Hochberg FDR across 96 tests.
+Effect sizes for the grain/stover ratio are visualized in Figure~\ref{fig:Figure_2}B and Supplementary Figure~\ref{supp:Figure_S4}B.}
+\label{table::ionome_contrasts}
+\begin{tabular}{lllllr}
+\hline
+Metric & Mineral & Pool & Genotype & Estimate $\pm$ SE & \textit{FDR} \\
+\hline
+Concentration & P & grain & CTRL & $-672 \pm 94$ & $3.9\times 10^{-8}$ \\
+ & P & grain & \invfour & $-684 \pm 93$ & $2.0\times 10^{-8}$ \\
+ & P & stover & CTRL & $-1592 \pm 85$ & $1.1\times 10^{-24}$ \\
+ & P & stover & \invfour & $-1673 \pm 82$ & $3.1\times 10^{-26}$ \\
+ & Zn & stover & CTRL & $6.85 \pm 1.12$ & $7.7\times 10^{-7}$ \\
+ & Zn & stover & \invfour & $5.02 \pm 1.08$ & $1.0\times 10^{-4}$ \\
+ & Ca & grain & CTRL & $19.0 \pm 3.4$ & $9.6\times 10^{-6}$ \\
+ & Ca & grain & \invfour & $16.7 \pm 3.4$ & $6.4\times 10^{-5}$ \\
+ & S & grain & CTRL & $79.1 \pm 29.9$ & $0.028$ \\
+ & S & stover & CTRL & $113 \pm 21$ & $9.6\times 10^{-6}$ \\
+ & Mg & grain & CTRL & $-97.5 \pm 30.5$ & $0.008$ \\
+\hline
+Content & P & grain & CTRL & $-41.1 \pm 14.6$ & $0.020$ \\
+ & P & grain & \invfour & $-67.5 \pm 14.4$ & $1.1\times 10^{-4}$ \\
+ & P & stover & CTRL & $-186 \pm 16$ & $1.1\times 10^{-15}$ \\
+ & P & stover & \invfour & $-169 \pm 15$ & $7.6\times 10^{-15}$ \\
+ & Ca & grain & CTRL & $1.26 \pm 0.29$ & $3.4\times 10^{-4}$ \\
+ & Ca & grain & \invfour & $1.19 \pm 0.28$ & $4.8\times 10^{-4}$ \\
+ & Ca & stover & CTRL & $-97.4 \pm 20.6$ & $8.0\times 10^{-5}$ \\
+ & Ca & stover & \invfour & $-67.1 \pm 19.9$ & $0.004$ \\
+ & Mg & stover & CTRL & $-34.8 \pm 8.4$ & $4.2\times 10^{-4}$ \\
+ & Mg & stover & \invfour & $-27.5 \pm 8.1$ & $0.004$ \\
+ & Mn & grain & \invfour & $-0.061 \pm 0.023$ & $0.026$ \\
+ & Mn & stover & CTRL & $-0.662 \pm 0.249$ & $0.026$ \\
+ & Mn & stover & \invfour & $-0.676 \pm 0.239$ & $0.020$ \\
+ & K & stover & CTRL & $-299 \pm 84$ & $0.003$ \\
+\hline
+Grain/stover ratio & P & -- & CTRL & -- & $7.6\times 10^{-12}$ \\
+ & P & -- & \invfour & -- & $1.3\times 10^{-9}$ \\
+ & Zn & -- & CTRL & -- & $1.0\times 10^{-4}$ \\
+ & Zn & -- & \invfour & -- & $0.004$ \\
+ & Ca & -- & CTRL & -- & $3.7\times 10^{-6}$ \\
+ & Ca & -- & \invfour & -- & $0.002$ \\
+\hline
+Harvest index & P & -- & CTRL & $0.280 \pm 0.031$ & $5.6\times 10^{-11}$ \\
+ & P & -- & \invfour & $0.238 \pm 0.030$ & $3.9\times 10^{-9}$ \\
+ & Ca & -- & CTRL & $0.00373 \pm 0.00077$ & $8.0\times 10^{-5}$ \\
+ & Ca & -- & \invfour & $0.00410 \pm 0.00076$ & $1.5\times 10^{-5}$ \\
+\hline
+\end{tabular}
+\end{table*}
 
 \begin{table}[h!]
 \centering
