@@ -589,6 +589,11 @@ Samples were weighed, digested in double-distilled HNO$_3$ followed by a 60/40 n
 Element concentrations were reported per sample dry weight.
 Signals for Al, B, Ca, Fe, K, Mg, Mn, Mo, Ni, P, S, Zn, Na and Cu were quantified; values beyond three times the interquartile range were flagged as outliers and excluded from downstream analysis.
 
+Ionome responses were modeled with the same two-stage linear-model framework described for the phenotypes below (Eq.~\ref{eq:pheno_model}), fit independently to 48 mineral $\times$ metric combinations covering 8 minerals (P, Zn, Ca, S, Mg, Mn, K, Fe) and 6 metrics per mineral (concentration in stover and grain, grain/stover concentration ratio, content in stover and grain, mineral harvest index).
+Within-genotype $-$P vs $+$P ionome contrasts formed a single \texttt{emmeans} \cite{lenth2023} family of 96 tests (48 responses $\times$ 2 within-genotype contrasts) and are plotted for P, Zn, Ca, S in Figure~\ref{fig:Figure_2} and for Mg, Mn, K, Fe in Supplementary Figure~\ref{supp:Figure_S4}.
+Marginal \invfour vs CTRL ionome contrasts pooled across phosphorus treatments formed a separate family of 48 tests; Supplementary Figure~\ref{supp:Figure_S5} plots this contrast for Mg, Ca, Zn, Fe, and K.
+Both families were adjusted with Benjamini-Hochberg FDR and reported at $\textit{FDR} < 0.05$.
+
 \subsection*{Phenotype analysis}
 
 For stover mass growth curves, a different plant at each time point (40, 50, 60, and harvest at 121 days after planting) was collected, dried, and weighed for each row.
@@ -613,10 +618,8 @@ The fixed effects coefficients represent the overall mean ($\beta_0$), the effec
 The residuals $\varepsilon_{ijr} \sim \mathcal{N}(0, \sigma_\varepsilon^2)$ capture remaining variation after spatial correction.
 We adjusted p-values for multiple testing using the false discovery rate method and report effects with FDR $< 0.05$.
 
-Within-genotype $-$P vs $+$P contrasts (\texttt{emmeans} \cite{lenth2023}) from Eq.~\ref{eq:pheno_model}, FDR-corrected across 48 tests, are plotted in Figure~\ref{fig:Figure_1}; marginal $\pm$P contrasts from the same model in Supplementary Figure~\ref{supp:Figure_S1}.
-The same model was fit independently to each mineral $\times$ metric family combination (concentration, content, grain/stover ratio, harvest index).
-Within-genotype $-$P vs $+$P ionome contrasts, FDR-corrected across 96 tests, are plotted in Figure~\ref{fig:Figure_2} and Supplementary Figure~\ref{supp:Figure_S4}.
-Marginal \invfour vs CTRL ionome contrasts, FDR-corrected across 48 tests, are plotted in Supplementary Figure~\ref{supp:Figure_S5}.
+Within-genotype $-$P vs $+$P contrasts and the corresponding marginal $\pm$P contrasts from Eq.~\ref{eq:pheno_model} (\texttt{emmeans} \cite{lenth2023}) were combined into a single family of 48 tests (16 phenotype traits $\times$ 3 contrast types) prior to Benjamini-Hochberg FDR adjustment.
+Figure~\ref{fig:Figure_1} displays within-genotype contrasts for the traits with significant main effects; Supplementary Figure~\ref{supp:Figure_S1} displays the marginal $\pm$P contrasts for plant height, 50-kernel weight, total kernel number, and total kernel weight per plant.
 
 \subsection*{Tissue sampling, RNA extraction, and sequencing}
 
