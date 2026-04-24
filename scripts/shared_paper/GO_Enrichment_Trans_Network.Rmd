@@ -29,7 +29,7 @@ trans-regulatory network to identify biological processes associated with genes
 in different genomic regions.
 
 **Approach**:
-1. Load trans network gene sets from MaizeNetome analysis (high-confidence DEGs: FDR < 0.05, |log2FC| > 1.5)
+1. Load trans network gene sets from MaizeNetome analysis (strong DEGs: FDR < 0.05, |log2FC| > 1.5)
 2. Define background (all analyzed genes)
 3. Perform GO enrichment separately for complete, flanking, and Inv4m networks
 4. Compare enrichment across network subsets
@@ -97,7 +97,7 @@ background <- effects_df %>%
 
 cat("Background genes:", length(background), "\n")
 cat("DEGs:", sum(effects_df$is_DEG), "\n")
-cat("High confidence DEGs:", sum(effects_df$is_hiconf_DEG), "\n")
+cat("Strong DEGs:", sum(effects_df$is_strong_DEG), "\n")
 ```
 
 ## Load GO Annotation
@@ -443,7 +443,7 @@ effects_df <- effects_df %>%
   mutate(is_topDEG = is_DEG & abs(logFC) > 2)
 
 cat("DEG categories:\n")
-cat("  High-confidence DEGs (is_hiconf_DEG):", sum(effects_df$is_hiconf_DEG), "\n")
+cat("  Strong DEGs (is_strong_DEG):", sum(effects_df$is_strong_DEG), "\n")
 cat("  Top DEGs (is_topDEG, |log2FC| > 2):", sum(effects_df$is_topDEG), "\n")
 
 # Filter for Top DEGs (|log2FC| > 2)
@@ -715,25 +715,25 @@ cat("Annotated GO plot exported\n")
 
 ---
 
-# Compare High-Confidence vs Top DEGs
+# Compare Strong vs Top DEGs
 
-**Purpose**: Compare enrichment patterns between high-confidence network DEGs 
+**Purpose**: Compare enrichment patterns between strong network DEGs
 (|log2FC| > 1.5) and Top DEGs (|log2FC| > 2).
 
-```{r compare_hiconf_vs_top}
+```{r compare_strong_vs_top}
 # Common terms
-hiconf_terms <- slim_comp@compareClusterResult$ID
+strong_terms <- slim_comp@compareClusterResult$ID
 top_terms <- slim_top@compareClusterResult$ID
 
-common_terms <- intersect(hiconf_terms, top_terms)
-hiconf_only <- setdiff(hiconf_terms, top_terms)
-top_only <- setdiff(top_terms, hiconf_terms)
+common_terms <- intersect(strong_terms, top_terms)
+strong_only <- setdiff(strong_terms, top_terms)
+top_only <- setdiff(top_terms, strong_terms)
 
 cat("Enrichment comparison:\n")
-cat("  Terms in high-confidence DEGs:", length(hiconf_terms), "\n")
+cat("  Terms in strong DEGs:", length(strong_terms), "\n")
 cat("  Terms in Top DEGs:", length(top_terms), "\n")
 cat("  Common terms:", length(common_terms), "\n")
-cat("  High-confidence only:", length(hiconf_only), "\n")
+cat("  Strong only:", length(strong_only), "\n")
 cat("  Top DEGs only:", length(top_only), "\n")
 
 if (length(common_terms) > 0) {

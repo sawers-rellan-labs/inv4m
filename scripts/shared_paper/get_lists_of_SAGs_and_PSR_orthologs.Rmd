@@ -223,9 +223,9 @@ effects_df <- effects_df %>%
 
 ## Join Orthologs with Expression Data
 ```{r join_expression}
-# Prepare effects data for joining - filter for high confidence DEGs
+# Prepare effects data for joining - filter for strong DEGs
 effects_leaf <- effects_df %>%
-  filter(is_hiconf_DEG == TRUE, predictor %in% c("Leaf", "Leaf:-P")) %>%
+  filter(is_strong_DEG == TRUE, predictor %in% c("Leaf", "Leaf:-P")) %>%
   dplyr::select(
     gene,
     predictor, 
@@ -237,7 +237,7 @@ effects_leaf <- effects_df %>%
   )
 
 effects_psr <- effects_df %>%
-  filter(is_hiconf_DEG == TRUE, predictor %in% c("-P", "Leaf:-P")) %>%
+  filter(is_strong_DEG == TRUE, predictor %in% c("-P", "Leaf:-P")) %>%
   dplyr::select(
     gene,
     predictor, 

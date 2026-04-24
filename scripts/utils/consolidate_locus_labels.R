@@ -2,7 +2,7 @@
 #'
 #' This script creates a master gene label file by combining:
 #' 1. WGCNA network genes (FDR < 0.05)
-#' 2. High-confidence DEGs (FDR < 0.05 AND |logFC| > 1.5)
+#' 2. Strong DEGs (FDR < 0.05 AND |logFC| > 1.5)
 #' 3. Curated labels from phosphorus paper
 #' 4. MaizeGDB official symbols
 #' 5. PANNZER functional descriptions
@@ -95,14 +95,14 @@ effects <- read_csv(effects_path, show_col_types = FALSE) %>%
   slice(1) %>%
   ungroup()
 
-hiconf_degs <- effects %>%
-  filter(is_hiconf_DEG == TRUE) %>%
+strong_degs <- effects %>%
+  filter(is_strong_DEG == TRUE) %>%
   pull(gene)
 
-cat("  High-conf DEGs:", length(hiconf_degs), "\n")
+cat("  Strong DEGs:", length(strong_degs), "\n")
 
 # Combine unique genes
-master_genes <- unique(c(wgcna_genes, hiconf_degs))
+master_genes <- unique(c(wgcna_genes, strong_degs))
 cat("  Combined unique:", length(master_genes), "\n\n")
 
 # === 2. Load Label Sources ===
@@ -152,7 +152,7 @@ master <- tibble(gene = master_genes) %>%
  left_join(curated, by = "gene") %>%
   # Add effects info
   left_join(
-    effects %>% dplyr::select(gene, logFC, adj.P.Val, is_hiconf_DEG),
+    effects %>% dplyr::select(gene, logFC, adj.P.Val, is_strong_DEG),
     by = "gene"
   )
 
@@ -187,7 +187,7 @@ master <- master %>%
   ) %>%
   dplyr::select(
     gene, locus_symbol, locus_name, locus_label, label_source,
-    desc_pannzer, desc_merged, logFC, adj.P.Val, is_hiconf_DEG, is_marker
+    desc_pannzer, desc_merged, logFC, adj.P.Val, is_strong_DEG, is_marker
   )
 
 # === 5. Summary ===

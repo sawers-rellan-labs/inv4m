@@ -92,7 +92,7 @@ with \( \varepsilon_{g,i} \sim N(0, \phi_i\sigma^2_{g}) \)
 ## DEG Classification Tiers
 
 1. **Significant DEGs**: FDR < 0.05 (`is_DEG`)
-2. **High-confidence DEGs**: FDR < 0.05 AND appropriate |log2FC| threshold (`is_hiconf_DEG`)
+2. **Strong DEGs**: FDR < 0.05 AND appropriate |log2FC| threshold (`is_strong_DEG`)
 3. **Selected DEGs**: Top 10 by significance + top 10 by Mahalanobis distance (`is_selected_DEG`)
 
 # Libraries
@@ -936,7 +936,7 @@ flanking_introgression_gene_ids <- shared_introgression_gene_ids[
 
 # Three-Tier DEG Classification
 
-## High-Confidence DEGs
+## Strong DEGs
 ```{r highconf_degs}
 # Define fold change thresholds
 is_large_effect <- rep(FALSE, nrow(effects_df))
@@ -945,11 +945,11 @@ is_large_effect[is_interaction & abs(effects_df$logFC) > 0.5] <- TRUE
 is_large_effect[!is_interaction & abs(effects_df$logFC) > 1.5] <- TRUE
 
 effects_df <- effects_df %>%
-  mutate(is_hiconf_DEG = is_DEG & is_large_effect)
+  mutate(is_strong_DEG = is_DEG & is_large_effect)
 
 {
-  cat("\nHigh-Confidence DEGs:\n")
-  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+  cat("\nStrong DEGs:\n")
+  print(with(effects_df, table(predictor, is_strong_DEG)))
 }
 ```
 
@@ -958,15 +958,15 @@ effects_df <- effects_df %>%
 rank_threshold <- 10
 
 effects_df <- effects_df %>%
-  group_by(is_hiconf_DEG, predictor, regulation) %>%
+  group_by(is_strong_DEG, predictor, regulation) %>%
   mutate(
     pval_rank = row_number(dplyr::desc(neglogP)),
     mahal_rank = row_number(dplyr::desc(mahalanobis))
   ) %>%
   ungroup() %>%
   mutate(
-    is_selected_DEG = (pval_rank <= rank_threshold & is_hiconf_DEG) |
-                      (mahal_rank <= rank_threshold & is_hiconf_DEG)
+    is_selected_DEG = (pval_rank <= rank_threshold & is_strong_DEG) |
+                      (mahal_rank <= rank_threshold & is_strong_DEG)
   )
 
 {
@@ -1061,7 +1061,7 @@ overall_summary <- effects_df %>%
   summarise(
     total_genes = n(),
     n_DEG = sum(is_DEG),
-    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_strong_DEG = sum(is_strong_DEG),
     n_selected_DEG = sum(is_selected_DEG),
     pct_DEG = round(100 * n_DEG / total_genes, 2)
   )
@@ -1188,7 +1188,7 @@ cat("No v5 mapping:", sum(is.na(crow_s2$v5)), "\n")
 ```{r crow_overall}
 inv4m_eff <- field_effects %>%
   filter(predictor == "Inv4m") %>%
-  select(gene, locus_label, logFC, adj.P.Val, is_DEG, is_hiconf_DEG,
+  select(gene, locus_label, logFC, adj.P.Val, is_DEG, is_strong_DEG,
          in_Inv4m, in_cis, in_flank, in_trans)
 
 # Build full table: Crow genes with our effects

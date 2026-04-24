@@ -479,7 +479,7 @@ effects_df <- effects_df %>%
   dplyr::select(-locus_label_new)
 
 # Replace with your actual field DEG gene IDs
-field_degs <- effects_df %>% filter(is_hiconf_DEG, predictor=="Inv4m") %>% pull(gene) %>% unique()
+field_degs <- effects_df %>% filter(is_strong_DEG, predictor=="Inv4m") %>% pull(gene) %>% unique()
 
 cat("\nField DEG list loaded:\n")
 cat("  Total field DEGs:", length(field_degs), "\n")

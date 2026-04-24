@@ -562,7 +562,7 @@ effects_df <- effects_df %>%
   dplyr::select(-locus_label_new)
 
 field_degs <- effects_df %>% 
-  filter(is_hiconf_DEG) %>% 
+  filter(is_strong_DEG) %>% 
   pull(gene) %>% 
   unique()
 
@@ -695,7 +695,7 @@ cat("Edges after v4->v5 conversion:", nrow(MaizeNetome_v5), "\n")
 
 ```{r define_cis_trans_genes}
 cis_degs <- effects_df %>%
-  filter(in_cis == TRUE, is_hiconf_DEG == TRUE) %>%
+  filter(in_cis == TRUE, is_strong_DEG == TRUE) %>%
   arrange(adj.P.Val) %>%
   dplyr::select(gene:desc_merged, logFC, adj.P.Val) %>%
   inner_join(v4_v5, by = c(gene = "v5")) %>%
@@ -703,7 +703,7 @@ cis_degs <- effects_df %>%
   arrange(adj.P.Val)
 
 trans_degs <- effects_df %>%
-  filter(in_trans == TRUE, is_hiconf_DEG == TRUE) %>%
+  filter(in_trans == TRUE, is_strong_DEG == TRUE) %>%
   arrange(adj.P.Val) %>%
   dplyr::select(gene:desc_merged, logFC, adj.P.Val) %>%
   inner_join(v4_v5, by = c(gene = "v5")) %>%
