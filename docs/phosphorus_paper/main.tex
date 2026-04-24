@@ -374,7 +374,6 @@ This interaction pattern indicates that phosphorus deficiency not only triggers 
 
 From our multi-omics analysis, we can infer that the maize phosphorus starvation response is shaped by leaf developmental stage, with older leaves showing enhanced stress responses indicative of the onset of developmental senescence during the vegetative phase.
 While phosphorus deficiency triggered canonical molecular responses across genotypes, the magnitude of these responses varied depending on the leaf developmental position.
-The \invfour chromosomal inversion showed minimal modulation of phosphorus starvation responses, indicating that its contribution to highland adaptation operates through effects on developmental timing rather than enhanced nutrient stress tolerance.
 
 \subsection*{We captured a gradient of sequential leaf senescence in our samples}
 
@@ -539,28 +538,18 @@ In older $-$P leaves, the transcriptional program for sulfolipid biosynthesis (\
 \subsection*{$\invfour$ does not alter phosphorus starvation responses}
 
 Despite the strong developmental dependency of phosphorus responses, we found minimal evidence that the \invfour chromosomal inversion modulates these interactions.
-The three genes showing significant genotype-by-phosphorus interactions (\textit{aldh2}, \textit{gras80}, and \textit{flz22}, \ref{supp:Figure_S7}) are located outside the inversion boundaries and did not show additional interactions with leaf stage.
+The single gene with a significant \invfour $\times -$P interaction (\textit{aldh2}, \ref{supp:Figure_S7}) is located outside the inversion in the flanking introgression and did not show additional interactions with leaf stage.
 % Lipidomic analysis detected subtle \invfour effects on specific monogalactosyldiacylglycerol species MGDG34:2 and MGDG34:3 that varied with both phosphorus availability and leaf age, but these effects were restricted to a small number of lipid classes and did not alter the overall pattern of age-dependent stress responses.
 
-The primary effects of \invfour on flowering time and plant height operated independently of both phosphorus treatment and leaf developmental stage.
-This independence indicates that \invfour\'s contribution to highland adaptation does not involve fine-tuning the coordination between leaf senescence and P stress responses.
-Instead, the inversion appears to establish constitutive differences in developmental timing that influence when leaves are produced and when flowering is initiated, without modifying how individual leaves respond to phosphorus limitation as they age.
+The phosphate transporter \textit{phos2} (\textit{Zm00001eb191650}, PHO1-2), a proposed candidate for low-phosphorus adaptation \cite{salazar-vidal2016, Ma2021, zhang2014-ew}, lies within the \invfour interval but showed no significant \invfour, $-$P, or interaction effect at the transcriptional level; PHO1-family transporters are largely post-translationally regulated, so transcript quiescence does not exclude an effect at the protein or activity level.
 
-The absence of significant \invfour modulation of canonical phosphorus starvation machinery (including phosphate scavenging genes, membrane lipid remodeling enzymes, and metabolic adjustment pathways) requires reconsideration of the hypothesis that \invfour enhances phosphorus acquisition or utilization efficiency.
-% PHOS2 responds to Leaf Zm00001eb191650 phos2        phosphate transporter2 log2FC =0.693   std err = 0.207   FDR =0.00963
-The fact that genes like \textit{phos2}, a phosphate transporter located within the inversion and previously proposed as an adaptive candidate, do not show genotype-by-phosphorus interactions suggests that \invfour\'s adaptive value in highland environments comes primarily from coordinating developmental timing with the constrained growing season rather than from direct enhancement of P stress tolerance.
-The earlier flowering observed in \invfour plants, which occurred regardless of phosphorus availability, aligns with previous reports showing that \invfour-highland accelerates flowering specifically at high elevations \cite{gates2019,barnes2022}.
-The absence of \invfour effects on phosphorus responses, combined with its constitutive effects on developmental timing, suggests that its adaptive value in highland environments may operate primarily through phenological adjustment to constrained growing seasons rather than enhanced nutrient stress tolerance.
+We did detect additive \invfour effects on the ionome, most prominently reductions in stover Ca, Zn, and K content and differences in Fe grain content and harvest index (\ref{supp:Figure_S5}).
+However, \invfour plants trended toward lower stover biomass at harvest ($-11.7$~g STWHV, $p = 0.016$; FDR $= 0.068$), so the stover content differences may in part reflect this biomass difference rather than a distinct mineral reallocation mechanism.
 
-Regarding a possible effect of \invfour in phosphorus response through control of leaf senescence, the genotype shows negligible effects on senescence gene expression in this experiment. 
-Only \textit{lkrsdh1} exhibits an \invfour main effect, and this gene lies outside the inversion boundaries without additional environment-dependent interactions. 
-This pattern reinforces the idea that the adaptive value of \invfour likely operates through constitutive developmental timing rather than the modulation of environment-specific stress responses.
+The one phenotypic exception to the additive pattern was cob diameter, which showed a significant \invfour $\times$ phosphorus interaction: control lines maintained consistent cob diameter regardless of phosphorus treatment, while \invfour plants developed substantially thinner cobs under phosphorus deficiency.
+This effect did not extend to other reproductive traits, limiting its explanatory power.
 
-The one phenotypic exception was cob diameter, which showed a significant \invfour $\times$ phosphorus interaction.
-While control lines maintained consistent cob diameter regardless of phosphorus treatment, \invfour plants developed substantially thinner cobs under phosphorus deficiency.
-This reproductive trait response may reflect altered resource allocation priorities during ear development, possibly linked to the earlier flowering phenology of \invfour plants.
-If \invfour plants initiate reproductive development earlier relative to their vegetative growth stage, they may be more vulnerable to resource limitation during ear formation.
-However, this effect did not extend to other reproductive traits such as seed weight or overall yield, limiting its explanatory power for \invfour\'s adaptive role.
+The \invfour phenotypic effects on flowering time, plant height, and related traits are developed in detail in the companion manuscript \cite{rodriguez2026inversion}.
 
 \section*{Conclusion}
 
@@ -847,13 +836,13 @@ The selected pool is indicated on the facet strip.
 \centering
 \includegraphics[width=\linewidth]{figs/Figure_S7.png}
 \caption{
-(\textbf{A}) \textbf{Manhattan plot for differentially expressed genes (DEGs) under $-\text{P}$}. 
-%A total of $\textbf{10,606}$ DEGs were identified for the main effect of P deficiency. 
+(\textbf{A}) \textbf{Manhattan plot for differentially expressed genes (DEGs) under $-\text{P}$}.
+%A total of $\textbf{10,606}$ DEGs were identified for the main effect of P deficiency.
 Loci associated with key P-starvation response genes, such as $\textit{pilncr1}$, $\textit{pap19}$, $\textit{ips1}$, and $\textit{spx4}$, are highlighted. The $y$-axis represents the $-\log_{10}(\text{FDR})$.
-(\textbf{B}) \textbf{Manhattan plot for DEGs with an $\invfour$ $\mathbf{\times} -\mathbf{P}$ interaction}. 
-%Only $\textbf{3}$ DEGs show a significant interaction effect with the $\invfour$ inversion.  is linked to $\textit{aldh2}$ and $\textit{flz22}$.
-(\textbf{C}) Zoomed-in view of the significant locus on Chromosome 4. The region on chromosome 4 (position 171,050,000 to 171,060,000) shows the candidate gene $\textit{aldh2}$ ($\textit{aldehyde dehydrogenase 2}$)
-(\textbf{D}) Volcano plot for differentially abundant lipids (DALs) under Leaf $\mathbf{\times} -\mathbf{P}$ interaction. 
+(\textbf{B}) \textbf{A single gene, \textit{aldh2}, carries a significant $\invfour$ $\mathbf{\times} -\mathbf{P}$ interaction}.
+\textit{aldh2} (\textit{aldehyde dehydrogenase 2}) surpasses the $\textit{FDR} < 0.05$ threshold and is located on Chromosome 4 outside the $\invfour$ inversion, within the flanking introgression.
+(\textbf{C}) Zoomed-in view of the $\textit{aldh2}$ locus on Chromosome 4 around position 171.05~Mb.
+(\textbf{D}) \textbf{Volcano plot for differentially abundant lipids (DALs) under Leaf $\mathbf{\times} -\mathbf{P}$ interaction}.
 %Only two lipids, $\textbf{PC34:2}$ and $\textbf{TG:54:9}$, are identified as significantly differentially abundant, showing a significant interaction between leaf developmental stage and P deficiency treatment.
 }
 \label{supp:Figure_S7}
