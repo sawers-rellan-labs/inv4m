@@ -127,7 +127,7 @@ effects_df <- effects_df %>%
 # Load GO annotation data
 TERM2NAME <- readRDS(file.path(paths$data, "TERM2NAME.rds"))
 
-TERM2GENE <- readRDS(file.path(paths$data, "TERM2GENE.rds"))
+TERM2GENE <- readRDS(file.path(paths$data, "TERM2GENE_Fattel_2024_full.rds"))
 
 # Gene universe
 universe <- union(
