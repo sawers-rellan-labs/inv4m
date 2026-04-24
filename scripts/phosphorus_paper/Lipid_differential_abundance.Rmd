@@ -1115,7 +1115,7 @@ print(table(effects_df$predictor[effects_df$adj.P.Val < 0.05]))
 
 **Approach**:
 - Tier 1: Significant (FDR < 0.05)
-- Tier 2: High-confidence (significant + effect size threshold)
+- Tier 2: Strong (significant + effect size threshold)
 
 Effect size thresholds:
 - Leaf predictors: |logFC| > 0.5
@@ -1128,13 +1128,13 @@ classify_differential_lipids <- function(effects_df) {
   effects_df %>%
     mutate(
       is_DL = adj.P.Val < 0.05,
-      is_hiconf_DL = case_when(
+      is_strong_DL = case_when(
         predictor %in% leaf_predictors & is_DL & abs(logFC) > 0.5 ~ TRUE,
         predictor == "-P" & is_DL & abs(logFC) > 1.5 ~ TRUE,
         .default = FALSE
       ),
       regulation = case_when(
-        !is_hiconf_DL ~ "Not significant",
+        !is_strong_DL ~ "Not significant",
         logFC > 0 ~ "Upregulated",
         logFC < 0 ~ "Downregulated",
         TRUE ~ "Not significant"
@@ -1162,8 +1162,8 @@ cat("Total tests:", nrow(effects_df), "\n\n")
 cat("Tier 1 - Significant DLs (FDR < 0.05):\n")
 print(table(effects_df$predictor, effects_df$is_DL))
 
-cat("\nTier 2 - High-confidence DLs:\n")
-print(table(effects_df$predictor, effects_df$is_hiconf_DL))
+cat("\nTier 2 - Strong DLs:\n")
+print(table(effects_df$predictor, effects_df$is_strong_DL))
 
 cat("\nDirection of significant effects:\n")
 print(with(effects_df %>% filter(is_DL), 
@@ -1229,7 +1229,7 @@ plot_data <- effects_df %>%
   inner_join(sp, by = c(response = "colname"))
 
 label_data <- plot_data %>%
-  filter(is_hiconf_DL)
+  filter(is_strong_DL)
 
 force <- 1
 label_size <- 6
@@ -1585,30 +1585,30 @@ ggsave(
 )
 ```
 
-## Export High-Confidence Lipids
-```{r export_hiconf_lipids}
+## Export Strong Lipids
+```{r export_strong_lipids}
 write.csv(
   label_data,
-  file = file.path(paths$intermediate, "high_confidence_DLs_TIC.csv"),
+  file = file.path(paths$intermediate, "strong_DLs_TIC.csv"),
   row.names = FALSE
 )
 
 cat("Volcano plots saved to figures/\n")
-cat("High-confidence lipids saved to intermediate/\n")
+cat("Strong lipids saved to intermediate/\n")
 ```
 
 # Interaction Plots: Leaf × Phosphorus
 
 ## Identify Leaf:-P Interaction Lipids
 
-**Purpose**: Extract high-confidence lipids showing significant interaction 
+**Purpose**: Extract strong lipids showing significant interaction
 between leaf developmental stage and phosphorus treatment.
 ```{r identify_interaction_lipids}
 interaction_lipids <- effects_df %>%
-  filter(predictor == "Leaf:-P", is_hiconf_DL) %>%
+  filter(predictor == "Leaf:-P", is_strong_DL) %>%
   arrange(adj.P.Val)
 
-cat("High-confidence Leaf:-P interaction lipids:", 
+cat("Strong Leaf:-P interaction lipids:",
     nrow(interaction_lipids), "\n")
 print(interaction_lipids %>% 
         select(response, logFC, adj.P.Val, regulation))
@@ -1878,7 +1878,7 @@ plot_lipid_by_treatment <- function(lipid_data,
 
 ## Plot Leaf:-P Interaction Lipids
 
-**Purpose**: Visualize high-confidence lipids showing significant interaction 
+**Purpose**: Visualize strong lipids showing significant interaction
 between leaf stage and phosphorus treatment.
 
 **Approach**: Plot log10(TIC fraction) to show proportions on interpretable 
@@ -1906,7 +1906,7 @@ create_trajectory_6panel <- function(lipid_data,
   
   # Select top lipid per predictor×regulation combination
   selected_lipids <- effects_df %>%
-    filter(is_hiconf_DL) %>%
+    filter(is_strong_DL) %>%
     group_by(predictor, regulation) %>%
     slice_min(adj.P.Val, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
@@ -2102,7 +2102,7 @@ saveRDS(p_trajectory_6, file.path(paths$intermediate, "lipid_trajectory_6panel.r
 
 # Print Selected Lipids
 selected_for_plot <- effects_df %>%
-  filter(is_hiconf_DL) %>%
+  filter(is_strong_DL) %>%
   group_by(predictor, regulation) %>%
   slice_min(adj.P.Val, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
