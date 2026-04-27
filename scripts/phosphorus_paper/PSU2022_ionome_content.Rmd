@@ -1037,6 +1037,7 @@ write_ttest <- function(x, name) {
 write_ttest(treatment.t.test,       "ionome_content_treatment_ttests.csv")
 write_ttest(treatment.conc.ttest,   "ionome_content_conc_treatment_ttests.csv")
 write_ttest(treatment.hi.ttest,     "ionome_content_hi_treatment_ttests.csv")
+write_ttest(treatment.ratio.ttest,  "ionome_content_ratio_treatment_ttests.csv")
 write_ttest(genotype.conc.ttest,    "ionome_content_conc_genotype_ttests.csv")
 write_ttest(genotype.content.ttest, "ionome_content_genotype_ttests.csv")
 write_ttest(genotype.hi.ttest,      "ionome_content_hi_genotype_ttests.csv")
