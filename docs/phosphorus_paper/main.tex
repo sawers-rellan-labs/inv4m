@@ -539,17 +539,15 @@ In older $-$P leaves, the transcriptional program for sulfolipid biosynthesis (\
 
 \subsection*{$\invfour$ does not alter phosphorus starvation responses}
 
-Despite the strong developmental dependency of phosphorus responses, we found minimal evidence that the \invfour chromosomal inversion modulates these interactions.
-The single gene with a significant \invfour $\times -$P interaction (\textit{aldh2}, \ref{supp:Figure_S7}) is located outside the inversion in the flanking introgression and did not show additional interactions with leaf stage.
+Across whole plant phenotypes, the leaf transcriptome, lipidome, and ionome, phosphorus deficiency resulted in consistent starvation responses.
+However, we did not find decisive evidence that the \invfour inversion modulates any of them.
+The two exceptions were incidental: a significant \invfour $\times$ phosphorus interaction on cob diameter (Fig.~\ref{fig:Figure_1}F) and on the expression of \textit{aldh2} (\ref{supp:Figure_S7}), a gene located in the flanking introgression of the inversion and without annotation related to phosphorus.
+No candidate gene for the phosphorus starvation response residing within the inversion showed a significant \invfour $\times -$P interaction at the transcriptional level.
+This includes \textit{phos2} (\textit{Zm00001eb191650}, ZmPHO1;2a), a PHO1 family phosphate efflux transporter and a candidate for adaptation to low phosphorus availability within the inversion \cite{salazar-vidal2016, ma2021,alonsonieves2022, zhang2025}.
 % Lipidomic analysis detected subtle \invfour effects on specific monogalactosyldiacylglycerol species MGDG34:2 and MGDG34:3 that varied with both phosphorus availability and leaf age, but these effects were restricted to a small number of lipid classes and did not alter the overall pattern of age-dependent stress responses.
 
-The phosphate transporter \textit{phos2} (\textit{Zm00001eb191650}, PHO1-2), a proposed candidate for low-phosphorus adaptation \cite{salazar-vidal2016, Ma2021, zhang2014-ew}, lies within the \invfour interval but showed no significant \invfour, $-$P, or interaction effect at the transcriptional level; PHO1 members undergo extensive post-translational regulation in \textit{Arabidopsis} and rice \cite{huang2013, ying2017}, so transcript quiescence does not exclude an effect at the protein or activity level.
-
-We did detect additive \invfour effects on the ionome, most prominently reductions in stover Ca, Zn, and K content and differences in Fe grain content and harvest index (\ref{supp:Figure_S5}).
-However, \invfour plants trended toward lower stover biomass at harvest ($-11.7$~g STWHV, $p = 0.016$; FDR $= 0.068$), so the stover content differences may in part reflect this biomass difference rather than a distinct mineral reallocation mechanism.
-
-The one phenotypic exception to the additive pattern was cob diameter, which showed a significant \invfour $\times$ phosphorus interaction: control lines maintained consistent cob diameter regardless of phosphorus treatment, while \invfour plants developed substantially thinner cobs under phosphorus deficiency.
-This effect did not extend to other reproductive traits, limiting its explanatory power.
+Nonetheless, we detected additive \invfour effects on the ionome, most prominently reductions in stover Ca, Zn, and K content and differences in Fe grain content and harvest index (\ref{supp:Figure_S5}).
+However, \invfour plants showed lower stover biomass at harvest (marginal Inv4m vs CTRL contrast: $-7.9 \pm 3.3$~g STWHV, FDR $= 0.044$), so the stover content differences may in part reflect this biomass difference rather than a distinct mineral reallocation mechanism.
 
 The \invfour phenotypic effects on flowering time, plant height, and related traits are developed in detail in the companion manuscript \cite{rodriguez2026inversion}.
 
@@ -620,7 +618,7 @@ The fixed effects coefficients represent the overall mean ($\beta_0$), the effec
 The residuals $\varepsilon_{ijr} \sim \mathcal{N}(0, \sigma_\varepsilon^2)$ capture remaining variation after spatial correction.
 We adjusted p-values for multiple testing using the false discovery rate method and report effects with FDR $< 0.05$.
 
-Within-genotype $-$P vs $+$P contrasts and the corresponding marginal $\pm$P contrasts from Eq.~\ref{eq:pheno_model} (\texttt{emmeans} \cite{lenth2023}) were combined into a single family of 48 tests (16 phenotype traits $\times$ 3 contrast types) prior to Benjamini-Hochberg FDR adjustment.
+For each of the 16 field plant phenotype traits we extracted from Eq.~\ref{eq:pheno_model} (\texttt{emmeans} \cite{lenth2023}) the nine contrasts that span the $2 \times 2$ \invfour $\times$ phosphorus design: the $-$P vs $+$P contrast at each genotype, the \invfour vs CTRL contrast at each treatment, the two diagonal contrasts, the marginal Treatment and Genotype contrasts, and the Treatment $\times$ Genotype interaction. These 144 contrasts were combined into a single family prior to Benjamini-Hochberg FDR adjustment.
 Figure~\ref{fig:Figure_1} displays within-genotype contrasts for the traits with significant main effects; Supplementary Figure~\ref{supp:Figure_S1} displays the marginal $\pm$P contrasts for plant height, 50-kernel weight, total kernel number, and total kernel weight per plant.
 
 \subsection*{Tissue sampling, RNA extraction, and sequencing}
