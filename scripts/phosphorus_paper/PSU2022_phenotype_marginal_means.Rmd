@@ -372,36 +372,81 @@ cat(paste(treatment_traits, collapse = ", "), "\n")
 cat("Total:", length(treatment_traits), "traits\n")
 ```
 
-### Stage 3: Pairwise ±P contrasts for figure brackets
+### Stage 3: 144-test family for figure brackets and downstream reporting
 
-For each trait, per-Genotype and marginal ±P contrasts are estimated from
-`lm(y ~ Genotype * Treatment)` via emmeans. All 48 contrasts (16 traits ×
-3: CTRL, Inv4m, marginal) are FDR-adjusted in a single pool and saved to
-`PSU2022_fig1_bracket_contrasts.csv` for use by the plotting scripts.
+For each trait, all 9 contrasts spanning the 2x2 \invfour x phosphorus
+design are estimated from `lm(y ~ Genotype * Treatment)` via emmeans
+custom contrasts:
+
+1. `Treatment_at_CTRL`   — CTRL: -P vs +P
+2. `Treatment_at_Inv4m`  — Inv4m: -P vs +P
+3. `Genotype_at_plusP`   — +P: Inv4m vs CTRL
+4. `Genotype_at_minusP`  — -P: Inv4m vs CTRL
+5. `Diag_Inv4m_minusP_vs_CTRL_plusP`  — diagonal
+6. `Diag_Inv4m_plusP_vs_CTRL_minusP`  — diagonal
+7. `Treatment_marginal`  — -P vs +P pooled over Genotype
+8. `Genotype_marginal`   — Inv4m vs CTRL pooled over Treatment
+9. `Interaction`         — Genotype x Treatment interaction
+
+All 144 contrasts (16 traits x 9) are FDR-adjusted in a single pool and
+saved to `PSU2022_fig1_bracket_contrasts.csv`. Backward-compatible columns
+`contrast_level` ("per_Genotype" or "marginal" for the original 3 contrast
+types; new values for the additional 6) and `Genotype` (CTRL/Inv4m for
+per_Genotype rows; NA otherwise) preserve filters used by the figure
+scripts.
 
 ```{r pairwise-contrasts}
+# emmeans cell ordering for ~ Genotype * Treatment with levels
+# Genotype = c("CTRL","Inv4m"), Treatment = c("+P","-P") is:
+#   1: CTRL,+P   2: Inv4m,+P   3: CTRL,-P   4: Inv4m,-P
+nine_contrasts <- list(
+  "Treatment_at_CTRL"               = c(-1,  0,  1,  0),
+  "Treatment_at_Inv4m"              = c( 0, -1,  0,  1),
+  "Genotype_at_plusP"               = c(-1,  1,  0,  0),
+  "Genotype_at_minusP"              = c( 0,  0, -1,  1),
+  "Diag_Inv4m_minusP_vs_CTRL_plusP" = c(-1,  0,  0,  1),
+  "Diag_Inv4m_plusP_vs_CTRL_minusP" = c( 0,  1, -1,  0),
+  "Treatment_marginal"              = c(-0.5, -0.5,  0.5,  0.5),
+  "Genotype_marginal"               = c(-0.5,  0.5, -0.5,  0.5),
+  "Interaction"                     = c( 1,  -1,  -1,   1)
+)
+
+# Map each contrast name to (contrast_level, Genotype, group1, group2) for
+# backward compatibility with existing figure filters.
+contrast_metadata <- tibble::tribble(
+  ~contrast_name,                    ~contrast_level,      ~Genotype, ~group1, ~group2,
+  "Treatment_at_CTRL",               "per_Genotype",       "CTRL",    "+P",    "-P",
+  "Treatment_at_Inv4m",              "per_Genotype",       "Inv4m",   "+P",    "-P",
+  "Genotype_at_plusP",               "per_Treatment",       NA,        "CTRL",  "Inv4m",
+  "Genotype_at_minusP",              "per_Treatment",       NA,        "CTRL",  "Inv4m",
+  "Diag_Inv4m_minusP_vs_CTRL_plusP", "diagonal",            NA,        "CTRL+P","Inv4m-P",
+  "Diag_Inv4m_plusP_vs_CTRL_minusP", "diagonal",            NA,        "CTRL-P","Inv4m+P",
+  "Treatment_marginal",              "marginal",            NA,        "+P",    "-P",
+  "Genotype_marginal",               "marginal_Genotype",   NA,        "CTRL",  "Inv4m",
+  "Interaction",                     "interaction",         NA,        NA,      NA
+)
+
 contrasts <- bind_rows(
   lapply(vars, function(v) {
     if (sum(!is.na(pheno[[v]])) < 20) return(NULL)
-    m <- tryCatch(lm(as.formula(paste(v, "~ Genotype * Treatment")), data = pheno),
-                  error = function(e) NULL)
+    m <- tryCatch(
+      lm(as.formula(paste(v, "~ Genotype * Treatment")), data = pheno),
+      error = function(e) NULL)
     if (is.null(m)) return(NULL)
-    bind_rows(
-      pairs(emmeans(m, ~ Treatment | Genotype), reverse = TRUE) %>%
-        as_tibble() %>% mutate(trait = v, contrast_level = "per_Genotype"),
-      pairs(emmeans(m, ~ Treatment),            reverse = TRUE) %>%
-        as_tibble() %>% mutate(trait = v, contrast_level = "marginal")
-    )
+    em <- emmeans(m, ~ Genotype * Treatment)
+    contrast(em, method = nine_contrasts) %>%
+      as_tibble() %>%
+      mutate(trait = v, contrast_name = as.character(contrast))
   })
 ) %>%
   rename(p = p.value, statistic = t.ratio) %>%
-  rstatix::adjust_pvalue(method = "fdr")
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  left_join(contrast_metadata, by = "contrast_name")
 
-cat("±P contrasts — per-Genotype and marginal, FDR across 48:\n")
+cat("Phenotype contrasts — 144-test family, BH FDR across all 144:\n")
 contrasts %>%
-  mutate(label = ifelse(is.na(Genotype), "marginal", as.character(Genotype))) %>%
-  select(trait, label, contrast_level, statistic, p, p.adj) %>%
-  arrange(p.adj) %>% as_tibble() %>% print(n = Inf)
+  select(trait, contrast_name, contrast_level, statistic, p, p.adj) %>%
+  arrange(p.adj) %>% as_tibble() %>% print(n = 30)
 
 # CTRL +P mean as common reference baseline for all percent-change calculations
 ctrl_plus_p_means <- vapply(vars, function(v) {
@@ -411,16 +456,19 @@ ctrl_plus_p_means <- vapply(vars, function(v) {
 bracket_contrasts <- contrasts %>%
   transmute(
     trait,
-    Genotype      = ifelse(is.na(Genotype), NA_character_, as.character(Genotype)),
+    Genotype,
     contrast_level,
-    group1        = "+P",
-    group2        = "-P",
+    contrast_name,
+    group1,
+    group2,
     estimate,
     SE,
     statistic,
     p,
     p.adj,
-    p.adj.signif  = rstatix::add_significance(tibble(p.adj = p.adj), "p.adj")$p.adj.signif
+    p.adj.signif = rstatix::add_significance(
+      tibble(p.adj = p.adj), "p.adj"
+    )$p.adj.signif
   ) %>%
   left_join(ctrl_plus_p_means, by = "trait") %>%
   mutate(
@@ -429,7 +477,7 @@ bracket_contrasts <- contrasts %>%
   ) %>%
   select(-ctrl_plus_p_mean)
 
-cat("±P contrasts with % change over CTRL +P mean:\n")
+cat("Per-genotype +-P contrasts (FDR over 144 tests):\n")
 bracket_contrasts %>%
   filter(contrast_level == "per_Genotype") %>%
   select(trait, Genotype, estimate_pct, SE_pct, p.adj, p.adj.signif) %>%
@@ -439,7 +487,9 @@ write.csv(bracket_contrasts,
   file.path(paths$intermediate, "PSU2022_fig1_bracket_contrasts.csv"),
   row.names = FALSE)
 
-cat("Saved", nrow(bracket_contrasts), "contrasts to PSU2022_fig1_bracket_contrasts.csv\n")
+cat("Saved", nrow(bracket_contrasts),
+    "contrasts to PSU2022_fig1_bracket_contrasts.csv (expected 144)\n")
+stopifnot(nrow(bracket_contrasts) == 144)
 ```
 
 ---
