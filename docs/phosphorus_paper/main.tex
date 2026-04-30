@@ -335,7 +335,7 @@ This widespread reduction in other phosphorus-rich membrane lipids is also seen 
 \centering
 \includegraphics[width=\linewidth]{figs/Figure_5.png}
 \caption{\textbf{The response to phosphorus starvation increases with leaf stage and is positively correlated with indicators of leaf senescence }.
-(\textbf{A}) Gene Set Transcription Indices Across Leaf Stages. Indices are calculated as the mean $\log_{10}(\text{CPM})$ for genes within defined sets and normalized across the four leaf stages to represent the proportion of the total expression range. The left panel shows Chlorophyll Synthesis (dark green) and Chlorophyll Degradation (light green/orange) sets derived from CornCyc/KEGG. 
+(\textbf{A}) Gene Set Transcription Indices Across Leaf Stages. Indices are calculated as the mean $\log_{10}(\text{CPM})$ for genes within defined sets and normalized across the four leaf stages to represent the proportion of the total expression range. The left panel shows Chlorophyll Synthesis (dark green) and Chlorophyll Degradation (light green/orange) sets derived from CornCyc/KEGG; the right panel shows Photosynthesis (dark green) and Leaf Senescence (orange) sets from \cite{ojedarivera2026}.
 %Chlorophyll Synthesis shows a significant negative correlation with age ($r = -0.78$, $p = 6.3\times 10^{-10}$), while Chlorophyll Degradation shows a positive correlation ($r = 0.53$, $p = 2.5\times 10^{-4}$). The right panel shows Photosynthesis (dark green) and Leaf Senescence (orange) sets from GO. Photosynthesis shows a significant negative correlation ($r = -0.76$, $p = 2.6\times 10^{-9}$), and Leaf Senescence shows a significant positive correlation ($r = 0.77$, $p = 1.2\times 10^{-9}$)). Error bars represent the standard error of the mean (SEM).
 (\textbf{B}) Expression profiles ($\log_{10}(\text{CPM})$) for representative gene pairs illustrating opposing trends across leaf stages. 
 %\textit{pep1} (phosphoenolpyruvate carboxylase, green) and \textit{ssu1} (ribulose bisphosphate carboxylase small subunit 1, green) decline as senescence-associated genes like \textit{Salt homolog 1} (orange), \textit{mir3} (\textit{maize insect resistance 3}, orange), and \textit{nactf108} (\textit{NAC transcription factor 108 / ORE1}) increase. \textit{sgrl1} and \textit{nye2} are STAY-GREEN homologs that exhibit opposing expression trends, despite similar annotated functions. 
@@ -700,13 +700,10 @@ Similarly, we tested for KEGG pathway overrepresentation using the \textit{enric
 Both types of overrepresentation analysis were plotted with the package \textit{DOSE} \cite{yu2015}.
 
 \subsection*{Gene Set Transcriptomic Indices}
-% The chlorophyll degradation list was manually curated from CornCyc.
-% Many (6) genes that were in WEi2025 were missing from the corncyc pathways
-% even if the reaction was present, I sent an email asking for the addition of these genes based on manual curation, mainly Wei2025.
-% The chlorophyll synthesis list is about 35 genes. I can add the table or just cite the pathways in corncyc (most economical), no further manual curation was needed
-% Senesce and Photosynthesysis lists were superseded by Ojeda2026 I need his input about how to cite/describe them.
-% todo: (fausto) add the tables and references, and correct the results and discussion correspondingly
-To visualize developmental and stress-induced changes in major biological processes, we calculated transcriptomic indices for four gene sets. Chlorophyll Synthesis and Chlorophyll Degradation gene sets were obtained from CornCyc pathways and KEGG annotations. Photosynthesis and Leaf Senescence gene sets were obtained from Gene Ontology biological process terms using the B73 NAM v5 annotation. 
+To visualize developmental and stress-induced changes in major biological processes, we calculated transcriptomic indices for four gene sets.
+The Chlorophyll Synthesis set was compiled from CornCyc pathway annotations.
+The Chlorophyll Degradation set was manually curated from the same CornCyc reactions, supplemented with six additional genes drawn from KEGG and \cite{wei2025} that mediate canonical chlorophyll catabolism in maize but were missing from the CornCyc reaction set.
+The Photosynthesis (163 genes) and Leaf Senescence (55 genes) sets were taken from \cite{ojedarivera2026}, who curated panicoid grass orthologs of canonical photosynthesis and senescence regulators.
 
 For each gene set, we calculated the mean $\log_{10}(\text{CPM})$ across all genes in the set for each sample. 
 Index values were then normalized to represent the proportion of the total expression range across the four leaf stages using the formula:
