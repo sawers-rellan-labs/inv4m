@@ -1103,7 +1103,7 @@ selected_degs <- effects_df %>%
 
 
 # Export Results
-```{r export_results, eval=FALSE}
+```{r export_results}
 # Full effects table
 write.csv(
   effects_df,

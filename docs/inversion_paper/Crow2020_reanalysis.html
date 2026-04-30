@@ -11,7 +11,7 @@
 
 <meta name="author" content="Maize Genetics Analysis" />
 
-<meta name="date" content="2026-03-23" />
+<meta name="date" content="2026-04-30" />
 
 <title>Crow et al. 2020 Differential Gene Expression Reanalysis I: Complete new Model Expotratory</title>
 
@@ -2859,7 +2859,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">Crow et al. 2020 Differential Gene
 Expression Reanalysis I: Complete new Model Expotratory</h1>
 <h4 class="author">Maize Genetics Analysis</h4>
-<h4 class="date">2026-03-23</h4>
+<h4 class="date">2026-04-30</h4>
 
 </div>
 
@@ -2975,8 +2975,8 @@ G}\)</span></td>
 <ol style="list-style-type: decimal">
 <li><strong>Significant DEGs</strong>: FDR &lt; 0.05
 (<code>is_DEG</code>)</li>
-<li><strong>High-confidence DEGs</strong>: FDR &lt; 0.05 AND appropriate
-|log2FC| threshold (<code>is_hiconf_DEG</code>)</li>
+<li><strong>Strong DEGs</strong>: FDR &lt; 0.05 AND appropriate |log2FC|
+threshold (<code>is_strong_DEG</code>)</li>
 <li><strong>Selected DEGs</strong>: Top 10 by significance + top 10 by
 Mahalanobis distance (<code>is_selected_DEG</code>)</li>
 </ol>
@@ -4013,14 +4013,14 @@ add_mahalanobis_outliers &lt;- function(
 ## Mahalanobis outliers detected:
 ##              is_mh_outlier
 ## predictor     FALSE  TRUE
-##   V3L2Tip     21864  4626
-##   V1L         21696  4794
-##   V3L         21867  4623
-##   V3LBase     21965  4525
+##   V3L2Tip     21861  4629
+##   V1L         21701  4789
+##   V3L         21866  4624
+##   V3LBase     21960  4530
 ##   V3L2Base    21604  4886
 ##   V3LSheath   22051  4439
 ##   V3SAM       22790  3700
-##   cold        23182  3308
+##   cold        23183  3307
 ##   Mi21        25963   527
 ##   V3R         26445    45
 ##   Inv4m       26446    44
@@ -4142,8 +4142,8 @@ flanking_introgression_gene_ids &lt;- shared_introgression_gene_ids[
 </div>
 <div id="three-tier-deg-classification" class="section level1">
 <h1>Three-Tier DEG Classification</h1>
-<div id="high-confidence-degs" class="section level2">
-<h2>High-Confidence DEGs</h2>
+<div id="strong-degs" class="section level2">
+<h2>Strong DEGs</h2>
 <pre class="r"><code># Define fold change thresholds
 is_large_effect &lt;- rep(FALSE, nrow(effects_df))
 is_interaction &lt;- effects_df$predictor == &quot;cold:Inv4m&quot;
@@ -4151,15 +4151,15 @@ is_large_effect[is_interaction &amp; abs(effects_df$logFC) &gt; 0.5] &lt;- TRUE
 is_large_effect[!is_interaction &amp; abs(effects_df$logFC) &gt; 1.5] &lt;- TRUE
 
 effects_df &lt;- effects_df %&gt;%
-  mutate(is_hiconf_DEG = is_DEG &amp; is_large_effect)
+  mutate(is_strong_DEG = is_DEG &amp; is_large_effect)
 
 {
-  cat(&quot;\nHigh-Confidence DEGs:\n&quot;)
-  print(with(effects_df, table(predictor, is_hiconf_DEG)))
+  cat(&quot;\nStrong DEGs:\n&quot;)
+  print(with(effects_df, table(predictor, is_strong_DEG)))
 }</code></pre>
 <pre><code>## 
-## High-Confidence DEGs:
-##              is_hiconf_DEG
+## Strong DEGs:
+##              is_strong_DEG
 ## predictor     FALSE  TRUE
 ##   V3L2Tip     15181 11309
 ##   V1L         15236 11254
@@ -4187,15 +4187,15 @@ effects_df &lt;- effects_df %&gt;%
 <pre class="r"><code>rank_threshold &lt;- 10
 
 effects_df &lt;- effects_df %&gt;%
-  group_by(is_hiconf_DEG, predictor, regulation) %&gt;%
+  group_by(is_strong_DEG, predictor, regulation) %&gt;%
   mutate(
     pval_rank = row_number(dplyr::desc(neglogP)),
     mahal_rank = row_number(dplyr::desc(mahalanobis))
   ) %&gt;%
   ungroup() %&gt;%
   mutate(
-    is_selected_DEG = (pval_rank &lt;= rank_threshold &amp; is_hiconf_DEG) |
-                      (mahal_rank &lt;= rank_threshold &amp; is_hiconf_DEG)
+    is_selected_DEG = (pval_rank &lt;= rank_threshold &amp; is_strong_DEG) |
+                      (mahal_rank &lt;= rank_threshold &amp; is_strong_DEG)
   )
 
 {
@@ -4332,7 +4332,7 @@ top_degs_qc</code></pre>
   summarise(
     total_genes = n(),
     n_DEG = sum(is_DEG),
-    n_hiconf_DEG = sum(is_hiconf_DEG),
+    n_strong_DEG = sum(is_strong_DEG),
     n_selected_DEG = sum(is_selected_DEG),
     pct_DEG = round(100 * n_DEG / total_genes, 2)
   )
@@ -4340,7 +4340,7 @@ top_degs_qc</code></pre>
 overall_summary</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["predictor"],"name":[1],"type":["fct"],"align":["left"]},{"label":["total_genes"],"name":[2],"type":["int"],"align":["right"]},{"label":["n_DEG"],"name":[3],"type":["int"],"align":["right"]},{"label":["n_hiconf_DEG"],"name":[4],"type":["int"],"align":["right"]},{"label":["n_selected_DEG"],"name":[5],"type":["int"],"align":["right"]},{"label":["pct_DEG"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"V3L2Tip","2":"26269","3":"20250","4":"11164","5":"24","6":"77.09"},{"1":"V1L","2":"26269","3":"20192","4":"11099","5":"26","6":"76.87"},{"1":"V3L","2":"26269","3":"19994","4":"10986","5":"24","6":"76.11"},{"1":"V3LBase","2":"26269","3":"19490","4":"10463","5":"23","6":"74.19"},{"1":"V3L2Base","2":"26269","3":"18711","4":"8750","5":"27","6":"71.23"},{"1":"V3LSheath","2":"26269","3":"18677","4":"9183","5":"22","6":"71.10"},{"1":"V3SAM","2":"26269","3":"14841","4":"4701","5":"21","6":"56.50"},{"1":"cold","2":"26269","3":"14486","4":"314","5":"21","6":"55.14"},{"1":"Mi21","2":"26269","3":"2002","4":"101","5":"22","6":"7.62"},{"1":"V3R","2":"26269","3":"197","4":"54","5":"21","6":"0.75"},{"1":"Inv4m","2":"26269","3":"175","4":"98","5":"21","6":"0.67"},{"1":"V3L2B:Inv4m","2":"26269","3":"44","4":"34","5":"25","6":"0.17"},{"1":"V3L2T:Inv4m","2":"26269","3":"30","4":"25","5":"23","6":"0.11"},{"1":"V3L:Inv4m","2":"26269","3":"29","4":"21","5":"19","6":"0.11"},{"1":"V3LB:Inv4m","2":"26269","3":"28","4":"23","5":"19","6":"0.11"},{"1":"V1L:Inv4m","2":"26269","3":"26","4":"24","5":"18","6":"0.10"},{"1":"V3LS:Inv4m","2":"26269","3":"19","4":"14","5":"14","6":"0.07"},{"1":"Inv4m:cold","2":"26269","3":"12","4":"6","5":"6","6":"0.05"},{"1":"V3SAM:Inv4m","2":"26269","3":"8","4":"7","5":"7","6":"0.03"},{"1":"V3R:Inv4m","2":"26269","3":"0","4":"0","5":"0","6":"0.00"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["predictor"],"name":[1],"type":["fct"],"align":["left"]},{"label":["total_genes"],"name":[2],"type":["int"],"align":["right"]},{"label":["n_DEG"],"name":[3],"type":["int"],"align":["right"]},{"label":["n_strong_DEG"],"name":[4],"type":["int"],"align":["right"]},{"label":["n_selected_DEG"],"name":[5],"type":["int"],"align":["right"]},{"label":["pct_DEG"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"V3L2Tip","2":"26269","3":"20250","4":"11164","5":"24","6":"77.09"},{"1":"V1L","2":"26269","3":"20192","4":"11099","5":"26","6":"76.87"},{"1":"V3L","2":"26269","3":"19994","4":"10986","5":"24","6":"76.11"},{"1":"V3LBase","2":"26269","3":"19490","4":"10463","5":"23","6":"74.19"},{"1":"V3L2Base","2":"26269","3":"18711","4":"8750","5":"27","6":"71.23"},{"1":"V3LSheath","2":"26269","3":"18677","4":"9183","5":"22","6":"71.10"},{"1":"V3SAM","2":"26269","3":"14841","4":"4701","5":"21","6":"56.50"},{"1":"cold","2":"26269","3":"14486","4":"314","5":"21","6":"55.14"},{"1":"Mi21","2":"26269","3":"2002","4":"101","5":"22","6":"7.62"},{"1":"V3R","2":"26269","3":"197","4":"54","5":"21","6":"0.75"},{"1":"Inv4m","2":"26269","3":"175","4":"98","5":"21","6":"0.67"},{"1":"V3L2B:Inv4m","2":"26269","3":"44","4":"34","5":"25","6":"0.17"},{"1":"V3L2T:Inv4m","2":"26269","3":"30","4":"25","5":"23","6":"0.11"},{"1":"V3L:Inv4m","2":"26269","3":"29","4":"21","5":"19","6":"0.11"},{"1":"V3LB:Inv4m","2":"26269","3":"28","4":"23","5":"19","6":"0.11"},{"1":"V1L:Inv4m","2":"26269","3":"26","4":"24","5":"18","6":"0.10"},{"1":"V3LS:Inv4m","2":"26269","3":"19","4":"14","5":"14","6":"0.07"},{"1":"Inv4m:cold","2":"26269","3":"12","4":"6","5":"6","6":"0.05"},{"1":"V3SAM:Inv4m","2":"26269","3":"8","4":"7","5":"7","6":"0.03"},{"1":"V3R:Inv4m","2":"26269","3":"0","4":"0","5":"0","6":"0.00"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 <pre class="r"><code># NOTE: This chunk is disabled - network_effects.csv is not available
@@ -4417,6 +4417,10 @@ write.csv(
   cat(&quot;  predictor_effects_crow2020.csv\n&quot;)
   cat(&quot;  selected_DEGs_crow2020.csv\n&quot;)
 }</code></pre>
+<pre><code>## 
+## Results exported:
+##   predictor_effects_crow2020.csv
+##   selected_DEGs_crow2020.csv</code></pre>
 </div>
 <div id="summary" class="section level1">
 <h1>Summary</h1>
@@ -4482,7 +4486,7 @@ cat(&quot;Crow Table S2:&quot;, nrow(crow_s2), &quot;rows,&quot;,
 <h2>Overall concordance</h2>
 <pre class="r"><code>inv4m_eff &lt;- field_effects %&gt;%
   filter(predictor == &quot;Inv4m&quot;) %&gt;%
-  select(gene, locus_label, logFC, adj.P.Val, is_DEG, is_hiconf_DEG,
+  select(gene, locus_label, logFC, adj.P.Val, is_DEG, is_strong_DEG,
          in_Inv4m, in_cis, in_flank, in_trans)
 
 # Build full table: Crow genes with our effects
