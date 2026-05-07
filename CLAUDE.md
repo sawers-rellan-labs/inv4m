@@ -103,8 +103,7 @@ inv4m/
 ├── agent/                       # AI agent sandbox (git-ignored, ephemeral scratch)
 ├── scripts/
 │   ├── phosphorus_paper/        # Paper 2 analysis notebooks ✅
-│   ├── inversion_paper/         # Paper 1 analysis notebooks (future)
-│   ├── shared_paper/            # Foundation scripts used by BOTH papers
+│   ├── inversion_paper/         # Paper 1 analysis notebooks
 │   └── utils/                   # Shared R utilities
 ├── data/                        # Raw data and annotations (git-ignored, symlink)
 ├── docs/                        # GitHub Pages (HTML reports)
@@ -176,7 +175,6 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `make_manhattan_plots.Rmd` | Manhattan plots (Fig 3 D,E,G,H) | ✅ |
 | `volcano_plot_analysis.Rmd` | Volcano plot (Fig 3 C / Fig 4) | ✅ |
 | `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ✅ |
-| `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
 | `jmj_cluster_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
@@ -249,9 +247,7 @@ results/
 │   ├── intermediate/    # CSV/RDS processed data files
 │   ├── figures/         # PDF, PNG, SVG publication figures
 │   └── tables/          # LaTeX tables ONLY (.tex files)
-├── inversion_paper/
-│   └── [same structure]
-└── shared_paper/
+└── inversion_paper/
     └── [same structure]
 ```
 
@@ -321,8 +317,7 @@ After sourcing `setup_paths.R`, use:
 **IMPORTANT: HTML Report Routing Convention**
 - Scripts in `scripts/{paper}/` render to `docs/{paper}/`
 - `render_notebook.R` determines output based on script location
-- All paper-related analysis scripts should be in `scripts/inversion_paper/` or `scripts/phosphorus_paper/`
-- Do NOT put paper-specific scripts in `scripts/shared_paper/` - move them to the appropriate paper folder
+- All paper-related analysis scripts live in `scripts/inversion_paper/` or `scripts/phosphorus_paper/`. The deprecated `scripts/shared_paper/` was removed on 2026-05-07.
 
 ### Running WGCNA Field Perturbation Pipeline
 
@@ -393,7 +388,7 @@ High-level summaries and multi-panel figures combining multiple analyses.
 ### Issue: "Cannot find file"
 
 **Cause:** File not yet moved from Desktop to `data/` structure
-**Solution:** Check file location, move to appropriate `data/phosphorus_paper/` or `data/shared_paper/`
+**Solution:** Check file location, move to appropriate place under `data/`
 
 ### Issue: "here::here() not working"
 
