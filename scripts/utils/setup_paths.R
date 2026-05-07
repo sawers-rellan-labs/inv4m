@@ -1,9 +1,10 @@
 #' Setup Project Paths (Flat data/ Structure)
 #'
 #' Centralized path configuration using here::here()
-#' Works with flat data/ directory (symlinked, read-only)
+#' Works with flat data/ directory (in-tree real folder, write-protected)
 #'
-#' @param paper Character string: "phosphorus_paper", "inversion_paper", or "shared_paper"
+#' @param paper Character string: "phosphorus_paper" or "inversion_paper"
+#'   ("shared_paper" was retired on 2026-05-07 with the removal of scripts/shared_paper/)
 #' @return Named list of standardized project paths
 #' @examples
 #' library(here)
@@ -14,7 +15,7 @@
 setup_project_paths <- function(paper = "phosphorus_paper") {
 
   # Validate paper argument
-  valid_papers <- c("phosphorus_paper", "inversion_paper", "shared_paper")
+  valid_papers <- c("phosphorus_paper", "inversion_paper")
   if (!paper %in% valid_papers) {
     stop(sprintf("Invalid paper: '%s'. Must be one of: %s",
                  paper, paste(valid_papers, collapse = ", ")))
@@ -30,7 +31,7 @@ setup_project_paths <- function(paper = "phosphorus_paper") {
     # Project root
     root = here::here(),
 
-    # Data directory (flat, symlinked - read-only for our purposes)
+    # Data directory (flat, write-protected; chmod -R u+w to add inputs)
     data = here::here("data"),
 
     # Results directories (paper-specific)

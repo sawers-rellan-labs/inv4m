@@ -244,7 +244,10 @@ mp <- modulePreservation(
   nPermutations = params$n_permutations,
   randomSeed = 123,
   quickCor = 0,
-  verbose = 3
+  verbose = 3,
+  # Keep the WGCNA permutation cache inside this run's output directory so it
+  # doesn't pollute the project root (the default is to write to getwd()).
+  permutedStatisticsFile = file.path(OUTPUT_DIR, "permutedStats-actualModules.RData")
 )
 
 saveRDS(mp, file.path(OUTPUT_DIR, "modulePreservation_results.rds"))
