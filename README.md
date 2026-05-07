@@ -83,7 +83,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation_network_split.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation_network_split.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ✅ |
-| Figure 7 | JMJ cluster expression + 6-genome microsynteny (incl. Mi21 NIL) | [`make_jmj_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_jmj_expression_boxplot.html) + `blocks6` (from RSSTU Mi21 microsynteny) | 🔶 update figure |
+| Figure 7 | JMJ cluster expression + 6-genome microsynteny (incl. Mi21 NIL) | [`jmj_cluster_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_cluster_expression_boxplot.html) + `blocks6` (from RSSTU Mi21 microsynteny) | 🔶 update figure |
 | Figure 8 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Supplementary Figures** | | | |
 | Figure S1 | SNP distribution and correlation | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
@@ -115,7 +115,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
 | Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
-| JMJ paralog expression | Transcript-level DEG with corrected cDNA ref | [`jmj_paralog_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_paralog_expression_boxplot.html) | ✅ |
+| JMJ paralog expression | Transcript-level DEG with corrected cDNA ref | [`jmj_5_paralog_split_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_5_paralog_split_expression_boxplot.html) | ✅ |
 | Greenyellow module | Greenyellow module characterization (sec6/pcna2) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
 | JMJ pink module | Pink module characterization (jmj2/jmj4 growth network) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
 | Phenotype association filter | FT/PH candidate gene overlap with DEGs | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |

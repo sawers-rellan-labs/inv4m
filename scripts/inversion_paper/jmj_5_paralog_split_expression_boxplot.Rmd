@@ -1,5 +1,5 @@
 ---
-title: "JMJ Paralog Expression Boxplot (PA2022)"
+title: "JMJ Paralog Expression Boxplot — Supplementary Figure (PA2022, kallisto-corrected reference)"
 author: "Analysis Pipeline"
 date: "`r Sys.Date()`"
 output:
@@ -33,23 +33,34 @@ paths <- setup_project_paths("inversion_paper")
 
 # Overview
 
-This script analyzes JMJ cluster expression from transcript-level kallisto
-quantification using the JMJ-corrected cDNA reference.
+**This script produces the per-paralog supplementary figure for the inversion
+paper.** It analyzes JMJ cluster expression from transcript-level kallisto
+quantification using the JMJ-corrected cDNA reference, where each of the five
+paralogs is a distinct entry. This complements **Figure 7** (gene-level analysis
+in `jmj_cluster_expression_boxplot.Rmd`), which uses the V5 annotation that
+collapses jmj9+psi+jmj6+jmj2 into a single gene model `Zm00001eb191790`.
+
+> **Symbol caveat.** In this notebook, "jmj2" refers to the single jmj2 paralog
+> (`Zm00001eb191790_T013`). In the gene-level Figure 7 notebook, "jmj2" labels
+> the V5 composite gene model `Zm00001eb191790` (= jmj9 + psi + jmj6 + jmj2 of
+> the corrected reference). The two notebooks use the same symbol for different
+> biological objects on purpose — this script is the only place where jmj2
+> means a single paralog.
 
 **Two analyses are performed:**
 
-1. **Total Cluster Expression** (main analysis): Sum of CPM across all 5 paralogs
-   per sample. This is the biologically meaningful comparison because:
-   - **B73/CTRL**: Has 5 tandem JMJ gene copies (>97% identical)
-   - **Inv4m**: Has only 1 gene copy in the cluster
+1. **Per-Paralog Expression** (the supplementary figure): Individual expression
+   for each of the 5 paralogs. Because the paralogs are >97% identical, kallisto
+   distributes Inv4m reads across all 5 loci artificially, so absolute per-paralog
+   levels for Inv4m are uninterpretable. The plot is informative as a read-distribution
+   diagnostic and to show that B73 reads concentrate in jmj2 + jmj4 (the V4 reference
+   transcripts) while Inv4m reads spread across all five.
 
-   Comparing total cluster output shows whether the single Inv4m copy produces
-   as much transcript as the 5 B73 copies combined.
-
-2. **Per-Paralog Expression**: Individual expression for each paralog. Note that
-   because the paralogs are >97% identical, kallisto distributes Inv4m reads
-   across all 5 loci artificially. This view is useful for understanding read
-   distribution but not for biological interpretation of Inv4m expression.
+2. **Total Cluster Expression** (kallisto cross-check): Sum of CPM across all 5
+   paralogs per sample. Methodological cross-check of the gene-level Figure 7
+   total-cluster contrast — answers the same biological question with a different
+   pipeline. Outputs are saved with `_kallisto` suffix to keep them distinct from
+   the gene-level Figure 7 outputs.
 
 **JMJ Cluster Paralogs (genomic order):**
 
@@ -628,51 +639,53 @@ ggsave(
   width = 14, height = 5, dpi = 300
 )
 
-# Save total cluster expression plot (log scale)
-saveRDS(p_jmj_total, file.path(paths$figures, "jmj_total_cluster_expression.rds"))
+# Save kallisto-based total cluster expression plot (log scale).
+# Suffixed with `_kallisto` to keep distinct from the gene-level Figure 7 outputs
+# in `jmj_cluster_expression_boxplot.Rmd` (`jmj_total_cluster_expression.*`).
+saveRDS(p_jmj_total, file.path(paths$figures, "jmj_total_cluster_expression_kallisto.rds"))
 ggsave(
-  file.path(paths$figures, "jmj_total_cluster_expression.pdf"),
+  file.path(paths$figures, "jmj_total_cluster_expression_kallisto.pdf"),
   p_jmj_total,
   width = 8, height = 6
 )
 ggsave(
-  file.path(paths$figures, "jmj_total_cluster_expression.png"),
+  file.path(paths$figures, "jmj_total_cluster_expression_kallisto.png"),
   p_jmj_total,
   width = 8, height = 6, dpi = 300
 )
 
-# Save total cluster expression plot (linear scale)
-saveRDS(p_jmj_total_linear, file.path(paths$figures, "jmj_total_cluster_expression_linear.rds"))
+# Save kallisto-based total cluster expression plot (linear scale)
+saveRDS(p_jmj_total_linear, file.path(paths$figures, "jmj_total_cluster_expression_kallisto_linear.rds"))
 ggsave(
-  file.path(paths$figures, "jmj_total_cluster_expression_linear.pdf"),
+  file.path(paths$figures, "jmj_total_cluster_expression_kallisto_linear.pdf"),
   p_jmj_total_linear,
   width = 8, height = 6
 )
 ggsave(
-  file.path(paths$figures, "jmj_total_cluster_expression_linear.png"),
+  file.path(paths$figures, "jmj_total_cluster_expression_kallisto_linear.png"),
   p_jmj_total_linear,
   width = 8, height = 6, dpi = 300
 )
 
 # Save per-paralog data
-write_csv(jmj_expr, file.path(paths$intermediate, "jmj_paralogs_expression_data.csv"))
+write_csv(jmj_expr,    file.path(paths$intermediate, "jmj_paralogs_expression_data.csv"))
 write_csv(jmj_summary, file.path(paths$intermediate, "jmj_paralogs_expression_summary.csv"))
 
-# Save total cluster data
-write_csv(jmj_total, file.path(paths$intermediate, "jmj_total_cluster_expression_data.csv"))
-write_csv(jmj_total_summary, file.path(paths$intermediate, "jmj_total_cluster_expression_summary.csv"))
+# Save kallisto-based total cluster data (suffixed to keep distinct from gene-level)
+write_csv(jmj_total,         file.path(paths$intermediate, "jmj_total_cluster_expression_kallisto_data.csv"))
+write_csv(jmj_total_summary, file.path(paths$intermediate, "jmj_total_cluster_expression_kallisto_summary.csv"))
 
 {
   cat("=== SAVED OUTPUTS ===\n")
-  cat("\nPer-Paralog Analysis:\n")
+  cat("\nPer-Paralog Analysis (the supplementary figure):\n")
   cat("  Figures: jmj_paralogs_expression_boxplot.pdf/png/rds\n")
   cat("  Data: jmj_paralogs_expression_data.csv\n")
   cat("  Data: jmj_paralogs_expression_summary.csv\n")
-  cat("\nTotal Cluster Analysis:\n")
-  cat("  Figures: jmj_total_cluster_expression.pdf/png/rds (log scale)\n")
-  cat("  Figures: jmj_total_cluster_expression_linear.pdf/png/rds (linear scale)\n")
-  cat("  Data: jmj_total_cluster_expression_data.csv\n")
-  cat("  Data: jmj_total_cluster_expression_summary.csv\n")
+  cat("\nKallisto-based Total Cluster (cross-check, distinct from Fig 7 outputs):\n")
+  cat("  Figures: jmj_total_cluster_expression_kallisto.pdf/png/rds (log scale)\n")
+  cat("  Figures: jmj_total_cluster_expression_kallisto_linear.pdf/png/rds (linear scale)\n")
+  cat("  Data: jmj_total_cluster_expression_kallisto_data.csv\n")
+  cat("  Data: jmj_total_cluster_expression_kallisto_summary.csv\n")
 }
 ```
 

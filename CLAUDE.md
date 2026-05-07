@@ -179,7 +179,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 | `model_comparison_plant_blocking.Rmd` | Model comparison utility | ✅ |
 | `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
 | `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
-| `make_jmj_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
+| `jmj_cluster_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
 | `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
 | `plot_synteny_and_repeats.Rmd` | Fig 1 Panels B–D: repeat annotation, dotplots, breakpoints | ✅ |
 | `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
