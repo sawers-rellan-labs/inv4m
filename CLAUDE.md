@@ -1,24 +1,24 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-02-24
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Proofreading 🔶
-**Version:** v2.1.0
+**Last Updated:** 2026-05-07
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 6 (pre-submission additions) 🔶
+**Version:** v2.2.0
 
 ---
 
-## START HERE: Inversion Paper Final Proofreading
+## START HERE: Inversion Paper — Phase 6 (Pre-submission additions)
 
-**Current State:** Peer review response edits APPLIED (2026-02-24). Manuscript proofreading ongoing.
+**Current State:** All proofreading + coauthor feedback complete (2026-05-07). Two new figure additions queued before submission: F2 hybrid panel for Figure 2 and a Zeal-population flowering-time supplementary figure. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
 ```
-agent/HANDOVER_inversion_paper_revision.md  # Current state & next actions
-agent/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
+agent/inversion_paper/HANDOVER_inversion_paper_revision.md  # Current state & next actions
+agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
 ```
 
-### Proofreading Task List (2026-02-24)
+### Proofreading + Phase 6 Task List (2026-05-07)
 
 | # | Task | Status | Blocked by |
 |---|------|--------|------------|
@@ -39,8 +39,19 @@ README.md  # Figure/table coverage
 | 15 | SAM p-values: switch to one-tailed, add flowering literature | ✅ done (2026-03-12) | #14 |
 | 16 | Discussion overclaim/framing pass | ✅ done (2026-03-23) | #13 |
 | 17 | Overleaf full sync | ✅ done (2026-03-23, tag: overleaf-sync-2026-03-23) | #16 |
-| 18 | Rubén full feedback | pending | #17 |
-| 19 | Coauthor suggestions | pending | #18 |
+| 18 | Rubén full feedback | ✅ done (2026-05-07) | #17 |
+| 19 | Coauthor suggestions (all coauthors) | ✅ done (2026-05-07) | #18 |
+| 20 | Repo-side site-label rename (PSU→PA, CLY→NC in R scripts) | ✅ done (2026-05-07) | - |
+| 21 | Scripts audit + cleanup (delete 25 orphan scripts; rename JMJ notebooks; resolve audit discrepancies) | ✅ done (2026-05-07; commits 988999b → cebb2d2) | - |
+| **Phase 6 — pre-submission** | | | |
+| 22 | F2 hybrid panel for Figure 2 (new analysis) | not started | - |
+| 23 | Zeal-population flowering-time supplementary figure (new analysis) | not started | - |
+| 24 | Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label | pending | - |
+| 25 | Re-upload renamed PNGs to Overleaf (PNGs still show old PSU/CLY labels even though main.tex + R scripts updated) | pending | #20 |
+| 26 | Bibtex audit of Overleaf .bib (all `\cite{}` keys resolve; spot-check; cover fransz2016, desmarais2017, minow2021, PT HiLo-1.0) | pending | - |
+| 27 | Typo fix: "acknlowledge" → "acknowledge" (~main.tex L901) | pending | - |
+| 28 | HiFi sequencing provenance: collaborator → co-author, facility → name in Methods | pending | - |
+| ❌ | ~~Run BUSCO on Mi21 NIL assembly~~ | dropped (2026-05-07) | - |
 
 ### Section 3.2 corrections applied (2026-02-24):
 - 126 → 1394 fixed alternate allele markers
@@ -62,7 +73,7 @@ README.md  # Figure/table coverage
 - Collar diameter → cob diameter
 - 4 new bibtex entries as comments (leiboff2015, thompson2015, ku2008, danilevskaya2008)
 - Commits: `93af919`, `a6fdadb`
-- R script site label rename TODO: `agent/TODO_rename_site_labels.md`
+- R script site label rename: ✅ done 2026-05-07 (the historical TODO doc lives in `agent/_trash/inversion_paper/TODO_rename_site_labels.md`)
 
 ### Discussion overclaim/framing pass (2026-03-23):
 - Guerrero 2016 citation corrected: removed false "proportional to divergence" claim
@@ -85,7 +96,7 @@ README.md  # Figure/table coverage
 - WGCNA: add DEG-input caveat, cite magenta as non-significant counterexample
 - Trans-network: "Novel" → "Dataset-specific", explain MaizeNetome overlap as tissue difference
 - Discussion: lead JMJ with CNV + ancestral single-copy, "consistent with" not "characteristic of" local adaptation, reciprocal transplant caveat, expanded 4-point limitations
-- See: `agent/peer_review_inversion_paper.md` and `review_response_edits.md`
+- See: `agent/_trash/inversion_paper/peer_review_inversion_paper.md` and `agent/_trash/inversion_paper/review_response_edits.md` (archived after the audit pass; recover from trash if you need to revisit)
 
 ---
 
@@ -105,10 +116,11 @@ inv4m/
 │   ├── phosphorus_paper/        # Paper 2 analysis notebooks ✅
 │   ├── inversion_paper/         # Paper 1 analysis notebooks
 │   └── utils/                   # Shared R utilities
-├── data/                        # Raw data and annotations (git-ignored, symlink)
+├── data/                        # Raw data and annotations (git-ignored, in-tree real folder, write-protected)
 ├── docs/                        # GitHub Pages (HTML reports)
 │   ├── index.html               # Landing page
-│   └── phosphorus_paper/        # Paper-specific reports
+│   ├── phosphorus_paper/        # Phosphorus paper reports
+│   └── inversion_paper/         # Inversion paper reports + main.tex
 ├── results/                     # Intermediate outputs (git-ignored)
 └── .gitignore                   # Configured for large data/results
 ```
@@ -117,7 +129,7 @@ inv4m/
 
 ## Phosphorus Paper - Complete ✅
 
-### Scripts (12 Rmd files in `scripts/phosphorus_paper/`)
+### Scripts (14 Rmd files in `scripts/phosphorus_paper/`)
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -125,9 +137,11 @@ inv4m/
 | `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
 | `Lipid_differential_abundance.Rmd` | Differential lipid analysis | ✅ |
 | `PSU2022_growthcurves.Rmd` | Growth curve analysis | ✅ |
-| `PSU2022_ionome.Rmd` | Ionome analysis | ✅ |
+| `PSU2022_ionome.Rmd` | Ionome analysis (concentration + grain/stover ratio) | ✅ |
+| `PSU2022_ionome_content.Rmd` | Ionome content per plant + harvest index | ✅ |
 | `PSU2022_make_transcription_indices.Rmd` | Transcription indices | ✅ |
 | `PSU2022_phenotype_marginal_means.Rmd` | Phenotype marginal means | ✅ |
+| `PSU2022_phenotype_fig1_contrast_test.Rmd` | Figure 1 contrast tests | ✅ |
 | `GO_Enrichment_Analysis_of_DEGs.Rmd` | GO term enrichment | ✅ |
 | `KEGG_Pathway_Enrichment_Analysis_of_DEGs.Rmd` | KEGG pathway enrichment | ✅ |
 | `LION_Lipid_Enrichment_Analysis.Rmd` | Lipid enrichment analysis | ✅ |
@@ -148,7 +162,7 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 ### Infrastructure
 
 ✅ **setup_paths.R** - Path configuration utility providing:
-- `paths$data` - Input data (symlinked)
+- `paths$data` - Input data (in-tree real folder, write-protected)
 - `paths$intermediate` - Processed CSV/RDS files
 - `paths$figures` - Publication figures
 - `paths$tables` - LaTeX tables only
@@ -159,28 +173,72 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 ---
 
-## Inversion Paper - Phase 4 Results Writing 🔶
+## Inversion Paper - Phase 6 Pre-submission Additions 🔶
 
-### Scripts (in `scripts/inversion_paper/`)
+### Scripts (27 Rmd + the field_perturbation pipeline in `scripts/inversion_paper/`)
+
+#### Figure 1 (Inv4m delimitation)
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `plot_genotype_get_correlated_loci.Rmd` | SNP distribution and correlation | ✅ |
-| `Corrected_phenotype_analysis_PSU2022.Rmd` | Corrected phenotype analysis | ✅ |
-| `differential_expression_leaf_treatment_model.Rmd` | DEG analysis | ✅ |
-| `Analyze_MaizeNetome_TransRegulation.Rmd` | Trans coexpression network | ✅ |
-| `get_WGCNA_modules.Rmd` | WGCNA network analysis | ✅ |
-| `GO_Enrichment_Trans_Network.Rmd` | Network GO analysis | ✅ |
-| `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis | ✅ |
-| `make_manhattan_plots.Rmd` | Manhattan plots (Fig 3 D,E,G,H) | ✅ |
-| `volcano_plot_analysis.Rmd` | Volcano plot (Fig 3 C / Fig 4) | ✅ |
-| `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ✅ |
-| `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Network ref/novel split | ✅ |
-| `assemble_WGCNA_figure.Rmd` | WGCNA Figure 6 assembly | ✅ |
-| `jmj_cluster_expression_boxplot.Rmd` | JMJ + cell proliferation expression | ✅ |
+| `plot_Figure_1.Rmd` | Figure 1 multi-panel assembly | ✅ |
+| `plot_synteny_and_repeats.Rmd` | Fig 1 panels B–D: repeat annotation, dotplots, breakpoints | ✅ |
+| `plot_genotype_get_correlated_loci.Rmd` | Fig 1 panels E–F + Fig S1 SNP distribution + Table 1 | ✅ |
+| `make_breakpoint_tables.Rmd` | Tables S1, S2 (breakpoints across 4 genomes + knob repeats) | ✅ |
+
+#### Figure 2 (phenotypes + SAM)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Corrected_phenotype_analysis_PSU2022.Rmd` | Spatially corrected phenotypes (PA2022 field) | ✅ |
 | `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
-| `plot_synteny_and_repeats.Rmd` | Fig 1 Panels B–D: repeat annotation, dotplots, breakpoints | ✅ |
-| `field_perturbation/` | WGCNA consensus pipeline (7 scripts) | ✅ |
+
+#### GxE (Fig S2/S3, Table S4)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `gdd_pre_spatial_correction.Rmd` | GDD lookup (intermediate for the spatial-correction Rmds) | ✅ |
+| `Corrected_phenotype_analysis_PSU2025.Rmd` | PA2025 spatial correction (GxE intermediate) | ✅ |
+| `Corrected_phenotype_analysis_CLY2025_modified.Rmd` | NC2025 spatial correction (GxE intermediate) | ✅ |
+| `inv4mGxE_3_env.Rmd` | GxE figures S2/S3 + Table S4 | ✅ |
+| `internode_analysis.Rmd` | Internode analysis (Fig S4) | ✅ |
+
+#### Figure 3 (transcriptomics) + Table 2
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `differential_expression_leaf_treatment_model.Rmd` | DEG analysis (limma, plant blocking) — Fig 3 MDS, Table S3 | ✅ |
+| `volcano_plot_analysis.Rmd` | Volcano plot (Figure 3 panel C) | ✅ |
+| `make_manhattan_plots.Rmd` | Manhattan plots (Fig 3 panels D, E, G, H) | ✅ |
+| `assemble_figure3_RNAseq.Rmd` | Figure 3 assembly (8 panels) | ✅ |
+| `phenotype_association_filter.Rmd` | Table 2 (FT/PH gene candidates) | ✅ |
+| `compare_r2_sliding_window_regions.Rmd` | R² sliding window across regions (intermediate for divergence figure) | ✅ |
+| `sequence_divergence_vs_DE.Rmd` | Mi21–B73 CDS divergence vs DE (Supp divergence figure) | ✅ |
+
+#### Figure 5 (trans network)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` | Trans network reference/dataset-specific edge split | ✅ |
+| `GO_Enrichment_Trans_Network.Rmd` | Network GO enrichment + Fig 5 annotation overlay | ✅ |
+
+#### Figure 6 + Fig S5/S6 (WGCNA)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `assemble_WGCNA_figure.Rmd` | Figure 6 (WGCNA module perturbation) | ✅ |
+| `WGCNA_module_perturbation_test.Rmd` | Figure S5 — bootstrap support comparison (Genotype Response × Leaf Gradient) | ✅ |
+| `field_perturbation/` | WGCNA consensus pipeline (7 scripts: 01_data_prep → 07_module_annotation; produces Fig 6 panels, Fig S6, Table S5) | ✅ |
+| `greenyellow_module_characterization.Rmd` | Table S6 (greenyellow module DEGs — sec6/pcna2) | ✅ |
+
+#### Figure 7 (JMJ)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Crow2020_reanalysis.Rmd` | Crow 2020 reanalysis (intermediate for JMJ + sequence divergence) | ✅ |
+| `jmj_cluster_expression_boxplot.Rmd` | Figure 7 panel A — JMJ cluster expression + cell proliferation companion genes | ✅ |
+| `jmj_5_paralog_split_expression_boxplot.Rmd` | Per-paralog supplementary figure (kallisto-corrected reference; planned supp, not yet loaded by main.tex) | 🔶 Phase 6 |
+| `jmj_pink_module_characterization.Rmd` | Table S7 (pink module DEGs — JMJ co-expression) | ✅ |
 
 ### Generated Outputs
 
@@ -196,7 +254,7 @@ docs/inversion_paper/   # HTML reports (GitHub Pages)
 ### Infrastructure
 
 ✅ **setup_paths.R** - Path configuration utility providing:
-- `paths$data` - Input data (symlinked)
+- `paths$data` - Input data (in-tree real folder, write-protected)
 - `paths$intermediate` - Processed CSV/RDS files
 - `paths$figures` - Publication figures
 - `paths$tables` - LaTeX tables only
@@ -309,7 +367,7 @@ paths <- setup_project_paths("phosphorus_paper")
 
 After sourcing `setup_paths.R`, use:
 
-- `paths$data` - `data/` (flat, symlinked directory - read-only)
+- `paths$data` - `data/` (flat, write-protected; `chmod -R u+w data/` to add inputs, then re-lock)
 - `paths$intermediate` - `results/phosphorus_paper/intermediate/`
 - `paths$figures` - `results/phosphorus_paper/figures/`
 - `paths$tables` - `results/phosphorus_paper/tables/`
@@ -467,28 +525,27 @@ git -C "/path/to/inv4m" push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper 🔶 Phase 4 In Progress
+### Inversion Paper 🔶 Phase 6 Pre-submission Additions
 
 **Completed Phases:**
-- [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-4)
+- [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-3)
 - [x] Phase 2: Network Analysis (Figure 5, Figure 6 WGCNA, GO enrichment)
 - [x] Phase 3: Phenotype Integration (SAM data in Figure 2)
+- [x] Phase 4: Methods & Results Writing (all 7 Results sections, Discussion, Abstract, Title)
+- [x] Phase 5: Review & Polish (proofreading, peer review, Discussion overclaim/framing pass, Overleaf sync, coauthor feedback)
+- [x] Audit + cleanup (2026-05-07): scripts audit, deletions, JMJ rename, S1/S5 producer fixes; commits `988999b` → `cebb2d2`
 
-**Current Phase 4: Methods & Results Writing**
-- [x] All main figures complete (1-8)
-- [x] All supplementary figures complete (S1-S5)
-- [x] All tables complete (1-2, S1-S4)
-- [x] Methods sections mostly complete
-- [ ] **Results narrative incomplete** - does not match recent analysis (est. 8-10 hours)
-- [ ] **Discussion section** - not written
-- [ ] MaizeNetome validation for WGCNA analysis (methods)
+**Current Phase 6: Pre-submission additions**
+- [ ] **F2 hybrid panel for Figure 2** (new analysis)
+- [ ] **Zeal-population flowering-time supplementary figure** (new analysis)
+- [ ] Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label
+- [ ] Re-upload renamed PNGs to Overleaf (PSU/CLY → PA/NC labels)
+- [ ] Bibtex audit of Overleaf .bib (full pass)
+- [ ] Read-aloud proofreading: Abstract + Discussion
+- [ ] Typo fix: "acknlowledge" → "acknowledge" (~main.tex L901)
+- [ ] HiFi sequencing provenance: collaborator → co-author, facility → name in Methods
 
-**Phase 5: Review & Polish (not started)**
-- [ ] Internal consistency check
-- [ ] Final proofreading
-- [ ] USER: Add preservation table/figure to Overleaf
-
-**See:** `agent/MASTER_PLAN_inversion_paper_revision.md` and `TODO_05_results_writing.md` for detailed roadmap
+**See:** `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` (active task list) and `agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md` (roadmap).
 
 ---
 
@@ -497,8 +554,8 @@ git -C "/path/to/inv4m" push origin main
 ### Session Start Protocol
 
 When starting a new session on this project, **proactively read**:
-1. `agent/HANDOVER_inversion_paper_revision.md` - Current state and next actions
-2. `agent/MASTER_PLAN_inversion_paper_revision.md` - Full revision roadmap
+1. `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` - Current state and next actions
+2. `agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md` - Full revision roadmap
 
 Then suggest next actions based on the handover document.
 
@@ -523,7 +580,7 @@ When giving multiline terminal commands or instructions to run on HPC/local shel
 ### What to Avoid
 
 - ❌ Don't put CSV files in `tables/` (LaTeX only)
-- ❌ Don't create subdirectories in `data/` (it's a symlink)
+- ❌ Don't create subdirectories in `data/` without first unlocking with `chmod -R u+w data/`; re-lock with `chmod -R a-w data/` after
 - ❌ Don't modify analysis logic without explicit request
 - ❌ Don't add formatting changes (axis removal, etc.) to analysis scripts - do it in assembly scripts
 - ❌ Don't hardcode values that can be calculated from data (e.g., DEG counts)
