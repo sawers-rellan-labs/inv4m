@@ -1146,6 +1146,18 @@ p_distribution <- inv4_distro %>%
   )
 
 p_distribution
+
+# Save Supplementary Figure S1 (SNP distribution by chromosome).
+ggsave(
+  file.path(paths$figures, "SNP_distribution.png"),
+  p_distribution,
+  width = 8, height = 5, dpi = 300
+)
+ggsave(
+  file.path(paths$figures, "SNP_distribution.svg"),
+  p_distribution,
+  width = 8, height = 5
+)
 ```
 
 # Manhattan Plots

@@ -79,8 +79,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | **Main Figures** | | | |
 | Figure 1 | Inv4m delimitation: breeding scheme (A), repeat annotation (B), AnchorWave dotplots (C), breakpoint self-similarity (D), genotype map (E–F) | [`plot_Figure_1.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_Figure_1.html) (assembly) + [`plot_synteny_and_repeats.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_synteny_and_repeats.html) (B–D) + [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) (E–F) | ✅ |
 | Figure 2 | Effect of Inv4m on PH, DTA, DTS, HI + SAM morphology | [`Corrected_phenotype_analysis_PSU2022.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2022.html) | ✅ |
-| Figure 3 | Global and local transcriptomic effects (8 panels) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + panel scripts | ✅ |
-| Figure 4 | Volcano plots for DEGs | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
+| Figure 3 | Global and local transcriptomic effects (8 panels, incl. volcano panel C) | [`assemble_figure3_RNAseq.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_figure3_RNAseq.html) + [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) (panel C) + manhattan/MDS panel scripts | ✅ |
 | Figure 5 | Trans coexpression network of Inv4m DEGs | [`Analyze_MaizeNetome_TransRegulation_network_split.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Analyze_MaizeNetome_TransRegulation_network_split.html) | ✅ |
 | Figure 6 | WGCNA module perturbation | [`assemble_WGCNA_figure.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/assemble_WGCNA_figure.html) + field_perturbation | ✅ |
 | Figure 7 | JMJ cluster expression + 6-genome microsynteny (incl. Mi21 NIL) | [`jmj_cluster_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_cluster_expression_boxplot.html) + `blocks6` (from RSSTU Mi21 microsynteny) | 🔶 update figure |
@@ -90,7 +89,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure S2 | GxE interaction plots (MI21 donor) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S3 | GxE effect sizes forest plot | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
 | Figure S4 | Internode analysis (4 panels: height, photos, schematic, profiles) | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) + photos | ✅ |
-| Figure S5 | WGCNA module bootstrap support | `field_perturbation/05_bootstrap_support.Rmd` | ✅ |
+| Figure S5 | WGCNA module bootstrap support (Genotype Response × Leaf Gradient) | [`WGCNA_module_perturbation_test.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/WGCNA_module_perturbation_test.html) | ✅ |
 | Figure S6 | WGCNA module GO enrichment | `field_perturbation/07_module_annotation.Rmd` | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
