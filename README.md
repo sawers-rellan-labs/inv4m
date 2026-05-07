@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Discussion complete (2026-03-23). Ready for PI full feedback, then coauthor suggestions.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; PI and coauthor feedback addressed (2026-05-07). Phase 6 pre-submission additions in progress: F2 hybrid panel for Figure 2, Zeal-population flowering-time supplementary figure, and Overleaf-side polish (PNG re-upload, bibtex audit). See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
@@ -58,7 +58,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 ### Peer review edits applied (2026-02-24)
 
-18 text edits addressing internal peer review (see `agent/peer_review_inversion_paper.md` and `review_response_edits.md`):
+18 text edits addressing internal peer review (archived to `agent/_trash/inversion_paper/peer_review_inversion_paper.md` and `agent/_trash/inversion_paper/review_response_edits.md` after the 2026-05-07 audit pass):
 
 | Category | Key changes |
 |----------|------------|
@@ -112,16 +112,19 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | 6-genome microsynteny | JMJ cluster panel B (jcvi pipeline, incl. Mi21 NIL) | `scripts/02_genomics_foundation/blocks6` + `blocks6.layout` + `prepare_Mi21_for_mcscan.sh` + `run_ortholog_B73_Mi21.sh` + `merge_blocks_and_plot.sh` | 🔶 update figure |
 | Breakpoint tables | Table S1 (delimitation) + S2 (knob repeats) data | [`make_breakpoint_tables.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_breakpoint_tables.html) | ✅ |
 | Manhattan plots | Fig 3 panels D, E, G, H | [`make_manhattan_plots.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/make_manhattan_plots.html) | ✅ |
-| Volcano plot | Fig 3 panel C / Fig 4 | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
+| Volcano plot | Figure 3 panel C | [`volcano_plot_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/volcano_plot_analysis.html) | ✅ |
 | SAM morphology | DIC microscopy analysis | [`SAM_morphology_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/SAM_morphology_analysis.html) | ✅ |
 | JMJ paralog expression | Transcript-level DEG with corrected cDNA ref | [`jmj_5_paralog_split_expression_boxplot.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_5_paralog_split_expression_boxplot.html) | ✅ |
 | Greenyellow module | Greenyellow module characterization (sec6/pcna2) | [`greenyellow_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/greenyellow_module_characterization.html) | ✅ |
 | JMJ pink module | Pink module characterization (jmj2/jmj4 growth network) | [`jmj_pink_module_characterization.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/jmj_pink_module_characterization.html) | ✅ |
 | Phenotype association filter | FT/PH candidate gene overlap with DEGs | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
 | GxE analysis | 3-environment genotype-by-environment interaction | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
-| Internode analysis | CLY2025 internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
-| PSU2025 phenotypes | Spatial correction for PSU2025 | [`Corrected_phenotype_analysis_PSU2025.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2025.html) | ✅ |
-| CLY2025 phenotypes | Spatial correction for CLY2025 | [`Corrected_phenotype_analysis_CLY2025_modified.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_CLY2025_modified.html) | ✅ |
+| Internode analysis | NC2025 internode length profiles | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) | ✅ |
+| PA2025 phenotypes | Spatial correction for PA2025 (formerly PSU2025) | [`Corrected_phenotype_analysis_PSU2025.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_PSU2025.html) | ✅ |
+| NC2025 phenotypes | Spatial correction for NC2025 (formerly CLY2025) | [`Corrected_phenotype_analysis_CLY2025_modified.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Corrected_phenotype_analysis_CLY2025_modified.html) | ✅ |
+| Sequence divergence vs DE | Mi21–B73 CDS divergence vs Inv4m DEG (Supp divergence figure) | [`sequence_divergence_vs_DE.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/sequence_divergence_vs_DE.html) | ✅ |
+| R² sliding window | Inv4m / flanking / outside region comparison (intermediate for divergence figure) | [`compare_r2_sliding_window_regions.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/compare_r2_sliding_window_regions.html) | ✅ |
+| GDD lookup | Growing degree day pre-correction (intermediate for spatial-correction Rmds) | [`gdd_pre_spatial_correction.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/gdd_pre_spatial_correction.html) | ✅ |
 
 **Status Legend:** ✅ Ready | 🔶 In Progress | ⚠️ Needs work | ❌ Missing
 
@@ -204,14 +207,15 @@ Rscript scripts/utils/render_notebook.R scripts/phosphorus_paper/GO_Enrichment_A
 
 ```
 inv4m/
+├── agent/                   # AI agent sandbox (git-ignored, ephemeral scratch)
 ├── scripts/
-│   ├── phosphorus_paper/    # Paper 2 analysis notebooks (12 Rmd files) ✅
-│   ├── inversion_paper/     # Paper 1 analysis notebooks (24 Rmd files) ✅
+│   ├── phosphorus_paper/    # Paper 2 analysis notebooks (14 Rmd files) ✅
+│   ├── inversion_paper/     # Paper 1 analysis notebooks (27 Rmd files + field_perturbation/) ✅
 │   └── utils/               # Shared utilities (setup_paths.R, render_notebook.R)
-├── data/                    # Input data (symlink, not tracked)
+├── data/                    # Input data (in-tree real folder, write-protected, not tracked)
 ├── docs/                    # Published HTML reports (GitHub Pages)
-│   ├── phosphorus_paper/    # Paper 2 reports (12 HTML files)
-│   └── inversion_paper/     # Paper 1 reports
+│   ├── phosphorus_paper/    # Paper 2 reports
+│   └── inversion_paper/     # Paper 1 reports + main.tex
 └── results/                 # Generated outputs (not tracked)
     ├── phosphorus_paper/
     └── inversion_paper/
@@ -235,7 +239,7 @@ Differentially expressed genes and differentially abundant lipids are classified
 
 ## Data
 
-Input data files should be placed in `data/` (symlinked to shared data directory). The pipeline reads from this flat directory structure and writes outputs to organized subdirectories in `results/`.
+Input data files live in `data/` — a write-protected, in-tree real folder (was a symlink to `../inv4mRNA/data` until 2026-05; consolidated). The pipeline reads from this flat directory and writes outputs to organized subdirectories in `results/`. To add new inputs: `chmod -R u+w data/` → drop files → `chmod -R a-w data/` to re-lock.
 
 ## License
 
