@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; PI and coauthor feedback addressed (2026-05-07). Phase 6 pre-submission additions in progress: F2 hybrid panel for Figure 2, Zeal-population flowering-time supplementary figure, and Overleaf-side polish (PNG re-upload, bibtex audit). See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; **Rubén's full feedback and coauthor suggestions still pending** (the 2026-05-07 coauthor close-out applies to the *phosphorus* paper, not this one). Phase 6 pre-submission additions also queued: F2 hybrid panel for Figure 2, Zeal-population flowering-time supplementary figure, and Overleaf-side polish (PNG re-upload, bibtex audit). See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 

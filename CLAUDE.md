@@ -1,14 +1,14 @@
 # inv4m Project Guide
 
 **Last Updated:** 2026-05-07
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Phase 6 (pre-submission additions) 🔶
+**Status:** Phosphorus Paper - Complete ✅ (coauthor feedback addressed 2026-05-07) | Inversion Paper - Late Phase 5 / Phase 6 🔶 (Rubén + coauthor feedback pending; pre-submission figure additions queued)
 **Version:** v2.2.0
 
 ---
 
-## START HERE: Inversion Paper — Phase 6 (Pre-submission additions)
+## START HERE: Inversion Paper — Late Phase 5 / Phase 6
 
-**Current State:** All proofreading + coauthor feedback complete (2026-05-07). Two new figure additions queued before submission: F2 hybrid panel for Figure 2 and a Zeal-population flowering-time supplementary figure. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+**Current State:** Manuscript text complete; **Rubén's full feedback and coauthor suggestions on the inversion paper are still pending**. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Two pre-submission figure additions also queued: F2 hybrid panel for Figure 2 and a Zeal-population flowering-time supplementary figure. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -39,8 +39,8 @@ README.md  # Figure/table coverage
 | 15 | SAM p-values: switch to one-tailed, add flowering literature | ✅ done (2026-03-12) | #14 |
 | 16 | Discussion overclaim/framing pass | ✅ done (2026-03-23) | #13 |
 | 17 | Overleaf full sync | ✅ done (2026-03-23, tag: overleaf-sync-2026-03-23) | #16 |
-| 18 | Rubén full feedback | ✅ done (2026-05-07) | #17 |
-| 19 | Coauthor suggestions (all coauthors) | ✅ done (2026-05-07) | #18 |
+| 18 | Rubén full feedback (inversion paper) | pending | #17 |
+| 19 | Coauthor suggestions (inversion paper) | pending | #18 |
 | 20 | Repo-side site-label rename (PSU→PA, CLY→NC in R scripts) | ✅ done (2026-05-07) | - |
 | 21 | Scripts audit + cleanup (delete 25 orphan scripts; rename JMJ notebooks; resolve audit discrepancies) | ✅ done (2026-05-07; commits 988999b → cebb2d2) | - |
 | **Phase 6 — pre-submission** | | | |
@@ -525,17 +525,21 @@ git -C "/path/to/inv4m" push origin main
 - [x] Validate outputs in correct directories
 - [x] Tag release v1.0.0
 
-### Inversion Paper 🔶 Phase 6 Pre-submission Additions
+### Inversion Paper 🔶 Late Phase 5 / Phase 6
 
 **Completed Phases:**
 - [x] Phase 1: Critical Updates (limma model, DEGs, Figure 1-3)
 - [x] Phase 2: Network Analysis (Figure 5, Figure 6 WGCNA, GO enrichment)
 - [x] Phase 3: Phenotype Integration (SAM data in Figure 2)
 - [x] Phase 4: Methods & Results Writing (all 7 Results sections, Discussion, Abstract, Title)
-- [x] Phase 5: Review & Polish (proofreading, peer review, Discussion overclaim/framing pass, Overleaf sync, coauthor feedback)
+- [~] Phase 5: Review & Polish — proofreading ✅, internal peer review ✅, Discussion overclaim/framing pass ✅, Overleaf sync ✅; **Rubén's full feedback and coauthor suggestions still pending**
 - [x] Audit + cleanup (2026-05-07): scripts audit, deletions, JMJ rename, S1/S5 producer fixes; commits `988999b` → `cebb2d2`
 
-**Current Phase 6: Pre-submission additions**
+**Open (Late Phase 5):**
+- [ ] **Address Rubén's full feedback on the inversion paper**
+- [ ] **Address coauthor suggestions on the inversion paper**
+
+**Phase 6 — Pre-submission additions (queued):**
 - [ ] **F2 hybrid panel for Figure 2** (new analysis)
 - [ ] **Zeal-population flowering-time supplementary figure** (new analysis)
 - [ ] Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label
