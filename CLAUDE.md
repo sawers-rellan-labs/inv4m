@@ -13,8 +13,8 @@
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
 ```
-scripts/00_agent_work/HANDOVER_inversion_paper_revision.md  # Current state & next actions
-scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
+agent/HANDOVER_inversion_paper_revision.md  # Current state & next actions
+agent/MASTER_PLAN_inversion_paper_revision.md  # Full roadmap
 README.md  # Figure/table coverage
 ```
 
@@ -62,7 +62,7 @@ README.md  # Figure/table coverage
 - Collar diameter → cob diameter
 - 4 new bibtex entries as comments (leiboff2015, thompson2015, ku2008, danilevskaya2008)
 - Commits: `93af919`, `a6fdadb`
-- R script site label rename TODO: `scripts/00_agent_work/TODO_rename_site_labels.md`
+- R script site label rename TODO: `agent/TODO_rename_site_labels.md`
 
 ### Discussion overclaim/framing pass (2026-03-23):
 - Guerrero 2016 citation corrected: removed false "proportional to divergence" claim
@@ -85,7 +85,7 @@ README.md  # Figure/table coverage
 - WGCNA: add DEG-input caveat, cite magenta as non-significant counterexample
 - Trans-network: "Novel" → "Dataset-specific", explain MaizeNetome overlap as tissue difference
 - Discussion: lead JMJ with CNV + ancestral single-copy, "consistent with" not "characteristic of" local adaptation, reciprocal transplant caveat, expanded 4-point limitations
-- See: `scripts/00_agent_work/peer_review_inversion_paper.md` and `review_response_edits.md`
+- See: `agent/peer_review_inversion_paper.md` and `review_response_edits.md`
 
 ---
 
@@ -100,8 +100,8 @@ The **inv4m** project analyzes the maize chromosomal inversion Inv4m and its eff
 
 ```
 inv4m/
+├── agent/                       # AI agent sandbox (git-ignored, ephemeral scratch)
 ├── scripts/
-│   ├── 00_agent_work/           # AI agent sandbox (git-ignored)
 │   ├── phosphorus_paper/        # Paper 2 analysis notebooks ✅
 │   ├── inversion_paper/         # Paper 1 analysis notebooks (future)
 │   ├── shared_paper/            # Foundation scripts used by BOTH papers
@@ -234,11 +234,12 @@ All figures and tables in the phosphorus paper have been mapped to their generat
 
 ## Directory Structure
 
-### Data Directory (Symlink)
+### Data Directory
 
-`data/` is a symbolic link to `../inv4mRNA/data` (shared across projects).
-- Flat structure with ~40 files at root level
-- Read-only - do not create subdirectories
+`data/` is a real folder inside the repo (was a symlink to `../inv4mRNA/data` until 2026-05; consolidated in-tree).
+- Flat structure with ~80 files at root level + a few subdirs (`papers/`, `ICP - PSU Maize 2023/`, `maizegdb_consensus_map/`)
+- Write-protected (`chmod -R a-w`) — to add new inputs, `chmod -R u+w data/` → drop files → re-lock with `chmod -R a-w data/`
+- Git-ignored
 
 ### Results Directory
 
@@ -424,7 +425,7 @@ High-level summaries and multi-panel figures combining multiple analyses.
 ❌ **Never commit:**
 - `data/` directory (large, git-ignored)
 - `results/` directory (generated outputs, git-ignored)
-- `scripts/00_agent_work/` (agent sandbox, git-ignored)
+- `agent/` (agent sandbox, git-ignored)
 - Binary files (`.RDS`, `.RData`, `.csv`, `.pdf`, `.png`)
 
 ### Sandbox-aware git commands
@@ -492,7 +493,7 @@ git -C "/path/to/inv4m" push origin main
 - [ ] Final proofreading
 - [ ] USER: Add preservation table/figure to Overleaf
 
-**See:** `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` and `TODO_05_results_writing.md` for detailed roadmap
+**See:** `agent/MASTER_PLAN_inversion_paper_revision.md` and `TODO_05_results_writing.md` for detailed roadmap
 
 ---
 
@@ -501,8 +502,8 @@ git -C "/path/to/inv4m" push origin main
 ### Session Start Protocol
 
 When starting a new session on this project, **proactively read**:
-1. `scripts/00_agent_work/HANDOVER_inversion_paper_revision.md` - Current state and next actions
-2. `scripts/00_agent_work/MASTER_PLAN_inversion_paper_revision.md` - Full revision roadmap
+1. `agent/HANDOVER_inversion_paper_revision.md` - Current state and next actions
+2. `agent/MASTER_PLAN_inversion_paper_revision.md` - Full revision roadmap
 
 Then suggest next actions based on the handover document.
 
@@ -516,13 +517,13 @@ Then suggest next actions based on the handover document.
 
 2. **Path management:** All scripts use `setup_paths.R` utility with `here::here()`
 
-3. **Agent sandbox:** `scripts/00_agent_work/` - Temporary work, git-ignored
+3. **Agent sandbox:** `agent/` - Temporary work, git-ignored. Organize as `agent/inversion_paper/`, `agent/phosphorus_paper/`, `agent/shared/`, with `agent/_trash/{paper}/` for files whose contents have been absorbed into tracked code or manuscript.
 
 4. **LaTeX formatting:** `main.tex` uses **one-sentence-per-line** (semantic line breaks). When editing LaTeX prose, keep each sentence on its own line — do not wrap to a fixed column width. This produces clean single-line git diffs per sentence change.
 
 ### Terminal Commands Rule
 
-When giving multiline terminal commands or instructions to run on HPC/local shell, **always write them to a markdown file in `scripts/00_agent_work/`** with proper code blocks. Never rely on the user copy-pasting commands from the Claude Code chat window — the formatting breaks and corrupts the commands.
+When giving multiline terminal commands or instructions to run on HPC/local shell, **always write them to a markdown file in `agent/`** with proper code blocks. Never rely on the user copy-pasting commands from the Claude Code chat window — the formatting breaks and corrupts the commands.
 
 ### What to Avoid
 

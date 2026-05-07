@@ -49,7 +49,7 @@ results/
 .Rproj.user/
 
 # Agent Sandbox and AI artifacts
-scripts/00_agent_work/
+agent/
 *.log
 *plan.sh
 migration_audit.md

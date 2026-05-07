@@ -1172,7 +1172,7 @@ labels <- read.csv(here("data", "locus_labels_master.csv")) %>%
 
 # Crow Table S2
 crow_s2 <- read.table(
-  here("scripts", "00_agent_work", "Crow2020_table_S2.tsv"),
+  here("data", "Crow2020_table_S2.tsv"),
   header = TRUE, sep = "\t", fill = TRUE
 ) %>%
   left_join(v4_v5, by = c(Gene = "v4"))

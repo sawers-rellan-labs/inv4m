@@ -58,7 +58,7 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 
 ### Peer review edits applied (2026-02-24)
 
-18 text edits addressing internal peer review (see `scripts/00_agent_work/peer_review_inversion_paper.md` and `review_response_edits.md`):
+18 text edits addressing internal peer review (see `agent/peer_review_inversion_paper.md` and `review_response_edits.md`):
 
 | Category | Key changes |
 |----------|------------|
