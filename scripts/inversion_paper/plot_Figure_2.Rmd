@@ -1,0 +1,308 @@
+---
+title: "Figure 2 draft assembly (2x2 macro layout)"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8.05
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Macro layout (850 x 570 px draft)
+
+```
++-------------------------------+-------------------------------+
+|  A  PSU2022 field phenotypes  |  B  PSU2024 significant       |
+|     (6-trait, 2 x 3 grid)     |     (4-trait 2 x 2 grid)      |
++-------------------------------+-------------------------------+
+|  C  SAM quantification        |  D  SAM micrograph (DIC)      |
+|     (4 morphometric panels)   |     (placeholder — Overleaf)  |
++-------------------------------+-------------------------------+
+```
+
+Panel A and C are imported as PNGs already saved by their producer notebooks.
+Panel B is rebuilt fresh from the PSU2024 corrected-phenotypes CSV restricted
+to the four traits significant at FDR < 0.05 in the marginal contrast (GWE,
+TGW, TGN, PH). Panel D currently shows a placeholder; the DIC micrograph PNG
+lives on Overleaf and would need to be added under `data/` (or pointed at via
+an absolute path) to be embedded here.
+
+# 1. Libraries
+
+```{r load-libraries}
+library(tidyverse)
+library(ggtext)
+library(ggfx)
+library(ggpubr)
+library(ggbeeswarm)
+library(cowplot)
+library(magick)
+```
+
+# 2. Harmonized theme + boxplot helper
+
+All boxplot panels (A, B, C) share this theme. `base_size = 14` matches the
+effective rendered size of the legacy 6-trait Panel A image at the 12-inch
+canvas width, so panel typography is internally consistent.
+
+```{r theme-helper}
+pheno_theme_panel <- theme_classic2(base_size = 14) +
+  theme(
+    plot.title       = element_text(size = 14, face = "bold", hjust = 0.5),
+    axis.title.y     = element_text(size = 12),
+    axis.title.x     = element_blank(),
+    axis.text.x      = element_markdown(size = 12, face = "bold",
+                                        color = "black"),
+    axis.text.y      = element_text(size = 10),
+    legend.position  = "none"
+  )
+
+# Single helper: trait_data has columns (genotype, trait, value);
+# label_lookup maps trait -> y-axis label; star_lookup maps trait -> sig star
+make_boxplot <- function(tr, trait_data, label_lookup, star_lookup) {
+  d <- trait_data %>% filter(trait == tr, !is.na(value))
+  if (!nrow(d)) return(NULL)
+  ymax <- max(d$value, na.rm = TRUE)
+  yrng <- diff(range(d$value, na.rm = TRUE))
+  star <- if (tr %in% names(star_lookup)) star_lookup[[tr]] else ""
+  bracket_df <- tibble(group1 = "CTRL", group2 = "Inv4m",
+                       y.position = ymax + 0.08 * yrng,
+                       label = star)
+  y_lab <- if (tr %in% names(label_lookup)) label_lookup[[tr]] else tr
+  ggplot(d, aes(x = genotype, y = value, color = genotype)) +
+    geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0) +
+    geom_quasirandom(size = 1.4) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
+    stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
+                       bracket.size = 0.6, inherit.aes = FALSE) +
+    labs(title = tr, y = y_lab, x = NULL) +
+    scale_y_continuous(expand = expansion(mult = c(0.08, 0.20))) +
+    pheno_theme_panel
+}
+```
+
+# 3. Panel A — PSU2022 6-trait phenotypes (rebuilt native)
+
+```{r panel-A, fig.width=7.2, fig.height=5.5}
+psu2022 <- read_csv(
+  file.path(paths$intermediate,
+            "PSU2022_spatially_corrected_phenotypes.csv"),
+  show_col_types = FALSE) %>%
+  filter(genotype %in% c("CTRL", "Inv4m")) %>%
+  mutate(genotype = factor(genotype, levels = c("CTRL", "Inv4m")))
+
+psu2022_eff <- read_csv(
+  file.path(paths$intermediate, "PSU2022_inv4m_effect_sizes.csv"),
+  show_col_types = FALSE)
+
+A_traits <- c("PH", "DTA", "DTS", "HI", "STWHV", "CD")
+A_labels <- c(PH = "Plant height (cm)", DTA = "Days to anthesis",
+              DTS = "Days to silking", HI = "Harvest index",
+              STWHV = "Stover dry wt (g)", CD = "Cob diameter (mm)")
+A_stars  <- setNames(psu2022_eff$p.adj.signif, psu2022_eff$trait)
+
+psu2022_long <- psu2022 %>%
+  pivot_longer(cols = any_of(A_traits), names_to = "trait",
+               values_to = "value") %>%
+  mutate(trait = factor(trait, levels = A_traits))
+
+A_plots <- lapply(A_traits, make_boxplot,
+                  trait_data = psu2022_long,
+                  label_lookup = A_labels,
+                  star_lookup = A_stars)
+panel_A <- cowplot::plot_grid(plotlist = A_plots, nrow = 2, ncol = 3,
+                              align = "hv", axis = "tblr")
+panel_A
+```
+
+# 4. Panel B — PSU2024 4 significant traits (rebuilt native)
+
+```{r panel-B, fig.width=4.8, fig.height=5.5}
+sp_corrected <- read_csv(
+  file.path(paths$intermediate,
+            "PSU2024_spatially_corrected_phenotypes.csv"),
+  show_col_types = FALSE)
+all_contrasts <- read_csv(
+  file.path(paths$intermediate, "PSU2024_focal_contrast_all_27.csv"),
+  show_col_types = FALSE)
+marginal <- all_contrasts %>% filter(contrast_type == "marginal") %>%
+  arrange(p_adj)
+sig_traits <- marginal %>% filter(p_adj < 0.05) %>% pull(trait)
+cat("Significant traits (FDR < 0.05):",
+    paste(sig_traits, collapse = ", "), "\n")
+
+B_labels <- c(PH = "Plant height (cm)",
+              TGW = "Total grain weight (g)",
+              GWE = "Grain weight / ear (g)",
+              TGN = "Total grain number")
+B_stars <- setNames(marginal$signif, marginal$trait)
+
+focal_long <- sp_corrected %>%
+  filter(geno_label %in% c("CTRL", "Inv4m")) %>%
+  mutate(genotype = factor(geno_label, levels = c("CTRL", "Inv4m"))) %>%
+  pivot_longer(cols = any_of(sig_traits),
+               names_to = "trait", values_to = "value") %>%
+  filter(trait %in% sig_traits) %>%
+  mutate(trait = factor(trait, levels = sig_traits))
+
+B_plots <- lapply(sig_traits, make_boxplot,
+                  trait_data = focal_long,
+                  label_lookup = B_labels,
+                  star_lookup = B_stars)
+panel_B <- cowplot::plot_grid(plotlist = B_plots, nrow = 2, ncol = 2,
+                              align = "hv", axis = "tblr")
+panel_B
+```
+
+# 5. Panel C — SAM 4-trait morphometry (rebuilt native)
+
+```{r panel-C, fig.width=7.2, fig.height=2.5}
+sam_raw <- read.csv(
+  here("data", "MeristemMesurements_B73-INV_December2024.csv")) %>%
+  dplyr::select(-starts_with("X")) %>%
+  mutate(
+    radius       = Width / 2,
+    hr_ratio     = Height / radius,
+    shape_factor = 1000 * Height / (radius^2),
+    genotype = factor(case_when(Genotype == "INV" ~ "Inv4m",
+                                Genotype == "B73" ~ "CTRL",
+                                TRUE              ~ as.character(Genotype)),
+                      levels = c("CTRL", "Inv4m"))
+  )
+
+C_traits <- c("Height", "radius", "hr_ratio", "shape_factor")
+C_labels <- c(Height       = "Height (μm)",
+              radius       = "Radius (μm)",
+              hr_ratio     = "h / r",
+              shape_factor = expression(h / r^2 ~ "(nm"^{-1}*")"))
+C_titles <- c(Height       = "Height",
+              radius       = "Radius",
+              hr_ratio     = "HR ratio",
+              shape_factor = "Shape Factor")
+
+## One-tailed t-tests (Inv4m > CTRL), matching SAM_morphology_analysis.Rmd
+sam_one_tailed <- sam_raw %>%
+  pivot_longer(cols = all_of(C_traits), names_to = "trait",
+               values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  group_by(trait) %>%
+  summarise(
+    p = t.test(value ~ genotype, alternative = "less")$p.value,
+    .groups = "drop"
+  )
+
+star_from_p <- function(p) {
+  if (is.na(p)) return("ns")
+  if (p < 0.001) return("***")
+  if (p < 0.01)  return("**")
+  if (p < 0.05)  return("*")
+  "ns"
+}
+C_stars <- setNames(vapply(sam_one_tailed$p, star_from_p, character(1)),
+                    sam_one_tailed$trait)
+print(sam_one_tailed)
+
+sam_long <- sam_raw %>%
+  pivot_longer(cols = all_of(C_traits),
+               names_to = "trait", values_to = "value") %>%
+  mutate(trait = factor(trait, levels = C_traits))
+
+make_sam_panel <- function(tr) {
+  d <- sam_long %>% filter(trait == tr, !is.na(value))
+  ymax <- max(d$value); yrng <- diff(range(d$value))
+  bracket_df <- tibble(group1 = "CTRL", group2 = "Inv4m",
+                       y.position = ymax + 0.08 * yrng,
+                       label = C_stars[[tr]])
+  y_lab <- C_labels[[tr]]
+  p <- ggplot(d, aes(x = genotype, y = value, color = genotype)) +
+    geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0) +
+    geom_quasirandom(size = 1.4) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
+    stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
+                       bracket.size = 0.6, inherit.aes = FALSE) +
+    labs(title = C_titles[[tr]], x = NULL) +
+    scale_y_continuous(expand = expansion(mult = c(0.08, 0.20))) +
+    pheno_theme_panel
+  if (is.expression(y_lab)) p + ylab(y_lab) else p + ylab(y_lab)
+}
+
+C_plots <- lapply(C_traits, make_sam_panel)
+panel_C <- cowplot::plot_grid(plotlist = C_plots, nrow = 1, ncol = 4,
+                              align = "hv", axis = "tblr")
+panel_C
+```
+
+# 6. Panel D — SAM DIC micrograph
+
+```{r panel-D, fig.width=4.8, fig.height=2.5}
+panel_D <- ggdraw() +
+  draw_image(image_read(here("data", "SAM_DIC_micrograph.png")), scale = 1)
+panel_D
+```
+
+# 6. Assemble 2x2 macro layout at 850 x 570 px
+
+```{r figure-2-draft, fig.width=12, fig.height=8.05}
+## Asymmetric grid:
+##   - columns: 60/40 (left wider than right; right = 2/3 of left)
+##   - rows:    top row ~2.2x taller than bottom row (D is short, height of
+##              one panel y-axis in C)
+top_row <- cowplot::plot_grid(
+  panel_A, panel_B,
+  ncol = 2, rel_widths = c(0.6, 0.4),
+  labels = c("A", "B"),
+  label_size = 18, label_fontface = "bold"
+)
+bottom_row <- cowplot::plot_grid(
+  panel_C, panel_D,
+  ncol = 2, rel_widths = c(0.6, 0.4),
+  labels = c("C", "D"),
+  label_size = 18, label_fontface = "bold"
+)
+fig2 <- cowplot::plot_grid(
+  top_row, bottom_row,
+  ncol = 1, rel_heights = c(5.55, 2.5)
+)
+
+print(fig2)
+
+ggsave(file.path(paths$figures, "Figure_2_draft.png"),
+       fig2, width = 12, height = 8.05, dpi = 300, bg = "white")
+
+cat("Saved:",
+    file.path(paths$figures, "Figure_2_draft.png"), "\n")
+```
+
+# 7. Notes
+
+- All boxplot panels (A, B, C) rendered native with a shared
+  `pheno_theme_panel` (base_size = 14, linewidth = 1.0, dot size = 1.4) so
+  typography and stroke weight match.
+- Significance stars: Panel A from `PSU2022_inv4m_effect_sizes.csv` (Welch
+  t-test, FDR), Panel B from the 27-row FDR pool in
+  `PSU2024_focal_contrast_all_27.csv` (marginal contrast row), Panel C
+  computed inline as **one-tailed Welch t-tests** (Inv4m > CTRL), matching
+  the convention used in `SAM_morphology_analysis.Rmd`.
+- Output dimensions: 12 x 8.05 in @ 300 dpi (3600 x 2415 px), aspect ≈ 1.49.
