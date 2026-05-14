@@ -207,15 +207,15 @@ PT, TIL18, and the Mi21 NIL showed the same four asymmetries in mirror image rel
 \includegraphics[width=0.6\linewidth]{figs/effects.png}
 \centering
 \caption{\textbf{Effect of \invfour on field phenotypes and shoot apical meristem architecture.}
-\textbf{(A)} Spatially-corrected phenotype values (BLUEs from SpATS mixed models) for plant height (PH, cm), days to anthesis (DTA, days), days to silking (DTS, days), harvest index (HI), stover dry weight at harvest (STWHV, g), and cob diameter (CD, mm) comparing CTRL (yellow) and \invfour (purple) genotypes.
-Asterisks show two-sample \textit{t}-tests.
-Phosphorus treatment was modeled as a covariate and data are pooled across treatments.
-\textbf{(B)} Representative differential interference contrast micrographs of cleared vegetative shoot apical meristems from two-week-old seedlings grown in controlled environment chambers.
-Yellow lines indicate height and width measurements used for quantification.
+Spatially-corrected phenotype values (per-plot residuals from SpATS spatial models fit with \texttt{repId} as a nuisance fixed factor) compared between CTRL (yellow) and \invfour (purple) genotypes.
+Stage-2 contrasts were computed as \texttt{lm(corrected $\sim$ Genotype $\times$ Treatment)} with marginal Genotype contrasts (pooled over phosphorus level) extracted via \texttt{emmeans}.
+P-values are BH-FDR adjusted across the single pool of all (trait $\times$ contrast) rows.
+\textbf{(A) NILs.} PA2022 NIL field trial: plant height (PH, cm), days to anthesis (DTA, days), and days to silking (DTS, days).
+\textbf{(B) Hybrids.} PA2024 NIL-derived hybrid field trial focal contrast \texttt{Inv4\_Mi21} vs \texttt{Inv4\_B73}: plant height (PH, cm), total grain weight (TGW, g), and total grain number (TGN).
+\textbf{(C) 21 DAP Seedling SAMs.} Representative differential interference contrast micrographs of cleared vegetative shoot apical meristems from 21-day-old seedlings grown in controlled environment chambers; yellow lines indicate height ($h$) and radius ($r$) used for quantification.
 Scale bars: 100 $\mu$m.
-\textbf{(C)} Quantification of SAM dimensions: absolute height ($h$), radius ($r$), height-to-radius ratio ($h/r$), and shape factor ($h/r^2$).
-\invfour plants exhibit significantly taller and more elongated meristems (one-tailed $t$-test, $p < 0.05$).
-Significance: $^{*}p < 0.05$, $^{****}p < 0.0001$ ( FDR-adjusted).}
+\textbf{(D) SAMs.} SAM shape descriptors derived from C: height-to-radius ratio ($h/r$) and shape factor ($h/r^2$, nm$^{-1}$), tested with two-sided Welch \textit{t}-tests.
+Significance: $^{*}p < 0.05$, $^{**}p < 0.01$, $^{***}p < 0.001$, $^{****}p < 0.0001$.}
   \label{fig:phenotypes}
   \end{figure*}
 
