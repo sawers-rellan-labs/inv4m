@@ -228,7 +228,7 @@ for (phen in usable_phenotypes) {
     fitModels(
       TP = tp_data,
       trait = phen,
-      extraFixedFactors = c("repId", "Treatment"),
+      extraFixedFactors = c("repId"),  # Treatment lives in Stage-2 lm
       timePoints = 1,
       what = "random"   # NIL_xxxx random; checks fixed via addCheck
     ),

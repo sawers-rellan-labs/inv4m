@@ -62,6 +62,7 @@ library(SpATS)
 library(statgenHTP)
 library(ggbeeswarm)
 library(cowplot)
+library(emmeans)
 ```
 
 ## 1b. Configuration and load GDD lookup table
@@ -256,7 +257,7 @@ for (phen in usable_phenotypes) {
     fitModels(
       TP = tp_data,
       trait = phen,
-      extraFixedFactors = c("repId", "Treatment"),
+      extraFixedFactors = c("repId"),  # Treatment lives in Stage-2 lm
       timePoints = 1,
       what = "fixed"
     ),
@@ -287,13 +288,22 @@ sp_corrected <- lapply(
   corrected_list,
   function(corr_df) {
     corr_df %>%
-      select(timeNumber, timePoint, genotype, repId, Treatment, 
+      select(timeNumber, timePoint, genotype, repId,
              rowId, colId, plotId)
   }
 ) %>%
   bind_rows() %>%
   arrange(plotId) %>%
   distinct()
+
+## Treatment is no longer in SpATS extraFixedFactors (Stage-2 lm handles it)
+## — re-attach it from single_time so downstream lm + emmeans has access.
+sp_corrected <- sp_corrected %>%
+  left_join(single_time %>%
+              mutate(plotId = as.character(rowid)) %>%
+              select(plotId, Treatment) %>%
+              distinct(),
+            by = "plotId")
 
 for (phen in names(corrected_list)) {
   phen_corr <- paste0(phen, "_corr")
@@ -343,36 +353,109 @@ if ("GDDS" %in% names(all_models)) {
 }
 ```
 
-## 8. Spatially Corrected Inv4m Effects from Combined P Treatments
+## 8. Stage-2 contrasts: lm + emmeans (matches PSU2024 §8)
 
 ```{r second-stage-analysis}
 NIL_corrected <- sp_corrected %>%
   filter(genotype %in% c("Inv4m", "CTRL")) %>%
+  mutate(genotype = factor(genotype, levels = c("CTRL", "Inv4m")),
+         Treatment = factor(Treatment)) %>%
   droplevels()
 
-htest <- NIL_corrected %>%
-  pivot_longer(
-    cols = all_of(usable_phenotypes), 
-    names_to = "trait", 
-    values_to = "value"
-  ) %>%
+## Per-trait lm + emmeans: marginal Genotype contrast (pooled over P) and
+## conditional Genotype contrasts within each P_LEVEL. G x T interaction p
+## stored as diagnostic (NOT in FDR pool).
+fit_one_trait <- function(trait_name, data) {
+  d <- data %>%
+    pivot_longer(cols = all_of(trait_name),
+                 names_to = "trait", values_to = "value") %>%
+    filter(!is.na(value))
+  if (nrow(d) < 4 || length(unique(d$genotype)) < 2 ||
+      length(unique(d$Treatment)) < 2) return(NULL)
+
+  m <- tryCatch(lm(value ~ genotype * Treatment, data = d),
+                error = function(e) NULL)
+  if (is.null(m)) return(NULL)
+
+  anov  <- anova(m)
+  p_int <- if ("genotype:Treatment" %in% rownames(anov))
+             anov["genotype:Treatment", "Pr(>F)"] else NA_real_
+
+  marg <- pairs(emmeans(m, ~ genotype), reverse = TRUE) %>%
+    as_tibble() %>%
+    transmute(trait = trait_name,
+              contrast_type = "marginal",
+              contrast_level = "marginal",
+              estimate, SE, df, t = t.ratio, p = p.value,
+              p_int_GxT = p_int)
+
+  cond <- pairs(emmeans(m, ~ genotype | Treatment), reverse = TRUE) %>%
+    as_tibble() %>%
+    transmute(trait = trait_name,
+              contrast_type = "conditional",
+              contrast_level = paste0("Genotype|", Treatment),
+              estimate, SE, df, t = t.ratio, p = p.value,
+              p_int_GxT = p_int)
+
+  bind_rows(marg, cond)
+}
+
+fitted_traits <- intersect(usable_phenotypes, names(NIL_corrected))
+
+all_contrasts <- lapply(fitted_traits, fit_one_trait,
+                        data = NIL_corrected) %>%
+  bind_rows() %>%
+  mutate(p_adj = p.adjust(p, method = "fdr"),
+         signif = case_when(
+           p_adj < 0.001 ~ "***",
+           p_adj < 0.01  ~ "**",
+           p_adj < 0.05  ~ "*",
+           TRUE          ~ "ns"
+         ))
+
+cat("FDR pool size:", nrow(all_contrasts), "contrasts\n")
+cat("Significant (FDR < 0.05):",
+    sum(all_contrasts$p_adj < 0.05), "rows\n\n")
+
+knitr::kable(all_contrasts %>% arrange(p_adj) %>%
+               select(trait, contrast_type, contrast_level,
+                      estimate, SE, df, t, p, p_adj, signif, p_int_GxT),
+             digits = 4,
+             caption = paste("All Stage-2 contrasts. p = nominal,",
+                             "p_adj = BH-FDR across the pool."))
+
+## y.position per trait for downstream stat_pvalue_manual
+y_positions <- NIL_corrected %>%
+  pivot_longer(cols = any_of(fitted_traits),
+               names_to = "trait", values_to = "value") %>%
   filter(!is.na(value)) %>%
   group_by(trait) %>%
-  t_test(value ~ genotype) %>%
-  adjust_pvalue(method = "fdr") %>%
-  add_y_position(scales = "free") %>%
-  add_significance() %>%
-  arrange(p.adj)
+  summarise(y.position = max(value, na.rm = TRUE) +
+                          0.10 * diff(range(value, na.rm = TRUE)),
+            .groups = "drop")
 
-print(htest)
+## contrast_df = marginal row per trait; drives the panel star
+contrast_df <- all_contrasts %>%
+  filter(contrast_type == "marginal") %>%
+  left_join(y_positions, by = "trait") %>%
+  mutate(group1 = "CTRL", group2 = "Inv4m",
+         p.adj = p_adj,
+         p.adj.signif = signif)
+
+## Back-compat alias: downstream boxplot code references `htest` with rstatix
+## column names (group1/group2/y.position/p.adj.signif).
+htest <- contrast_df %>%
+  select(trait, group1, group2, y.position, p.adj, p.adj.signif,
+         signif, p_int_GxT,
+         effect = estimate, se_diff = SE, t, p, df)
 
 alpha <- 0.05
-sig_traits <- htest %>%
-  filter(p.adj < alpha) %>%
-  arrange(p.adj) %>%
-  pull(trait)
+sig_traits <- contrast_df %>% filter(p_adj < alpha) %>%
+  arrange(p_adj) %>% pull(trait)
 
-cat("Significant traits (FDR < 0.05):", paste(sig_traits, collapse = ", "), "\n")
+cat("Significant traits — marginal Inv4m - CTRL (FDR < 0.05):",
+    if (length(sig_traits)) paste(sig_traits, collapse = ", ") else "none",
+    "\n")
 
 pheno_theme2 <- theme_classic2(base_size = 20) +
   theme(
@@ -530,46 +613,26 @@ if (length(sig_traits) == 0) {
 }
 ```
 
-## 8b. Save effect sizes for reproducibility
+## 8b. Save Stage-2 contrasts (matches PSU2024 CSV naming)
 
-```{r save-effect-sizes}
-# Compute mean differences (Inv4m - CTRL) with SE for manuscript reporting
-effect_sizes <- NIL_corrected %>%
-  pivot_longer(
-    cols = all_of(usable_phenotypes),
-    names_to = "trait",
-    values_to = "value"
-  ) %>%
-  filter(!is.na(value)) %>%
-  group_by(trait, genotype) %>%
-  summarise(
-    mean = mean(value),
-    sd = sd(value),
-    n = n(),
-    .groups = "drop"
-  ) %>%
-  pivot_wider(
-    names_from = genotype,
-    values_from = c(mean, sd, n)
-  ) %>%
-  mutate(
-    effect = mean_Inv4m - mean_CTRL,
-    se_diff = sqrt(sd_CTRL^2 / n_CTRL + sd_Inv4m^2 / n_Inv4m)
-  ) %>%
-  left_join(
-    htest %>% select(trait, statistic, df, p, p.adj, p.adj.signif),
-    by = "trait"
-  ) %>%
-  arrange(p.adj)
+```{r save-contrasts}
+write_csv(contrast_df %>% select(-y.position, -group1, -group2, -p.adj,
+                                  -p.adj.signif),
+          file.path(paths$intermediate,
+                    paste0(environment_name,
+                           "_focal_contrast_marginal.csv")))
 
-print(effect_sizes)
+write_csv(all_contrasts,
+          file.path(paths$intermediate,
+                    paste0(environment_name,
+                           "_focal_contrast_all.csv")))
 
-write_csv(
-  effect_sizes,
-  file.path(paths$intermediate, paste0(environment_name, "_inv4m_effect_sizes.csv"))
-)
-cat("Effect sizes saved to:",
-    file.path(paths$intermediate, paste0(environment_name, "_inv4m_effect_sizes.csv")), "\n")
+cat("Outputs:\n  ",
+    file.path(paths$intermediate,
+              paste0(environment_name, "_focal_contrast_marginal.csv")),
+    "\n  ",
+    file.path(paths$intermediate,
+              paste0(environment_name, "_focal_contrast_all.csv")), "\n")
 ```
 
 ## 9. Summary and export

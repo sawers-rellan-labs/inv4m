@@ -78,8 +78,10 @@ pheno_theme_panel <- theme_classic2(base_size = 14) +
   )
 
 # Single helper: trait_data has columns (genotype, trait, value);
-# label_lookup maps trait -> y-axis label; star_lookup maps trait -> sig star
-make_boxplot <- function(tr, trait_data, label_lookup, star_lookup) {
+# label_lookup maps trait -> y-axis label; star_lookup maps trait -> sig star;
+# title_lookup (optional) maps trait -> displayed panel title (else uses trait)
+make_boxplot <- function(tr, trait_data, label_lookup, star_lookup,
+                         title_lookup = NULL) {
   d <- trait_data %>% filter(trait == tr, !is.na(value))
   if (!nrow(d)) return(NULL)
   ymax <- max(d$value, na.rm = TRUE)
@@ -89,6 +91,8 @@ make_boxplot <- function(tr, trait_data, label_lookup, star_lookup) {
                        y.position = ymax + 0.08 * yrng,
                        label = star)
   y_lab <- if (tr %in% names(label_lookup)) label_lookup[[tr]] else tr
+  panel_title <- if (!is.null(title_lookup) && tr %in% names(title_lookup))
+                   title_lookup[[tr]] else tr
   ggplot(d, aes(x = genotype, y = value, color = genotype)) +
     geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0) +
     geom_quasirandom(size = 1.4) +
@@ -96,7 +100,7 @@ make_boxplot <- function(tr, trait_data, label_lookup, star_lookup) {
     scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
     stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
                        bracket.size = 0.6, inherit.aes = FALSE) +
-    labs(title = tr, y = y_lab, x = NULL) +
+    labs(title = panel_title, y = y_lab, x = NULL) +
     scale_y_continuous(expand = expansion(mult = c(0.08, 0.20))) +
     pheno_theme_panel
 }
@@ -112,15 +116,17 @@ psu2022 <- read_csv(
   filter(genotype %in% c("CTRL", "Inv4m")) %>%
   mutate(genotype = factor(genotype, levels = c("CTRL", "Inv4m")))
 
-psu2022_eff <- read_csv(
-  file.path(paths$intermediate, "PSU2022_inv4m_effect_sizes.csv"),
+psu2022_marg <- read_csv(
+  file.path(paths$intermediate, "PSU2022_focal_contrast_marginal.csv"),
   show_col_types = FALSE)
 
-A_traits <- c("PH", "DTA", "DTS", "HI", "STWHV", "CD")
+A_traits <- c("PH", "DTA", "DTS", "HI", "STWHV", "TKW")
 A_labels <- c(PH = "Plant height (cm)", DTA = "Days to anthesis",
               DTS = "Days to silking", HI = "Harvest index",
-              STWHV = "Stover dry wt (g)", CD = "Cob diameter (mm)")
-A_stars  <- setNames(psu2022_eff$p.adj.signif, psu2022_eff$trait)
+              STWHV = "Stover dry wt (g)",
+              TKW = "Total grain weight (g)")
+A_titles <- c(TKW = "TGW")
+A_stars  <- setNames(psu2022_marg$signif, psu2022_marg$trait)
 
 psu2022_long <- psu2022 %>%
   pivot_longer(cols = any_of(A_traits), names_to = "trait",
@@ -130,7 +136,8 @@ psu2022_long <- psu2022 %>%
 A_plots <- lapply(A_traits, make_boxplot,
                   trait_data = psu2022_long,
                   label_lookup = A_labels,
-                  star_lookup = A_stars)
+                  star_lookup = A_stars,
+                  title_lookup = A_titles)
 panel_A <- cowplot::plot_grid(plotlist = A_plots, nrow = 2, ncol = 3,
                               align = "hv", axis = "tblr")
 panel_A
@@ -300,9 +307,16 @@ cat("Saved:",
 - All boxplot panels (A, B, C) rendered native with a shared
   `pheno_theme_panel` (base_size = 14, linewidth = 1.0, dot size = 1.4) so
   typography and stroke weight match.
-- Significance stars: Panel A from `PSU2022_inv4m_effect_sizes.csv` (Welch
-  t-test, FDR), Panel B from the 27-row FDR pool in
-  `PSU2024_focal_contrast_all_27.csv` (marginal contrast row), Panel C
-  computed inline as **one-tailed Welch t-tests** (Inv4m > CTRL), matching
-  the convention used in `SAM_morphology_analysis.Rmd`.
+- Stats pipeline (Panels A and B share it):
+  - Stage 1: SpATS spatial correction with `repId` as fixed factor (Treatment
+    NOT in SpATS — kept in Stage 2)
+  - Stage 2: `lm(corrected ~ Genotype * Treatment)` per trait + emmeans
+    contrasts (marginal Genotype pooled over P, plus conditional within each
+    P_LEVEL). Single FDR pool across (trait × contrast) rows.
+  - Marginal-Genotype p_adj drives the panel star (Panel A from
+    `PSU2022_focal_contrast_marginal.csv`; Panel B from the equivalent
+    `PSU2024_focal_contrast_marginal.csv`).
+- Panel C uses one-tailed Welch t-tests (Inv4m > CTRL), matching the
+  convention used in `SAM_morphology_analysis.Rmd`. No FDR pool here —
+  single-trait comparisons.
 - Output dimensions: 12 x 8.05 in @ 300 dpi (3600 x 2415 px), aspect ≈ 1.49.
