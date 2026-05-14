@@ -1,0 +1,520 @@
+---
+title: "PA2024 Spatial Analysis: SpATS Spatial Correction (preliminary)"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 12
+    fig_height: 8
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Overview
+
+Preliminary spatial correction of PA2024 (PSU2024) field phenotypes, mirroring
+the PA2022 pipeline (`Corrected_phenotype_analysis_PSU2022.Rmd`):
+
+1. Load PSU2024 raw data and assemble physical X/Y from the 2×2 P_SQUARE layout.
+2. Recode genotype (NIL_xxxx → CTRL / Inv4m / Unknown / Check) via a stub key.
+3. Fit a single SpATS PSANOVA surface **per phenotype** with `Rep` and `P_LEVEL`
+   as fixed factors.
+4. Extract corrected plot-level values.
+5. Second-stage CTRL vs Inv4m t-test (FDR) + Figure 2-style boxplot panel.
+
+The field is a 2×2 of P_SQUAREs: P_SQ 1 = bottom-left (LowP), 2 = bottom-right
+(HighP), 3 = top-left (LowP), 4 = top-right (HighP). Each P_SQUARE is 10 rows ×
+24 cols, so the assembled field is 20 rows × 48 cols. RS 2001 sits at (X=1, Y=1)
+and RS 2960 at (X=48, Y=20).
+
+## 1. Libraries
+
+```{r load-libraries}
+library(tidyverse)
+library(ggtext)
+library(ggfx)
+library(rstatix)
+library(ggpubr)
+library(SpATS)
+library(statgenHTP)
+library(ggbeeswarm)
+library(cowplot)
+```
+
+## 2. Load and prepare PSU2024 data
+
+```{r load-data}
+DATA_DIR <- paths$data
+plant_csv <- file.path(DATA_DIR, "PSU2024.csv")
+
+field_raw <- read_csv(plant_csv, show_col_types = FALSE)
+
+## Assembled X/Y physical coords (2x2 layout)
+n_col_psq <- max(field_raw$COLUMN)
+n_row_psq <- max(field_raw$ROW)
+psq_x_offset <- c(`1` = 0L, `3` = 0L, `2` = n_col_psq, `4` = n_col_psq)
+psq_y_offset <- c(`1` = 0L, `2` = 0L, `3` = n_row_psq, `4` = n_row_psq)
+
+field_data <- field_raw %>%
+  rename(rowid = RS) %>%
+  mutate(
+    X = psq_x_offset[as.character(P_SQUARE)] + COLUMN,
+    Y = psq_y_offset[as.character(P_SQUARE)] + ROW,
+    Treatment = factor(P_LEVEL, levels = c("HIGH_P", "LOW_P")),
+    Rep      = as.factor(REP),
+    Genotype = as.character(GENOTYPE)
+  ) %>%
+  mutate(Treatment = fct_recode(Treatment, "+P" = "HIGH_P", "-P" = "LOW_P"))
+
+cat("Field data dims:", dim(field_data), "\n")
+cat("X range:", range(field_data$X), "  Y range:", range(field_data$Y), "\n")
+```
+
+## 3. Genotype classification (Check / NIL population)
+
+The PSU2024 trial has two biological tiers:
+
+- **Checks (fixed effects in SpATS via `addCheck`):** every entry that is *not*
+  part of the segregating NIL mapping population. That is `B73`, `Inv4_B73`,
+  `Inv4_MEX`, `Inv4_Mi21`, `Inv4_PT`, `Oh43`, `Z031E0591`, `Z031E0594` — eight
+  entries total.
+- **NIL population (random effect):** the 41 `NIL_xxxx` segregating lines.
+  Residual / BLUP normality applies *within* this cohort.
+- **Nuisance fixed effects:** `Rep`, `P_LEVEL`, spatial smooth on assembled X/Y.
+
+The **focal contrast** is `Inv4_Mi21` vs `Inv4_B73`. Both are checks (fixed
+effects), so their BLUEs and the difference SE come straight out of the check
+coefficient block.
+
+For this paper, the contrast of interest is **CTRL = `Inv4_B73`** vs
+**Inv4m = `Inv4_Mi21`**. Each entry has a `donor` (the source of the Inv4m
+introgression at chromosome 4 — `B73`/`Mi21`/`MEX`/`PT`) that is parsed from
+the GENOTYPE label where possible.
+
+```{r genotype-classify}
+check_set <- c("B73", "Inv4_B73", "Inv4_MEX", "Inv4_Mi21", "Inv4_PT",
+               "Oh43", "Z031E0591", "Z031E0594")
+focal_pair <- c("Inv4_B73", "Inv4_Mi21")
+
+donor_lookup <- c(
+  "B73"        = "B73",
+  "Inv4_B73"   = "B73",
+  "Inv4_MEX"   = "MEX",
+  "Inv4_Mi21"  = "Mi21",
+  "Inv4_PT"    = "PT",
+  "Oh43"       = "Oh43",
+  "Z031E0591"  = "hybrid_check",
+  "Z031E0594"  = "hybrid_check"
+)
+## NIL_xxxx donor not encoded in the genotype code — flagged as "NIL_pop" for now
+## (user: replace if/when an external donor key becomes available)
+
+field_data <- field_data %>%
+  mutate(
+    geno_class = if_else(Genotype %in% check_set, "Check", "NILpop"),
+    donor      = unname(donor_lookup[Genotype]),
+    donor      = if_else(is.na(donor), "NIL_pop", donor),
+    geno_label = case_when(
+      Genotype == "Inv4_B73"  ~ "CTRL",
+      Genotype == "Inv4_Mi21" ~ "Inv4m",
+      TRUE                    ~ NA_character_
+    ),
+    Genotype   = factor(Genotype)
+  )
+
+cat("\n--- genotype tier summary ---\n")
+print(field_data %>% count(geno_class))
+print(field_data %>% filter(geno_class == "Check") %>%
+        count(Genotype, donor))
+cat("\nFocal contrast: ",
+    "CTRL = ", focal_pair[1], ", Inv4m = ", focal_pair[2], "\n", sep = "")
+```
+
+## 4. Identify usable phenotypes (<50% missing)
+
+```{r usable-traits}
+base_phenotypes <- c("PH", "DTA", "DTS", "SDW_11wk", "SDW_H")
+ear_phenotypes  <- c("TEW", "TEN", "TGW", "GWE", "HGW", "TGN", "AMF")
+ndvi_phenotypes <- c("NDVI_T1", "NDVI_T2")
+all_phenotypes  <- intersect(
+  unique(c(base_phenotypes, ear_phenotypes, ndvi_phenotypes)),
+  names(field_data)
+)
+
+## Strip stray spaces (e.g. "SDW_11wk ")
+fix_names <- setNames(names(field_data), trimws(names(field_data)))
+if (!"SDW_11wk" %in% names(field_data) &&
+    "SDW_11wk " %in% names(field_data)) {
+  field_data <- field_data %>% rename(SDW_11wk = `SDW_11wk `)
+}
+
+missing_summary <- field_data %>%
+  select(all_of(all_phenotypes)) %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "phenotype",
+               values_to = "missing_count") %>%
+  mutate(total_obs = nrow(field_data),
+         missing_pct = round(missing_count / total_obs * 100, 1),
+         available_n = total_obs - missing_count) %>%
+  arrange(missing_pct)
+
+print(missing_summary)
+
+usable_phenotypes <- missing_summary %>%
+  filter(missing_pct < 50) %>% pull(phenotype)
+
+cat("\nUsable phenotypes (<50% missing):",
+    paste(usable_phenotypes, collapse = ", "), "\n")
+```
+
+## 5. Build TimePoints object for statgenHTP
+
+```{r build-timepoints}
+environment_name <- "PSU2024"
+single_time <- field_data %>%
+  filter(!is.na(X), !is.na(Y)) %>%
+  mutate(time = as.POSIXct("2024-05-22 10:00:00"))
+
+tp_data <- createTimePoints(
+  dat = single_time,
+  experimentName = environment_name,
+  genotype = "Genotype",
+  timePoint = "time",
+  plotId = "rowid",
+  repId = "Rep",
+  rowNum = "Y",
+  colNum = "X",
+  checkGenotypes = check_set,
+  addCheck = TRUE
+)
+
+summary(tp_data)
+```
+
+## 6. Fit SpATS per phenotype
+
+```{r fit-spats, results='hide'}
+corrected_list <- list()
+fit_info <- list()
+all_models <- list()
+
+for (phen in usable_phenotypes) {
+  message("Fitting SpATS model for: ", phen)
+  no_nas <- single_time %>% filter(!is.na(.data[[phen]]))
+  if (nrow(no_nas) < 10) {
+    message("Insufficient data for ", phen, " (n=", nrow(no_nas), ")")
+    next
+  }
+  fit_try <- try(
+    fitModels(
+      TP = tp_data,
+      trait = phen,
+      extraFixedFactors = c("repId", "Treatment"),
+      timePoints = 1,
+      what = "random"   # NIL_xxxx random; checks fixed via addCheck
+    ),
+    silent = TRUE
+  )
+  if (inherits(fit_try, "try-error")) {
+    fit_info[[phen]] <- list(n_obs = nrow(no_nas), status = "failed")
+    next
+  }
+  all_models[[phen]] <- fit_try
+  corr <- getCorrected(fit_try) %>%
+    rename(!!phen := !!phen)
+  corrected_list[[phen]] <- corr %>%
+    select(plotId, genotype, !!phen)
+  fit_info[[phen]] <- list(n_obs = nrow(no_nas), status = "ok")
+}
+
+sp_corrected <- Reduce(function(a, b)
+                       full_join(a, b, by = c("plotId", "genotype")),
+                       corrected_list)
+
+## Attach Treatment, geno_class, donor, geno_label back on
+sp_corrected <- sp_corrected %>%
+  mutate(plotId = as.character(plotId)) %>%
+  left_join(field_data %>%
+              mutate(rowid = as.character(rowid)) %>%
+              select(rowid, Treatment, geno_class, donor, geno_label),
+            by = c("plotId" = "rowid"))
+
+cat("Plots with corrected data:", nrow(sp_corrected), "\n")
+cat("Traits with corrected values:",
+    paste(intersect(usable_phenotypes, names(sp_corrected)), collapse = ", "),
+    "\n")
+```
+
+## 7. SpATS diagnostics (PH, DTA, DTS)
+
+```{r spats-PH}
+if ("PH" %in% names(all_models)) {
+  plot(all_models$PH, timePoints = 1)
+  plot(all_models$PH, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+```{r spats-DTA}
+if ("DTA" %in% names(all_models)) {
+  plot(all_models$DTA, timePoints = 1)
+  plot(all_models$DTA, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+```{r spats-DTS}
+if ("DTS" %in% names(all_models)) {
+  plot(all_models$DTS, timePoints = 1)
+  plot(all_models$DTS, timePoints = 1, plotType = "spatial", spaTrend = "raw")
+}
+```
+
+## 8. Genotype BLUEs from check fixed effects
+
+For each fitted model we pull the check-genotype BLUEs (their fixed-effect
+coefficients) plus the NIL_xxxx BLUPs via `getGenoPred()`. The focal contrast
+`Inv4_Mi21 − Inv4_B73` and its SE come straight from the check block of the
+variance-covariance matrix.
+
+```{r genotype-blues}
+get_focal_contrast <- function(model_list, focal_pair) {
+  out <- list()
+  for (trait in names(model_list)) {
+    pred <- try(getGenoPred(model_list[[trait]]), silent = TRUE)
+    if (inherits(pred, "try-error")) next
+    pred_df <- pred$genoPred
+    if (!all(focal_pair %in% pred_df$genotype)) next
+
+    sub <- pred_df %>%
+      filter(genotype %in% focal_pair) %>%
+      select(genotype, predicted.values, standard.errors)
+    if (nrow(sub) != 2) next
+
+    ctrl  <- sub %>% filter(genotype == focal_pair[1])
+    inv4m <- sub %>% filter(genotype == focal_pair[2])
+    diff  <- inv4m$predicted.values - ctrl$predicted.values
+    se_diff <- sqrt(inv4m$standard.errors^2 + ctrl$standard.errors^2)
+    z_stat <- diff / se_diff
+    p_z    <- 2 * pnorm(-abs(z_stat))
+
+    out[[trait]] <- tibble(
+      trait = trait,
+      BLUE_CTRL      = ctrl$predicted.values,
+      SE_CTRL        = ctrl$standard.errors,
+      BLUE_Inv4m     = inv4m$predicted.values,
+      SE_Inv4m       = inv4m$standard.errors,
+      effect         = diff,
+      se_diff        = se_diff,
+      z              = z_stat,
+      p              = p_z
+    )
+  }
+  bind_rows(out)
+}
+
+contrast_df <- get_focal_contrast(all_models, focal_pair) %>%
+  mutate(CTRL  = focal_pair[1],
+         Inv4m = focal_pair[2],
+         donor_CTRL  = donor_lookup[focal_pair[1]],
+         donor_Inv4m = donor_lookup[focal_pair[2]],
+         p_adj = p.adjust(p, method = "fdr"),
+         signif = case_when(
+           p_adj < 0.001 ~ "***",
+           p_adj < 0.01  ~ "**",
+           p_adj < 0.05  ~ "*",
+           TRUE          ~ "ns"
+         )) %>%
+  arrange(p_adj)
+
+print(contrast_df)
+```
+
+## 9. Figure 2-style panel: per-plot boxplots for the focal pair
+
+Show the spatially-corrected plot-level values for `Inv4_Mi21` vs `Inv4_B73`
+(20 plots each) per trait, with the BLUE difference overlaid as the bracket
+label.
+
+```{r main-panel, fig.width=10, fig.height=7}
+focal_corrected <- sp_corrected %>%
+  filter(genotype %in% focal_pair) %>%
+  mutate(genotype = factor(geno_label, levels = c("CTRL", "Inv4m")))
+
+pheno_theme_panel <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title = element_blank(),
+    axis.title.y = element_text(size = 18),
+    axis.title.x = element_blank(),
+    axis.text.x = element_markdown(size = 18, face = "bold", color = "black"),
+    axis.text.y = element_text(size = 16),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 20, face = "bold"),
+    legend.position = "none"
+  )
+
+make_trait_plot <- function(trait_name, data, contrast_tbl, units) {
+  d <- filter(data, trait == trait_name)
+  cr <- contrast_tbl %>% filter(trait == trait_name)
+  y_label <- units[trait_name]
+  star <- if (nrow(cr)) cr$signif else "ns"
+
+  ymax <- max(d$value, na.rm = TRUE)
+  yrng <- diff(range(d$value, na.rm = TRUE))
+
+  p <- ggplot(d, aes(x = genotype, y = value, color = genotype)) +
+    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
+    annotate("text", x = 1.5, y = ymax + 0.10 * yrng, label = star,
+             size = 8, fontface = "bold") +
+    labs(title = trait_name, y = y_label, x = NULL) +
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.20))) +
+    pheno_theme_panel +
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+  if (trait_name %in% c("DTA", "DTS")) {
+    y_range <- range(d$value, na.rm = TRUE)
+    p <- p + scale_y_continuous(
+      breaks = seq(floor(y_range[1]), ceiling(y_range[2]), by = 1),
+      expand = expansion(mult = c(0.1, 0.20)))
+  }
+  p
+}
+
+main_traits <- intersect(c("PH", "DTA", "DTS", "SDW_H", "GWE", "HGW"),
+                         usable_phenotypes)
+trait_units <- c(PH = "cm", DTA = "Days", DTS = "Days",
+                 SDW_H = "g", GWE = "g", HGW = "g", TGW = "g",
+                 SDW_11wk = "g", TEW = "g")
+
+plot_data_main <- focal_corrected %>%
+  pivot_longer(cols = any_of(usable_phenotypes),
+               names_to = "trait", values_to = "value") %>%
+  filter(trait %in% main_traits, !is.na(value)) %>%
+  mutate(trait = factor(trait, levels = main_traits))
+
+trait_plots <- lapply(main_traits, make_trait_plot,
+                      data = plot_data_main, contrast_tbl = contrast_df,
+                      units = trait_units)
+
+main_panel <- cowplot::plot_grid(plotlist = trait_plots,
+                                 nrow = 2, ncol = 3,
+                                 align = "hv", axis = "tblr")
+
+print(main_panel)
+
+ggsave(file.path(paths$figures, "PSU2024_field_phenotypes_panel.png"),
+       main_panel, width = 10, height = 7, dpi = 300)
+cat("Saved panel to:",
+    file.path(paths$figures, "PSU2024_field_phenotypes_panel.png"), "\n")
+```
+
+## 10. Cohen's d forest plot + export
+
+To compare effects across traits on a common scale, we standardize each BLUE
+difference by the **pooled within-genotype SD** of the spatially corrected
+plot-level values for Inv4_B73 and Inv4_Mi21 (20 plots each). With n=20 per
+group, we also report Hedges' g (small-sample correction).
+
+```{r cohens-d}
+focal_long <- sp_corrected %>%
+  filter(genotype %in% focal_pair) %>%
+  pivot_longer(cols = any_of(usable_phenotypes),
+               names_to = "trait", values_to = "value") %>%
+  filter(!is.na(value))
+
+pooled_sd_df <- focal_long %>%
+  group_by(trait, genotype) %>%
+  summarise(sd_g = sd(value), n_g = n(), .groups = "drop") %>%
+  group_by(trait) %>%
+  summarise(pooled_sd = sqrt(sum((n_g - 1) * sd_g^2) / sum(n_g - 1)),
+            n_total   = sum(n_g),
+            .groups = "drop")
+
+contrast_df <- contrast_df %>%
+  left_join(pooled_sd_df, by = "trait") %>%
+  mutate(cohens_d  = effect / pooled_sd,
+         se_d      = se_diff / pooled_sd,
+         hedges_g  = cohens_d * (1 - 3 / (4 * n_total - 9)))
+
+print(contrast_df %>%
+        select(trait, effect, se_diff, pooled_sd,
+               cohens_d, se_d, hedges_g, p_adj, signif))
+```
+
+```{r forest-plot, fig.width=7, fig.height=5}
+forest_df <- contrast_df %>%
+  arrange(cohens_d) %>%
+  mutate(trait = factor(trait, levels = trait))
+
+p_forest <- ggplot(forest_df,
+                   aes(x = cohens_d, y = trait,
+                       xmin = cohens_d - 1.96 * se_d,
+                       xmax = cohens_d + 1.96 * se_d)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_vline(xintercept = c(-0.8, -0.5, -0.2, 0.2, 0.5, 0.8),
+             linetype = "dotted", color = "grey80") +
+  geom_pointrange(size = 0.8, color = "purple4") +
+  geom_text(aes(label = signif), nudge_y = 0.25, size = 5,
+            fontface = "bold") +
+  labs(x = "Cohen's d (Inv4m − CTRL)  ±95% CI",
+       y = NULL,
+       title = "PA2024 — focal contrast (standardized effect)") +
+  theme_classic2(base_size = 14)
+
+print(p_forest)
+
+ggsave(file.path(paths$figures, "PSU2024_focal_contrast_forest.png"),
+       p_forest, width = 7, height = 5, dpi = 300)
+
+write_csv(contrast_df,
+          file.path(paths$intermediate,
+                    paste0(environment_name, "_focal_contrast_BLUEs.csv")))
+write_csv(sp_corrected,
+          file.path(paths$intermediate,
+                    paste0(environment_name,
+                           "_spatially_corrected_phenotypes.csv")))
+
+cat("Outputs:\n  ",
+    file.path(paths$intermediate,
+              paste0(environment_name, "_focal_contrast_BLUEs.csv")), "\n  ",
+    file.path(paths$intermediate,
+              paste0(environment_name, "_spatially_corrected_phenotypes.csv")),
+    "\n  ",
+    file.path(paths$figures, "PSU2024_focal_contrast_forest.png"), "\n  ",
+    file.path(paths$figures, "PSU2024_field_phenotypes_panel.png"), "\n")
+```
+
+## 11. Notes / next steps
+
+- Model design:
+  - `Genotype` random over the 41 `NIL_xxxx` lines (residual normality applies here)
+  - 8 non-NIL entries (`B73`, `Inv4_B73`, `Inv4_MEX`, `Inv4_Mi21`, `Inv4_PT`,
+    `Oh43`, `Z031E0591/4`) added as checks (fixed via `addCheck = TRUE`)
+  - `Rep` and `Treatment` (P_LEVEL) as fixed nuisance terms
+  - Spatial smooth on assembled X (1–48) and Y (1–20)
+- The focal contrast `Inv4_Mi21 − Inv4_B73` is extracted from the check BLUE
+  block. SE-of-difference is computed as `sqrt(SE_A^2 + SE_B^2)` (independent
+  approximation; replace with full Var-Cov if check-pair covariance becomes a
+  concern).
+- Compare these BLUE-based corrected values against Sandra's `_SPAT` columns
+  as a methods-parity check before finalizing the Figure 2 hybrid panel.
