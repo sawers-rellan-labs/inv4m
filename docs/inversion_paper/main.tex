@@ -1081,17 +1081,24 @@ For each phenotype $y$, SpATS fits a mixed model that decomposes spatial variati
 
 \begin{eqnarray}
 \label{eq:pheno_model}
-y_{ijr} = \mu + \text{Rep}_i + \text{P}_j + f(\text{row}, \text{col}) + \varepsilon_{ijr}
+y_{ijk} = \mu + \text{Rep}_i + \text{Genotype}_j + f(\text{row}_k, \text{col}_k) + \varepsilon_{ijk}
 \end{eqnarray}
 
-where $\mu$ is the overall mean, $\text{Rep}_i$ is the replicate effect, $\text{P}_j$ is the phosphorus treatment effect, and $f(\text{row}, \text{col})$ is a smooth bivariate spatial surface estimated via penalized spline ANOVA (PSANOVA).
-Notably, genotype was not included in this model, so genotypic effects are preserved in the spatially-corrected values extracted using the \texttt{getCorrected()} function.
+where $\mu$ is the overall mean, $\text{Rep}_i$ is the replicate effect, $\text{Genotype}_j$ is the genotype effect, and $f(\text{row}_k, \text{col}_k)$ is a smooth bivariate spatial surface estimated via penalized spline ANOVA (PSANOVA).
+Phosphorus treatment is \textit{not} included in this stage so its variance remains in the corrected values for proper modeling in the second stage.
+For the PA2024 hybrid trial, the 41 segregating NIL$_{xxxx}$ lines were treated as a random-effect cohort and the eight named entries (\texttt{B73}, \texttt{Oh43}, \texttt{Inv4\_\{B73, MEX, Mi21, PT\}}, and the two hybrid checks) as fixed effects via \texttt{addCheck = TRUE}; for the PA2022 NIL trial only CTRL and \invfour genotypes are present so both were treated as fixed.
+Per-plot spatially-corrected values were extracted with \texttt{getCorrected()} from the resulting fit.
 
-In the second stage, we tested for \invfour effects on these spatially-corrected values.
-For each phenotype, we performed two-sample \textit{t}-tests comparing \invfour and control genotypes, with data pooled across phosphorus treatments.
-This approach tests whether \invfour affects phenotypes independent of phosphorus availability.
-P-values were adjusted for multiple comparisons using the Benjamini-Hochberg false discovery rate (FDR) method \cite{benjamini1995}.
-Phenotypes with adjusted $p < 0.05$ were considered significantly affected by \invfour.
+In the second stage, we tested for \invfour effects on the spatially-corrected values using a linear model with genotype and phosphorus treatment as fixed factors:
+\begin{eqnarray}
+\label{eq:stage2_model}
+\tilde{y}_{ij} = \alpha + \text{Genotype}_i + \text{P}_j + (\text{Genotype} \times \text{P})_{ij} + \varepsilon_{ij}
+\end{eqnarray}
+where $\tilde{y}$ denotes a spatially-corrected per-plot value.
+Marginal Genotype contrasts (\invfour $-$ CTRL, averaged over phosphorus levels) and conditional Genotype contrasts within each phosphorus level were estimated using the \texttt{emmeans} package \cite{lenth2025}.
+For each trait this yields three contrasts (one marginal, two conditional), all of which are pooled into a single Benjamini-Hochberg false discovery rate family across the (trait $\times$ contrast) table \cite{benjamini1995}.
+Significance stars in Figure~\ref{fig:phenotypes} panels~A and B reflect the marginal-Genotype row.
+The Genotype $\times$ phosphorus interaction $p$-value is retained as a model diagnostic and is not included in the FDR pool.
 
 Days to anthesis (DTA) and days to silking (DTS) were converted to growing degree days (GDDA and GDDS, respectively) using daily temperature records from the Rock Springs weather station with a base temperature of 10°C and an upper threshold of 30°C.
 
