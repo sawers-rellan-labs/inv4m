@@ -57,6 +57,7 @@ library(SpATS)
 library(statgenHTP)
 library(ggbeeswarm)
 library(cowplot)
+library(emmeans)
 ```
 
 ## 2. Load and prepare PSU2024 data
@@ -286,125 +287,179 @@ if ("DTS" %in% names(all_models)) {
 }
 ```
 
-## 8. Genotype BLUEs from check fixed effects
+## 8. Focal contrast: t-test on corrected per-plot values
 
-For each fitted model we pull the check-genotype BLUEs (their fixed-effect
-coefficients) plus the NIL_xxxx BLUPs via `getGenoPred()`. The focal contrast
-`Inv4_Mi21 − Inv4_B73` and its SE come straight from the check block of the
-variance-covariance matrix.
+For each trait, `rstatix::t_test` compares the spatially- and nuisance-corrected
+plot values for `Inv4_B73` (20 plots) vs `Inv4_Mi21` (20 plots), FDR-adjusted
+across traits. This is the same approach as PSU2022.
 
-```{r genotype-blues}
-get_focal_contrast <- function(model_list, focal_pair) {
+We also extract the genotype BLUEs from `getGenoPred()` for the CSV output —
+useful as a summary of each genotype's model-implied mean, but **not** what
+drives the panel significance stars.
+
+```{r get-blues}
+get_focal_blues <- function(model_list, focal_pair) {
   out <- list()
   for (trait in names(model_list)) {
     pred <- try(getGenoPred(model_list[[trait]]), silent = TRUE)
     if (inherits(pred, "try-error")) next
     pred_df <- pred$genoPred
     if (!all(focal_pair %in% pred_df$genotype)) next
-
     sub <- pred_df %>%
       filter(genotype %in% focal_pair) %>%
       select(genotype, predicted.values, standard.errors)
     if (nrow(sub) != 2) next
-
     ctrl  <- sub %>% filter(genotype == focal_pair[1])
     inv4m <- sub %>% filter(genotype == focal_pair[2])
-    diff  <- inv4m$predicted.values - ctrl$predicted.values
-    se_diff <- sqrt(inv4m$standard.errors^2 + ctrl$standard.errors^2)
-    z_stat <- diff / se_diff
-    p_z    <- 2 * pnorm(-abs(z_stat))
-
     out[[trait]] <- tibble(
       trait = trait,
-      BLUE_CTRL      = ctrl$predicted.values,
-      SE_CTRL        = ctrl$standard.errors,
-      BLUE_Inv4m     = inv4m$predicted.values,
-      SE_Inv4m       = inv4m$standard.errors,
-      effect         = diff,
-      se_diff        = se_diff,
-      z              = z_stat,
-      p              = p_z
+      BLUE_CTRL  = ctrl$predicted.values,
+      SE_CTRL    = ctrl$standard.errors,
+      BLUE_Inv4m = inv4m$predicted.values,
+      SE_Inv4m   = inv4m$standard.errors
     )
   }
   bind_rows(out)
 }
 
-contrast_df <- get_focal_contrast(all_models, focal_pair) %>%
-  mutate(CTRL  = focal_pair[1],
-         Inv4m = focal_pair[2],
-         donor_CTRL  = donor_lookup[focal_pair[1]],
-         donor_Inv4m = donor_lookup[focal_pair[2]],
-         p_adj = p.adjust(p, method = "fdr"),
+blue_df <- get_focal_blues(all_models, focal_pair)
+```
+
+```{r second-stage-lm}
+focal_corrected <- sp_corrected %>%
+  filter(genotype %in% focal_pair) %>%
+  mutate(genotype = factor(geno_label, levels = c("CTRL", "Inv4m")),
+         Treatment = factor(Treatment))
+
+## Per-trait lm + emmeans: marginal Genotype contrast (pooled over P) and
+## conditional Genotype contrasts within each P_LEVEL. G x T interaction p
+## stored as diagnostic (NOT in FDR pool).
+fit_one_trait <- function(trait_name, data) {
+  d <- data %>%
+    pivot_longer(cols = all_of(trait_name),
+                 names_to = "trait", values_to = "value") %>%
+    filter(!is.na(value))
+  if (nrow(d) < 4 || length(unique(d$genotype)) < 2 ||
+      length(unique(d$Treatment)) < 2) return(NULL)
+
+  m <- tryCatch(lm(value ~ genotype * Treatment, data = d),
+                error = function(e) NULL)
+  if (is.null(m)) return(NULL)
+
+  # G x T interaction p-value (diagnostic only)
+  anov  <- anova(m)
+  p_int <- if ("genotype:Treatment" %in% rownames(anov))
+             anov["genotype:Treatment", "Pr(>F)"] else NA_real_
+
+  marg <- pairs(emmeans(m, ~ genotype), reverse = TRUE) %>%
+    as_tibble() %>%
+    transmute(trait = trait_name,
+              contrast_type = "marginal",
+              contrast_level = "marginal",
+              estimate, SE, df, t = t.ratio, p = p.value,
+              p_int_GxT = p_int)
+
+  cond <- pairs(emmeans(m, ~ genotype | Treatment), reverse = TRUE) %>%
+    as_tibble() %>%
+    transmute(trait = trait_name,
+              contrast_type = "conditional",
+              contrast_level = paste0("Genotype|", Treatment),
+              estimate, SE, df, t = t.ratio, p = p.value,
+              p_int_GxT = p_int)
+
+  bind_rows(marg, cond)
+}
+
+## restrict to traits that actually have SpATS-corrected columns
+fitted_traits <- intersect(usable_phenotypes, names(focal_corrected))
+
+all_contrasts <- lapply(fitted_traits, fit_one_trait,
+                        data = focal_corrected) %>%
+  bind_rows()
+
+## Single FDR pool: all (trait x contrast) rows together
+all_contrasts <- all_contrasts %>%
+  mutate(p_adj = p.adjust(p, method = "fdr"),
          signif = case_when(
            p_adj < 0.001 ~ "***",
            p_adj < 0.01  ~ "**",
            p_adj < 0.05  ~ "*",
            TRUE          ~ "ns"
-         )) %>%
-  arrange(p_adj)
+         ))
 
-print(contrast_df)
+cat("FDR pool size:", nrow(all_contrasts), "contrasts\n")
+cat("Significant (FDR < 0.05):",
+    sum(all_contrasts$p_adj < 0.05), "rows\n\n")
+
+all_contrasts %>%
+  arrange(p_adj) %>%
+  select(trait, contrast_type, contrast_level,
+         estimate, SE, df, t,
+         p, p_adj, signif, p_int_GxT) %>%
+  knitr::kable(digits = 4,
+               caption = "All 27 contrasts (9 traits x 3 contrast types). p = nominal, p_adj = BH-FDR across the 27-row pool.")
+
+## contrast_df = marginal row per trait — drives the panel star
+contrast_df <- all_contrasts %>%
+  filter(contrast_type == "marginal") %>%
+  select(trait, estimate, SE, df, t, p, p_adj, signif, p_int_GxT) %>%
+  rename(effect = estimate, se_diff = SE) %>%
+  left_join(blue_df, by = "trait") %>%
+  mutate(CTRL  = focal_pair[1],
+         Inv4m = focal_pair[2],
+         donor_CTRL  = donor_lookup[focal_pair[1]],
+         donor_Inv4m = donor_lookup[focal_pair[2]])
+
+contrast_df %>%
+  arrange(p_adj) %>%
+  select(trait, effect, se_diff, t, p, p_adj, signif, p_int_GxT) %>%
+  knitr::kable(digits = 4,
+               caption = "Marginal Inv4m - CTRL contrast per trait (panel-star source). p = nominal, p_adj = BH-FDR across the 27-row pool from above.")
+
+cat("\nTraits with significant G x T interaction (raw p < 0.05):\n")
+contrast_df %>%
+  filter(p_int_GxT < 0.05) %>%
+  select(trait, p_int_GxT) %>%
+  arrange(p_int_GxT) %>%
+  knitr::kable(digits = 4)
 ```
 
-## 9. Figure 2-style panel: per-plot boxplots for the focal pair
+## 9. Figure 2-style panel: per-plot boxplots with t-test significance
 
-Show the spatially-corrected plot-level values for `Inv4_Mi21` vs `Inv4_B73`
-(20 plots each) per trait, with the BLUE difference overlaid as the bracket
-label.
+Each panel shows the spatially- and nuisance-corrected plot-level values for
+the 20 `Inv4_B73` and 20 `Inv4_Mi21` plots. The significance star is the
+FDR-adjusted Welch t-test from §8.
 
-```{r main-panel, fig.width=10, fig.height=7}
-focal_corrected <- sp_corrected %>%
-  filter(genotype %in% focal_pair) %>%
-  mutate(genotype = factor(geno_label, levels = c("CTRL", "Inv4m")))
+```{r main-panel, fig.width=10, fig.height=10}
+## Order panels by FDR-adjusted marginal contrast p (most significant first),
+## with any unfitted traits appended at the end
+main_traits <- c(
+  contrast_df %>% arrange(p_adj) %>% pull(trait),
+  setdiff(usable_phenotypes,
+          contrast_df %>% pull(trait))
+)
 
-pheno_theme_panel <- theme_classic2(base_size = 20) +
-  theme(
-    plot.title = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.title.x = element_blank(),
-    axis.text.x = element_markdown(size = 18, face = "bold", color = "black"),
-    axis.text.y = element_text(size = 16),
-    strip.background = element_blank(),
-    strip.text = element_text(size = 20, face = "bold"),
-    legend.position = "none"
-  )
-
-make_trait_plot <- function(trait_name, data, contrast_tbl, units) {
-  d <- filter(data, trait == trait_name)
-  cr <- contrast_tbl %>% filter(trait == trait_name)
-  y_label <- units[trait_name]
-  star <- if (nrow(cr)) cr$signif else "ns"
-
-  ymax <- max(d$value, na.rm = TRUE)
-  yrng <- diff(range(d$value, na.rm = TRUE))
-
-  p <- ggplot(d, aes(x = genotype, y = value, color = genotype)) +
-    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
-      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-    geom_quasirandom(size = 2) %>%
-      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
-    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
-    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
-    annotate("text", x = 1.5, y = ymax + 0.10 * yrng, label = star,
-             size = 8, fontface = "bold") +
-    labs(title = trait_name, y = y_label, x = NULL) +
-    scale_y_continuous(expand = expansion(mult = c(0.1, 0.20))) +
-    pheno_theme_panel +
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
-  if (trait_name %in% c("DTA", "DTS")) {
-    y_range <- range(d$value, na.rm = TRUE)
-    p <- p + scale_y_continuous(
-      breaks = seq(floor(y_range[1]), ceiling(y_range[2]), by = 1),
-      expand = expansion(mult = c(0.1, 0.20)))
-  }
-  p
-}
-
-main_traits <- intersect(c("PH", "DTA", "DTS", "SDW_H", "GWE", "HGW"),
-                         usable_phenotypes)
-trait_units <- c(PH = "cm", DTA = "Days", DTS = "Days",
+unit_lookup <- c(PH = "cm", DTA = "Days", DTS = "Days",
                  SDW_H = "g", GWE = "g", HGW = "g", TGW = "g",
-                 SDW_11wk = "g", TEW = "g")
+                 SDW_11wk = "g", TEW = "g",
+                 TGN = "count", TEN = "count",
+                 NDVI_T1 = "index", NDVI_T2 = "index",
+                 AMF = "")
+## Descriptive y-axis labels override the bare unit for selected traits
+axis_label_lookup <- c(
+  TGW = "Total grain weight (g)",
+  GWE = "Grain weight / ear (g)",
+  TGN = "Total grain number"
+)
+trait_units <- setNames(
+  vapply(main_traits,
+         function(tr) {
+           if (tr %in% names(axis_label_lookup)) axis_label_lookup[[tr]]
+           else if (tr %in% names(unit_lookup)) unit_lookup[[tr]]
+           else ""
+         },
+         character(1)),
+  main_traits)
 
 plot_data_main <- focal_corrected %>%
   pivot_longer(cols = any_of(usable_phenotypes),
@@ -412,18 +467,72 @@ plot_data_main <- focal_corrected %>%
   filter(trait %in% main_traits, !is.na(value)) %>%
   mutate(trait = factor(trait, levels = main_traits))
 
-trait_plots <- lapply(main_traits, make_trait_plot,
-                      data = plot_data_main, contrast_tbl = contrast_df,
-                      units = trait_units)
+pheno_theme_panel <- theme_classic2(base_size = 20) +
+  theme(
+    plot.title       = element_blank(),
+    axis.title.y     = element_text(size = 18),
+    axis.title.x     = element_blank(),
+    axis.text.x      = element_markdown(size = 18, face = "bold",
+                                        color = "black"),
+    axis.text.y      = element_text(size = 16),
+    strip.background = element_blank(),
+    strip.text       = element_text(size = 20, face = "bold"),
+    legend.position  = "none"
+  )
+
+make_trait_plot <- function(trait_name, data, contrast_tbl, units) {
+  d <- filter(data, trait == trait_name)
+  if (!nrow(d)) return(NULL)
+  cr      <- contrast_tbl %>% filter(trait == trait_name)
+  star    <- if (nrow(cr)) cr$signif else "ns"
+  y_label <- units[trait_name]
+  ymax    <- max(d$value, na.rm = TRUE)
+  yrng    <- diff(range(d$value, na.rm = TRUE))
+
+  bracket_df <- tibble(
+    group1     = "CTRL",
+    group2     = "Inv4m",
+    y.position = ymax + 0.10 * yrng,
+    label      = star
+  )
+
+  ggplot(d, aes(x = genotype, y = value, color = genotype)) +
+    geom_boxplot(width = 0.25, linewidth = 1.5, alpha = 0) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    geom_quasirandom(size = 2) %>%
+      with_shadow(colour = "black", x_offset = 0, y_offset = 0, sigma = 1) +
+    scale_color_manual(values = c("CTRL" = "gold", "Inv4m" = "purple4")) +
+    scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
+    stat_pvalue_manual(bracket_df,
+                       tip.length    = 0.01,
+                       size          = 8,
+                       bracket.size  = 0.8,
+                       inherit.aes   = FALSE) +
+    labs(title = trait_name, y = y_label, x = NULL) +
+    scale_y_continuous(expand = expansion(mult = c(0.10, 0.20))) +
+    pheno_theme_panel +
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+}
+
+trait_plots <- Filter(Negate(is.null),
+                      lapply(main_traits, make_trait_plot,
+                             data = plot_data_main, contrast_tbl = contrast_df,
+                             units = trait_units))
+
+panel_ncol <- 3L
+panel_nrow <- ceiling(length(trait_plots) / panel_ncol)
 
 main_panel <- cowplot::plot_grid(plotlist = trait_plots,
-                                 nrow = 2, ncol = 3,
+                                 nrow = panel_nrow, ncol = panel_ncol,
                                  align = "hv", axis = "tblr")
 
 print(main_panel)
 
 ggsave(file.path(paths$figures, "PSU2024_field_phenotypes_panel.png"),
-       main_panel, width = 10, height = 7, dpi = 300)
+       main_panel,
+       width  = 3.5 * panel_ncol,
+       height = 3.5 * panel_nrow,
+       dpi = 300)
 cat("Saved panel to:",
     file.path(paths$figures, "PSU2024_field_phenotypes_panel.png"), "\n")
 ```
@@ -488,7 +597,11 @@ ggsave(file.path(paths$figures, "PSU2024_focal_contrast_forest.png"),
 
 write_csv(contrast_df,
           file.path(paths$intermediate,
-                    paste0(environment_name, "_focal_contrast_BLUEs.csv")))
+                    paste0(environment_name, "_focal_contrast_marginal.csv")))
+write_csv(all_contrasts,
+          file.path(paths$intermediate,
+                    paste0(environment_name,
+                           "_focal_contrast_all_27.csv")))
 write_csv(sp_corrected,
           file.path(paths$intermediate,
                     paste0(environment_name,
@@ -496,7 +609,11 @@ write_csv(sp_corrected,
 
 cat("Outputs:\n  ",
     file.path(paths$intermediate,
-              paste0(environment_name, "_focal_contrast_BLUEs.csv")), "\n  ",
+              paste0(environment_name, "_focal_contrast_marginal.csv")),
+    "\n  ",
+    file.path(paths$intermediate,
+              paste0(environment_name, "_focal_contrast_all_27.csv")),
+    "\n  ",
     file.path(paths$intermediate,
               paste0(environment_name, "_spatially_corrected_phenotypes.csv")),
     "\n  ",
@@ -506,15 +623,22 @@ cat("Outputs:\n  ",
 
 ## 11. Notes / next steps
 
-- Model design:
+- **Stage 1 (SpATS):**
   - `Genotype` random over the 41 `NIL_xxxx` lines (residual normality applies here)
   - 8 non-NIL entries (`B73`, `Inv4_B73`, `Inv4_MEX`, `Inv4_Mi21`, `Inv4_PT`,
     `Oh43`, `Z031E0591/4`) added as checks (fixed via `addCheck = TRUE`)
   - `Rep` and `Treatment` (P_LEVEL) as fixed nuisance terms
   - Spatial smooth on assembled X (1–48) and Y (1–20)
-- The focal contrast `Inv4_Mi21 − Inv4_B73` is extracted from the check BLUE
-  block. SE-of-difference is computed as `sqrt(SE_A^2 + SE_B^2)` (independent
-  approximation; replace with full Var-Cov if check-pair covariance becomes a
-  concern).
+- **Stage 2 (lm + emmeans):** mirrors `PSU2022_phenotype_marginal_means.Rmd`
+  from the phosphorus paper for cross-paper congruence.
+  - `lm(corrected ~ Genotype * Treatment)` per trait on the focal-pair plots
+    (20 Inv4_B73 + 20 Inv4_Mi21 = 40 plots/trait)
+  - Three contrasts per trait: marginal Genotype (pooled over P), Genotype|−P,
+    Genotype|+P → **27 contrasts total, single FDR pool**
+  - The boxplot star is the marginal Genotype contrast row
+  - G × Treatment interaction p-value reported per trait as a diagnostic
+    (not in the FDR pool)
+- The `BLUE_*` columns in the marginal-contrast CSV come from
+  `getGenoPred()` on the SpATS fit (reference summary, not the primary test).
 - Compare these BLUE-based corrected values against Sandra's `_SPAT` columns
   as a methods-parity check before finalizing the Figure 2 hybrid panel.

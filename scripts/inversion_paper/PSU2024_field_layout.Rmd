@@ -1,0 +1,259 @@
+---
+title: "PA2024 field layout inference (for review with Ruairidh)"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 10
+    fig_height: 5
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+
+library(tidyverse)
+```
+
+# Purpose
+
+The PSU2024 field CSV (`data/PSU2024.csv`) provides per-plot phenotype data with
+design columns `REP`, `IBLOCK`, `P_SQUARE`, `ROW`, `COLUMN`, but **no absolute
+field X/Y coordinates**. SpATS spatial correction needs X/Y on a single
+continuous grid covering all plots.
+
+This notebook documents how those coordinates were inferred from the data and
+the in-field knowledge that **the smallest plot ID (RS) is at the bottom-left
+of the field and the maximum at the top-right, with -P treatment on the left
+and +P on the right**. The resulting offset table is what
+`Corrected_phenotype_analysis_PSU2024.Rmd` uses in its X/Y derivation.
+
+# 1. Load PSU2024
+
+```{r load}
+dat <- read_csv(here("data", "PSU2024.csv"), show_col_types = FALSE) %>%
+  mutate(P_LEVEL = factor(P_LEVEL, levels = c("LOW_P", "HIGH_P")))
+
+cat("rows:", nrow(dat), "\n")
+cat("ROW range:    ", range(dat$ROW), "\n")
+cat("COLUMN range: ", range(dat$COLUMN), "\n")
+cat("REP levels:   ", paste(sort(unique(dat$REP)), collapse = ", "), "\n")
+cat("IBLOCK levels:", paste(sort(unique(dat$IBLOCK)), collapse = ", "), "\n")
+cat("P_SQUARE:     ", paste(sort(unique(dat$P_SQUARE)), collapse = ", "), "\n")
+cat("P_LEVEL:      ", paste(levels(dat$P_LEVEL), collapse = ", "), "\n")
+cat("n GENOTYPE:   ", length(unique(dat$GENOTYPE)), "\n")
+cat("RS range:     ", range(dat$RS), "\n")
+```
+
+# 2. Design structure
+
+```{r design-counts}
+dat %>% count(REP, P_SQUARE, P_LEVEL) %>% print(n = 30)
+```
+
+5 REPs × 4 P_SQUAREs × 48 plots = 960 plots. P_SQUAREs 1 and 3 are LOW_P,
+P_SQUAREs 2 and 4 are HIGH_P.
+
+# 3. ROW × COLUMN are local within each P_SQUARE
+
+If `ROW` × `COLUMN` were global field coordinates we'd expect one plot per cell.
+Counting how many plots share each `(ROW, COLUMN)`:
+
+```{r row-col-uniqueness}
+dat %>% count(ROW, COLUMN) %>%
+  count(n, name = "cells_with_this_count")
+
+dat %>% count(REP, P_SQUARE, ROW, COLUMN) %>%
+  count(n, name = "cells_with_this_count")
+```
+
+Each `(ROW, COLUMN)` is shared by 4 plots — one per P_SQUARE — but
+`(REP, P_SQUARE, ROW, COLUMN)` is a unique identifier. So **`ROW` and `COLUMN`
+restart inside each P_SQUARE**, and P_SQUARE is an independent block dimension
+not captured by the spatial coords alone.
+
+# 4. Plot-ID distribution by P_LEVEL (PSU2024)
+
+```{r rs-by-level}
+dat %>% group_by(P_LEVEL) %>%
+  summarise(n = n(), RS_min = min(RS), RS_max = max(RS),
+            ID_min = min(ID), ID_max = max(ID))
+
+dat %>% group_by(P_SQUARE, P_LEVEL) %>%
+  summarise(n = n(), RS_min = min(RS), RS_max = max(RS),
+            ID_min = min(ID), ID_max = max(ID), .groups = "drop")
+```
+
+RS is contiguous within each P_SQUARE — no interleaving. P_SQ 1 = LOW_P
+(2001-2240), P_SQ 2 = HIGH_P (2241-2480), P_SQ 3 = LOW_P (2481-2720),
+P_SQ 4 = HIGH_P (2721-2960). The ID-numbering scheme labels the P_SQUAREs but
+**does not by itself determine their physical arrangement** in the field.
+
+# 5. Cross-check vs PSU2022
+
+PSU2022 used a comparable 4-square design with thousands-digit encoding of P
+treatment. Same pattern — two LowP blocks and two HighP blocks, each spanning
+192 plots (16 IBLOCK × 12 plots):
+
+```{r psu2022-cross-check}
+psu2022 <- read_csv(here("data", "22_NCS_PSU_LANGEBIO_FIELDS_PSU_P_field.csv"),
+                    show_col_types = FALSE) %>%
+  rename(plot_id = `P22-`)
+
+psu2022 %>% group_by(Treatment) %>%
+  summarise(n = n(), id_min = min(plot_id), id_max = max(plot_id))
+```
+
+PSU2022 LowP plots cluster in `1xxx` + `3xxx`, HighP plots in `2xxx` + `4xxx` —
+the same alternating-block convention. Physical orientation
+(-P left / +P right) was confirmed by field observation.
+
+# 6. Inferred physical layout — 2×2 of P_SQUAREs
+
+Combining:
+
+- `ROW` (1-10) and `COLUMN` (1-24) are local within each 240-plot P_SQUARE.
+- RS 2001 (P_SQUARE 1, ROW 1, COLUMN 1) sits at the **bottom-left** of the
+  field; RS 2960 (P_SQUARE 4, ROW 10, COLUMN 24) sits at the **top-right**.
+- The two LowP squares are on the **left** half, the two HighP on the right.
+
+Gives a 2×2 layout:
+
+```
+top    | P_SQ 3 (LowP)  | P_SQ 4 (HighP) |   RS 2960 → top-right
+bottom | P_SQ 1 (LowP)  | P_SQ 2 (HighP) |   RS 2001 → bottom-left
+        ROW 1-10, COL 1-24  ROW 1-10, COL 1-24
+```
+
+Assembled field = **20 rows tall × 48 columns wide**.
+
+# 7. X / Y derivation
+
+```{r derive-XY}
+n_col_psq <- max(dat$COLUMN)   # 24
+n_row_psq <- max(dat$ROW)      # 10
+psq_x_offset <- c(`1` = 0L, `3` = 0L,
+                  `2` = n_col_psq, `4` = n_col_psq)
+psq_y_offset <- c(`1` = 0L, `2` = 0L,
+                  `3` = n_row_psq, `4` = n_row_psq)
+
+dat <- dat %>%
+  mutate(X = psq_x_offset[as.character(P_SQUARE)] + COLUMN,
+         Y = psq_y_offset[as.character(P_SQUARE)] + ROW)
+
+dat %>% group_by(P_SQUARE, P_LEVEL) %>%
+  summarise(X_range = paste(range(X), collapse = "-"),
+            Y_range = paste(range(Y), collapse = "-"),
+            .groups = "drop")
+```
+
+This is the exact offset table copied into
+`Corrected_phenotype_analysis_PSU2024.Rmd` §2.
+
+# 8. Field maps
+
+```{r field-map-by-P_LEVEL, fig.width=9, fig.height=6}
+p_lvl <- ggplot(dat, aes(x = X, y = Y, fill = P_LEVEL)) +
+  geom_tile(color = "white", linewidth = 0.15) +
+  scale_fill_manual(values = c("LOW_P" = "#d95f02", "HIGH_P" = "#1b9e77")) +
+  scale_y_continuous(breaks = seq(1, 20, 2)) +
+  coord_equal() +
+  labs(title = "PA2024 field — assembled 2×2 layout, colored by P_LEVEL",
+       subtitle = "RS 2001 bottom-left → RS 2960 top-right; -P on left, +P on right",
+       x = "field X (assembled, COL 1-48)", y = "field row (1-20)",
+       fill = "P level") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid = element_blank())
+
+ggsave(file.path(paths$figures, "PSU2024_layout_by_P_LEVEL.png"),
+       p_lvl, width = 9, height = 6, dpi = 150)
+p_lvl
+```
+
+```{r field-map-by-P_SQUARE, fig.width=9, fig.height=6}
+p_sq <- ggplot(dat, aes(x = X, y = Y, fill = factor(P_SQUARE))) +
+  geom_tile(color = "white", linewidth = 0.15) +
+  scale_y_continuous(breaks = seq(1, 20, 2)) +
+  coord_equal() +
+  labs(title = "PA2024 field — colored by P_SQUARE",
+       x = "field X (assembled)", y = "field row",
+       fill = "P_SQUARE") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid = element_blank())
+
+ggsave(file.path(paths$figures, "PSU2024_layout_by_P_SQUARE.png"),
+       p_sq, width = 9, height = 6, dpi = 150)
+p_sq
+```
+
+```{r field-map-by-REP, fig.width=9, fig.height=6}
+p_rep <- ggplot(dat, aes(x = X, y = Y, fill = factor(REP))) +
+  geom_tile(color = "white", linewidth = 0.15) +
+  scale_y_continuous(breaks = seq(1, 20, 2)) +
+  coord_equal() +
+  labs(title = "PA2024 field — colored by REP",
+       x = "field X (assembled)", y = "field row",
+       fill = "REP") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid = element_blank())
+
+ggsave(file.path(paths$figures, "PSU2024_layout_by_REP.png"),
+       p_rep, width = 9, height = 6, dpi = 150)
+p_rep
+```
+
+# 9. RS-at-X/Y grid CSV (for Excel inspection of the serpentine)
+
+Wide-format CSV: rows = field Y (sorted descending so the top of the spreadsheet
+matches the top of the field), columns = field X (1-48). Each cell holds the
+RS plot ID at that (X, Y) position.
+
+```{r rs-grid-csv}
+rs_grid <- dat %>%
+  select(X, Y, RS) %>%
+  arrange(desc(Y), X) %>%
+  pivot_wider(id_cols = Y, names_from = X, values_from = RS,
+              names_prefix = "X") %>%
+  arrange(desc(Y))
+
+out_csv <- file.path(paths$intermediate, "PSU2024_layout_RS_grid.csv")
+write_csv(rs_grid, out_csv)
+cat("wrote", out_csv, "\n")
+
+knitr::kable(rs_grid,
+             caption = "RS plot ID at each (X, Y); Y descending so top row = top of field.")
+```
+
+# 10. Notes for review
+
+This layout interpretation rests on two pieces of in-field knowledge:
+
+1. **Smallest RS (2001) → physical bottom-left; largest RS (2960) → top-right.**
+2. **LowP on the left half, HighP on the right.**
+
+If either is wrong, the offset table at §7 needs to change. Specifically:
+
+- If the layout is taller than wide (transposed), swap X ↔ Y in §7.
+- If P_SQUARE 1 is *top*-left rather than bottom-left, swap the Y offsets.
+- If LowP and HighP squares are interleaved (1-2-3-4 left-to-right) rather than
+  side-by-side (1-3 left, 2-4 right), the X offsets need to be permuted.
+
+The downstream analysis (`Corrected_phenotype_analysis_PSU2024.Rmd`) uses these
+X/Y as the SpATS spatial coords with no further assumptions about plot
+positions, so a wrong layout would manifest as a poor SpATS surface fit (and
+visibly weird spatial residual plots).
