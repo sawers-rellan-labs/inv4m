@@ -1,14 +1,14 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-05-14
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ done 2026-05-14; Rubén + coauthor feedback still pending)
+**Last Updated:** 2026-05-15
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ 2026-05-14; BZea NIL Inv4m supp figure ✅ 2026-05-15; Rubén + coauthor feedback still pending)
 **Version:** v2.3.0
 
 ---
 
 ## START HERE: Inversion Paper — Late Phase 5 / Phase 6
 
-**Current State:** Manuscript text complete; **Figure 2 redesigned per Rubén's spec with a new PA2024 hybrid panel (Phase 6 row 1 ✅)**. Rubén's full feedback and coauthor suggestions still pending. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Remaining Phase 6: Zeal-population flowering-time supplementary figure, JMJ paralog supp inclusion, Overleaf PNG re-upload (now including Figure 2), bibtex audit, typo fix, read-aloud, HiFi provenance. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+**Current State:** Manuscript text complete; **Figure 2 redesigned per Rubén's spec with a new PA2024 hybrid panel (Phase 6 row 1 ✅ 2026-05-14)**; **BZea NIL Inv4m supp figure (DTA, DTS, PH) added (Phase 6 row 2 ✅ 2026-05-15)**. Rubén's full feedback and coauthor suggestions still pending. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Remaining Phase 6: JMJ paralog supp inclusion, Overleaf PNG re-upload (now including Figure 2 + Zeal supp), bibtex audit, typo fix, read aloud, HiFi provenance. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -45,7 +45,7 @@ README.md  # Figure/table coverage
 | 21 | Scripts audit + cleanup (delete 25 orphan scripts; rename JMJ notebooks; resolve audit discrepancies) | ✅ done (2026-05-07; commits 988999b → cebb2d2) | - |
 | **Phase 6 — pre-submission** | | | |
 | 22 | F2 hybrid panel for Figure 2 (new analysis) | ✅ done (2026-05-14) | - |
-| 23 | Zeal-population flowering-time supplementary figure (new analysis) | not started | - |
+| 23 | BZea NIL Inv4m supp figure: DTA, DTS, PH; lineage corrected boxplots + forest (`Zeal_Inv4m_flowering_lmm.Rmd`) | ✅ done (2026-05-15; commit b47ede3) | - |
 | 24 | Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label | pending | - |
 | 25 | Re-upload renamed PNGs to Overleaf (PNGs still show old PSU/CLY labels even though main.tex + R scripts updated; also include new Figure 2 PNG) | pending | #20, #22 |
 | 26 | Bibtex audit of Overleaf .bib (all `\cite{}` keys resolve; spot-check; cover fransz2016, desmarais2017, minow2021, PT HiLo-1.0) | pending | - |
@@ -554,7 +554,7 @@ git -C "/path/to/inv4m" push origin main
 
 **Phase 6 — Pre-submission additions (queued):**
 - [ ] **F2 hybrid panel for Figure 2** (new analysis)
-- [ ] **Zeal-population flowering-time supplementary figure** (new analysis)
+- [x] **BZea NIL Inv4m supp figure** (DTA, DTS, PH) — done 2026-05-15 (`Zeal_Inv4m_flowering_lmm.Rmd`)
 - [ ] Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label
 - [ ] Re-upload renamed PNGs to Overleaf (PSU/CLY → PA/NC labels)
 - [ ] Bibtex audit of Overleaf .bib (full pass)
