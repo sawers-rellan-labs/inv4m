@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; **F2 hybrid panel for Figure 2 ✅ done 2026-05-14** with the new PA2024 NIL-derived hybrid trial. **Rubén's full feedback and coauthor suggestions still pending** (the 2026-05-07 coauthor close-out applies to the *phosphorus* paper, not this one). Remaining Phase 6 work: Zeal-population flowering-time supplementary figure, JMJ paralog supplementary inclusion, Overleaf PNG re-upload (now including Figure 2), bibtex audit, copyedit. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; **F2 hybrid panel for Figure 2 ✅ done 2026-05-14** (PA2024 NIL-derived hybrid trial); **ZEAL NIL panel Inv4m supp figure ✅ done 2026-05-15** (Fig.~S2: DTA, DTS, PH across 5 mexicana/huehuetenangensis ancestry groups via parsim LMM with strict ancestry/BC2/NIL nesting; Methods + Results + caption already in main.tex on Overleaf). **Next priorities:** review Figure 6 (WGCNA module perturbation) layout/style, then address Rubén's full feedback and coauthor suggestions. Remaining Phase 6 cleanup: JMJ paralog supplementary inclusion, Overleaf PNG re-upload (Figure 2 + Fig.~S2 ZEAL panel `inv4mZEAL.png`), bibtex audit, copyedit. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
@@ -86,11 +86,12 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Figure 8 | B73 phenotypic/gene expression model | Manual/Illustrator | N/A |
 | **Supplementary Figures** | | | |
 | Figure S1 | SNP distribution and correlation | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
-| Figure S2 | GxE interaction plots (MI21 donor) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
-| Figure S3 | GxE effect sizes forest plot | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
-| Figure S4 | Internode analysis (4 panels: height, photos, schematic, profiles) | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) + photos | ✅ |
-| Figure S5 | WGCNA module bootstrap support (Genotype Response × Leaf Gradient) | [`WGCNA_module_perturbation_test.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/WGCNA_module_perturbation_test.html) | ✅ |
-| Figure S6 | WGCNA module GO enrichment | `field_perturbation/07_module_annotation.Rmd` | ✅ |
+| Figure S2 | ZEAL NIL panel Inv4m effect on flowering (DTA, DTS) and plant height (4 panels: lineage corrected boxplots + forest) | [`Zeal_Inv4m_flowering_lmm.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/Zeal_Inv4m_flowering_lmm.html) | ✅ |
+| Figure S3 | GxE interaction plots (MI21 donor) | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
+| Figure S4 | GxE effect sizes forest plot | [`inv4mGxE_3_env.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/inv4mGxE_3_env.html) | ✅ |
+| Figure S5 | Internode analysis (4 panels: height, photos, schematic, profiles) | [`internode_analysis.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/internode_analysis.html) + photos | ✅ |
+| Figure S6 | WGCNA module bootstrap support (Genotype Response × Leaf Gradient) | [`WGCNA_module_perturbation_test.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/WGCNA_module_perturbation_test.html) | ✅ |
+| Figure S7 | WGCNA module GO enrichment | `field_perturbation/07_module_annotation.Rmd` | ✅ |
 | **Main Tables** | | | |
 | Table 1 | Inv4m breakpoints | [`plot_genotype_get_correlated_loci.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/plot_genotype_get_correlated_loci.html) | ✅ |
 | Table 2 | FT/PH gene candidates | [`phenotype_association_filter.Rmd`](https://sawers-rellan-labs.github.io/inv4m/inversion_paper/phenotype_association_filter.html) | ✅ |
