@@ -1,14 +1,14 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-05-07
-**Status:** Phosphorus Paper - Complete ✅ (coauthor feedback addressed 2026-05-07) | Inversion Paper - Late Phase 5 / Phase 6 🔶 (Rubén + coauthor feedback pending; pre-submission figure additions queued)
-**Version:** v2.2.0
+**Last Updated:** 2026-05-14
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ done 2026-05-14; Rubén + coauthor feedback still pending)
+**Version:** v2.3.0
 
 ---
 
 ## START HERE: Inversion Paper — Late Phase 5 / Phase 6
 
-**Current State:** Manuscript text complete; **Rubén's full feedback and coauthor suggestions on the inversion paper are still pending**. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Two pre-submission figure additions also queued: F2 hybrid panel for Figure 2 and a Zeal-population flowering-time supplementary figure. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+**Current State:** Manuscript text complete; **Figure 2 redesigned per Rubén's spec with a new PA2024 hybrid panel (Phase 6 row 1 ✅)**. Rubén's full feedback and coauthor suggestions still pending. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Remaining Phase 6: Zeal-population flowering-time supplementary figure, JMJ paralog supp inclusion, Overleaf PNG re-upload (now including Figure 2), bibtex audit, typo fix, read-aloud, HiFi provenance. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -44,14 +44,23 @@ README.md  # Figure/table coverage
 | 20 | Repo-side site-label rename (PSU→PA, CLY→NC in R scripts) | ✅ done (2026-05-07) | - |
 | 21 | Scripts audit + cleanup (delete 25 orphan scripts; rename JMJ notebooks; resolve audit discrepancies) | ✅ done (2026-05-07; commits 988999b → cebb2d2) | - |
 | **Phase 6 — pre-submission** | | | |
-| 22 | F2 hybrid panel for Figure 2 (new analysis) | not started | - |
+| 22 | F2 hybrid panel for Figure 2 (new analysis) | ✅ done (2026-05-14) | - |
 | 23 | Zeal-population flowering-time supplementary figure (new analysis) | not started | - |
 | 24 | Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label | pending | - |
-| 25 | Re-upload renamed PNGs to Overleaf (PNGs still show old PSU/CLY labels even though main.tex + R scripts updated) | pending | #20 |
+| 25 | Re-upload renamed PNGs to Overleaf (PNGs still show old PSU/CLY labels even though main.tex + R scripts updated; also include new Figure 2 PNG) | pending | #20, #22 |
 | 26 | Bibtex audit of Overleaf .bib (all `\cite{}` keys resolve; spot-check; cover fransz2016, desmarais2017, minow2021, PT HiLo-1.0) | pending | - |
 | 27 | Typo fix: "acknlowledge" → "acknowledge" (~main.tex L901) | pending | - |
 | 28 | HiFi sequencing provenance: collaborator → co-author, facility → name in Methods | pending | - |
 | ❌ | ~~Run BUSCO on Mi21 NIL assembly~~ | dropped (2026-05-07) | - |
+
+### F2 hybrid panel for Figure 2 — completed 2026-05-14:
+- New PA2024 hybrid analysis: `scripts/inversion_paper/Corrected_phenotype_analysis_PSU2024.Rmd`. SpATS stage 1 with `repId` only as fixed factor; stage 2 `lm(corrected ~ Genotype * Treatment) + emmeans` marginal Genotype contrast; 27-row BH-FDR pool. Focal contrast `Inv4_Mi21` vs `Inv4_B73`; the 41 NIL_xxxx lines are the random-effect cohort via `addCheck`.
+- Field layout documentation (RPubs-shared): `scripts/inversion_paper/PSU2024_field_layout.Rmd`.
+- PA2022 NIL analysis refactored to the same stage-1/2 stats (mirrors phosphorus paper); Treatment removed from SpATS to avoid double-correction.
+- Figure 2 R-side assembly: `scripts/inversion_paper/plot_Figure_2.Rmd`. 12×7 in @ 300 dpi. A NIL PA2022 (PH/DTA/DTS) | C DIC micrograph; B NIL-derived hybrid PA2024 (PH/TGW/TGN) | D NIL Seedling SAMs (Height/h/r/h/r²). One-tailed Welch + BH-FDR over 3 elongation traits in D.
+- SAM estimation alternative: `scripts/inversion_paper/SAM_dabestr_estimation.Rmd` (bootstrap 95% BCa CIs).
+- main.tex updated: caption simplified, Methods Phenotype-analysis subsection rewritten for two-stage pipeline (new eq:stage2_model), Meristem subsection notes SAM stats decision, hyphenated compounds stripped.
+- Commits: `a07862e` → `40c8c38`, all pushed to `origin/main`.
 
 ### Section 3.2 corrections applied (2026-02-24):
 - 126 → 1394 fixed alternate allele markers
@@ -190,8 +199,12 @@ docs/phosphorus_paper/   # 10 HTML reports (GitHub Pages)
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `Corrected_phenotype_analysis_PSU2022.Rmd` | Spatially corrected phenotypes (PA2022 field) | ✅ |
-| `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis | ✅ |
+| `plot_Figure_2.Rmd` | Figure 2 R-side cowplot assembly (4-panel; A NILs / B Hybrids / C+D NIL Seedling SAMs) | ✅ |
+| `Corrected_phenotype_analysis_PSU2022.Rmd` | PA2022 NIL spatial correction + stage-2 lm/emmeans | ✅ |
+| `Corrected_phenotype_analysis_PSU2024.Rmd` | PA2024 NIL-derived hybrid spatial correction + focal contrast (Inv4_Mi21 vs Inv4_B73) | ✅ |
+| `PSU2024_field_layout.Rmd` | PA2024 2×2 P_SQUARE layout inference + X/Y derivation (also shared on RPubs) | ✅ |
+| `SAM_morphology_analysis.Rmd` | SAM DIC microscopy analysis (Alex's primary notebook) | ✅ |
+| `SAM_dabestr_estimation.Rmd` | SAM estimation statistics alternative (bootstrap BCa CIs via dabestr) | ✅ |
 
 #### GxE (Fig S2/S3, Table S4)
 
