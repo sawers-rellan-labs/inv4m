@@ -263,6 +263,13 @@ Effect sizes varied substantially across environments (Supplementary Fig.~\ref{f
 For plant height, Cohen's $d$ ranged from 1.45 (PA2022) to 2.23 (PA2025) in Pennsylvania environments, but was negative ($d = -1.28$) in North Carolina (NC2025).
 This reversal suggests that the magnitude and direction of \invfour effects on growth depend on environmental conditions.
 
+To test whether the \invfour flowering time effect generalizes across donor genetic backgrounds, we analyzed an independent BZea NIL panel grown at the Central Crops Research Station (Clayton, NC; NC2025) in which the \invfour bearing segment had been introgressed into B73 from multiple teosinte donor accessions spanning four \textit{Z.~mays} ssp.\ \textit{mexicana} ancestry groups (Chalco, Durango, Mesa-Central, Nobogame) and \textit{Z.~mays} ssp.\ \textit{huehuetenangensis} (Huehuetenango).
+After the both arms BC1 filter the panel comprised 393 plots from 218 NILs across 35 BC1 families; Balsas parviglumis, \textit{Z.~luxurians}, and \textit{Z.~diploperennis} donor lineages were excluded because they do not carry the mexicana derived \invfour haplotype (no donor arm at the \invfour locus).
+A linear mixed model with strictly nested random effects (ancestry / BC2 family / NIL; see Methods) recovered the flowering time signal we observed in the MI21 single donor panel: \invfour donors silked $0.88 \pm 0.31$ days earlier ($p = 0.004$, FDR $= 0.013$) and reached anthesis $0.61 \pm 0.27$ days earlier ($p = 0.022$, FDR $= 0.033$) than the recurrent B73 haplotype arm within the same NIL line, with within BC2 permutation $p$ values agreeing within rounding (Supplementary Fig.~\ref{fig::zeal_inv4m}A,B).
+The contrast was driven primarily by the Durango ancestry, which provided both the largest donor sample (n = 37 plots) and the largest per ancestry effect (DTS: $-1.47 \pm 0.46$ d, FDR $= 0.009$); the \invfour $\times$ ancestry interaction was not significant for either trait ($p > 0.2$), so the data do not support claiming the effect varies meaningfully by donor ancestry.
+Plant height showed a positive but non significant donor effect in the BZea panel ($+1.6 \pm 2.7$ cm, $p = 0.55$; Supplementary Fig.~\ref{fig::zeal_inv4m}C,D), directionally consistent with the Pennsylvania environment height increases observed in the MI21 panel but with insufficient resolution to detect a $\sim$1.6 cm effect against the donor lineage scatter ($\sim$15 cm within arm SD) introduced by the multi donor design.
+The flowering time replication across two independent NIL panels with different donor backgrounds, including the typological reach into \textit{Z.~mays} ssp.\ \textit{huehuetenangensis}, supports the conclusion that the earlier flowering effect maps to the \invfour interval itself rather than to MI21 specific genetic background.
+
 To characterize the architectural basis of \invfour effects on plant height, we measured internode lengths in the NC2025 field experiment, where \invfour plants were shorter than controls ($d = -1.28$).
 In the MI21 background, we measured 1,556 internodes from 112 control plants and 1,607 internodes from 116 \invfour plants.
 Mean internode length was similar between genotypes (CTRL: $13.1 \pm 5.5$ cm; \invfour: $12.9 \pm 5.2$ cm).
@@ -1117,6 +1124,30 @@ P-values were adjusted for multiple testing using the Benjamini-Hochberg FDR met
 
 To examine temperature sensitivity of \invfour effects, we correlated genotype effect sizes (Cohen's $d$) with mean environmental temperature during the first 100 days after planting, calculated from NASA POWER hourly temperature data.
 
+\subsection{BZea NIL panel \invfour effect (NC2025)}
+
+To test whether the \invfour flowering time effect generalizes beyond the MI21 single donor background, we analyzed the BZea NIL panel grown in 2025 at the Central Crops Research Station (Clayton, NC).
+The BZea panel introgresses chromosomal segments from multiple teosinte donor accessions into the B73 background.
+After the both arms BC1 filter (BC1 families containing both \invfour donor and recurrent alleles), the surviving panel comprised four \textit{Z.~mays} subsp.\ \textit{mexicana} ancestry groups (Chalco, Durango, Mesa-Central, Nobogame) and \textit{Z.~mays} subsp.\ \textit{huehuetenangensis} (Huehuetenango); donor lineages that do not carry the \invfour mexicana haplotype (Balsas parviglumis, \textit{Z.~luxurians}, \textit{Z.~diploperennis}) had no donor arm at the \invfour locus and were excluded mechanically by the filter.
+We use ``ancestry'' rather than ``race'' for these germplasm groupings to follow current convention in human and increasingly in plant genetics literature where ``race'' is avoided; the column is stored as \texttt{race} in the BZea germplasm metadata and renamed to \texttt{ancestry} on join.
+
+Spatially corrected phenotypes (DTA, DTS, PH) were obtained as described above.
+Three known outlier plots (IDs 2756, 453, 304) were removed; the remaining dataset comprised 393 plots from 218 NILs across 35 BC1 families.
+Pedigree levels (donor accession, F1, BC1, BC2) were derived as substring prefixes of the NIL identifier; ancestry was joined from the BZea germplasm metadata via donor accession.
+For each trait we fit a linear mixed model with \invfour as a two level fixed factor (recurrent vs.\ donor) and a strictly nested random effect structure spanning ancestry, BC2 family, and NIL identity:
+
+\begin{eqnarray}
+\label{eq:zeal_lmm}
+y_{ijkl} = \mu + \beta\,\mathrm{Inv4m}_{ijkl} + u_{\text{ancestry},i} + u_{\text{BC2},ij} + u_{\text{NIL},ijk} + \varepsilon_{ijkl}
+\end{eqnarray}
+
+Models were fit with \texttt{lme4}~\cite{bates2015} via \texttt{lmerTest}~\cite{kuznetsova2017} for Satterthwaite degrees of freedom.
+A pre flight diagnostic showed that intermediate pedigree levels (donor accession, F1, BC1) carry zero additional variance once ancestry (above) and BC2 (below) are accounted for, so we report the parsimonious 3 random effect specification; the full slash nested 6 random effect model gave identical \invfour fixed effect estimates with singular fits at the intermediate levels.
+We additionally validated the parametric inference with a within BC2 permutation test (1000 permutations of \invfour labels within each BC2 family); permutation $p$ values agreed with Satterthwaite $p$ values within rounding.
+Per trait $p$ values were adjusted for multiple testing across the 3 trait family (DTA, DTS, PH) using the Benjamini Hochberg method \cite{benjamini1995}.
+For visualization (Supplementary Fig.~\ref{fig::zeal_inv4m}), lineage corrected trait values were computed by subtracting the ancestry and BC2 random effect BLUPs but retaining the NIL random effect, $\tilde{y}_{ijkl} = y_{ijkl} - \hat{u}_{\text{ancestry},i} - \hat{u}_{\text{BC2},ij}$, so that the within arm spread reflects the line to line NIL variation the model uses for inference.
+The reproducible analysis notebook is at \texttt{scripts/inversion\_paper/Zeal\_Inv4m\_flowering\_lmm.Rmd}.
+
 \subsection{Internode length measurements}
 
 To characterize the effect of \invfour on plant architecture, we measured internode lengths in the NC2025 field experiment.
@@ -1670,6 +1701,22 @@ SNPs with significant correlation with \invfour (full circles) are divergent hig
 Each point represents a NIL, \invfour plants are tagged by the highland allele of PZE04175660223, CTRL plants by the reference (B73) allele, dashed line is the overall mean for the 13 NILs.}
 \label{fig::SNPdistro}
 \end{figure}
+
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/Zeal_Inv4m_flowering_supp.png}
+\caption{\textbf{\invfour effect on flowering and plant height in the BZea near isogenic line panel (NC2025).}
+\textbf{(A)} Lineage corrected days to anthesis (DTA, left) and days to silking (DTS, right) for CTRL (\invfour recurrent allele, B73 haplotype, gold) and \invfour (donor allele, mexicana or huehuetenangensis haplotype, purple).
+Each \invfour arm shows the spread of NIL line means around its arm mean: ancestry and BC2 family random effect BLUPs from the linear mixed model were subtracted from the spatially corrected values, while NIL identity was retained so the visual spread reflects the line to line variation the model uses for inference.
+Stars indicate significance from the \invfour fixed effect Satterthwaite $p$ (Materials and Methods); ** $p < 0.01$, * $p < 0.05$.
+\textbf{(B)} Forest plot of the linear mixed model \invfour fixed effect estimate (donor $-$ recurrent) for DTA and DTS, with 95\% Wald confidence intervals.
+\textbf{(C)} Lineage corrected plant height (PH); same conventions as A.
+\textbf{(D)} Forest plot of the \invfour fixed effect estimate for PH; the donor effect is positive but not significant in this panel.
+$n = 393$ plots from 218 NILs across 35 BC1 families spanning five donor ancestry groups (Chalco, Durango, Mesa-Central, Nobogame, Huehuetenango).
+Donor lineages that do not carry the \invfour mexicana haplotype (parviglumis, \textit{Z.~luxurians}, \textit{Z.~diploperennis}) are excluded by the both arms BC1 filter.}
+\label{fig::zeal_inv4m}
+\end{figure*}
 
 
 \begin{table}[!ht]
