@@ -204,14 +204,14 @@ In B73, the upstream segment was larger (323 kb vs 89 kb), contained more knob r
 PT, TIL18, and the Mi21 NIL showed the same four asymmetries in mirror image relative to B73, consistent with the inversion swapping the two breakpoint segments between orientations (Fig~\ref{fig::design}C; Supplementary Table~\ref{tab:knob_repeats}).
 
 \begin{figure*}[!ht]
-\includegraphics[width=0.6\linewidth]{figs/effects.png}
+\includegraphics[width=\linewidth]{figs/effects.png}
 \centering
 \caption{\textbf{Effect of \invfour on field phenotypes and shoot apical meristem architecture.}
-CTRL (yellow) vs \invfour (purple) per-plot spatially-corrected phenotypes; stage-2 contrasts described in Methods.
-\textbf{(A) NILs.} PA2022 NIL field trial: plant height (PH, cm), days to anthesis (DTA, days), and days to silking (DTS, days).
-\textbf{(B) Hybrids.} PA2024 NIL-derived hybrid field trial focal contrast \texttt{Inv4\_Mi21} vs \texttt{Inv4\_B73}: plant height (PH, cm), total grain weight (TGW, g), and total grain number (TGN).
-\textbf{(C) 21 DAP Seedling SAMs.} Representative differential interference contrast micrographs of cleared vegetative shoot apical meristems; yellow lines indicate height ($h$) and radius ($r$). Scale bars: 100 $\mu$m.
-\textbf{(D) SAMs.} SAM shape descriptors derived from C: height-to-radius ratio ($h/r$) and shape factor ($h/r^2$, nm$^{-1}$), two-sided Welch \textit{t}-tests.
+CTRL (yellow) vs \invfour (purple).
+\textbf{(A)} PA2022 NIL field trial; emmeans contrasts on stage 2 linear models, FDR adjusted within trial.
+\textbf{(B)} PA2024 hybrid field trial; emmeans contrasts as in A, FDR adjusted within trial.
+\textbf{(C)} Differential interference contrast micrographs of cleared shoot apical meristems from seedlings grown two weeks in a growth chamber; yellow lines mark height ($h$) and radius ($r$). Scale bars: 100~$\mu$m.
+\textbf{(D)} SAM dimensions: height, heught radius ratio, and shape factor; one tailed Welch \textit{t}-tests (Inv4m $>$ CTRL), FDR adjusted.\\
 Significance: $^{*}p < 0.05$, $^{**}p < 0.01$, $^{***}p < 0.001$, $^{****}p < 0.0001$.}
   \label{fig:phenotypes}
   \end{figure*}
@@ -272,7 +272,7 @@ Notably, the direction of internode effects in North Carolina (shortening at pos
 
 \subsection{Inv4m seedlings have elongated shoot apical meristems}
 
-To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from 21-day-after-planting seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}C,D).
+To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from seedlings grown two weeks in controlled environment chambers (Fig~\ref{fig:phenotypes}C,D).
 
 \begin{figure*}[!ht]
 \centering
@@ -899,7 +899,7 @@ In adapted temperate maize, earlier flowering and shorter stature are positively
 \subsection*{Seedling SAM elongation in the growth chamber echoes the effects of \invfour on PA2022 flowering time and plant height}
 
 Because both flowering determination and stem elongation originate at the shoot apical meristem, we asked whether the field phenotypes had an anatomical correlate at the meristem level.
-SAM measurements from 21-day-old seedlings grown in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one-tailed) and significant elevation of the height-to-radius ratio and shape factor ($h/r^2$) under two-sided Welch \textit{t}-tests (Fig~\ref{fig:phenotypes}C,D).
+SAM measurements from seedlings grown two weeks in controlled environment chambers showed that \invfour plants have elongated meristems, with a 9\% increase in SAM height ($+9.65 \pm 5.50$ $\mu$m, $p = 0.044$, one tailed) and significant elevation of the height to radius ratio and shape factor ($h/r^2$) under two sided Welch \textit{t}-tests (Fig~\ref{fig:phenotypes}C,D).
 In maize, SAM elongation marks the acquisition of floral competence \cite{danilevskaya2008} and the end of the photoperiod-sensitive inductive phase \cite{wu2008}, and natural variation in SAM size correlates with flowering time across inbred lines \cite{leiboff2015, thompson2015}.
 Recent single cell transcriptomic profiling of the maize SAM confirmed that meristem elongation tracks floral transition progression, with mutants in floral promoters (\textit{mads69}, \textit{ub2}/\textit{ub3}) producing shorter SAMs and a floral repressor mutant (\textit{rap2.7}) producing taller ones \cite{dong2026}.
 The elongated SAMs in \invfour seedlings are thus consistent with both the earlier flowering and the increased height observed in PA2022.
@@ -1335,6 +1335,7 @@ Height was measured from the highest point of the meristem tip to the width line
 Surface area was measured using the polygon selection tool by taking into consideration the width line and marking the edge of the meristem dome.
 
 Data were analyzed using ANOVA and plots were generated in R v.4.3.2 with the packages rstatix v.0.7.2, readxl v.1.4.3, ggplot2 v.3.5.1 and ggpubr v.0.6.0.
+Because the directional hypothesis concerns meristem elongation, the SAM Welch \textit{t}-tests in Figure~\ref{fig:phenotypes}D were one tailed (Inv4m $>$ CTRL) and the BH-FDR pool was restricted to the three elongation related dimensions (height, $h/r$, $h/r^2$).
 
 
 

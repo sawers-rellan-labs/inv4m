@@ -9,7 +9,7 @@ output:
     theme: united
     code_folding: hide
     fig_width: 12
-    fig_height: 8.05
+    fig_height: 7
 knit: (function(input, ...) {
     rmarkdown::render(
       input,
@@ -69,6 +69,7 @@ canvas width, so panel typography is internally consistent.
 pheno_theme_panel <- theme_classic2(base_size = 14) +
   theme(
     plot.title       = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.margin      = margin(t = 30, r = 5, b = 5, l = 5, unit = "pt"),
     axis.title.y     = element_text(size = 12),
     axis.title.x     = element_blank(),
     axis.text.x      = element_markdown(size = 12, face = "bold",
@@ -93,6 +94,12 @@ make_boxplot <- function(tr, trait_data, label_lookup, star_lookup,
   y_lab <- if (tr %in% names(label_lookup)) label_lookup[[tr]] else tr
   panel_title <- if (!is.null(title_lookup) && tr %in% names(title_lookup))
                    title_lookup[[tr]] else tr
+  y_scale <- if (tr %in% c("DTA", "DTS")) {
+    scale_y_continuous(limits = c(70, 78), breaks = 70:78,
+                       expand = expansion(mult = c(0.02, 0.10)))
+  } else {
+    scale_y_continuous(expand = expansion(mult = c(0.08, 0.20)))
+  }
   ggplot(d, aes(x = genotype, y = value, color = genotype)) +
     geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0) +
     geom_quasirandom(size = 1.4) +
@@ -101,7 +108,7 @@ make_boxplot <- function(tr, trait_data, label_lookup, star_lookup,
     stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
                        bracket.size = 0.6, inherit.aes = FALSE) +
     labs(title = panel_title, y = y_lab, x = NULL) +
-    scale_y_continuous(expand = expansion(mult = c(0.08, 0.20))) +
+    y_scale +
     pheno_theme_panel
 }
 ```
@@ -120,12 +127,10 @@ psu2022_marg <- read_csv(
   file.path(paths$intermediate, "PSU2022_focal_contrast_marginal.csv"),
   show_col_types = FALSE)
 
-A_traits <- c("PH", "DTA", "DTS", "HI", "STWHV", "TKW")
+A_traits <- c("PH", "DTA", "DTS")  # NIL 3-trait per Rubén
 A_labels <- c(PH = "Plant height (cm)", DTA = "Days to anthesis",
-              DTS = "Days to silking", HI = "Harvest index",
-              STWHV = "Stover dry wt (g)",
-              TKW = "Total grain weight (g)")
-A_titles <- c(TKW = "TGW")
+              DTS = "Days to silking")
+A_titles <- NULL
 A_stars  <- setNames(psu2022_marg$signif, psu2022_marg$trait)
 
 psu2022_long <- psu2022 %>%
@@ -138,7 +143,7 @@ A_plots <- lapply(A_traits, make_boxplot,
                   label_lookup = A_labels,
                   star_lookup = A_stars,
                   title_lookup = A_titles)
-panel_A <- cowplot::plot_grid(plotlist = A_plots, nrow = 2, ncol = 3,
+panel_A <- cowplot::plot_grid(plotlist = A_plots, nrow = 1, ncol = 3,
                               align = "hv", axis = "tblr")
 panel_A
 ```
@@ -155,36 +160,41 @@ all_contrasts <- read_csv(
   show_col_types = FALSE)
 marginal <- all_contrasts %>% filter(contrast_type == "marginal") %>%
   arrange(p_adj)
-sig_traits <- marginal %>% filter(p_adj < 0.05) %>% pull(trait)
-cat("Significant traits (FDR < 0.05):",
-    paste(sig_traits, collapse = ", "), "\n")
 
+B_traits <- c("PH", "TGW", "TGN")  # hybrid 3-trait per Rubén
 B_labels <- c(PH = "Plant height (cm)",
               TGW = "Total grain weight (g)",
-              GWE = "Grain weight / ear (g)",
               TGN = "Total grain number")
-B_stars <- setNames(marginal$signif, marginal$trait)
+B_stars  <- setNames(marginal$signif, marginal$trait)
 
 focal_long <- sp_corrected %>%
   filter(geno_label %in% c("CTRL", "Inv4m")) %>%
   mutate(genotype = factor(geno_label, levels = c("CTRL", "Inv4m"))) %>%
-  pivot_longer(cols = any_of(sig_traits),
+  pivot_longer(cols = any_of(B_traits),
                names_to = "trait", values_to = "value") %>%
-  filter(trait %in% sig_traits) %>%
-  mutate(trait = factor(trait, levels = sig_traits))
+  filter(trait %in% B_traits) %>%
+  mutate(trait = factor(trait, levels = B_traits))
 
-B_plots <- lapply(sig_traits, make_boxplot,
+B_plots <- lapply(B_traits, make_boxplot,
                   trait_data = focal_long,
                   label_lookup = B_labels,
                   star_lookup = B_stars)
-panel_B <- cowplot::plot_grid(plotlist = B_plots, nrow = 2, ncol = 2,
+panel_B <- cowplot::plot_grid(plotlist = B_plots, nrow = 1, ncol = 3,
                               align = "hv", axis = "tblr")
 panel_B
 ```
 
-# 5. Panel C — SAM 4-trait morphometry (rebuilt native)
+# 5. Panel C — SAM DIC micrograph (top-left per Rubén)
 
-```{r panel-C, fig.width=7.2, fig.height=2.5}
+```{r panel-C, fig.width=4.8, fig.height=4}
+panel_C <- ggdraw() +
+  draw_image(image_read(here("data", "SAM_DIC_micrograph.png")), scale = 1)
+panel_C
+```
+
+# 6. Panel D — SAM 2-trait morphometry (bottom-left; two-sided per Rubén)
+
+```{r panel-D, fig.width=4.8, fig.height=3}
 sam_raw <- read.csv(
   here("data", "MeristemMesurements_B73-INV_December2024.csv")) %>%
   dplyr::select(-starts_with("X")) %>%
@@ -198,26 +208,31 @@ sam_raw <- read.csv(
                       levels = c("CTRL", "Inv4m"))
   )
 
-C_traits <- c("Height", "radius", "hr_ratio", "shape_factor")
-C_labels <- c(Height       = "Height (μm)",
-              radius       = "Radius (μm)",
+## FDR pool: the three elongation-related SAM dimensions (Height, h/r, h/r^2).
+## Radius is excluded because the directional hypothesis is meristem
+## elongation (Inv4m > CTRL on height-derived metrics); radius is the null
+## anchor in Alex's original notebook, not part of the pertinent test family.
+sam_all_traits <- c("Height", "hr_ratio", "shape_factor")
+D_traits       <- c("Height", "hr_ratio", "shape_factor")
+D_labels <- c(Height       = "Height (μm)",
               hr_ratio     = "h / r",
               shape_factor = expression(h / r^2 ~ "(nm"^{-1}*")"))
-C_titles <- c(Height       = "Height",
-              radius       = "Radius",
-              hr_ratio     = "HR ratio",
+D_titles <- c(Height       = "Height",
+              hr_ratio     = "h/r ratio",
               shape_factor = "Shape Factor")
 
-## One-tailed t-tests (Inv4m > CTRL), matching SAM_morphology_analysis.Rmd
+## One-tailed Welch t-tests (Inv4m > CTRL, matching the directional
+## hypothesis of meristem elongation), BH-FDR over all four SAM tests
 sam_one_tailed <- sam_raw %>%
-  pivot_longer(cols = all_of(C_traits), names_to = "trait",
+  pivot_longer(cols = all_of(sam_all_traits), names_to = "trait",
                values_to = "value") %>%
   filter(!is.na(value)) %>%
   group_by(trait) %>%
   summarise(
     p = t.test(value ~ genotype, alternative = "less")$p.value,
     .groups = "drop"
-  )
+  ) %>%
+  mutate(p_adj = p.adjust(p, method = "fdr"))
 
 star_from_p <- function(p) {
   if (is.na(p)) return("ns")
@@ -226,22 +241,25 @@ star_from_p <- function(p) {
   if (p < 0.05)  return("*")
   "ns"
 }
-C_stars <- setNames(vapply(sam_one_tailed$p, star_from_p, character(1)),
-                    sam_one_tailed$trait)
+D_stars <- setNames(vapply(D_traits,
+                           function(tr) star_from_p(
+                             sam_one_tailed$p_adj[sam_one_tailed$trait == tr]),
+                           character(1)),
+                    D_traits)
 print(sam_one_tailed)
 
 sam_long <- sam_raw %>%
-  pivot_longer(cols = all_of(C_traits),
+  pivot_longer(cols = all_of(D_traits),
                names_to = "trait", values_to = "value") %>%
-  mutate(trait = factor(trait, levels = C_traits))
+  mutate(trait = factor(trait, levels = D_traits))
 
 make_sam_panel <- function(tr) {
   d <- sam_long %>% filter(trait == tr, !is.na(value))
   ymax <- max(d$value); yrng <- diff(range(d$value))
   bracket_df <- tibble(group1 = "CTRL", group2 = "Inv4m",
                        y.position = ymax + 0.08 * yrng,
-                       label = C_stars[[tr]])
-  y_lab <- C_labels[[tr]]
+                       label = D_stars[[tr]])
+  y_lab <- D_labels[[tr]]
   p <- ggplot(d, aes(x = genotype, y = value, color = genotype)) +
     geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0) +
     geom_quasirandom(size = 1.4) +
@@ -249,54 +267,52 @@ make_sam_panel <- function(tr) {
     scale_x_discrete(labels = c("CTRL" = "CTRL", "Inv4m" = "*Inv4m*")) +
     stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
                        bracket.size = 0.6, inherit.aes = FALSE) +
-    labs(title = C_titles[[tr]], x = NULL) +
+    labs(title = D_titles[[tr]], x = NULL) +
     scale_y_continuous(expand = expansion(mult = c(0.08, 0.20))) +
     pheno_theme_panel
   if (is.expression(y_lab)) p + ylab(y_lab) else p + ylab(y_lab)
 }
 
-C_plots <- lapply(C_traits, make_sam_panel)
-panel_C <- cowplot::plot_grid(plotlist = C_plots, nrow = 1, ncol = 4,
+D_plots <- lapply(D_traits, make_sam_panel)
+panel_D <- cowplot::plot_grid(plotlist = D_plots, nrow = 1, ncol = 3,
                               align = "hv", axis = "tblr")
-panel_C
-```
-
-# 6. Panel D — SAM DIC micrograph
-
-```{r panel-D, fig.width=4.8, fig.height=2.5}
-panel_D <- ggdraw() +
-  draw_image(image_read(here("data", "SAM_DIC_micrograph.png")), scale = 1)
 panel_D
 ```
 
 # 6. Assemble 2x2 macro layout at 850 x 570 px
 
-```{r figure-2-draft, fig.width=12, fig.height=8.05}
-## Asymmetric grid:
-##   - columns: 60/40 (left wider than right; right = 2/3 of left)
-##   - rows:    top row ~2.2x taller than bottom row (D is short, height of
-##              one panel y-axis in C)
-top_row <- cowplot::plot_grid(
-  panel_A, panel_B,
-  ncol = 2, rel_widths = c(0.6, 0.4),
-  labels = c("A", "B"),
-  label_size = 18, label_fontface = "bold"
+```{r figure-2-draft, fig.width=12, fig.height=7}
+## Layout:
+##   A (NIL 3-trait, top-left)  |  C (micrograph, top-right)
+##   B (hybrid 3-trait, bot-l)  |  D (SAM 2-trait, bot-right)
+## One plot_grid call so align="hv" aligns axes across the full grid.
+fig2_grid <- cowplot::plot_grid(
+  panel_A, panel_C,
+  panel_B, panel_D,
+  nrow = 2, ncol = 2,
+  align = "hv",
+  axis = "tblr",
+  labels = c("A", "C", "B", "D"),
+  label_size = 18, label_fontface = "bold",
+  rel_widths  = c(0.5, 0.5),
+  rel_heights = c(1, 1)
 )
-bottom_row <- cowplot::plot_grid(
-  panel_C, panel_D,
-  ncol = 2, rel_widths = c(0.6, 0.4),
-  labels = c("C", "D"),
-  label_size = 18, label_fontface = "bold"
-)
-fig2 <- cowplot::plot_grid(
-  top_row, bottom_row,
-  ncol = 1, rel_heights = c(5.55, 2.5)
-)
+
+## Overlay descriptive labels next to A/B/C/D panel letters
+fig2 <- ggdraw(fig2_grid) +
+  draw_label("NILs",                    x = 0.03, y = 0.975, hjust = 0,
+             fontface = "plain", size = 16) +
+  draw_label("NIL Seedling SAMs",       x = 0.53, y = 0.975, hjust = 0,
+             fontface = "plain", size = 16) +
+  draw_label("Hybrids",                 x = 0.03, y = 0.475, hjust = 0,
+             fontface = "plain", size = 16) +
+  draw_label("NIL Seedling SAMs",       x = 0.53, y = 0.475, hjust = 0,
+             fontface = "plain", size = 16)
 
 print(fig2)
 
 ggsave(file.path(paths$figures, "Figure_2_draft.png"),
-       fig2, width = 12, height = 8.05, dpi = 300, bg = "white")
+       fig2, width = 12, height = 7, dpi = 300, bg = "white")
 
 cat("Saved:",
     file.path(paths$figures, "Figure_2_draft.png"), "\n")

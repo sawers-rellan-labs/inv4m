@@ -1,0 +1,162 @@
+---
+title: "SAM morphometry: estimation statistics with dabestr"
+author: "Fausto Rodriguez"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+    fig_width: 9
+    fig_height: 6
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+# Purpose
+
+Apply estimation statistics (DABEST, Ho et al. 2019) to the same SAM
+morphometry data analysed parametrically in `SAM_morphology_analysis.Rmd`.
+For each of the four SAM traits (height, radius, $h/r$, $h/r^2$), report the
+mean difference Inv4m $-$ CTRL with bootstrap 95% confidence intervals via
+the multi two-group estimation idiom (`dabestr`). Effect sizes are not
+$p$-thresholded; significance is read from whether the bootstrap CI overlaps
+zero.
+
+# 1. Libraries and data
+
+```{r libs}
+library(tidyverse)
+library(dabestr)
+library(cowplot)
+library(knitr)
+
+sam_raw <- read.csv(
+  here("data", "MeristemMesurements_B73-INV_December2024.csv")) %>%
+  dplyr::select(-starts_with("X")) %>%
+  mutate(
+    radius       = Width / 2,
+    hr_ratio     = Height / radius,
+    shape_factor = 1000 * Height / (radius^2),
+    genotype = factor(case_when(Genotype == "INV" ~ "Inv4m",
+                                Genotype == "B73" ~ "CTRL",
+                                TRUE              ~ as.character(Genotype)),
+                      levels = c("CTRL", "Inv4m"))
+  )
+
+cat("rows:", nrow(sam_raw), "\n")
+sam_raw %>% count(genotype)
+```
+
+# 2. Per-trait dabest analyses
+
+`dabestr::load()` builds a dabest object; `mean_diff()` computes the
+unpaired mean difference with 5000 bootstrap resamples (defaults). The
+returned object carries the bootstrap distribution, point estimate, and
+95% CI.
+
+```{r per-trait-dabest, results = "hide"}
+sam_traits <- c("Height", "radius", "hr_ratio", "shape_factor")
+trait_units <- c(Height       = "Height (μm)",
+                 radius       = "Radius (μm)",
+                 hr_ratio     = "h / r",
+                 shape_factor = expression(h / r^2 ~ "(nm"^{-1}*")"))
+
+run_dabest <- function(tr) {
+  d <- sam_raw %>% dplyr::select(genotype, !!sym(tr)) %>%
+    rename(value = !!sym(tr)) %>%
+    dplyr::filter(!is.na(value))
+  dabest_obj <- dabestr::load(d, x = genotype, y = value,
+                              idx = c("CTRL", "Inv4m"))
+  mean_diff(dabest_obj)
+}
+
+dabest_results <- setNames(lapply(sam_traits, run_dabest), sam_traits)
+```
+
+# 3. Effect size summary
+
+```{r summary-table}
+summary_tbl <- lapply(sam_traits, function(tr) {
+  bs <- dabest_results[[tr]]$boot_result
+  tibble(trait        = tr,
+         mean_diff    = bs$difference[1],
+         ci_lo_95     = bs$bca_ci_low[1],
+         ci_hi_95     = bs$bca_ci_high[1],
+         ci_overlap_0 = (bs$bca_ci_low[1] <= 0) & (bs$bca_ci_high[1] >= 0))
+}) %>% bind_rows()
+
+knitr::kable(summary_tbl, digits = 3,
+             caption = paste("Mean differences (Inv4m - CTRL) with",
+                             "bootstrap 95% BCa intervals."))
+
+write_csv(summary_tbl,
+          file.path(paths$intermediate,
+                    "SAM_dabestr_mean_diff_BCa.csv"))
+```
+
+# 4. Estimation plots
+
+```{r plot-each, fig.width=8, fig.height=5}
+plot_list <- setNames(
+  lapply(sam_traits, function(tr) {
+    dabest_plot(dabest_results[[tr]],
+                raw_marker_alpha = 0.8,
+                contrast_label   = paste("Inv4m −\nCTRL"))
+  }),
+  sam_traits
+)
+
+for (tr in sam_traits) {
+  cat("\n\n### ", tr, " — ", as.character(trait_units[[tr]]), "\n\n", sep = "")
+  print(plot_list[[tr]])
+}
+```
+
+# 5. Composite grid (all four traits)
+
+```{r grid, fig.width=14, fig.height=10}
+grid_plot <- cowplot::plot_grid(
+  plot_list$Height,
+  plot_list$radius,
+  plot_list$hr_ratio,
+  plot_list$shape_factor,
+  nrow = 2, ncol = 2,
+  labels = sam_traits,
+  label_size = 14, label_fontface = "bold"
+)
+
+print(grid_plot)
+
+ggsave(file.path(paths$figures, "SAM_dabestr_estimation_plots.png"),
+       grid_plot, width = 14, height = 10, dpi = 200, bg = "white")
+cat("\nSaved:",
+    file.path(paths$figures, "SAM_dabestr_estimation_plots.png"), "\n")
+```
+
+# 6. Interpretation notes
+
+- Whisker bars in each contrast panel are bias-corrected and accelerated
+  (BCa) bootstrap 95% confidence intervals on the mean difference.
+- A trait is conventionally "significant at $\alpha = 0.05$" under this
+  framework if its 95% CI does not cross zero. This is conceptually
+  similar to a two-sided test at $\alpha = 0.05$ but does not require an
+  FDR correction across traits since the inference target is the
+  per-trait effect size and CI rather than a global null-hypothesis test.
+- The CI half-widths report inferential precision and are interpretable
+  on the natural scale of each trait.
