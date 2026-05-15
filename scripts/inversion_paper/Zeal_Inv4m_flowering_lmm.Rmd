@@ -1,0 +1,1007 @@
+---
+title: "Zeal panel: Inv4m effect on flowering time (NC2025)"
+author: "Fausto Rodríguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, fig.height = 4, dpi = 150)
+library(here)
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(ggpubr)        # theme_classic2, stat_pvalue_manual
+  library(ggbeeswarm)    # geom_quasirandom
+  library(ggtext)        # element_markdown for *Inv4m* italics
+  library(cowplot)
+  library(lme4)
+  library(lmerTest)
+  library(knitr)
+})
+
+set.seed(42)
+```
+
+## Goal
+
+Test whether the *Inv4m* introgression affects flowering time (DTS, DTA)
+in the BZea NIL panel grown at NC2025 (raw data: `data/CLY25_ZEAL.csv`,
+provided by Hannah Pil; spatial correction applied upstream).
+
+`Inv4m` is recoded `recurrent` (B73 haplotype) vs `donor` (teosinte
+haplotype) so the fixed-effect coefficient reads as the *donor − recurrent*
+contrast.
+
+## Data prep
+
+```{r data}
+corr <- read.csv(file.path(paths$data, "CLY25_ZEAL.csv"),  stringsAsFactors = FALSE)
+meta <- read.csv(file.path(paths$data, "Bzea_metadata.csv"), stringsAsFactors = FALSE)
+
+OUTLIER_PLOTS <- c(2756, 453, 304)   # Hannah's outlier list
+
+df_full <- corr |>
+  filter(!Plot %in% OUTLIER_PLOTS) |>
+  rename(NIL = Genotype) |>
+  filter(!NIL %in% c("B73", "Purple Check"), !is.na(NIL)) |>
+  filter(inv4m_introgression %in% c("yes", "no")) |>
+  mutate(
+    Inv4m     = factor(
+      ifelse(inv4m_introgression == "yes", "donor", "recurrent"),
+      levels = c("recurrent", "donor")
+    ),
+    accession = substr(NIL, 1,  7),
+    f1        = substr(NIL, 1, 10),
+    bc1       = substr(NIL, 1, 13),
+    bc2       = substr(NIL, 1, 16),
+    taxon_L1  = case_when(
+      grepl("^Zea mays",          meta$species[match(accession, meta$donor_id)]) ~ "Z_mays",
+      grepl("^Zea luxurians",     meta$species[match(accession, meta$donor_id)]) ~ "Z_luxurians",
+      grepl("^Zea diploperennis", meta$species[match(accession, meta$donor_id)]) ~ "Z_diploperennis"
+    ),
+    taxon_L2  = meta$species[match(accession, meta$donor_id)]
+  ) |>
+  select(-species) |>
+  left_join(meta |> select(donor_id, ancestry = race),
+            by = c("accession" = "donor_id"))
+
+both_arms_bc1 <- df_full |>
+  distinct(bc1, Inv4m) |>
+  count(bc1) |>
+  filter(n == 2) |>
+  pull(bc1)
+df <- df_full |> filter(bc1 %in% both_arms_bc1)
+
+cat(sprintf("plots: %d  |  bc1 families: %d  |  bc2 families: %d  |  NILs: %d\n",
+            nrow(df),
+            dplyr::n_distinct(df$bc1),
+            dplyr::n_distinct(df$bc2),
+            dplyr::n_distinct(df$NIL)))
+```
+
+## Model selection
+
+A note on terminology: the `Bzea_metadata.csv` file stores the maize
+germplasm grouping in a column named `race`. Throughout this notebook
+that column is renamed to `ancestry` on join, following current
+convention in human and increasingly in plant genetics literature where
+"race" is avoided. The two terms refer to the same field; the rename is
+cosmetic.
+
+The candidate hierarchy (top → bottom):
+
+```
+taxon_L1 (Zea species)
+  └─ taxon_L2 (subspecies / species)
+       └─ ancestry (race column)
+            └─ accession (donor germplasm)
+                 └─ f1
+                      └─ bc1
+                           └─ bc2
+                                └─ NIL (full pedigree string)
+                                     └─ replicate plots
+```
+
+A first decision is which levels carry enough variance contrast to be
+identifiable. Two checks: per-level group counts (a level with <5 groups
+won't yield a credible variance estimate) and how many groups have **both**
+inv4m arms (without that, the level can't be separated from the Inv4m
+fixed effect).
+
+### Per-level diagnostic
+
+```{r level-diagnostic}
+levels_to_check <- c("taxon_L1", "taxon_L2", "ancestry",
+                     "accession", "f1", "bc1", "bc2", "NIL")
+
+summarise_level <- function(col) {
+  tab <- table(df[[col]])
+  arms <- df |>
+    distinct(.data[[col]], Inv4m) |>
+    count(.data[[col]]) |>
+    pull(n)
+  data.frame(
+    level         = col,
+    n_groups      = length(tab),
+    plots_min     = min(tab),
+    plots_med     = median(tab),
+    plots_max     = max(tab),
+    groups_w_both_arms = sum(arms == 2)
+  )
+}
+diag_tbl <- do.call(rbind, lapply(levels_to_check, summarise_level))
+kable(diag_tbl, caption = "Per-level group counts and inv4m arm coverage")
+```
+
+**Findings:**
+
+- **`taxon_L1` collapses to a single level** (`Z_mays`). The both-arms-at-BC1
+  filter strips parviglumis, luxurians, and diploperennis donor lines because
+  those lineages don't carry the *Inv4m* mexicana haplotype to introgress.
+  Drop it.
+- **`taxon_L2` has only 2 levels** (Z. mays mexicana + Z. mays huehuetenangensis).
+  Two groups is too few for a credible random-effect variance.
+  Drop it (or treat as fixed, but it's nested in `ancestry` anyway).
+- **`ancestry` (5 levels)** is the highest taxonomic level the data actually supports.
+- **`accession` / `f1` / `bc1`** (18 / 21 / 35 levels) are the candidate
+  intermediate pedigree levels; whether they carry independent variance is
+  an empirical question — see next section.
+- **`bc2` (100 groups)** and **`NIL` (218)** are fine; both are required to
+  capture the within-family-vs-between-NIL structure.
+
+### Full slash-nested fit (6 random effects)
+
+Fit the full nested structure first to see which intermediates carry
+identifiable variance.
+
+```{r full-fit}
+fit_one <- function(trait, formula_str, label) {
+  f <- as.formula(paste(trait, "~", formula_str))
+  m <- suppressMessages(lmerTest::lmer(f, data = df))
+  fe <- summary(m)$coefficients["Inv4mdonor", ]
+  ci <- confint(m, parm = "Inv4mdonor", method = "Wald")
+  list(model = m, trait = trait, label = label,
+       estimate = unname(fe["Estimate"]),
+       se       = unname(fe["Std. Error"]),
+       df       = unname(fe["df"]),
+       t        = unname(fe["t value"]),
+       p        = unname(fe["Pr(>|t|)"]),
+       ci_lo    = ci[1, 1],
+       ci_hi    = ci[1, 2],
+       singular = lme4::isSingular(m),
+       vc       = as.data.frame(VarCorr(m)))
+}
+
+TRAITS <- c("DTA_corr", "DTS_corr", "PH_corr")
+
+full_re <- "Inv4m + (1 | ancestry / accession / f1 / bc1 / bc2 / NIL)"
+full_fits <- lapply(TRAITS, fit_one,
+                    formula_str = full_re, label = "full 6-RE slash")
+names(full_fits) <- TRAITS
+
+for (tr in names(full_fits)) {
+  f <- full_fits[[tr]]
+  cat(sprintf("\n%s   isSingular = %s\n", tr, f$singular))
+  vc <- f$vc; vc$pct <- round(100 * vc$vcov / sum(vc$vcov), 1)
+  print(vc[, c("grp", "vcov", "sdcor", "pct")], row.names = FALSE)
+}
+```
+
+**Result:** `accession`, `f1`, and `bc1` collapse to **0 variance** for both
+traits. The model is singular but the Inv4m fixed effect is unbiased — the
+intermediates are simply unidentifiable beyond what `ancestry` (above) and
+`bc2` (below) already absorb. Mathematically this is expected because the
+levels are *strictly nested by construction* (each `bc2` is a unique
+substring that uniquely determines its `bc1`, `f1`, `accession`), so any
+correlation among siblings sharing a higher level is already captured by
+the lower level.
+
+### Parsimonious model
+
+Drop the three zero-variance levels:
+
+```{r parsim-fit}
+parsim_re <- "Inv4m + (1 | ancestry / bc2 / NIL)"
+parsim_fits <- lapply(TRAITS, fit_one,
+                      formula_str = parsim_re, label = "parsimonious 3-RE slash")
+names(parsim_fits) <- TRAITS
+
+for (tr in names(parsim_fits)) {
+  f <- parsim_fits[[tr]]
+  cat(sprintf("\n%s   isSingular = %s\n", tr, f$singular))
+  vc <- f$vc; vc$pct <- round(100 * vc$vcov / sum(vc$vcov), 1)
+  print(vc[, c("grp", "vcov", "sdcor", "pct")], row.names = FALSE)
+  cat(sprintf("Inv4m (donor - recurrent) = %+.3f d   SE = %.3f   95%% CI [%+.3f, %+.3f]   p = %.4g\n",
+              f$estimate, f$se, f$ci_lo, f$ci_hi, f$p))
+}
+```
+
+The parsimonious model converges cleanly (`isSingular = FALSE`) with
+**identical** Inv4m estimates and SEs to the singular full fit — the
+dropped REs were carrying exactly zero information.
+
+### Sanity check: equivalent flat formulation
+
+`(1 | ancestry / bc2 / NIL)` is mathematically identical to
+`(1|ancestry) + (1|bc2) + (1|bc2:NIL)` because the IDs are globally unique
+(each `bc2` belongs to one `ancestry`; each `NIL` belongs to one `bc2`). The
+slash form is preferred because it makes the nesting visible in the
+formula itself.
+
+```{r equiv-check}
+flat_re   <- "Inv4m + (1|ancestry) + (1|bc2) + (1|bc2:NIL)"
+flat_fits <- lapply(TRAITS, fit_one,
+                    formula_str = flat_re, label = "parsim flat")
+names(flat_fits) <- TRAITS
+
+cmp <- bind_rows(
+  lapply(TRAITS, function(tr)
+    tibble(trait = tr,
+           form  = c("full slash (6 RE)",
+                     "parsim slash (3 RE)",
+                     "parsim flat (3 RE)"),
+           est   = c(full_fits[[tr]]$estimate, parsim_fits[[tr]]$estimate,
+                     flat_fits[[tr]]$estimate),
+           se    = c(full_fits[[tr]]$se,       parsim_fits[[tr]]$se,
+                     flat_fits[[tr]]$se),
+           singular = c(full_fits[[tr]]$singular, parsim_fits[[tr]]$singular,
+                        flat_fits[[tr]]$singular)))
+)
+kable(cmp, digits = 4, caption = "Inv4m fixed effect across three formulations")
+```
+
+**Canonical model (used downstream):**
+
+$$
+\texttt{trait} \sim \text{Inv4m} + (1 \mid \text{ancestry} / \text{bc2} / \text{NIL})
+$$
+
+```{r canonical-handle}
+fits <- parsim_fits   # downstream chunks reference `fits`
+```
+
+### Where does the variance live?
+
+A natural follow-up: are `bc1`/`bc2` effects "absorbed into ancestry"? To
+check, refit the parsimonious model dropping either `ancestry` or `bc2`. If
+they were fighting for the same variance, the survivor would grow to
+compensate.
+
+```{r variance-partitioning}
+vc_table <- function(formula_str, label) {
+  m <- suppressMessages(lmerTest::lmer(
+    as.formula(paste("DTS_corr ~", formula_str)), data = df))
+  vc <- as.data.frame(VarCorr(m))
+  vc$pct <- round(100 * vc$vcov / sum(vc$vcov), 1)
+  vc$model <- label
+  vc[, c("model", "grp", "vcov", "pct")]
+}
+
+bind_rows(
+  vc_table("Inv4m + (1 | ancestry / bc2 / NIL)",  "ancestry + bc2 + NIL  (canonical)"),
+  vc_table("Inv4m + (1 | ancestry) + (1 | NIL)",  "ancestry + NIL  (no bc2)"),
+  vc_table("Inv4m + (1 | bc2 / NIL)",         "bc2 + NIL   (no ancestry)")
+) |>
+  pivot_wider(id_cols = grp, names_from = model, values_from = pct,
+              values_fill = 0) |>
+  kable(caption = "Variance components (% of total) for DTS_corr under three nestings")
+```
+
+**Reading the table:** when `bc2` is dropped, `ancestry` doesn't grow — the
+`bc2` variance flows down into `NIL` and `Residual` (the next-finer
+levels), not up into `ancestry`. Likewise dropping `ancestry` doesn't inflate
+`bc2`. The two REs are **independent partitions** of different sources:
+`ancestry` = between-ancestry differences in donor genetic background;
+`bc2` = within-ancestry between-family differences (genetic noise within a
+ancestry). The dropped levels (`accession`, `f1`, `bc1`) had 0 *additional*
+variance because every signal they could carry was already attributable
+to the level above (ancestry) or below (bc2) — the structure was overspecified,
+not the variance was hiding.
+
+## Permutation test
+
+Permute the `Inv4m` label within each `bc2` family (the finest pedigree
+level in the model) so the null preserves the nested structure.
+1000 iterations per trait.
+
+```{r perm, cache=TRUE}
+permute_within_bc2 <- function(d) {
+  d |> group_by(bc2) |> mutate(Inv4m = sample(Inv4m)) |> ungroup()
+}
+
+perm_test <- function(trait, n_perm = 1000) {
+  observed <- fits[[trait]]$estimate
+  f <- as.formula(paste(trait, "~ Inv4m + (1 | ancestry / bc2 / NIL)"))
+  null_coefs <- numeric(n_perm)
+  for (i in seq_len(n_perm)) {
+    d_perm <- permute_within_bc2(df)
+    m_perm <- suppressMessages(suppressWarnings(lme4::lmer(f, data = d_perm)))
+    null_coefs[i] <- fixef(m_perm)["Inv4mdonor"]
+  }
+  p_perm <- (sum(abs(null_coefs) >= abs(observed)) + 1) / (n_perm + 1)
+  list(observed = observed, null = null_coefs, p_perm = p_perm)
+}
+
+perms <- lapply(names(fits), perm_test, n_perm = 1000)
+names(perms) <- names(fits)
+
+for (tr in names(perms)) {
+  cat(sprintf("%s: permutation p (1000 within-bc2 perms) = %.4g\n",
+              tr, perms[[tr]]$p_perm))
+}
+```
+
+```{r perm-null-plot}
+null_df <- bind_rows(lapply(names(perms), function(tr) {
+  tibble(trait    = tr,
+         null     = perms[[tr]]$null,
+         observed = perms[[tr]]$observed)
+})) |>
+  mutate(trait_label = recode(trait,
+                              DTS_corr = "Days to silking",
+                              DTA_corr = "Days to anthesis"))
+
+p_null <- ggplot(null_df, aes(x = null)) +
+  geom_histogram(bins = 40, fill = "grey75", color = "white") +
+  geom_vline(aes(xintercept = observed), color = "#551a8b", linewidth = 1) +
+  facet_wrap(~ trait_label, scales = "free") +
+  labs(x = "Inv4m coefficient under within-BC2 permutation",
+       y = "count",
+       title = "Permutation null vs observed Inv4m effect",
+       subtitle = "Purple line = observed coefficient (real data); 1000 within-BC2 permutations") +
+  theme_bw(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+print(p_null)
+```
+
+## Boxplot (Figure 2 style)
+
+Two-trait boxplot pooling all NILs by Inv4m arm, styled to match Figure 2
+(panels A/B) so this can drop into the main figure or supplement without
+visual jarring. Significance star reflects the LMM Satterthwaite p (the
+permutation p agrees within rounding).
+
+```{r boxplot-fig2-style, fig.width=7.2, fig.height=4.6}
+results_tbl <- tibble(
+  trait    = names(fits),
+  estimate = sapply(fits, `[[`, "estimate"),
+  se       = sapply(fits, `[[`, "se"),
+  ci_lo    = sapply(fits, `[[`, "ci_lo"),
+  ci_hi    = sapply(fits, `[[`, "ci_hi"),
+  p_lmm    = sapply(fits, `[[`, "p"),
+  p_perm   = sapply(perms, `[[`, "p_perm")
+) |>
+  mutate(star = case_when(p_lmm < 0.001 ~ "***",
+                          p_lmm < 0.01  ~ "**",
+                          p_lmm < 0.05  ~ "*",
+                          TRUE          ~ "ns"))
+
+# Figure 2's shared theme (verbatim where possible)
+pheno_theme_panel <- ggpubr::theme_classic2(base_size = 14) +
+  theme(
+    plot.title       = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.margin      = margin(t = 30, r = 5, b = 5, l = 5, unit = "pt"),
+    axis.title.y     = element_text(size = 12),
+    axis.title.x     = element_blank(),
+    axis.text.x      = ggtext::element_markdown(size = 12, face = "bold",
+                                                color = "black"),
+    axis.text.y      = element_text(size = 10),
+    legend.position  = "none"
+  )
+
+zeal_long <- df |>
+  pivot_longer(cols = c(DTA_corr, DTS_corr, PH_corr),
+               names_to = "trait", values_to = "value") |>
+  filter(!is.na(value))
+
+trait_lookup <- c(DTA_corr = "DTA",
+                  DTS_corr = "DTS",
+                  PH_corr  = "PH")
+y_lab_pool   <- c(DTA_corr = "Days to anthesis",
+                  DTS_corr = "Days to silking",
+                  PH_corr  = "Plant height (cm)")
+y_breaks_pool <- list(
+  DTA_corr = scales::breaks_width(1),
+  DTS_corr = scales::breaks_width(1),
+  PH_corr  = scales::breaks_width(20)
+)
+star_lookup  <- setNames(
+  results_tbl$star[match(TRAITS, results_tbl$trait)], TRAITS)
+
+make_zeal_boxplot <- function(tr) {
+  d <- zeal_long |> filter(trait == tr)
+  ymax <- max(d$value, na.rm = TRUE)
+  yrng <- diff(range(d$value, na.rm = TRUE))
+  bracket_df <- tibble(group1 = "recurrent", group2 = "donor",
+                       y.position = ymax + 0.08 * yrng,
+                       label = star_lookup[[tr]])
+  ggplot(d, aes(x = Inv4m, y = value, color = Inv4m)) +
+    geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0,
+                 outlier.shape = NA) +
+    ggbeeswarm::geom_quasirandom(size = 0.8, alpha = 0.5) +
+    scale_color_manual(values = c("recurrent" = "gold",
+                                  "donor"     = "purple4")) +
+    scale_x_discrete(labels = c("recurrent" = "CTRL",
+                                "donor"     = "*Inv4m*")) +
+    ggpubr::stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
+                               bracket.size = 0.6, inherit.aes = FALSE) +
+    scale_y_continuous(breaks = y_breaks_pool[[tr]],
+                       expand = expansion(mult = c(0.05, 0.15))) +
+    labs(title = trait_lookup[[tr]], y = y_lab_pool[[tr]], x = NULL) +
+    pheno_theme_panel
+}
+
+box_plots <- lapply(TRAITS, make_zeal_boxplot)
+panel_box <- cowplot::plot_grid(plotlist = box_plots, nrow = 1, ncol = 3,
+                                align = "hv", axis = "tblr")
+panel_box
+```
+
+## Per-ancestry breakdown
+
+The pooled Inv4m effect averages across 5 races. Which races drive it?
+Promote `ancestry` to a fixed-effect interaction to extract per-ancestry contrasts:
+
+$$
+\texttt{trait} \sim \text{Inv4m} \times \text{ancestry} + (1 \mid \text{bc2} / \text{NIL})
+$$
+
+```{r per-ancestry-fit}
+suppressPackageStartupMessages(library(emmeans))
+
+per_race <- function(trait) {
+  f <- as.formula(paste(trait, "~ Inv4m * ancestry + (1 | bc2/NIL)"))
+  m <- suppressMessages(lmerTest::lmer(f, data = df |> mutate(ancestry = factor(ancestry))))
+  aov <- anova(m, type = "III")
+  em  <- emmeans(m, ~ Inv4m | ancestry, lmer.df = "satterthwaite")
+  ct  <- as.data.frame(contrast(em, method = "revpairwise"))
+  ct$p_adj_BH <- p.adjust(ct$p.value, method = "BH")
+  ct$trait    <- trait
+  list(model = m, anova = aov, contrast = ct |> arrange(estimate))
+}
+
+per_race_fits <- lapply(TRAITS, per_race)
+names(per_race_fits) <- TRAITS
+
+cat("Inv4m × ancestry interaction (does the effect vary by ancestry?):\n")
+for (tr in names(per_race_fits)) {
+  pp <- per_race_fits[[tr]]$anova["Inv4m:ancestry", "Pr(>F)"]
+  cat(sprintf("  %s: p = %.3f\n", tr, pp))
+}
+
+per_race_tbl <- bind_rows(lapply(per_race_fits, `[[`, "contrast")) |>
+  mutate(trait_label = recode(trait,
+                              DTA_corr = "Days to anthesis",
+                              DTS_corr = "Days to silking",
+                              PH_corr  = "Plant height (cm)"),
+         star = case_when(p_adj_BH < 0.001 ~ "***",
+                          p_adj_BH < 0.01  ~ "**",
+                          p_adj_BH < 0.05  ~ "*",
+                          TRUE             ~ "ns"))
+
+per_race_tbl |>
+  select(trait_label, ancestry, estimate, SE, p.value, p_adj_BH, star) |>
+  kable(digits = 3,
+        caption = "Per-ancestry donor − recurrent contrast (BH-FDR over 5 races within each trait)")
+```
+
+The Inv4m × ancestry interaction is **not significant** for either trait,
+so formally the data don't reject "all races have the same Inv4m
+effect" — the per-ancestry table below is descriptive, not a hypothesis
+test the paper relies on.
+
+### Per-ancestry boxplots (Figure 2 style)
+
+```{r per-ancestry-boxplot, fig.width=10, fig.height=10}
+race_n <- df |>
+  group_by(ancestry, Inv4m) |>
+  summarise(n = sum(!is.na(DTS_corr) | !is.na(DTA_corr) | !is.na(PH_corr)),
+            .groups = "drop") |>
+  pivot_wider(names_from = Inv4m, values_from = n, values_fill = 0) |>
+  mutate(ancestry_lab = sprintf("%s (n=%d/%d)", ancestry, recurrent, donor))
+ancestry_lab_lookup <- setNames(race_n$ancestry_lab, race_n$ancestry)
+
+zeal_long_race <- df |>
+  pivot_longer(cols = c(DTA_corr, DTS_corr, PH_corr),
+               names_to = "trait", values_to = "value") |>
+  filter(!is.na(value)) |>
+  mutate(ancestry_lab = factor(ancestry_lab_lookup[as.character(ancestry)],
+                           levels = ancestry_lab_lookup[
+                             c("Durango", "Nobogame", "Mesa-Central",
+                               "Chalco", "Huehuetenango")]),
+         trait_label = factor(recode(trait,
+                                     DTA_corr = "Days to anthesis",
+                                     DTS_corr = "Days to silking",
+                                     PH_corr  = "Plant height (cm)"),
+                              levels = c("Days to anthesis",
+                                         "Days to silking",
+                                         "Plant height (cm)")))
+
+# star table keyed by ancestry × trait_label
+star_df <- per_race_tbl |>
+  mutate(ancestry_lab = ancestry_lab_lookup[as.character(ancestry)]) |>
+  select(ancestry_lab, trait_label, star)
+
+# y-position for star bracket per facet
+bracket_df <- zeal_long_race |>
+  group_by(ancestry_lab, trait_label) |>
+  summarise(ymax = max(value, na.rm = TRUE),
+            yrng = diff(range(value, na.rm = TRUE)),
+            .groups = "drop") |>
+  mutate(y.position = ymax + 0.10 * yrng,
+         group1 = "recurrent", group2 = "donor") |>
+  left_join(star_df, by = c("ancestry_lab", "trait_label")) |>
+  rename(label = star)
+
+p_per_race <- ggplot(zeal_long_race,
+                     aes(x = Inv4m, y = value, color = Inv4m)) +
+  geom_boxplot(width = 0.4, linewidth = 0.8, alpha = 0,
+               outlier.shape = NA) +
+  ggbeeswarm::geom_quasirandom(size = 0.7, alpha = 0.5) +
+  scale_color_manual(values = c("recurrent" = "gold",
+                                "donor"     = "purple4")) +
+  scale_x_discrete(labels = c("recurrent" = "CTRL",
+                              "donor"     = "*Inv4m*")) +
+  ggpubr::stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 4,
+                             bracket.size = 0.5) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  facet_grid(trait_label ~ ancestry_lab, scales = "free_y", switch = "y") +
+  labs(x = NULL, y = NULL,
+       title    = "Inv4m effect by donor ancestry",
+       subtitle = "NC2025 BZea NIL panel; FDR adjusted per ancestry emmeans contrast (5 ancestry family per trait)") +
+  theme_bw(base_size = 12) +
+  theme(plot.title       = element_text(face = "bold"),
+        strip.background = element_rect(fill = "grey92", color = NA),
+        strip.text       = element_text(face = "bold"),
+        axis.text.x      = ggtext::element_markdown(face = "bold"),
+        legend.position  = "none",
+        strip.placement  = "outside")
+print(p_per_race)
+```
+
+```{r per-ancestry-save}
+ggsave(file.path(paths$figures, "Zeal_Inv4m_per_race_boxplot.png"),
+       p_per_race, width = 10, height = 8, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_per_race_boxplot.svg"),
+       p_per_race, width = 10, height = 8, fix_text_size = TRUE)
+write.csv(per_race_tbl,
+          file.path(paths$intermediate, "Zeal_Inv4m_per_race_contrasts.csv"),
+          row.names = FALSE)
+```
+
+### Ancestry centered boxplot
+
+The pooled boxplot above looks flat because `ancestry` carries ~20% of the
+total variance — mexicana races differ in baseline flowering by several
+days, which dwarfs the ~0.9 day Inv4m shift on the raw scale. Subtract
+each ancestry's mean and the within ancestry contrast becomes visible:
+
+$$
+\tilde{y}_{ij} = y_{ij} - \overline{y}_{\text{ancestry}=j}
+$$
+
+```{r boxplot-ancestry-resid, fig.width=7.2, fig.height=4.6}
+zeal_resid <- df |>
+  group_by(ancestry) |>
+  mutate(DTA_resid = DTA_corr - mean(DTA_corr, na.rm = TRUE),
+         DTS_resid = DTS_corr - mean(DTS_corr, na.rm = TRUE),
+         PH_resid  = PH_corr  - mean(PH_corr,  na.rm = TRUE)) |>
+  ungroup() |>
+  pivot_longer(cols = c(DTA_resid, DTS_resid, PH_resid),
+               names_to = "trait", values_to = "value") |>
+  filter(!is.na(value))
+
+resid_lookup <- c(DTA_resid = "DTA",
+                  DTS_resid = "DTS",
+                  PH_resid  = "PH")
+y_lab_resid <- c(DTA_resid = "Days to anthesis (ancestry centered)",
+                 DTS_resid = "Days to silking (ancestry centered)",
+                 PH_resid  = "Plant height, cm (ancestry centered)")
+y_breaks_resid <- list(
+  DTA_resid = scales::breaks_width(1),
+  DTS_resid = scales::breaks_width(1),
+  PH_resid  = scales::breaks_width(20)
+)
+star_lookup_resid <- setNames(
+  results_tbl$star[match(TRAITS, results_tbl$trait)],
+  c("DTA_resid", "DTS_resid", "PH_resid"))
+
+make_resid_boxplot <- function(tr) {
+  d <- zeal_resid |> filter(trait == tr)
+  ymax <- max(d$value, na.rm = TRUE)
+  yrng <- diff(range(d$value, na.rm = TRUE))
+  bracket_df <- tibble(group1 = "recurrent", group2 = "donor",
+                       y.position = ymax + 0.08 * yrng,
+                       label = star_lookup_resid[[tr]])
+  ggplot(d, aes(x = Inv4m, y = value, color = Inv4m)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0,
+                 outlier.shape = NA) +
+    ggbeeswarm::geom_quasirandom(size = 0.8, alpha = 0.5) +
+    scale_color_manual(values = c("recurrent" = "gold",
+                                  "donor"     = "purple4")) +
+    scale_x_discrete(labels = c("recurrent" = "CTRL",
+                                "donor"     = "*Inv4m*")) +
+    ggpubr::stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
+                               bracket.size = 0.6, inherit.aes = FALSE) +
+    scale_y_continuous(breaks = y_breaks_resid[[tr]],
+                       expand = expansion(mult = c(0.05, 0.15))) +
+    labs(title = resid_lookup[[tr]], y = y_lab_resid[[tr]],
+         x = NULL) +
+    pheno_theme_panel
+}
+
+resid_plots <- lapply(c("DTA_resid", "DTS_resid", "PH_resid"),
+                      make_resid_boxplot)
+panel_resid <- cowplot::plot_grid(plotlist = resid_plots,
+                                  nrow = 1, ncol = 3,
+                                  align = "hv", axis = "tblr")
+panel_resid
+
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot_ancResid.png"),
+       panel_resid, width = 7.2, height = 4.6, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot_ancResid.svg"),
+       panel_resid, width = 7.2, height = 4.6, fix_text_size = TRUE)
+```
+
+The *Inv4m* boxes now sit visibly below the B73 boxes — same data, same
+LMM contrast (−0.88 d / −0.61 d), but the ancestry stratification is no
+longer masking it. The dashed line is the within-ancestry mean (= zero by
+construction).
+
+### Lineage corrected boxplot (ancestry + bc2 BLUPs subtracted, NIL preserved)
+
+Subtract the upper random effect BLUPs (ancestry + bc2) but **keep** the
+NIL random effect, so each NIL line still contributes its own deviation
+to the visual spread:
+
+$$
+\tilde{y}_{ij} = y_{ij} - \hat{u}_{\text{ancestry}} - \hat{u}_{\text{bc2}}
+              = X\beta + \hat{u}_{\text{NIL}} + \varepsilon
+$$
+
+This matters because Inv4m is perfectly nested within NIL (each NIL
+carries one Inv4m haplotype, never both). Subtracting the NIL BLUP would
+absorb the line level variation the LMM uses for inference, leaving
+only plot to plot replication noise — the boxes would look artificially
+tight. Keeping the NIL BLUP makes the visual spread honest: each Inv4m
+arm shows the distribution of NIL line means around its arm mean, plus
+within NIL plot noise. The donor − recurrent gap is still exactly the
+LMM coefficient.
+
+```{r boxplot-lmm-resid, fig.width=7.2, fig.height=4.6}
+m_dts <- parsim_fits[["DTS_corr"]]$model
+m_dta <- parsim_fits[["DTA_corr"]]$model
+m_ph  <- parsim_fits[["PH_corr"]]$model
+
+# IMPORTANT: predict()/residuals() return values only for rows the model
+# actually fitted (NA-omitted). Align by the original row indices stored
+# in model.frame() to avoid silent recycling.
+#
+# Lineage corrected = subtract ancestry + bc2 BLUPs; KEEP NIL BLUP.
+#   y - ancestry_BLUP - bc2_BLUP
+# = X*beta + NIL_BLUP + residual
+# = predict(m, re.form = ~(1 | NIL:bc2:ancestry)) + residuals(m)
+# (the deepest random effect grouping name from the slash form)
+add_lmm_resid <- function(d, model, target_col, out_col) {
+  rows_used <- as.integer(rownames(model.frame(model)))
+  d[[out_col]] <- NA_real_
+  d[[out_col]][rows_used] <-
+    predict(model, re.form = ~(1 | NIL:bc2:ancestry)) + residuals(model)
+  d
+}
+
+df_lmm <- df |>
+  add_lmm_resid(m_dts, "DTS_corr", "DTS_lmm_resid") |>
+  add_lmm_resid(m_dta, "DTA_corr", "DTA_lmm_resid") |>
+  add_lmm_resid(m_ph,  "PH_corr",  "PH_lmm_resid")
+
+# sanity check: donor - recurrent mean of residuals should equal the LMM beta
+sanity <- df_lmm |>
+  group_by(Inv4m) |>
+  summarise(DTA_mean = mean(DTA_lmm_resid, na.rm = TRUE),
+            DTS_mean = mean(DTS_lmm_resid, na.rm = TRUE),
+            PH_mean  = mean(PH_lmm_resid,  na.rm = TRUE),
+            .groups = "drop")
+cat("residualized mean per arm:\n"); print(sanity)
+cat(sprintf("residualized donor - recurrent: DTA = %+.3f (beta %+.3f), DTS = %+.3f (beta %+.3f), PH = %+.3f (beta %+.3f)\n",
+            diff(sanity$DTA_mean), fixef(m_dta)["Inv4mdonor"],
+            diff(sanity$DTS_mean), fixef(m_dts)["Inv4mdonor"],
+            diff(sanity$PH_mean),  fixef(m_ph)["Inv4mdonor"]))
+
+zeal_lmm <- df_lmm |>
+  pivot_longer(cols = c(DTA_lmm_resid, DTS_lmm_resid, PH_lmm_resid),
+               names_to = "trait", values_to = "value") |>
+  filter(!is.na(value))
+
+lmm_lookup <- c(DTA_lmm_resid = "DTA",
+                DTS_lmm_resid = "DTS",
+                PH_lmm_resid  = "PH")
+y_lab_lookup <- c(DTA_lmm_resid = "Days to anthesis (lineage corrected)",
+                  DTS_lmm_resid = "Days to silking (lineage corrected)",
+                  PH_lmm_resid  = "Plant height, cm (lineage corrected)")
+y_breaks_lookup <- list(
+  DTA_lmm_resid = scales::breaks_width(1),
+  DTS_lmm_resid = scales::breaks_width(1),
+  PH_lmm_resid  = scales::breaks_width(20)
+)
+star_lookup_lmm <- setNames(
+  results_tbl$star[match(c("DTA_corr", "DTS_corr", "PH_corr"), results_tbl$trait)],
+  c("DTA_lmm_resid", "DTS_lmm_resid", "PH_lmm_resid"))
+
+make_lmm_boxplot <- function(tr) {
+  d <- zeal_lmm |> filter(trait == tr)
+  ymax <- max(d$value, na.rm = TRUE)
+  yrng <- diff(range(d$value, na.rm = TRUE))
+  bracket_df <- tibble(group1 = "recurrent", group2 = "donor",
+                       y.position = ymax + 0.08 * yrng,
+                       label = star_lookup_lmm[[tr]])
+  ggplot(d, aes(x = Inv4m, y = value, color = Inv4m)) +
+    geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0,
+                 outlier.shape = NA) +
+    ggbeeswarm::geom_quasirandom(size = 0.8, alpha = 0.5) +
+    scale_color_manual(values = c("recurrent" = "gold",
+                                  "donor"     = "purple4")) +
+    scale_x_discrete(labels = c("recurrent" = "CTRL",
+                                "donor"     = "*Inv4m*")) +
+    ggpubr::stat_pvalue_manual(bracket_df, tip.length = 0.01, size = 5,
+                               bracket.size = 0.6, inherit.aes = FALSE) +
+    scale_y_continuous(breaks = y_breaks_lookup[[tr]],
+                       expand = expansion(mult = c(0.05, 0.15))) +
+    labs(title = lmm_lookup[[tr]], y = y_lab_lookup[[tr]],
+         x = NULL) +
+    pheno_theme_panel
+}
+
+lmm_plots <- lapply(c("DTA_lmm_resid", "DTS_lmm_resid", "PH_lmm_resid"),
+                    make_lmm_boxplot)
+panel_lmm <- cowplot::plot_grid(plotlist = lmm_plots,
+                                nrow = 1, ncol = 3,
+                                align = "hv", axis = "tblr")
+panel_lmm
+
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot_lmmResid.png"),
+       panel_lmm, width = 7.2, height = 4.6, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot_lmmResid.svg"),
+       panel_lmm, width = 7.2, height = 4.6, fix_text_size = TRUE)
+
+# write the per-plot residualized values alongside raw + ancestry-centered
+out <- df_lmm |>
+  group_by(ancestry) |>
+  mutate(DTS_anc_centered = DTS_corr - mean(DTS_corr, na.rm = TRUE),
+         DTA_anc_centered = DTA_corr - mean(DTA_corr, na.rm = TRUE),
+         PH_anc_centered  = PH_corr  - mean(PH_corr,  na.rm = TRUE)) |>
+  ungroup() |>
+  select(Plot, NIL, ancestry, bc2, Inv4m,
+         DTA_corr, DTS_corr, PH_corr,
+         DTA_anc_centered, DTS_anc_centered, PH_anc_centered,
+         DTA_lmm_resid, DTS_lmm_resid, PH_lmm_resid)
+write.csv(out,
+          file.path(paths$intermediate, "Zeal_phenotypes_race_corrected.csv"),
+          row.names = FALSE)
+```
+
+Each Inv4m arm now shows the spread of NIL line means around its arm
+mean. The donor − recurrent gap matches the LMM coefficient (within a
+small drift from BLUP shrinkage), and the within arm SD reflects the
+line to line variation the LMM weighs — not the artificially tight
+plot to plot noise that subtracting the NIL BLUP would produce.
+
+## Forest plot
+
+```{r forest, fig.width=8, fig.height=4.8}
+unit_lookup <- c(DTA_corr = "d", DTS_corr = "d", PH_corr = "cm")
+results_tbl <- results_tbl |>
+  mutate(trait_label = recode(trait,
+                              DTA_corr = "Days to anthesis",
+                              DTS_corr = "Days to silking",
+                              PH_corr  = "Plant height (cm)"),
+         unit  = unit_lookup[trait],
+         label = sprintf("%+.2f %s   p=%.3g %s", estimate, unit, p_lmm, star))
+
+print(results_tbl |> select(trait, estimate, se, ci_lo, ci_hi, p_lmm, p_perm))
+
+# faceted forest, free x scale per trait so days and cm coexist honestly
+p_forest <- ggplot(results_tbl,
+                   aes(x = estimate, y = trait_label)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_errorbarh(aes(xmin = ci_lo, xmax = ci_hi),
+                 height = 0.15, linewidth = 0.8) +
+  geom_point(size = 4, color = "purple4") +
+  geom_text(aes(label = label), nudge_y = 0.25, size = 4.2) +
+  facet_wrap(~ trait_label, scales = "free", ncol = 1) +
+  labs(
+    x = "Inv4m effect (donor − recurrent, native units)",
+    y = NULL,
+    title    = "Inv4m accelerates flowering in the BZea NIL panel",
+    subtitle = "NC2025 field; LMM with ancestry / bc2 / NIL nesting; 95% Wald CI"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(plot.title       = element_text(face = "bold"),
+        strip.background = element_blank(),
+        strip.text       = element_blank())
+print(p_forest)
+```
+
+## Supplementary figure assembly
+
+4 panel composite: (A) flowering boxplot with DTA + DTS as nested facets
+sharing a single days y axis, (B) flowering forest of LMM Inv4m effect
+(DTA + DTS in days), (C) PH boxplot alone (cm), (D) PH forest alone
+(cm). Mixed unit traits are kept on separate panels rather than forced
+onto a shared axis.
+
+```{r supp-figure, fig.width=11, fig.height=4.6}
+suppressPackageStartupMessages(library(ggh4x))
+
+forest_df <- results_tbl |>
+  mutate(trait_short = factor(recode(trait,
+                                     DTA_corr = "Anthesis",
+                                     DTS_corr = "Silking",
+                                     PH_corr  = "Plant height"),
+                              levels = c("Anthesis", "Silking", "Plant height")))
+
+## Panel A — flowering boxplot (anthesis + silking nested, shared y axis)
+flow_long <- df_lmm |>
+  pivot_longer(cols = c(DTA_lmm_resid, DTS_lmm_resid),
+               names_to = "trait", values_to = "value") |>
+  filter(!is.na(value)) |>
+  mutate(trait_short = factor(recode(trait,
+                                     DTA_lmm_resid = "Anthesis",
+                                     DTS_lmm_resid = "Silking"),
+                              levels = c("Anthesis", "Silking")))
+
+flow_stars <- forest_df |> filter(trait %in% c("DTA_corr", "DTS_corr")) |>
+  transmute(trait_short = factor(recode(trait,
+                                        DTA_corr = "Anthesis",
+                                        DTS_corr = "Silking"),
+                                 levels = c("Anthesis", "Silking")),
+            star = star)
+flow_brackets <- flow_long |>
+  group_by(trait_short) |>
+  summarise(ymax = max(value, na.rm = TRUE),
+            yrng = diff(range(value, na.rm = TRUE)),
+            .groups = "drop") |>
+  mutate(group1 = "recurrent", group2 = "donor",
+         y.position = ymax + 0.08 * yrng) |>
+  left_join(flow_stars, by = "trait_short") |>
+  rename(label = star)
+
+p_flow_box <- ggplot(flow_long,
+                     aes(x = Inv4m, y = value, color = Inv4m)) +
+  geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0,
+               outlier.shape = NA) +
+  ggbeeswarm::geom_quasirandom(size = 0.8, alpha = 0.5) +
+  scale_color_manual(values = c("recurrent" = "gold",
+                                "donor"     = "purple4")) +
+  scale_x_discrete(labels = c("recurrent" = "CTRL",
+                              "donor"     = "*Inv4m*")) +
+  ggpubr::stat_pvalue_manual(flow_brackets, tip.length = 0.01, size = 5,
+                             bracket.size = 0.6, inherit.aes = FALSE) +
+  scale_y_continuous(breaks = scales::breaks_width(1),
+                     expand = expansion(mult = c(0.05, 0.15))) +
+  ggh4x::facet_nested(~ trait_short, scales = "fixed") +
+  labs(x = NULL, y = "Days (lineage corrected)") +
+  pheno_theme_panel +
+  theme(strip.background  = element_blank(),
+        strip.text        = element_text(size = 13, face = "bold"),
+        ggh4x.facet.nestline = element_line(color = "black", linewidth = 0.5))
+
+## Panel B — flowering forest (DTA + DTS, days)
+forest_flow <- forest_df |> filter(trait %in% c("DTA_corr", "DTS_corr"))
+p_forest_flow <- ggplot(forest_flow,
+                        aes(x = trait_short, y = estimate)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.8) +
+  geom_point(size = 4, color = "purple4") +
+  scale_y_continuous(breaks = scales::breaks_width(0.5)) +
+  labs(x = NULL, y = "*Inv4m* effect (days)") +
+  pheno_theme_panel +
+  theme(axis.title.y = ggtext::element_markdown(size = 12))
+
+## Panel C — PH boxplot alone (cm)
+ph_long <- df_lmm |>
+  filter(!is.na(PH_lmm_resid)) |>
+  rename(value = PH_lmm_resid)
+ph_star <- forest_df |> filter(trait == "PH_corr") |> pull(star)
+ph_bracket <- tibble(group1 = "recurrent", group2 = "donor",
+                     y.position = max(ph_long$value, na.rm = TRUE) +
+                                  0.08 * diff(range(ph_long$value, na.rm = TRUE)),
+                     label = ph_star)
+p_ph_box <- ggplot(ph_long, aes(x = Inv4m, y = value, color = Inv4m)) +
+  geom_boxplot(width = 0.25, linewidth = 1.0, alpha = 0,
+               outlier.shape = NA) +
+  ggbeeswarm::geom_quasirandom(size = 0.8, alpha = 0.5) +
+  scale_color_manual(values = c("recurrent" = "gold",
+                                "donor"     = "purple4")) +
+  scale_x_discrete(labels = c("recurrent" = "CTRL",
+                              "donor"     = "*Inv4m*")) +
+  ggpubr::stat_pvalue_manual(ph_bracket, tip.length = 0.01, size = 5,
+                             bracket.size = 0.6, inherit.aes = FALSE) +
+  scale_y_continuous(breaks = scales::breaks_width(20),
+                     expand = expansion(mult = c(0.05, 0.15))) +
+  labs(title = "Plant height", x = NULL,
+       y = "Plant height, cm (lineage corrected)") +
+  pheno_theme_panel
+
+## Panel D — PH forest alone (cm)
+forest_ph <- forest_df |> filter(trait == "PH_corr")
+p_forest_ph <- ggplot(forest_ph,
+                      aes(x = trait_short, y = estimate)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.8) +
+  geom_point(size = 4, color = "purple4") +
+  labs(x = NULL, y = "*Inv4m* effect (cm)") +
+  pheno_theme_panel +
+  theme(axis.title.y = ggtext::element_markdown(size = 12))
+
+panel_supp <- cowplot::plot_grid(p_flow_box, p_forest_flow,
+                                 p_ph_box,   p_forest_ph,
+                                 nrow = 1, ncol = 4,
+                                 align = "hv", axis = "tblr",
+                                 rel_widths = c(1.6, 1, 1, 0.9),
+                                 labels = c("A", "B", "C", "D"),
+                                 label_size = 16,
+                                 label_fontface = "bold")
+panel_supp
+
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_supp.png"),
+       panel_supp, width = 11, height = 4.6, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_supp.svg"),
+       panel_supp, width = 11, height = 4.6, fix_text_size = TRUE)
+```
+
+## Save outputs
+
+```{r save}
+write.csv(results_tbl,
+          file.path(paths$intermediate, "Zeal_Inv4m_flowering_lmm_results.csv"),
+          row.names = FALSE)
+write.csv(null_df,
+          file.path(paths$intermediate, "Zeal_Inv4m_flowering_lmm_perm_null.csv"),
+          row.names = FALSE)
+write.csv(diag_tbl,
+          file.path(paths$intermediate, "Zeal_Inv4m_flowering_lmm_level_diagnostic.csv"),
+          row.names = FALSE)
+
+# Figure 2-style boxplot (drop-in)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot.png"),
+       panel_box, width = 4.8, height = 4.6, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_boxplot.svg"),
+       panel_box, width = 4.8, height = 4.6, fix_text_size = TRUE)
+
+# Forest summary
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_forest.png"),
+       p_forest, width = 7, height = 3.2, dpi = 300)
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_forest.svg"),
+       p_forest, width = 7, height = 3.2, fix_text_size = TRUE)
+
+# Permutation null
+ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_perm_null.png"),
+       p_null, width = 9, height = 3.6, dpi = 300)
+```
+
+## Session info
+
+```{r session}
+sessionInfo()
+```
