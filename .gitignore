@@ -55,3 +55,6 @@ agent/
 migration_audit.md
 .gemini/
 .claude/
+
+# RPubs (rsconnect::rpubsUpload) publish metadata — user/account specific
+rsconnect/
