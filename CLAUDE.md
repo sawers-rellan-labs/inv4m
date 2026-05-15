@@ -1,14 +1,46 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-05-15
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ 2026-05-14; BZea NIL Inv4m supp figure ✅ 2026-05-15; Rubén + coauthor feedback still pending)
+**Last Updated:** 2026-05-15 (evening)
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ 2026-05-14; ZEAL NIL Inv4m supp figure ✅ 2026-05-15; Rubén + coauthor feedback still pending)
 **Version:** v2.3.0
 
 ---
 
+## NEXT SESSION PROMPT
+
+> **Read first** (in order):
+> 1. `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` — current state + active task list with full notes
+> 2. `agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md` — Phase 6 row table
+> 3. This file's "Phase 6 Task List" table below
+>
+> **Active priority (user-pinned):** **Review Figure 6 (WGCNA module perturbation)** layout / style / labels. Producer: `scripts/inversion_paper/assemble_WGCNA_figure.Rmd`. Current rendered: `results/inversion_paper/figures/WGCNA_module_perturbation.png`. Walk through the panels (A dendrogram, B Δk_Within boxplot, C hub gene connectivity scatter) and surface specific layout / font / label issues.
+>
+> **Other Phase 6 deliverables queued (not blocking):**
+> - **C4 / row 2d — PA2024 W22 × NIL hybrid trial integration** (= Figure 2 panel B; analysis already done). Needs: (a) dedicated Results paragraph in §3.2 narrating Figure 2 panel B (currently §3.2 only describes PA2022 panel A explicitly), (b) Discussion expansion to integrate with ZEAL multi-donor flowering replication, (c) W22 tester identity inserted into existing Methods (L1090) + Discussion (L902) + Figure 2 caption (L212) since current text uses breeders' shorthand `Inv4_Mi21` / `Inv4_B73` without explanation. **Trial design:** W22 tester crossed to B73-background NILs; focal pair `Inv4_Mi21` (W22 × NIL with Mi21-donor inverted karyotype) vs `Inv4_B73` (W22 × NIL with B73 standard karyotype). The "Inv4_B73" label decodes as the recurrent karyotype, NOT a B73-only entry.
+> - **C3 / row 2c — ZEAL Discussion integration** (Methods + Results + Fig.~S2 already in main.tex; just needs Discussion paragraph). Frame: multi-donor flowering replication (4 mexicana races + Hueh) supports the Inv4m-interval-mapping argument vs MI21-specific background; PH null is consistent with the larger donor lineage variance; ZEAL has no direct grain yield trait, so the yield framing comes from C4 (PA2024 hybrid), not from ZEAL.
+> - **C / row — JMJ paralog supp figure inclusion** in main.tex (`figs/jmj_paralogs_expression_boxplot.png` already exists; just needs `\includegraphics` + caption + label).
+> - **C2 / row 2b — NEW supp figure: teosinte single-copy evidence for the jmj2-9 cluster** (structural / microsynteny / coverage evidence; producer notebook TBD).
+> - **D / row — Re-upload renamed PNGs to Overleaf**: PA2024 Figure 2, `inv4mZEAL.png` (new Fig.~S2), and the PSU/CLY → PA/NC label updates from earlier passes.
+> - **E / row — Bibtex audit**: confirm `bates2015`, `kuznetsova2017` resolve in `Inv4m.bib` on Overleaf; `sanchez-gonzalez2018` already added by user. Spot-check `fransz2016`, `desmarais2017`, `minow2021`, PT HiLo-1.0.
+> - **F / row — Typo fix**: "acknlowledge" → "acknowledge" near main.tex L901.
+> - **G / row — Read aloud proofread**: Abstract + Discussion.
+> - **H / row — HiFi sequencing provenance**: collaborator → co-author, facility → name in Methods.
+>
+> **Standing items (highest priority once they arrive):**
+> - **Rubén's full feedback on the inversion paper** (pending).
+> - **Coauthor suggestions** (pending; likely overlaps / depends on Rubén).
+>
+> **Project conventions to keep in mind:**
+> - `agent/` is git-ignored on purpose. Track in-flight notes / scratch in there. Tracked manuscript work goes in `docs/inversion_paper/main.tex` (synced to Overleaf manually) and `scripts/inversion_paper/*.Rmd`.
+> - Figures: PNG + SVG in `results/inversion_paper/figures/` (git-ignored); refer from main.tex as `figs/<name>.png`.
+> - Use `git -C <path>` not `cd && git` (sandbox restriction).
+> - User strongly prefers no hyphens in compound terms. "lineage corrected", not "lineage-corrected"; "FDR adjusted", not "FDR-adjusted".
+> - Karyotype terminology: "inverted karyotype" / "standard karyotype" for the *Inv4m* configuration contrast (paper convention at main.tex L1052–1054). The figure axis labels "CTRL" / "*Inv4m*" map to standard / inverted respectively.
+> - Ancestry not race when describing teosinte germplasm groupings; cite `sanchez-gonzalez2018` for the race definitions.
+
 ## START HERE: Inversion Paper — Late Phase 5 / Phase 6
 
-**Current State:** Manuscript text complete; **Figure 2 redesigned per Rubén's spec with a new PA2024 hybrid panel (Phase 6 row 1 ✅ 2026-05-14)**; **BZea NIL Inv4m supp figure (DTA, DTS, PH) added (Phase 6 row 2 ✅ 2026-05-15)**. Rubén's full feedback and coauthor suggestions still pending. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. Remaining Phase 6: JMJ paralog supp inclusion, Overleaf PNG re-upload (now including Figure 2 + Zeal supp), bibtex audit, typo fix, read aloud, HiFi provenance. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+**Current State:** Manuscript text complete; **Figure 2 redesigned per Rubén's spec with a new PA2024 W22 × NIL hybrid panel B (Phase 6 row 1 ✅ 2026-05-14)**; **ZEAL NIL Inv4m supp figure (DTA, DTS, PH) added as Fig.~S2 (Phase 6 row 2 ✅ 2026-05-15)** — notebook + supp figure + Methods + Results + caption all in main.tex on Overleaf. Rubén's full feedback and coauthor suggestions still pending. The 2026-05-07 coauthor close-out applies to the phosphorus paper, not the inversion paper. **Active priority for next session: review Figure 6 (WGCNA module perturbation) layout/style.** Other Phase 6 cleanup queued: PA2024 hybrid Results paragraph + Discussion integration, ZEAL Discussion integration, JMJ paralog supp inclusion, new supp figure for teosinte single-copy evidence at jmj2-9, Overleaf PNG re-upload (Figure 2 + `inv4mZEAL.png`), bibtex audit, typo fix, read aloud, HiFi provenance. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list with full notes.
 
 **New Title:** "The teosinte *mexicana* chromosomal inversion *Inv4m* modulates maize flowering time, plant height, and growth regulation gene networks"
 
@@ -45,10 +77,14 @@ README.md  # Figure/table coverage
 | 21 | Scripts audit + cleanup (delete 25 orphan scripts; rename JMJ notebooks; resolve audit discrepancies) | ✅ done (2026-05-07; commits 988999b → cebb2d2) | - |
 | **Phase 6 — pre-submission** | | | |
 | 22 | F2 hybrid panel for Figure 2 (new analysis) | ✅ done (2026-05-14) | - |
-| 23 | BZea NIL Inv4m supp figure: DTA, DTS, PH; lineage corrected boxplots + forest (`Zeal_Inv4m_flowering_lmm.Rmd`) | ✅ done (2026-05-15; commit b47ede3) | - |
+| 23 | ZEAL NIL Inv4m supp figure (Fig.~S2): DTA, DTS, PH; lineage corrected boxplots + forest (`Zeal_Inv4m_flowering_lmm.Rmd`); Methods + Results + caption in main.tex | ✅ done (2026-05-15; commits b47ede3, 924384a, 149625f) | - |
+| **NEW** | **Review Figure 6 (WGCNA module perturbation) layout/style/labels** (`assemble_WGCNA_figure.Rmd`) | **active priority** | - |
 | 24 | Add `\includegraphics{figs/jmj_paralogs_expression_boxplot.png}` to main.tex supp section + caption + label | pending | - |
-| 25 | Re-upload renamed PNGs to Overleaf (PNGs still show old PSU/CLY labels even though main.tex + R scripts updated; also include new Figure 2 PNG) | pending | #20, #22 |
-| 26 | Bibtex audit of Overleaf .bib (all `\cite{}` keys resolve; spot-check; cover fransz2016, desmarais2017, minow2021, PT HiLo-1.0) | pending | - |
+| 24b | **NEW supp figure: teosinte single-copy evidence for the jmj2-9 cluster** (structural / microsynteny / coverage; complements Fig.~7 panel B). Producer notebook TBD | pending | - |
+| 24c | **Integrate ZEAL panel results into the Discussion** (multi-donor flowering replication; PH null framed against larger donor variance; ZEAL has no yield trait — yield framing comes from #24d) | pending | #23 |
+| 24d | **PA2024 W22 × NIL hybrid trial integration** (= Figure 2 panel B; analysis already done). Add: dedicated Results paragraph in §3.2 for panel B, expand Discussion to integrate with ZEAL framing, insert W22 tester identity into existing Methods (L1090) + Discussion (L902) + Figure 2 caption (L212). Trial: W22 × B73-background-NIL hybrids; `Inv4_Mi21` (Mi21-donor inverted karyotype) vs `Inv4_B73` (B73 standard karyotype) | pending | #22 |
+| 25 | Re-upload renamed PNGs to Overleaf (include new Figure 2 + `inv4mZEAL.png` for Fig.~S2; PSU/CLY → PA/NC label updates from earlier passes) | pending | #20, #22, #23 |
+| 26 | Bibtex audit of Overleaf .bib: confirm `bates2015`, `kuznetsova2017` resolve (`sanchez-gonzalez2018` already added by user); spot-check `fransz2016`, `desmarais2017`, `minow2021`, PT HiLo-1.0 | pending | - |
 | 27 | Typo fix: "acknlowledge" → "acknowledge" (~main.tex L901) | pending | - |
 | 28 | HiFi sequencing provenance: collaborator → co-author, facility → name in Methods | pending | - |
 | ❌ | ~~Run BUSCO on Mi21 NIL assembly~~ | dropped (2026-05-07) | - |
