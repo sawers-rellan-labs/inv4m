@@ -749,21 +749,21 @@ This bidirectional rewiring, connectivity loss for downregulated chromatin regul
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=\linewidth]{figs/WGCNA_module_perturbation.png}
-\caption{\textbf{WGCNA module perturbation analysis shows widespread network disruption in \invfour plants.}
-\textbf{(A)} Consensus WGCNA dendrogram for CTRL samples showing 13 gene coexpression modules.
-We obtained module assignments from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35).
-Color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
-\textbf{(B)} Permutation test of intramodular connectivity loss in \invfour relative to CTRL.
+\caption{\textbf{Network analysis of \invfour DEGs.}
+\textbf{(A)} Consensus WGCNA modules of \invfour DEGs reconstructed from CTRL plant samples only.
+The 13 gene coexpression modules were obtained from 1000 consensus iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35).
+The color bar indicates module membership for 465 DEGs (FDR $< 0.05$).
+\textbf{(B)} Change in intramodular connectivity ($\Delta k_{Within}$) of the genes in each module from (A) between \invfour and CTRL plants.
 Density ridges show the null distribution of $z$-scored $\Delta k_{Within}$ obtained by shuffling genotype labels across 1000 permutations; red vertical segments mark the observed $z$-score for each module.
 Modules are grouped by gene set: Genotype Response DEGs (top facet) and Leaf Gradient Hubs (bottom facet).
-$y$-axis labels show module color and sample size ($n$).
-FDR-corrected $p$-values are shown in red next to modules with significant connectivity loss.
-Text to the right of each ridge shows the top reduced Gene Ontology Biological Process term for that module.
-\textbf{(C)} Hub gene connectivity comparison between CTRL ($x$-axis) and \invfour ($y$-axis).
-Points represent top 5 hub genes per module, colored by module assignment.
-Point size indicates $|\log_2 FC|$.
-Points below the diagonal indicate hub genes that lost connectivity in \invfour.
-Gene symbols are shown in italics where available; \jmjii is highlighted in bold italic.}
+FDR adjusted $p$-values are shown in red next to modules with significant connectivity loss.
+Text to the right of each ridge shows the top Gene Ontology Biological Process term for each module.
+\textbf{(C)} Trans coexpression network from \invfour strong DEGs, reconstructed jointly from CTRL and \invfour samples and shown as minimum spanning trees.
+\textit{Reference} edges recover coexpression relationships reported in MaizeNetome.
+\textit{Novel} edges (detail) show the \jmjiv neighborhood subgraph; the full Novel network is in Fig.~\ref{fig::trans_novel_full}.
+Nodes within the \invfour introgression are purple, flanking nodes are pink, and targets elsewhere in the genome are gold.
+Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants.
+Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.}
 \label{fig:wgcna}
 \end{figure*}
 

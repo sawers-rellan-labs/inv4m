@@ -59,11 +59,15 @@ paths <- setup_project_paths("inversion_paper")
 # Pipeline run directory
 run_dir <- here("results/inversion_paper/field_perturbation/run_20251231_201332")
 
-# Panel paths
+# Panel paths.
+# Panel C was previously the WGCNA hub-gene connectivity scatter from the
+# field_perturbation pipeline. Per Ruben's restructure (2026-05-18) it is now
+# the hand-assembled trans-network MST composite produced from the Bonferroni
+# iteration in agent/inversion_paper/novel_edge_filter_iterate.html.
 panel_paths <- list(
   A = file.path(run_dir, "04_consensus_networks/ctrl/dendrogram_plot.rds"),
   B = file.path(run_dir, "06_preservation/zscore_density_kWithin.rds"),
-  C = file.path(run_dir, "07_module_annotation/hub_connectivity_plot.rds")
+  C = here("results/inversion_paper/figures/Figure_4_C_trans_network.png")
 )
 
 # Verify all panels exist
@@ -82,7 +86,7 @@ cat("All panel files found.\n")
 ```{r load_panels}
 p_A <- readRDS(panel_paths$A)
 p_B <- readRDS(panel_paths$B)
-p_C <- readRDS(panel_paths$C)
+p_C <- cowplot::ggdraw() + cowplot::draw_image(panel_paths$C)
 
 cat("Panels loaded successfully.\n")
 ```

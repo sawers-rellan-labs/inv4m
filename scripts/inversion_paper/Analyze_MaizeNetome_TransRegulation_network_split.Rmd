@@ -487,13 +487,17 @@ for (i in 1:nrow(corr_bipartite)) {
     p_values[i, j] <- 2 * pt(-abs(t_stat), df = n_samples - 2)
   }
 }
-p_adj <- matrix(p.adjust(c(p_values), method = "fdr"), nrow = nrow(p_values))
+p_adj <- matrix(p.adjust(c(p_values), method = "bonferroni"), nrow = nrow(p_values))
 
-# Filter by FDR
+# Filter by Bonferroni-corrected p < 0.001. The cis x trans test universe is
+# small (m ~ 1095), so BH at 0.05 was nearly equivalent to raw p < 0.05 and
+# admitted edges down to |r| = 0.30. Bonferroni at alpha = 0.001 enforces a
+# credibility floor of |r| ~ 0.67 on the surviving edges.
 corr_bipartite_filtered <- corr_bipartite
-corr_bipartite_filtered[p_adj > 0.05] <- 0
+corr_bipartite_filtered[p_adj > 0.001] <- 0
 
-cat("Significant pairs (FDR < 0.05):", sum(corr_bipartite_filtered != 0), "\n")
+cat("Significant pairs (Bonferroni < 0.001):",
+    sum(corr_bipartite_filtered != 0), "\n")
 
 # Create edge list
 edges_idx <- which(corr_bipartite_filtered != 0, arr.ind = TRUE)
