@@ -42,7 +42,7 @@ set.seed(42)
 ## Goal
 
 Test whether the *Inv4m* introgression affects flowering time (DTS, DTA)
-in the BZea NIL panel grown at NC2025 (raw data: `data/CLY25_ZEAL.csv`,
+in the ZEAL NIL panel grown at NC2025 (raw data: `data/CLY25_ZEAL.csv`,
 provided by Hannah Pil; spatial correction applied upstream).
 
 `Inv4m` is recoded `recurrent` (B73 haplotype) vs `donor` (teosinte
@@ -565,7 +565,7 @@ p_per_race <- ggplot(zeal_long_race,
   facet_grid(trait_label ~ ancestry_lab, scales = "free_y", switch = "y") +
   labs(x = NULL, y = NULL,
        title    = "Inv4m effect by donor ancestry",
-       subtitle = "NC2025 BZea NIL panel; FDR adjusted per ancestry emmeans contrast (5 ancestry family per trait)") +
+       subtitle = "NC2025 ZEAL NIL panel; FDR adjusted per ancestry emmeans contrast (5 ancestry family per trait)") +
   theme_bw(base_size = 12) +
   theme(plot.title       = element_text(face = "bold"),
         strip.background = element_rect(fill = "grey92", color = NA),
@@ -830,7 +830,7 @@ p_forest <- ggplot(results_tbl,
   labs(
     x = "Inv4m effect (donor − recurrent, native units)",
     y = NULL,
-    title    = "Inv4m accelerates flowering in the BZea NIL panel",
+    title    = "Inv4m accelerates flowering in the ZEAL NIL panel",
     subtitle = "NC2025 field; LMM with ancestry / bc2 / NIL nesting; 95% Wald CI"
   ) +
   theme_bw(base_size = 13) +
@@ -964,9 +964,9 @@ panel_supp <- cowplot::plot_grid(p_flow_box, p_forest_flow,
                                  label_fontface = "bold")
 panel_supp
 
-ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_supp.png"),
+ggsave(file.path(paths$figures, "inv4mZEAL.png"),
        panel_supp, width = 11, height = 4.6, dpi = 300)
-ggsave(file.path(paths$figures, "Zeal_Inv4m_flowering_supp.svg"),
+ggsave(file.path(paths$figures, "inv4mZEAL.svg"),
        panel_supp, width = 11, height = 4.6, fix_text_size = TRUE)
 ```
 
