@@ -1,0 +1,103 @@
+---
+title: "Supplementary Fig.~S8 assembly — GO enrichment (WGCNA modules + trans-network)"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+knit: (function(input, ...) {
+    rmarkdown::render(
+      input,
+      output_dir = here::here("docs", "inversion_paper"),
+      envir = globalenv()
+    )
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                     fig.width = 14, fig.height = 12, dpi = 150)
+library(here)
+library(ggplot2)
+library(ggtext)
+library(cowplot)
+
+source(here("scripts", "utils", "setup_paths.R"))
+paths <- setup_project_paths("inversion_paper")
+```
+
+## Panel paths
+
+```{r panel_paths}
+panel_paths <- list(
+  # Panel A: WGCNA consensus module GO enrichment (from field_perturbation
+  # pipeline step 07).
+  A = here("results/inversion_paper/field_perturbation/run_20251231_201332/07_module_annotation/go_enrichment_BP_rrvgo.rds"),
+  # Panel B: trans-coexpression network GO enrichment by genomic location
+  # (from GO_Enrichment_Trans_Network.Rmd).
+  B = file.path(paths$intermediate, "GO_trans_network_annotated.rds")
+)
+
+for (panel in names(panel_paths)) {
+  if (!file.exists(panel_paths[[panel]])) {
+    stop(paste("Panel", panel, "RDS not found:", panel_paths[[panel]]))
+  }
+}
+cat("All panel RDS files found.\n")
+```
+
+## Load panels
+
+```{r load_panels}
+p_A <- readRDS(panel_paths$A)
+p_B <- readRDS(panel_paths$B)
+
+# Override titles: drop "Enrichment", italicize Inv4m via ggtext markdown.
+p_A <- p_A +
+  labs(title = "GO Biological Process by WGCNA Module") +
+  theme(plot.title = element_markdown())
+
+p_B <- p_B +
+  labs(title = "GO Biological Process for the *Inv4m* Trans Co-expression Network") +
+  theme(plot.title = element_markdown())
+```
+
+## Preview
+
+### Panel A — WGCNA consensus modules
+
+```{r preview_A, fig.height=6}
+print(p_A)
+```
+
+### Panel B — trans-coexpression network by genomic location
+
+```{r preview_B, fig.height=5}
+print(p_B)
+```
+
+## Combined figure
+
+```{r combine, fig.height=12}
+fig_combined <- plot_grid(
+  p_A, p_B,
+  ncol = 1,
+  labels = c("A", "B"),
+  label_size = 22,
+  rel_heights = c(2, 1)
+)
+
+ggsave(
+  file.path(paths$figures, "supp_GO_enrichment.png"),
+  fig_combined,
+  width = 14, height = 12,
+  dpi = 300
+)
+
+ggsave(
+  file.path(paths$figures, "supp_GO_enrichment.pdf"),
+  fig_combined,
+  width = 14, height = 12
+)
+
+print(fig_combined)
+```

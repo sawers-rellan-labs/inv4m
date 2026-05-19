@@ -535,11 +535,28 @@ ggsave(
   width = 14
 )
 
+ggsave(
+  annotation_plot,
+  file = file.path(paths$figures, "GO_trans_network_annotated.png"),
+  height = 5,
+  width = 14,
+  dpi = 300
+)
+
+# Also export the plot object as RDS for downstream assembly (Fig S8 panel B
+# in the supplementary GO figure).
+saveRDS(
+  annotation_plot,
+  file = file.path(paths$intermediate, "GO_trans_network_annotated.rds")
+)
+
 cat("\nFiles exported:\n")
 cat("  - GO_enrichment_trans_network.csv\n")
 cat("  - GO_gene_term_associations.csv\n")
 cat("  - GO_trans_network_annotated.svg\n")
 cat("  - GO_trans_network_annotated.pdf\n")
+cat("  - GO_trans_network_annotated.png\n")
+cat("  - GO_trans_network_annotated.rds\n")
 ```
 
 ---
