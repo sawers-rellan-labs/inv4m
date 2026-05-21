@@ -1952,11 +1952,23 @@ This figure complements Fig.~\ref{fig:wgcna}B, which summarizes module-level con
 \centering
 \includegraphics[width=\linewidth]{figs/sec6_leaf_trajectory.png}
 \caption{\textbf{\textit{sec6} expression across leaf positions in CTRL and \invfour.}
-\textbf{(A)} Raw $\log_2$(CPM) expression of \textit{sec6} (\textit{Zm00001eb194380}) across leaf 3, 4, and 5 samples.
-\textbf{(B)} Expression centered per genotype to highlight the divergence in leaf-position trajectory.
-Lines connect genotype means $\pm$ SE; individual sample points are shown as jittered dots.
-The \invfour karyotype shows a steeper decline from leaf 3 to leaf 5, consistent with the Leaf $\times$ Genotype interaction driving the greenyellow module connectivity loss described in Fig.~\ref{fig:wgcna}B and Supplementary Table~\ref{tab::greenyellow_module}.}
+}
 \label{fig::sec6_trajectory}
+\end{figure*}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/supp_novel_trans_network_full.png}
+\caption{\textbf{Full \invfour dataset-specific trans-coexpression network (Bonferroni $< 0.001$).}
+Minimum spanning tree of all dataset-specific co-expression edges not present in the MaizeNetome reference, filtered to Bonferroni-adjusted $p < 0.001$ across the cis $\times$ trans correlation test pool ($m \approx 1{,}095$ tests, $n = 43$ samples).
+Node fill indicates genomic location: purple (\invfour region), pink (flanking introgression), gold (outside inversion).
+Solid fill indicates upregulation in \invfour; transparent fill indicates downregulation.
+Edge width is proportional to $|r|$.
+Gene labels are shown in italics.
+This figure shows the complete novel network; the \jmjiv neighborhood subgraph is detailed in Fig.~\ref{fig:wgcna}C.}
+\label{fig::trans_novel_full}
 \end{figure*}
 
 \clearpage
