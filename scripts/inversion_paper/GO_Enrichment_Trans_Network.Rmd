@@ -530,13 +530,6 @@ ggsave(
 
 ggsave(
   annotation_plot,
-  file = file.path(paths$figures, "GO_trans_network_annotated.pdf"),
-  height = 5,
-  width = 14
-)
-
-ggsave(
-  annotation_plot,
   file = file.path(paths$figures, "GO_trans_network_annotated.png"),
   height = 5,
   width = 14,
@@ -554,7 +547,6 @@ cat("\nFiles exported:\n")
 cat("  - GO_enrichment_trans_network.csv\n")
 cat("  - GO_gene_term_associations.csv\n")
 cat("  - GO_trans_network_annotated.svg\n")
-cat("  - GO_trans_network_annotated.pdf\n")
 cat("  - GO_trans_network_annotated.png\n")
 cat("  - GO_trans_network_annotated.rds\n")
 ```

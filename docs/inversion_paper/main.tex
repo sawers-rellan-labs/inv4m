@@ -1908,14 +1908,55 @@ Most Genotype Response modules achieve moderate to stable support, and all Leaf 
 
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width=\linewidth]{figs/go_enrichment_BP_rrvgo.png}
-\caption{\textbf{Gene Ontology enrichment of WGCNA consensus modules.}
-Bubble plot showing Biological Process (BP) GO term enrichment for each CTRL consensus module.
-Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$).
-GO terms were reduced using rrvgo semantic similarity to eliminate redundancy.
+\includegraphics[width=\linewidth]{figs/supp_GO_enrichment.png}
+\caption{\textbf{Gene Ontology enrichment of the WGCNA consensus modules and the \invfour trans coexpression network.}
+\textbf{(A)} Biological Process GO term enrichment for each CTRL WGCNA consensus module.
 Module labels include gene counts in parentheses.
-Notable enrichments include chromatin organization (blue module), translation (brown), and cellular response to stress (yellow).}
+Notable enrichments include chromatin organization (blue module), translation (brown), and cellular response to stress (yellow).
+\textbf{(B)} GO enrichment of the \invfour trans coexpression network from Fig.~\ref{fig:wgcna}C, stratified by gene location (flanking introgression vs.\ \invfour proper) and regulation direction.
+Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.
+In both panels, bubble size indicates gene count and color indicates enrichment significance ($-\log_{10}(p)$); GO terms were reduced using rrvgo semantic similarity to eliminate redundancy.}
 \label{fig::module_go}
+\end{figure*}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/jmj_teosinte.png}
+\caption{\textbf{Microsynteny of the \jmjii / \jmjiv cluster across \textit{Zea mays} and teosinte genomes.}
+PanZea v2 pangene track (PanZea.v2.pan00060) of the genomic neighborhood around \jmjii and \jmjiv in nine \textit{Zea mays} NAM reference assemblies (top) and five teosinte assemblies (bottom; \parv, \mex, and \textit{Z.~nicaraguensis} lines).
+Arrows represent gene models colored by pangene ortholog group; green arrows mark the \jmjii / \jmjiv tandem array.
+The \textit{Zea mays} assemblies carry the multi-copy tandem array described in Fig.~\ref{fig:jmj_cluster}B, whereas the teosinte assemblies retain a reduced or single-copy configuration, consistent with a lineage-specific expansion in \textit{Z.~mays}.
+Interactive view: \url{https://gcv.maizegdb.org/gene;maize=Zm00001eb191810?sources=maize&neighbors=10}.}
+\label{fig::jmj_teosinte}
+\end{figure*}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/supp_hub_connectivity.png}
+\caption{\textbf{Intramodular hub-gene connectivity in CTRL vs.\ \invfour.}
+Each point shows one of the top five hub genes (by CTRL $k_{Within}$) in each WGCNA consensus module; point color corresponds to module identity as in Fig.~\ref{fig:wgcna}.
+The x-axis is intramodular connectivity in the CTRL consensus network and the y-axis is connectivity in the \invfour consensus network; points below the dashed identity line have lost connectivity in the \invfour karyotype.
+Point size encodes $|\log_2\text{FC}|$ from the genotype DEG analysis.
+Gene labels show curated names where available; \textit{jmj2} is shown in bold italic.
+This figure complements Fig.~\ref{fig:wgcna}B, which summarizes module-level connectivity loss as a permutation-based $z$-score.}
+\label{fig::hub_connectivity}
+\end{figure*}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/sec6_leaf_trajectory.png}
+\caption{\textbf{\textit{sec6} expression across leaf positions in CTRL and \invfour.}
+\textbf{(A)} Raw $\log_2$(CPM) expression of \textit{sec6} (Zm00001eb194380) across leaf 3, 4, and 5 samples.
+\textbf{(B)} Expression centered per genotype to highlight the divergence in leaf-position trajectory.
+Lines connect genotype means $\pm$ SE; individual sample points are shown as jittered dots.
+The \invfour karyotype shows a steeper decline from leaf 3 to leaf 5, consistent with the Leaf $\times$ Genotype interaction driving the greenyellow module connectivity loss described in Fig.~\ref{fig:wgcna}B and Supplementary Table~\ref{tab::greenyellow_module}.}
+\label{fig::sec6_trajectory}
 \end{figure*}
 
 \clearpage

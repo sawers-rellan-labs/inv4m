@@ -158,6 +158,26 @@ print(fig_combined)
 
 ---
 
+# Supplementary Figure — Hub Gene Connectivity
+
+```{r supp_hub_connectivity, fig.width=10, fig.height=8}
+p_hub <- readRDS(file.path(run_dir, "07_module_annotation/hub_connectivity_plot.rds")) +
+  theme(
+    legend.position      = c(0.05, 0.95),
+    legend.justification = c(0, 1)
+  )
+
+ggsave(
+  file.path(paths$figures, "supp_hub_connectivity.png"),
+  p_hub,
+  width = 10, height = 8, dpi = 300
+)
+
+print(p_hub)
+```
+
+---
+
 # Session Info
 
 ```{r session_info}
