@@ -1376,6 +1376,104 @@ We thank [collaborators] for assistance with field work and laboratory analyses.
 \beginsupplement
 
 
+\begin{table*}[ht!]
+\caption{Distribution of \invfour DEGs in the Maize Genome}
+\label{tab:DEGs_distro}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+ &
+  \multicolumn{1}{c}{} &
+  \multicolumn{1}{c}{} &
+  \multicolumn{1}{c}{} &
+  \multicolumn{1}{c}{\textbf{}} &
+  \multicolumn{1}{c}{\textbf{DEGs}} &
+  \multicolumn{1}{l}{\textbf{Strong DEGs}} \\
+\textbf{Location of genes} &
+  \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total \\ Annotated\end{tabular}}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Total\\  Expressed\end{tabular}}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fraction \\ Expressed\end{tabular}}} &
+  \multicolumn{1}{c}{$\textit{FDR} < 0.05$} &
+  \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}$\textit{FDR} < 0.05$ \\ $|log_2 FC| > 1.5$\end{tabular}} \\ \midrule
+Chromosomes 1-10 &
+  \multicolumn{2}{r}{43459} &
+  24011 &
+  0.55 &
+  465 &
+  155 \\
+Outside Introgression &
+  \multicolumn{2}{r}{42360} &
+  23403 &
+  0.55 &
+  193 &
+  39 \\
+Shared Introgression &
+  \multicolumn{2}{r}{1099} &
+  608 &
+  0.55 &
+  272 &
+  116 \\
+\hspace*{2em}\invfour &
+  \multicolumn{2}{r}{432} &
+  253 &
+  0.59 &
+  114 &
+  40 \\
+\hspace*{2em}Flanking Introgression &
+  \multicolumn{2}{r}{667} &
+  355 &
+  0.53 &
+  158 &
+  76 \\ \midrule
+ &
+  \multicolumn{1}{l}{} &
+  \multicolumn{1}{l}{} &
+  \multicolumn{1}{l}{} &
+  \multicolumn{1}{l}{} &
+  \multicolumn{1}{l}{} &
+  \multicolumn{1}{l}{} \\
+ &
+  \multicolumn{3}{c}{\textbf{DEGs Enrichment}} &
+  \multicolumn{3}{c}{\textbf{Strong DEGs Enrichment}} \\ \cline{2-7}
+\textbf{Comparison} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Odds\\ Ratio\end{tabular}}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fisher's \\ Exact test\\ \textit{p-value}\end{tabular}}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Confidence\\ Interval\end{tabular}}} &
+  \textbf{\begin{tabular}[c]{@{}r@{}}Odds\\ Ratio\end{tabular}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Fisher's\\ Exact test\\ \textit{p-value}\end{tabular}}} &
+  \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}Confidence\\ Interval\end{tabular}}} \\ \midrule
+Shared introgression vs Outside &
+  97.1 &
+  $<10^{-200}$ &
+  {[}70,135{]} &
+  141 &
+  $<10^{-100}$ &
+  {[}95,215{]} \\
+Flanking vs Outside &
+  96.5 &
+  $<10^{-150}$ &
+  {[}68,135{]} &
+  163 &
+  $<10^{-80}$ &
+  {[}100,275{]} \\
+\textbf{\invfour vs Outside} &
+  \textbf{98.7} &
+  $<10^{-100}$ &
+  {[}65,150{]} &
+  \textbf{112} &
+  $<10^{-45}$ &
+  {[}65,200{]} \\
+\invfour vs Flanking &
+  1.02 &
+  0.95 &
+  {[}0.7,1.5{]} &
+  0.69 &
+  0.25 &
+  {[}0.4,1.2{]} \\ \bottomrule
+\end{tabular}%
+}
+\end{table*}
+
+
 \begin{table}[!ht]
 \caption[\invfour delimitation and breakpoints]{\textbf{\invfour delimitation and breakpoints.}}
 \label{tab:breakpoints}
@@ -1677,6 +1775,7 @@ We thank [collaborators] for assistance with field work and laboratory analyses.
 \end{tabular}%
 }
 \end{table}
+\clearpage
 
 
 \begin{figure}[!ht]
@@ -1693,101 +1792,25 @@ Each point represents a NIL, \invfour plants are tagged by the highland allele o
 \end{figure}
 
 
+
+
 \begin{figure*}[!ht]
 \centering
 \includegraphics[width=\linewidth]{figs/inv4mZEAL.png}
 \caption{\textbf{\invfour effect on flowering and plant height in the ZEAL near isogenic line panel (NC2025).}
-\textbf{(A)} Lineage corrected days to anthesis (DTA, left) and days to silking (DTS, right) for CTRL (recurrent B73 standard karyotype at \invfour, gold) and \invfour (donor mexicana or huehuetenangensis inverted karyotype, purple).
+\textbf{(A)} Lineage corrected days to anthesis (DTA, left) and days to silking (DTS, right) for CTRL (\invfour recurrent allele, B73 haplotype, gold) and \invfour (donor allele, mexicana or huehuetenangensis haplotype, purple).
 Each \invfour arm shows the spread of NIL line means around its arm mean: ancestry and BC2 family random effect BLUPs from the linear mixed model were subtracted from the spatially corrected values, while NIL identity was retained so the visual spread reflects the line to line variation the model uses for inference.
 Stars indicate significance from the \invfour fixed effect Satterthwaite $p$ (Materials and Methods); ** $p < 0.01$, * $p < 0.05$.
 \textbf{(B)} Forest plot of the linear mixed model \invfour fixed effect estimate (donor $-$ recurrent) for DTA and DTS, with 95\% Wald confidence intervals.
 \textbf{(C)} Lineage corrected plant height (PH); same conventions as A.
 \textbf{(D)} Forest plot of the \invfour fixed effect estimate for PH; the donor effect is positive but not significant in this panel.
 $n = 393$ plots from 218 NILs across 35 BC1 families spanning five donor ancestry groups (Chalco, Durango, Mesa-Central, Nobogame, Huehuetenango).
-Donor lineages that do not carry the \invfour inverted karyotype (parviglumis, \textit{Z.~luxurians}, \textit{Z.~diploperennis}) are excluded because their BC1 families are monomorphic standard at \invfour (no donor arm to estimate a within family contrast).}
+Donor lineages that do not carry the \invfour mexicana haplotype (parviglumis, \textit{Z.~luxurians}, \textit{Z.~diploperennis}) are excluded by the both arms BC1 filter.}
 \label{fig::zeal_inv4m}
 \end{figure*}
 
-
-\begin{table}[!ht]
-\caption{\textbf{Effect of \invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|\log_2 \text{FC}| > 1.5$). Bottom rows show significant Leaf$\times$\invfour interactions.}
-\label{tab:gene_effects}
-\centering
-\small
-\begin{tabular}{@{}llrrl@{}}
-\toprule
-\textbf{Gene ID} & \textbf{Label} & \textbf{$-\log_{10}$(\textit{FDR})} & \textbf{$\log_2$FC} & \textbf{Description} \\ \midrule
-\multicolumn{5}{l}{\textbf{\invfour: Downregulated}} \\ \midrule
-Zm00001eb191790 & \textit{jmj2} & 21.9 & $-3.49$ & JUMONJI-transcription factor 2 \\
-Zm00001eb191820 & \textit{jmj4} & 19.7 & $-2.84$ & JUMONJI-transcription factor 4 \\
-Zm00001eb189910 & \textit{metrs1} & 17.5 & $-2.86$ & Methionyl-tRNA synthetase \\
-Zm00001eb192850 & \textit{smo4} & 17.5 & $-1.98$ & Ribosome biogenesis protein NOP53 \\
-Zm00001eb192630 &  & 15.8 & $-1.69$ & CCT-alpha \\
-Zm00001eb188070 & \textit{arf1} & 15.8 & $-2.78$ & ADP-ribosylation factor \\
-Zm00001eb188750 & \textit{hsp70-17} & 14.2 & $-6.48$ & Heat shock 70 kDa protein 17 \\
-Zm00001eb190240 &  & 14.2 & $-9.16$ &  \\
-Zm00001eb188240 & \textit{ropgef14} & 13.6 & $-2.98$ & Rop guanine nucleotide exchange facto... \\
-Zm00001eb193260 & \textit{trxl2} & 13.2 & $-6.10$ & Thioredoxin-like 3-1, chloroplastic \\
-Zm00001eb190350 &  & 13.0 & $-1.83$ & Ankyrin repeat-containing protein \\
-\midrule
-\multicolumn{5}{l}{\textbf{\invfour: Upregulated}} \\ \midrule
-Zm00001eb264460 & \textit{ychf} & 16.9 & $+6.50$ &  \\
-Zm00001eb194380 & \textit{sec6} & 16.5 & $+2.87$ & Exocyst complex component Sec6 \\
-Zm00001eb190670 & \textit{zfrvt} & 15.6 & $+1.97$ &  \\
-Zm00001eb191990 & \textit{pig3} & 15.0 & $+1.97$ & Quinone oxidoreductase PIG3 \\
-Zm00001eb241410 & \textit{etfa} & 14.0 & $+4.46$ & Electron transfer flavoprotein subuni... \\
-Zm00001eb213070 & \textit{gbp1} & 13.7 & $+8.96$ & GTP-binding protein-related \\
-Zm00001eb195370 &  & 13.6 & $+1.63$ &  \\
-Zm00001eb041890 & \textit{kan1} & 13.6 & $+1.68$ & KANADI1 \\
-Zm00001eb189920 & \textit{aldh2} & 13.6 & $+2.70$ & aldehyde dehydrogenase2 \\
-Zm00001eb190750 & \textit{jmj21} & 13.5 & $+2.28$ & JUMONJI-transcription factor 21 \\
-Zm00001eb189580 &  & 13.2 & $+7.38$ &  \\
-Zm00001eb182850 & \textit{mybsant} & 12.4 & $+6.96$ &  \\
-Zm00001eb112470 & \textit{engd2} & 12.3 & $+6.14$ & OBG-type G domain-containing protein \\
-Zm00001eb187280 & \textit{gpm458} & 11.2 & $+10.47$ & Oil body-associated protein like \\
-\midrule
-\multicolumn{5}{l}{\textbf{Leaf$\times$\invfour}} \\ \midrule
-Zm00001eb194380 & \textit{sec6} & 3.1 & $-0.55$ & Exocyst complex component Sec6 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[!ht]
-\includegraphics[width=\linewidth]{figs/divergence.png}
-\caption{\textbf{Expression change and CDS sequence divergence in the \invfour introgression.}
-\textbf{(A)} Distribution of $\log_2$ fold change for all expressed genes on chromosome 4, grouped by region (\invfour, flanking introgression, outside).
-Wilcoxon rank-sum tests show no significant directional bias between regions.
-\textbf{(B)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes inside the inversion (\invfour, $n$ = 107) and in the flanking introgression (flanking, $n$ = 147).
-Points show individual genes (beeswarm); boxes show median and interquartile range.
-$y$-axis is log$_{10}$-scaled.
-Wilcoxon rank-sum $p$ = 0.0034.
-\textbf{(C)} Absolute $\log_2$ fold change vs CDS divergence.
-Parallel lines show the additive model (shared slope for divergence effect, vertical offset for region effect).
-Region $p$ = 0.0023;
-divergence $p$ = 2.4e-06;
-adj.\ $R^2$ = 0.104.}
-\label{fig::divergence}
-\end{figure}
-
-\begin{table}[!ht]
-\caption{\textbf{Model comparison for the relationship between CDS divergence and expression change in the \invfour introgression.}
-Five linear models predicting $|\text{log}_2\text{FC}|$ were compared by BIC and AIC.
-The additive model (CDS divergence + region) provided the best fit, with the interaction term adding no improvement.
-Region distinguishes genes inside \invfour from the flanking introgression.}
-\label{tab::divergence_models}
-\centering
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-\textbf{Model} & \textbf{df} & \textbf{AIC} & \textbf{BIC} & \textbf{adj.\ $R^2$} \\ \midrule
-CDS divergence + region & 3 & 1032.2 & 1046.3 & 0.1037 \\
-CDS divergence & 2 & 1039.6 & 1050.2 & 0.0734 \\
-CDS divergence $\times$ region & 4 & 1033.2 & 1050.9 & 0.1035 \\
-Region & 2 & 1052.8 & 1063.4 & 0.0242 \\
-Null (intercept only) & 1 & 1058 & 1065.1 & 0 \\ \bottomrule
-\end{tabular}
-\end{table}
-
 \clearpage
+
 
 \begin{table}[!ht]
 \caption{\textbf{Genotype $\times$ Environment interaction statistics.} Two-way ANOVA results for \invfour effects across three location-year combinations (PA2022, PA2025, NC2025) using the MI21 donor background. Interaction $p$-values and effect sizes ($\eta^2_p$) are shown for each phenotype.}
@@ -1879,6 +1902,100 @@ Internode 2 shows the largest difference ($-4.12$ cm, $-18.5\%$; FDR $= 3.7 \tim
 \clearpage
 
 
+
+\begin{table}[!ht]
+\caption{\textbf{Effect of \invfour on gene expression.} Selected DEGs from the plant-blocking limma model (FDR $< 0.05$, $|\log_2 \text{FC}| > 1.5$). Bottom rows show significant Leaf$\times$\invfour interactions.}
+\label{tab:gene_effects}
+\centering
+\small
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+\textbf{Gene ID} & \textbf{Label} & \textbf{$-\log_{10}$(\textit{FDR})} & \textbf{$\log_2$FC} & \textbf{Description} \\ \midrule
+\multicolumn{5}{l}{\textbf{\invfour: Downregulated}} \\ \midrule
+Zm00001eb191790 & \textit{jmj2} & 21.9 & $-3.49$ & JUMONJI-transcription factor 2 \\
+Zm00001eb191820 & \textit{jmj4} & 19.7 & $-2.84$ & JUMONJI-transcription factor 4 \\
+Zm00001eb189910 & \textit{metrs1} & 17.5 & $-2.86$ & Methionyl-tRNA synthetase \\
+Zm00001eb192850 & \textit{smo4} & 17.5 & $-1.98$ & Ribosome biogenesis protein NOP53 \\
+Zm00001eb192630 & \textit{ccta} & 15.8 & $-1.69$ & CCT-alpha \\
+Zm00001eb188070 & \textit{arf1} & 15.8 & $-2.78$ & ADP-ribosylation factor \\
+Zm00001eb188750 & \textit{hsp70-17} & 14.2 & $-6.48$ & Heat shock 70 kDa protein 17 \\
+Zm00001eb190240 &  & 14.2 & $-9.16$ &  \\
+Zm00001eb188240 & \textit{ropgef14} & 13.6 & $-2.98$ & Rop guanine nucleotide exchange facto... \\
+Zm00001eb193260 & \textit{trxl2} & 13.2 & $-6.10$ & Thioredoxin-like 3-1, chloroplastic \\
+Zm00001eb190350 &  & 13.0 & $-1.83$ & Ankyrin repeat-containing protein \\
+\midrule
+\multicolumn{5}{l}{\textbf{\invfour: Upregulated}} \\ \midrule
+Zm00001eb264460 & \textit{ychf} & 16.9 & $+6.50$ &  \\
+Zm00001eb194380 & \textit{sec6} & 16.5 & $+2.87$ & Exocyst complex component Sec6 \\
+Zm00001eb190670 & \textit{zfrvt} & 15.6 & $+1.97$ &  \\
+Zm00001eb191990 & \textit{pig3} & 15.0 & $+1.97$ & Quinone oxidoreductase PIG3 \\
+Zm00001eb241410 & \textit{etfa} & 14.0 & $+4.46$ & Electron transfer flavoprotein subuni... \\
+Zm00001eb213070 & \textit{gbp1} & 13.7 & $+8.96$ & GTP-binding protein-related \\
+Zm00001eb195370 &  & 13.6 & $+1.63$ &  \\
+Zm00001eb041890 & \textit{kan1} & 13.6 & $+1.68$ & KANADI1 \\
+Zm00001eb189920 & \textit{aldh2} & 13.6 & $+2.70$ & aldehyde dehydrogenase2 \\
+Zm00001eb190750 & \textit{jmj21} & 13.5 & $+2.28$ & JUMONJI-transcription factor 21 \\
+Zm00001eb189580 &  & 13.2 & $+7.38$ &  \\
+Zm00001eb182850 & \textit{mybsant} & 12.4 & $+6.96$ &  \\
+Zm00001eb112470 & \textit{engd2} & 12.3 & $+6.14$ &  \\
+Zm00001eb187280 & \textit{gpm458} & 11.2 & $+10.47$ & Oil body-associated protein like \\
+\midrule
+\multicolumn{5}{l}{\textbf{Leaf$\times$\invfour}} \\ \midrule
+Zm00001eb194380 & \textit{sec6} & 3.1 & $-0.55$ & Exocyst complex component Sec6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/sec6_leaf_trajectory.png}
+\caption{\textbf{\textit{sec6} expression across leaf positions in CTRL and \invfour.}
+}
+\label{fig::sec6_trajectory}
+\end{figure*}
+
+\clearpage
+
+\begin{table}[!ht]
+\caption{\textbf{Model comparison for the relationship between CDS divergence and expression change in the \invfour introgression.}
+Five linear models predicting $|\text{log}_2\text{FC}|$ were compared by BIC and AIC.
+The additive model (CDS divergence + region) provided the best fit, with the interaction term adding no improvement.
+Region distinguishes genes inside \invfour from the flanking introgression.}
+\label{tab::divergence_models}
+\centering
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{df} & \textbf{AIC} & \textbf{BIC} & \textbf{adj.\ $R^2$} \\ \midrule
+CDS divergence + region & 3 & 1032.2 & 1046.3 & 0.1037 \\
+CDS divergence & 2 & 1039.6 & 1050.2 & 0.0734 \\
+CDS divergence $\times$ region & 4 & 1033.2 & 1050.9 & 0.1035 \\
+Region & 2 & 1052.8 & 1063.4 & 0.0242 \\
+Null (intercept only) & 1 & 1058 & 1065.1 & 0 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+
+\begin{figure}[!ht]
+\includegraphics[width=\linewidth]{figs/divergence.png}
+\caption{\textbf{Expression change and CDS sequence divergence in the \invfour introgression.}
+\textbf{(A)} Distribution of $\log_2$ fold change for all expressed genes on chromosome 4, grouped by region (\invfour, flanking introgression, outside).
+Wilcoxon rank-sum tests show no significant directional bias between regions.
+\textbf{(B)} Distribution of CDS divergence (100 $-$ \% identity) for expressed genes inside the inversion (\invfour, $n$ = 107) and in the flanking introgression (flanking, $n$ = 147).
+Points show individual genes (beeswarm); boxes show median and interquartile range.
+$y$-axis is log$_{10}$-scaled.
+Wilcoxon rank-sum $p$ = 0.0034.
+\textbf{(C)} Absolute $\log_2$ fold change vs CDS divergence.
+Parallel lines show the additive model (shared slope for divergence effect, vertical offset for region effect).
+Region $p$ = 0.0023;
+divergence $p$ = 2.4e-06;
+adj.\ $R^2$ = 0.104.}
+\label{fig::divergence}
+\end{figure}
+
+\clearpage
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=\linewidth]{figs/module_support.png}
@@ -1910,18 +2027,7 @@ In both panels, bubble size indicates gene count and color indicates enrichment 
 
 \clearpage
 
-\begin{figure*}[!ht]
-\centering
-\includegraphics[width=\linewidth]{figs/jmj_teosinte.png}
-\caption{\textbf{Microsynteny of the \jmjii / \jmjiv cluster across \textit{Zea mays} and teosinte genomes.}
-PanZea v2 pangene track (PanZea.v2.pan00060) of the genomic neighborhood around \jmjii and \jmjiv in nine \textit{Zea mays} NAM reference assemblies (top) and five teosinte assemblies (bottom; \parv, \mex, and \textit{Z.~nicaraguensis} lines).
-Arrows represent gene models colored by pangene ortholog group; green arrows mark the \jmjii / \jmjiv tandem array.
-The \textit{Zea mays} assemblies carry the multi-copy tandem array described in Fig.~\ref{fig:jmj_cluster}B, whereas the teosinte assemblies retain a reduced or single-copy configuration, consistent with a lineage-specific expansion in \textit{Z.~mays}.
-Interactive view: \url{https://gcv.maizegdb.org/gene;maize=Zm00001eb191810?sources=maize&neighbors=10}.}
-\label{fig::jmj_teosinte}
-\end{figure*}
 
-\clearpage
 
 \begin{figure*}[!ht]
 \centering
@@ -1937,111 +2043,6 @@ This figure complements Fig.~\ref{fig:wgcna}B, which summarizes module-level con
 
 \clearpage
 
-\begin{figure*}[!ht]
-\centering
-\includegraphics[width=\linewidth]{figs/sec6_leaf_trajectory.png}
-\caption{\textbf{\textit{sec6} expression across leaf positions in CTRL and \invfour.}
-}
-\label{fig::sec6_trajectory}
-\end{figure*}
-
-\clearpage
-
-\begin{figure*}[!ht]
-\centering
-\includegraphics[width=\linewidth]{figs/supp_novel_trans_network_full.png}
-\caption{\textbf{Full \invfour dataset-specific trans-coexpression network (Bonferroni $< 0.001$).}
-Minimum spanning tree of all dataset-specific co-expression edges not present in the MaizeNetome reference, filtered to Bonferroni-adjusted $p < 0.001$ across the cis $\times$ trans correlation test pool ($m \approx 1{,}095$ tests, $n = 43$ samples).
-Node fill indicates genomic location: purple (\invfour region), pink (flanking introgression), gold (outside inversion).
-Colored fill indicates upregulation in \invfour; white fill with colored border indicates downregulation.
-Edge width is proportional to mutual information.
-Gene labels are shown in italics.
-This figure shows the complete novel network; the \jmjiv neighborhood subgraph is detailed in Fig.~\ref{fig:wgcna}C.}
-\label{fig::trans_novel_full}
-\end{figure*}
-
-\begin{table*}[!ht]
-\caption{\textbf{\invfour trans-coexpression network genes: \invfour region.}
-Genes within the \invfour introgression participating in the trans-coexpression
-network (Bonferroni $< 0.001$), spanning both MaizeNetome-supported reference
-edges and dataset-specific novel edges, sorted by FDR ascending.
-$\log_2$FC and FDR are from the genotype DEG analysis.}
-\label{tab::trans_network_inv4m}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lllrr}
-\toprule
-\textbf{Gene ID} & \textbf{Label} & \textbf{Description} &
-  \textbf{$\log_2$FC} & \textbf{FDR} \\
-\midrule
-  \textit{Zm00001eb191790} & \textit{jmj2} & JUMONJI-transcription factor 2 & -3.49 & 1.17e-22 \\
-  \textit{Zm00001eb191820} & \textit{jmj4} & JUMONJI-transcription factor 4 & -2.84 & 1.91e-20 \\
-  \textit{Zm00001eb192850} & \textit{smo4} & Ribosome biogenesis protein NOP53 & -1.98 & 3.14e-18 \\
-  \textit{Zm00001eb194380} & \textit{sec6} & Exocyst complex component Sec6 & 2.87 & 2.93e-17 \\
-  \textit{Zm00001eb192630} & \textit{ccta} & CCT-alpha & -1.69 & 1.58e-16 \\
-  \textit{Zm00001eb190670} & \textit{zfrvt} & Non-LTR retroelement reverse transcriptase (zf-RVT) & 1.97 & 2.27e-16 \\
-  \textit{Zm00001eb191990} & \textit{pig3} & Quinone oxidoreductase PIG3 & 1.97 & 9.60e-16 \\
-  \textit{Zm00001eb190750} & \textit{jmj21} & JUMONJI-transcription factor 21 & 2.28 & 2.96e-14 \\
-  \textit{Zm00001eb193260} & \textit{trxl2} & Thioredoxin-like 3-1, chloroplastic & -6.10 & 6.74e-14 \\
-  \textit{Zm00001eb192880} & \textit{tet2} & Tetraspanin-2 & -6.86 & 2.09e-13 \\
-  \textit{Zm00001eb192330} & \textit{borr} & Borealin-related, chromosomal passenger complex (Pfam PF10512) & 5.05 & 3.27e-13 \\
-  \textit{Zm00001eb194300} & \textit{paspa} & Aspartic proteinase-like protein 1 & -3.87 & 9.71e-12 \\
-  \textit{Zm00001eb192350} & \textit{pkwd1} & Protein kinase family protein / WD-40 repeat family protein & -2.20 & 1.87e-09 \\
-  \textit{Zm00001eb194270} & \textit{flz22} & FCS-like zinc finger22 & 2.69 & 1.94e-09 \\
-  \textit{Zm00001eb192970} & --- & DUF1618 domain-containing protein (Fragment) & -6.06 & 7.67e-09 \\
-  \textit{Zm00001eb193300} & --- & --- & -4.92 & 9.60e-09 \\
-  \textit{Zm00001eb192580} & \textit{map4k8} & serine/threonine-protein kinase BLUS1 & 2.83 & 4.44e-08 \\
-  \textit{Zm00001eb194700} & --- & Nucleobase-ascorbate transporter 6-like isoform X1 & -2.07 & 8.38e-08 \\
-  \textit{Zm00001eb193120} & \textit{o3l1} & Oxidative stress-like 3 & 2.35 & 1.01e-07 \\
-  \textit{Zm00001eb193130} & \textit{chi} & Chalcone--flavonone isomerase & -5.47 & 2.61e-07 \\
-  \textit{Zm00001eb192180} & \textit{hpse3} & Heparanase-like protein 3 & -5.75 & 7.12e-07 \\
-  \textit{Zm00001eb192120} & \textit{enth1} & ENTH domain-containing protein & -2.41 & 1.99e-06 \\
-  \textit{Zm00001eb194180} & --- & troponin T, skeletal muscle-like & 3.97 & 4.68e-06 \\
-  \textit{Zm00001eb193660} & \textit{nii2} & nitrite reductase2 & -2.06 & 1.64e-05 \\
-  \textit{Zm00001eb192170} & --- & --- & -8.83 & 6.26e-05 \\
-  \textit{Zm00001eb192910} & \textit{lkrsdh1} & lysine-ketoglutarate reductase/saccharopine dehydrogenase1 & -1.78 & 3.51e-04 \\
-  \textit{Zm00001eb191000} & \textit{4cll5} & 4-coumarate--CoA ligase-like 5 & -3.35 & 1.74e-03 \\
-  \textit{Zm00001eb192470} & \textit{cdi} & Protein CDI & 3.19 & 1.86e-03 \\
-  \textit{Zm00001eb194110} & \textit{pmt1} & pectin methyltransferase1 & -1.78 & 4.36e-03 \\
-  \textit{Zm00001eb192050} & \textit{pcna2} & proliferating cell nuclear antigen2 & 2.99 & 9.34e-03 \\
-  \textit{Zm00001eb194570} & --- & --- & -1.71 & 1.49e-02 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{table*}[!ht]
-\caption{\textbf{\invfour trans-coexpression network genes: outside introgression.}
-Genes outside the \invfour introgression participating in the trans-coexpression
-network (Bonferroni $< 0.001$), spanning both MaizeNetome-supported reference
-edges and dataset-specific novel edges, sorted by FDR ascending.
-$\log_2$FC and FDR are from the genotype DEG analysis.}
-\label{tab::trans_network_outside}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lllrr}
-\toprule
-\textbf{Gene ID} & \textbf{Label} & \textbf{Description} &
-  \textbf{$\log_2$FC} & \textbf{FDR} \\
-\midrule
-  \textit{Zm00001eb041890} & \textit{kan1} & KANADI1 & 1.68 & 2.59e-14 \\
-  \textit{Zm00001eb182850} & \textit{mybsant} & --- & 6.96 & 3.80e-13 \\
-  \textit{Zm00001eb112470} & \textit{engd2} & OBG-type G domain-containing protein & 6.14 & 4.90e-13 \\
-  \textit{Zm00001eb000540} & \textit{prd4} & Phosphatidylinositol N-acetyglucosaminlytransferase subunit P-related & 2.32 & 3.99e-10 \\
-  \textit{Zm00001eb025970} & \textit{ppp} & Serine/threonine protein phosphatase & 5.24 & 1.87e-09 \\
-  \textit{Zm00001eb251960} & \textit{abh1} & abscisic acid 8'-hydroxylase1 & -2.83 & 5.23e-07 \\
-  \textit{Zm00001eb096620} & \textit{pip2i} & plasma membrane intrinsic protein, PIP2i & 1.59 & 1.03e-06 \\
-  \textit{Zm00001eb428740} & \textit{ocl2} & outer cell layer2 & -2.66 & 3.43e-06 \\
-  \textit{Zm00001eb157030} & --- & --- & 5.68 & 1.46e-05 \\
-  \textit{Zm00001eb332450} & \textit{roc4} & Peptidyl-prolyl cis-trans isomerase & -2.92 & 1.69e-05 \\
-  \textit{Zm00001eb166340} & \textit{bgal1} & Beta-galactosidase & -4.14 & 5.61e-05 \\
-  \textit{Zm00001eb148670} & \textit{acd6} & accelerated cell death ortholog6 & -1.86 & 1.51e-03 \\
-  \textit{Zm00001eb183030} & \textit{gst} & Glutathione S-transferase & 7.84 & 2.04e-03 \\
-  \textit{Zm00001eb132370} & --- & --- & 2.33 & 4.82e-03 \\
-  \textit{Zm00001eb213980} & \textit{dwy1} & Pentatricopeptide repeat-containing protein & -5.21 & 9.70e-03 \\
-  \textit{Zm00001eb159210} & \textit{cyp72a} & Cytochrome P450 family 72 subfamily A polypeptide 8 & -1.57 & 1.47e-02 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\clearpage
 
 \begin{table}[!ht]
 \caption{\textbf{WGCNA module preservation statistics for the Genotype Response (Inv4m DEG) reference network.} Modules sorted by FDR from the genotype-label permutation test used in Fig.~\ref{fig:wgcna}B (1000 shuffles of the CTRL/\invfour labels). $\Delta k_{Within}$ is the mean intramodular connectivity change (\invfour $-$ CTRL); $Z_{\Delta k}$ is that observed value expressed as a $z$-score relative to the permutation null. $Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $Z_{summary} < 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. $Z_{connectivity}$ quantifies rank preservation of intramodular connectivity; $Z_{density}$ quantifies preservation of average connectivity strength. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
@@ -2161,5 +2162,120 @@ Zm00001eb160040 & \textit{rpc3} & DNA-directed RNA polymerase III subun... & $-0
 \bottomrule
 \end{tabular}
 \end{table}
+
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/supp_novel_trans_network_full.png}
+\caption{\textbf{Full \invfour dataset-specific trans-coexpression network (Bonferroni $< 0.001$).}
+Minimum spanning tree of all dataset-specific co-expression edges not present in the MaizeNetome reference, filtered to Bonferroni-adjusted $p < 0.001$ across the cis $\times$ trans correlation test pool ($m \approx 1{,}095$ tests, $n = 43$ samples).
+Node fill indicates genomic location: purple (\invfour region), pink (flanking introgression), gold (outside inversion).
+Colored fill indicates upregulation in \invfour; white fill with colored border indicates downregulation.
+Edge width is proportional to mutual information.
+Gene labels are shown in italics.
+This figure shows the complete novel network; the \jmjiv neighborhood subgraph is detailed in Fig.~\ref{fig:wgcna}C.}
+\label{fig::trans_novel_full}
+\end{figure*}
+
+\clearpage
+
+
+\begin{table*}[!ht]
+\caption{\textbf{\invfour trans-coexpression network genes: \invfour region.}
+Genes within the \invfour introgression participating in the trans-coexpression
+network (Bonferroni $< 0.001$), spanning both MaizeNetome-supported reference
+edges and dataset-specific novel edges, sorted by FDR ascending.
+$\log_2$FC and FDR are from the genotype DEG analysis.}
+\label{tab::trans_network_inv4m}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrr}
+\toprule
+\textbf{Gene ID} & \textbf{Label} & \textbf{Description} &
+  \textbf{$\log_2$FC} & \textbf{FDR} \\
+\midrule
+  \textit{Zm00001eb191790} & \textit{jmj2} & JUMONJI-transcription factor 2 & -3.49 & 1.17e-22 \\
+  \textit{Zm00001eb191820} & \textit{jmj4} & JUMONJI-transcription factor 4 & -2.84 & 1.91e-20 \\
+  \textit{Zm00001eb192850} & \textit{smo4} & Ribosome biogenesis protein NOP53 & -1.98 & 3.14e-18 \\
+  \textit{Zm00001eb194380} & \textit{sec6} & Exocyst complex component Sec6 & 2.87 & 2.93e-17 \\
+  \textit{Zm00001eb192630} & \textit{ccta} & CCT-alpha & -1.69 & 1.58e-16 \\
+  \textit{Zm00001eb190670} & \textit{zfrvt} & Non-LTR retroelement reverse transcriptase (zf-RVT) & 1.97 & 2.27e-16 \\
+  \textit{Zm00001eb191990} & \textit{pig3} & Quinone oxidoreductase PIG3 & 1.97 & 9.60e-16 \\
+  \textit{Zm00001eb190750} & \textit{jmj21} & JUMONJI-transcription factor 21 & 2.28 & 2.96e-14 \\
+  \textit{Zm00001eb193260} & \textit{trxl2} & Thioredoxin-like 3-1, chloroplastic & -6.10 & 6.74e-14 \\
+  \textit{Zm00001eb192880} & \textit{tet2} & Tetraspanin-2 & -6.86 & 2.09e-13 \\
+  \textit{Zm00001eb192330} & \textit{borr} & Borealin-related, chromosomal passenger complex (Pfam PF10512) & 5.05 & 3.27e-13 \\
+  \textit{Zm00001eb194300} & \textit{paspa} & Aspartic proteinase-like protein 1 & -3.87 & 9.71e-12 \\
+  \textit{Zm00001eb192350} & \textit{pkwd1} & Protein kinase family protein / WD-40 repeat family protein & -2.20 & 1.87e-09 \\
+  \textit{Zm00001eb194270} & \textit{flz22} & FCS-like zinc finger22 & 2.69 & 1.94e-09 \\
+  \textit{Zm00001eb192970} & --- & DUF1618 domain-containing protein (Fragment) & -6.06 & 7.67e-09 \\
+  \textit{Zm00001eb193300} & --- & --- & -4.92 & 9.60e-09 \\
+  \textit{Zm00001eb192580} & \textit{map4k8} & serine/threonine-protein kinase BLUS1 & 2.83 & 4.44e-08 \\
+  \textit{Zm00001eb194700} & --- & Nucleobase-ascorbate transporter 6-like isoform X1 & -2.07 & 8.38e-08 \\
+  \textit{Zm00001eb193120} & \textit{o3l1} & Oxidative stress-like 3 & 2.35 & 1.01e-07 \\
+  \textit{Zm00001eb193130} & \textit{chi} & Chalcone--flavonone isomerase & -5.47 & 2.61e-07 \\
+  \textit{Zm00001eb192180} & \textit{hpse3} & Heparanase-like protein 3 & -5.75 & 7.12e-07 \\
+  \textit{Zm00001eb192120} & \textit{enth1} & ENTH domain-containing protein & -2.41 & 1.99e-06 \\
+  \textit{Zm00001eb194180} & --- & troponin T, skeletal muscle-like & 3.97 & 4.68e-06 \\
+  \textit{Zm00001eb193660} & \textit{nii2} & nitrite reductase2 & -2.06 & 1.64e-05 \\
+  \textit{Zm00001eb192170} & --- & --- & -8.83 & 6.26e-05 \\
+  \textit{Zm00001eb192910} & \textit{lkrsdh1} & lysine-ketoglutarate reductase/saccharopine dehydrogenase1 & -1.78 & 3.51e-04 \\
+  \textit{Zm00001eb191000} & \textit{4cll5} & 4-coumarate--CoA ligase-like 5 & -3.35 & 1.74e-03 \\
+  \textit{Zm00001eb192470} & \textit{cdi} & Protein CDI & 3.19 & 1.86e-03 \\
+  \textit{Zm00001eb194110} & \textit{pmt1} & pectin methyltransferase1 & -1.78 & 4.36e-03 \\
+  \textit{Zm00001eb192050} & \textit{pcna2} & proliferating cell nuclear antigen2 & 2.99 & 9.34e-03 \\
+  \textit{Zm00001eb194570} & --- & --- & -1.71 & 1.49e-02 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\clearpage
+
+\begin{table*}[!ht]
+\caption{\textbf{\invfour trans-coexpression network genes: outside introgression.}
+Genes outside the \invfour introgression participating in the trans-coexpression
+network (Bonferroni $< 0.001$), spanning both MaizeNetome-supported reference
+edges and dataset-specific novel edges, sorted by FDR ascending.
+$\log_2$FC and FDR are from the genotype DEG analysis.}
+\label{tab::trans_network_outside}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrr}
+\toprule
+\textbf{Gene ID} & \textbf{Label} & \textbf{Description} &
+  \textbf{$\log_2$FC} & \textbf{FDR} \\
+\midrule
+  \textit{Zm00001eb041890} & \textit{kan1} & KANADI1 & 1.68 & 2.59e-14 \\
+  \textit{Zm00001eb182850} & \textit{mybsant} & --- & 6.96 & 3.80e-13 \\
+  \textit{Zm00001eb112470} & \textit{engd2} & OBG-type G domain-containing protein & 6.14 & 4.90e-13 \\
+  \textit{Zm00001eb000540} & \textit{prd4} & Phosphatidylinositol N-acetyglucosaminlytransferase subunit P-related & 2.32 & 3.99e-10 \\
+  \textit{Zm00001eb025970} & \textit{ppp} & Serine/threonine protein phosphatase & 5.24 & 1.87e-09 \\
+  \textit{Zm00001eb251960} & \textit{abh1} & abscisic acid 8'-hydroxylase1 & -2.83 & 5.23e-07 \\
+  \textit{Zm00001eb096620} & \textit{pip2i} & plasma membrane intrinsic protein, PIP2i & 1.59 & 1.03e-06 \\
+  \textit{Zm00001eb428740} & \textit{ocl2} & outer cell layer2 & -2.66 & 3.43e-06 \\
+  \textit{Zm00001eb157030} & --- & --- & 5.68 & 1.46e-05 \\
+  \textit{Zm00001eb332450} & \textit{roc4} & Peptidyl-prolyl cis-trans isomerase & -2.92 & 1.69e-05 \\
+  \textit{Zm00001eb166340} & \textit{bgal1} & Beta-galactosidase & -4.14 & 5.61e-05 \\
+  \textit{Zm00001eb148670} & \textit{acd6} & accelerated cell death ortholog6 & -1.86 & 1.51e-03 \\
+  \textit{Zm00001eb183030} & \textit{gst} & Glutathione S-transferase & 7.84 & 2.04e-03 \\
+  \textit{Zm00001eb132370} & --- & --- & 2.33 & 4.82e-03 \\
+  \textit{Zm00001eb213980} & \textit{dwy1} & Pentatricopeptide repeat-containing protein & -5.21 & 9.70e-03 \\
+  \textit{Zm00001eb159210} & \textit{cyp72a} & Cytochrome P450 family 72 subfamily A polypeptide 8 & -1.57 & 1.47e-02 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\clearpage
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[width=\linewidth]{figs/jmj_teosinte.png}
+\caption{\textbf{Microsynteny of the \jmjii / \jmjiv cluster across \textit{Zea mays} and teosinte genomes.}
+PanZea v2 pangene track (PanZea.v2.pan00060) of the genomic neighborhood around \jmjii and \jmjiv in nine \textit{Zea mays} NAM reference assemblies (top) and five teosinte assemblies (bottom; \parv, \mex, and \textit{Z.~nicaraguensis} lines).
+Arrows represent gene models colored by pangene ortholog group; green arrows mark the \jmjii / \jmjiv tandem array.
+The \textit{Zea mays} assemblies carry the multi-copy tandem array described in Fig.~\ref{fig:jmj_cluster}B, whereas the teosinte assemblies retain a reduced or single-copy configuration, consistent with a lineage-specific expansion in \textit{Z.~mays}.
+Interactive view: \url{https://gcv.maizegdb.org/gene;maize=Zm00001eb191810?sources=maize&neighbors=10}.}
+\label{fig::jmj_teosinte}
+\end{figure*}
+
+\clearpage
 
 \end{document}
