@@ -1,28 +1,32 @@
 # inv4m Project Guide
 
-**Last Updated:** 2026-05-15 (evening)
-**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (F2 hybrid panel for Figure 2 ✅ 2026-05-14; ZEAL NIL Inv4m supp figure ✅ 2026-05-15; Rubén + coauthor feedback still pending)
-**Version:** v2.3.0
+**Last Updated:** 2026-05-21
+**Status:** Phosphorus Paper - Complete ✅ | Inversion Paper - Late Phase 5 / Phase 6 🔶 (PA2024 hybrid panel ✅ 2026-05-14; ZEAL NIL supp figure ✅ 2026-05-15; gene-name / description revision pass + trans-network figure/table restructure ✅ 2026-05-21; Rubén + coauthor feedback still pending)
+**Version:** v2.4.0
 
 ---
 
 ## NEXT SESSION PROMPT
 
 > **Read first** (in order):
-> 1. `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` — current state + active task list with full notes
-> 2. `agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md` — Phase 6 row table
+> 1. `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` — full state with the 2026-05-21 snapshot at top covering today's gene-name / description revision pass and trans-network supplement restructure
+> 2. `agent/inversion_paper/MASTER_PLAN_inversion_paper_revision.md` — v2.4 Phase 6 row table
 > 3. This file's "Phase 6 Task List" table below
 >
-> **Active priority (user-pinned):** **Review Figure 6 (WGCNA module perturbation)** layout / style / labels. Producer: `scripts/inversion_paper/assemble_WGCNA_figure.Rmd`. Current rendered: `results/inversion_paper/figures/WGCNA_module_perturbation.png`. Walk through the panels (A dendrogram, B Δk_Within boxplot, C hub gene connectivity scatter) and surface specific layout / font / label issues.
+> **Active priority (user-pinned):** **Complete the supplement audit** — walk every figure and table in the supplement (`docs/inversion_paper/main.tex` from L1374 onward, after `\section*{Supplement}`) and verify consistency now that the 2026-05-21 revision pass has propagated through. Concretely:
 >
-> **Other Phase 6 deliverables queued (not blocking):**
-> - **C4 / row 2d — PA2024 W22 × NIL hybrid trial integration** (= Figure 2 panel B; analysis already done). Needs: (a) dedicated Results paragraph in §3.2 narrating Figure 2 panel B (currently §3.2 only describes PA2022 panel A explicitly), (b) Discussion expansion to integrate with ZEAL multi-donor flowering replication, (c) W22 tester identity inserted into existing Methods (L1090) + Discussion (L902) + Figure 2 caption (L212) since current text uses breeders' shorthand `Inv4_Mi21` / `Inv4_B73` without explanation. **Trial design:** W22 tester crossed to B73-background NILs; focal pair `Inv4_Mi21` (W22 × NIL with Mi21-donor inverted karyotype) vs `Inv4_B73` (W22 × NIL with B73 standard karyotype). The "Inv4_B73" label decodes as the recurrent karyotype, NOT a B73-only entry.
-> - **C3 / row 2c — ZEAL Discussion integration** (Methods + Results + Fig.~S2 already in main.tex; just needs Discussion paragraph). Frame: multi-donor flowering replication (4 mexicana races + Hueh) supports the Inv4m-interval-mapping argument vs MI21-specific background; PH null is consistent with the larger donor lineage variance; ZEAL has no direct grain yield trait, so the yield framing comes from C4 (PA2024 hybrid), not from ZEAL.
-> - **C / row — JMJ paralog supp figure inclusion** in main.tex (`figs/jmj_paralogs_expression_boxplot.png` already exists; just needs `\includegraphics` + caption + label).
-> - **C2 / row 2b — NEW supp figure: teosinte single-copy evidence for the jmj2-9 cluster** (structural / microsynteny / coverage evidence; producer notebook TBD).
-> - **C5 / row 24e — NEW supp figure: full Novel trans-coexpression MST** under Bonferroni<0.001 (~48 nodes). Label `fig::trans_novel_full` is already referenced from the new `fig:wgcna` panel C caption; hand-export from the "Novel network MST (full)" widget in `agent/inversion_paper/novel_edge_filter_iterate.html`.
-> - **D / row — Re-upload renamed PNGs to Overleaf**: PA2024 Figure 2, `inv4mZEAL.png` (new Fig.~S2), and the PSU/CLY → PA/NC label updates from earlier passes.
-> - **E / row — Bibtex audit**: confirm `bates2015`, `kuznetsova2017` resolve in `Inv4m.bib` on Overleaf; `sanchez-gonzalez2018` already added by user. Spot-check `fransz2016`, `desmarais2017`, `minow2021`, PT HiLo-1.0.
+> 1. **Cross-reference audit**: every `\ref{fig::...}` / `\ref{tab::...}` / `\ref{tab:...}` in the body and supplement must resolve to a label that exists in the supplement. Run `grep -oE "\\\\ref\{[^}]+\}" docs/inversion_paper/main.tex | sort -u` and confirm each label is defined exactly once.
+> 2. **Label / description consistency**: cross-check every gene in every supplement table against `data/locus_labels_master.csv`. The script template lives at `agent/inversion_paper/check_table1_labels.py` (Python csv reader; extend to scan all supplement tables in one pass, report mismatches gene-by-gene). Today's renames already applied: `roc4-1` → `borr`, `roc4-2` → `roc4`, `dwy1` → `dyw1`. Today's description corrections: `smo4` (NOP53, not SUMO), `prd4` (PAIR1, not phosphatidylinositol), `engd2` (OBG-type G domain), `zfrvt` (Non-LTR retroelement reverse transcriptase / zf-RVT), `dyw1` (DYW family nucleic acid deaminase). Today's drops: troponin annotation for Zm00001eb194180, `cl59140_1` marker for Zm00001eb126770. Any remaining "GTPase-like protein" / "Pentatricopeptide repeat-containing protein" / generic PANNZER strings that look like spurious or low-information annotations are candidates for the same MaizeGDB-anchored correction workflow.
+> 3. **Formatting consistency**: empty cells blank (no `---`); positive log2FC has explicit `+` sign; all gene IDs wrapped in `\textit{}`; "Label" column header (not "Locus"); captions use `\textbf{...}` for the bolded leading phrase. Re-run the targeted greps from the 2026-05-21 commits to confirm nothing regressed.
+> 4. **Image-side label check**: for every figure rendered from `Analyze_MaizeNetome_TransRegulation_network_split.Rmd` (notably `Figure_4_C_trans_network.png` and `supp_novel_trans_network_full.png`), open the PNG with the Read tool and verify the displayed labels match the master CSV. If any are stale, re-render the notebook (sandbox disabled — `processx` blocked; `dangerouslyDisableSandbox=true` is documented as the correct path for this specific case). For the composite `WGCNA_module_perturbation.png`, re-render `assemble_WGCNA_figure.Rmd` to pick up the updated panel C.
+> 5. **Bibtex audit on new citations** added 2026-05-21: confirm `zhang2015b` (Zhang 2015 J Integr Plant Biol, SMO4 / NOP53), `gan2014` (Gan 2014 Nat Commun, Arabidopsis JMJ flowering), `song2018` (Song 2018 Plant Physiol Biochem, OsJMJ703) all resolve in `Inv4m.bib` on Overleaf. Plus carry-over: `bates2015`, `kuznetsova2017`, `fransz2016`, `desmarais2017`, `minow2021`, `suwastika2008`, `suwastika2014`.
+>
+> **Other Phase 6 deliverables queued (not blocking the audit):**
+> - **C4 / row 2d — PA2024 W22 × NIL hybrid trial integration** (= Figure 2 panel B; analysis done). Needs: (a) dedicated Results paragraph in §3.2 narrating panel B, (b) Discussion expansion to integrate with ZEAL multi-donor flowering replication, (c) W22 tester identity inserted into Methods (L1090) + Discussion (L902) + Figure 2 caption (L212). Trial: W22 × B73-background NILs; focal pair `Inv4_Mi21` (W22 × NIL with Mi21 inverted karyotype) vs `Inv4_B73` (W22 × NIL with B73 standard karyotype). "Inv4_B73" decodes as recurrent karyotype, NOT a B73-only entry.
+> - **C3 / row 2c — ZEAL Discussion integration** (Methods + Results + Fig.~S2 already in main.tex; just needs Discussion paragraph). Frame: multi-donor flowering replication (4 mexicana races + Hueh) supports the Inv4m-interval-mapping argument vs MI21-specific background; PH null consistent with larger donor lineage variance; ZEAL has no grain yield trait — yield framing comes from C4, not from ZEAL.
+> - **C / row — JMJ paralog supp figure inclusion** in main.tex (`figs/jmj_paralogs_expression_boxplot.png` already exists; needs `\includegraphics` + caption + label).
+> - **C2 / row 2b — NEW supp figure: teosinte single-copy evidence for the jmj2-9 cluster** (structural / microsynteny / coverage; producer notebook TBD).
+> - **D / row — Re-upload renamed PNGs to Overleaf**: `Figure_2_phenotypes.png`, `inv4mZEAL.png`, `Figure_4_C_trans_network.png`, `supp_novel_trans_network_full.png`, plus PSU/CLY → PA/NC label updates from earlier passes.
 > - **F / row — Typo fix**: "acknlowledge" → "acknowledge" near main.tex L901.
 > - **G / row — Read aloud proofread**: Abstract + Discussion.
 > - **H / row — HiFi sequencing provenance**: collaborator → co-author, facility → name in Methods.
@@ -32,12 +36,15 @@
 > - **Coauthor suggestions** (pending; likely overlaps / depends on Rubén).
 >
 > **Project conventions to keep in mind:**
-> - `agent/` is git-ignored on purpose. Track in-flight notes / scratch in there. Tracked manuscript work goes in `docs/inversion_paper/main.tex` (synced to Overleaf manually) and `scripts/inversion_paper/*.Rmd`.
+> - `agent/` is git-ignored on purpose. Track in-flight notes / scratch in there. Tracked manuscript work goes in `docs/inversion_paper/main.tex` (synced to Overleaf manually) and `scripts/inversion_paper/*.Rmd`. **Temp scripts go in `agent/inversion_paper/`, never `$TMPDIR` or `/tmp`.**
 > - Figures: PNG + SVG in `results/inversion_paper/figures/` (git-ignored); refer from main.tex as `figs/<name>.png`.
-> - Use `git -C <path>` not `cd && git` (sandbox restriction).
+> - Use `git -C <path>` not `cd && git` (sandbox restriction). Push: `git -C <path> -c http.postBuffer=524288000 push origin main` to bypass SSL/RPC errors.
 > - User strongly prefers no hyphens in compound terms. "lineage corrected", not "lineage-corrected"; "FDR adjusted", not "FDR-adjusted".
 > - Karyotype terminology: "inverted karyotype" / "standard karyotype" for the *Inv4m* configuration contrast (paper convention at main.tex L1052–1054). The figure axis labels "CTRL" / "*Inv4m*" map to standard / inverted respectively.
 > - Ancestry not race when describing teosinte germplasm groupings; cite `sanchez-gonzalez2018` for the race definitions.
+> - **Label column convention** (recorded in `scripts/utils/consolidate_locus_labels.R` header): the "Label" column across manuscript tables is editorial shorthand — MaizeGDB locus\_symbol when informative, curated mnemonic otherwise. NOT naming orthodoxy. Caption-level explanation deferred until reviewers ask.
+> - **`data/locus_labels_master.csv` is the single source of truth** for gene labels and descriptions. Write-locked by default; to update: `chmod u+w → edit → chmod a-w`. The trans-network table chunk uses `coalesce(desc_merged_master, desc_merged, desc_pannzer)` — master CSV wins over the raw effects file.
+> - **Sandbox**: `dangerouslyDisableSandbox=true` is required for any R notebook that uses `webshot` / `processx` (e.g., the trans-network re-render). Confirmed sandbox-caused failure (".onLoad failed for processx: Operation not permitted") with no settings.json workaround.
 
 ## START HERE: Inversion Paper — Late Phase 5 / Phase 6
 
