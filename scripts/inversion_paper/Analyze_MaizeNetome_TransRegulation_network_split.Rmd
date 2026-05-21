@@ -678,12 +678,18 @@ if (nrow(novel_edges) > 0) {
   vn_novel_full <- visualize_mst(novel_edges_prep, novel_nodes,
                                   effects_df, font_size = 22)
 
+  # Set widget canvas to square before screenshotting
+  vn_novel_full$width  <- 1400
+  vn_novel_full$height <- 1400
+
   out_png  <- file.path(paths$figures, "supp_novel_trans_network_full.png")
   tmp_html <- tempfile(fileext = ".html")
 
   saveWidget(vn_novel_full, tmp_html, selfcontained = TRUE)
-  webshot(tmp_html, file = out_png, vwidth = 1400, vheight = 1400,
-          zoom = 2, delay = 1.5)
+  webshot(tmp_html, file = out_png,
+          selector = ".vis-network",
+          vwidth = 1400, vheight = 1400,
+          zoom = 2, delay = 2)
   unlink(tmp_html)
 
   cat("Saved:", out_png, "\n")
@@ -933,6 +939,80 @@ write.csv(
 cat("\n=== Novel Network ===\n")
 cat("Genes:", nrow(novel_gene_info), "\n")
 cat("Edges:", nrow(novel_edges), "\n")
+```
+
+---
+
+# Supplementary Table — Novel Trans-coexpression Network Genes
+
+```{r novel_network_table}
+# Join novel_nodes (region) with gene annotations and DEG stats
+novel_table_df <- novel_nodes %>%
+  dplyr::select(id, region) %>%
+  left_join(
+    effects_df %>%
+      group_by(gene) %>%
+      dplyr::slice(1) %>%
+      ungroup() %>%
+      dplyr::select(gene, locus_label, desc_merged, logFC, adj.P.Val),
+    by = c("id" = "gene")
+  ) %>%
+  mutate(
+    tex_gene  = paste0("\\textit{", id, "}"),
+    tex_label = ifelse(!is.na(locus_label),
+                       paste0("\\textit{", locus_label, "}"), "---"),
+    tex_desc  = ifelse(!is.na(desc_merged),
+                       gsub("%", "\\\\%", desc_merged), "---"),
+    tex_lfc   = sprintf("%.2f", logFC),
+    tex_fdr   = formatC(adj.P.Val, format = "e", digits = 2)
+  ) %>%
+  arrange(region, logFC)
+
+inv4m_rows   <- novel_table_df %>% filter(region == "inv4m")
+outside_rows <- novel_table_df %>% filter(region != "inv4m")
+
+make_rows <- function(df) {
+  apply(df, 1, function(r) {
+    paste0("  ", r["tex_gene"], " & ", r["tex_label"], " & ",
+           r["tex_desc"], " & ", r["tex_lfc"], " & ", r["tex_fdr"], " \\\\")
+  })
+}
+
+header <- c(
+  "\\toprule",
+  "\\textbf{Gene ID} & \\textbf{Label} & \\textbf{Description} &",
+  "  \\textbf{$\\log_2$FC} & \\textbf{FDR} \\\\",
+  "\\midrule"
+)
+
+out_lines <- c(
+  "\\begin{table*}[!ht]",
+  "\\caption{\\textbf{Novel \\invfour trans-coexpression network genes.}",
+  "All genes in the dataset-specific co-expression network (Bonferroni $< 0.001$),",
+  "split by genomic location relative to the \\invfour introgression.",
+  "$\\log_2$FC and FDR are from the genotype DEG analysis.}",
+  "\\label{tab::novel_trans_network}",
+  "\\resizebox{\\textwidth}{!}{%",
+  "\\begin{tabular}{lllrr}",
+  header,
+  paste0("\\multicolumn{5}{l}{\\textbf{\\invfour region}} \\\\"),
+  "\\midrule",
+  make_rows(inv4m_rows),
+  "\\midrule",
+  paste0("\\multicolumn{5}{l}{\\textbf{Outside introgression}} \\\\"),
+  "\\midrule",
+  make_rows(outside_rows),
+  "\\bottomrule",
+  "\\end{tabular}}",
+  "\\end{table*}"
+)
+
+out_tex <- file.path(paths$tables, "novel_trans_network_genes.tex")
+writeLines(out_lines, out_tex)
+
+cat("Saved:", out_tex, "\n")
+cat("Inv4m region genes:", nrow(inv4m_rows), "\n")
+cat("Outside introgression genes:", nrow(outside_rows), "\n")
 ```
 
 ---
