@@ -162,10 +162,12 @@ gy_annotated <- ctrl_modules %>%
   filter(color == "greenyellow") %>%
   left_join(labels, by = "gene") %>%
   mutate(
-    # Use locus_label if available, else locus_symbol
+    # Use locus_label if available; fall back to locus_symbol only when it is
+    # not a marker (is_marker=TRUE means the symbol is a clone/marker ID
+    # like cl59140_1, which is uninformative as a display label).
     symbol = case_when(
       !is.na(locus_label) & locus_label != "" ~ locus_label,
-      !is.na(locus_symbol) & locus_symbol != "" ~ locus_symbol,
+      !is.na(locus_symbol) & locus_symbol != "" & (is.na(is_marker) | !is_marker) ~ locus_symbol,
       TRUE ~ "---"
     ),
     # Clean up description - use desc_merged or desc_pannzer

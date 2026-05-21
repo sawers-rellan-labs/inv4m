@@ -778,13 +778,27 @@ if (nrow(novel_edges_prep) > 0 && length(jmj4_all_genes) > 0) {
       ) %>%
       dplyr::select(from, to, width, arrows.to.type, color)
 
-    visNetwork(jmj4_nodes, jmj4_vis_edges) %>%
+    vn_jmj4 <- visNetwork(jmj4_nodes, jmj4_vis_edges) %>%
       visNodes(font = list(size = 25, multi = "html")) %>%
       visEdges(arrows = "to") %>%
       visOptions(
         highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
         nodesIdSelection = TRUE
       )
+
+    # Save Figure 4 panel C (jmj4 neighborhood subgraph) as PNG via webshot
+    library(htmlwidgets); library(webshot)
+    vn_jmj4$width  <- 1400
+    vn_jmj4$height <- 1400
+    out_png_jmj4 <- file.path(paths$figures, "Figure_4_C_trans_network.png")
+    tmp_html_jmj4 <- tempfile(fileext = ".html")
+    saveWidget(vn_jmj4, tmp_html_jmj4, selfcontained = TRUE)
+    webshot(tmp_html_jmj4, file = out_png_jmj4, selector = ".vis-network",
+            vwidth = 1400, vheight = 1400, zoom = 2, delay = 2)
+    unlink(tmp_html_jmj4)
+    cat("Saved:", out_png_jmj4, "\n")
+
+    vn_jmj4
   } else {
     cat("No jmj4 neighborhood genes found in novel MST\n")
   }
