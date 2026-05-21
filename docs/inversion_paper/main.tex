@@ -491,14 +491,6 @@ Candidates}}
   outside &
    &
   \cite{wang2021} \\
-  \textit{Zm00001eb070810} &
-  \textit{ychf} &
-  Uncharacterized protein &
-  4.19 &
-  9.70 &
-  outside &
-   &
-  \cite{li2016, liu2023} \\
   \textit{Zm00001eb192350} &
   \textit{pkwd1} &
   Protein kinase family protein / WD-40 repeat family protein &
@@ -613,14 +605,6 @@ Candidates}}
   flanking &
   4.32e-05 &
   \cite{liu2023, peiffer2014} \\
-  \textit{Zm00001eb123230} &
-  \textit{tip4c} &
-  Tonoplast intrinsic protein 41 &
-  2.56 &
-  8.25 &
-  outside &
-   &
-  \cite{liu2023} \\
   \textit{Zm00001eb195970} &
   \textit{mpv17} &
   Mpv17/PMP22 family protein, expressed &
@@ -1312,7 +1296,9 @@ Semantic redundancy was reduced using \textit{rrvgo} \cite{sayols2023} with a si
 To identify genes regulated in \textit{trans} by \invfour, we constructed a bipartite co-expression network linking DEGs within the introgressed region (\textit{cis} potential regulators) to DEGs located elsewhere in the genome (\textit{trans} targets).
 Pearson correlation coefficients were calculated between all \textit{cis}-\textit{trans} gene pairs using $\log_2(\text{CPM})$ normalized expression values.
 Edges were retained if the correlation was significant after FDR correction ($q < 0.05$).
-Prior to network construction, we excluded \textit{trans} targets carrying SNPs in linkage disequilibrium with the \invfour tagging marker (Pearson correlation FDR $< 0.005$; see Section~3.1), which removed 2 of 39 \textit{trans} DEGs (\textit{Zm00001eb070810} on chromosome~2 and \textit{tip4c} on chromosome~3).
+Prior to network construction and to flowering time / plant height candidate selection (Table~\ref{tab:FT_PH_candidates}), we excluded \textit{trans} DEGs carrying SNPs in linkage disequilibrium with the \invfour tagging marker (Pearson correlation FDR $< 0.005$; see Section~3.1) because differential expression at these genes cannot be distinguished from cis effects of the linked SNPs.
+This filter removed 2 of 39 \textit{trans} DEGs from the network (\textit{Zm00001eb070810 / ychf} on chromosome~2 and \textit{Zm00001eb123230 / tip4c} on chromosome~3); the same two genes were also excluded from Table~\ref{tab:FT_PH_candidates}.
+The filter was not applied to WGCNA module assignment, where the LD-linked genes contribute to module composition but are not interpreted as candidate \invfour regulators.
 
 To distinguish \invfour-specific effects from flanking introgression effects, we applied a strongest correlated gene criterion: for each \textit{trans} target, we identified the \textit{cis} potential regulator with the highest absolute correlation.
 Targets were assigned to the \invfour network only if their strongest regulator was located within the 15 Mb inversion proper, not in the flanking introgressed regions.

@@ -175,9 +175,21 @@ effects_all <- read.csv(
   stringsAsFactors = FALSE
 )
 
+# Genes whose own SNPs are in LD with the Inv4m tagging marker. Differential
+# expression at these loci is confounded with cis effects of the linked SNPs,
+# so they are excluded from candidate selection. The same filter is applied
+# upstream in the trans-coexpression network notebook.
+ld_linked_path <- file.path(paths$intermediate, "inv4m_linked_genes_to_filter.txt")
+ld_linked_genes <- if (file.exists(ld_linked_path)) {
+  read.table(ld_linked_path, header = TRUE, stringsAsFactors = FALSE)$gene_id
+} else {
+  character(0)
+}
+
 # Filter to Inv4m predictor, keep best p-value per gene
 effects <- effects_all %>%
   dplyr::filter(predictor == "Inv4m") %>%
+  dplyr::filter(!gene %in% ld_linked_genes) %>%
   mutate(
     is_significant = adj.P.Val < FDR_THRESHOLD,
     is_topDEG = is_significant & abs(logFC) > LOGFC_THRESHOLD
@@ -187,7 +199,8 @@ effects <- effects_all %>%
   dplyr::slice(1) %>%
   ungroup()
 
-cat("Total Inv4m-tested genes:", nrow(effects), "\n")
+cat("LD-linked genes excluded:", length(ld_linked_genes), "\n")
+cat("Total Inv4m-tested genes (after LD filter):", nrow(effects), "\n")
 cat("Significant DEGs (FDR < 0.05):", sum(effects$is_significant), "\n")
 cat("Top DEGs (|logFC| >", LOGFC_THRESHOLD, "):",
     sum(effects$is_topDEG), "\n")
