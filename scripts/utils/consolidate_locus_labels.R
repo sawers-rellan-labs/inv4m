@@ -12,6 +12,16 @@
 #' - Real genes are identified by having locus_name in gene_symbol.tab
 #' - Priority: curated_label > filtered_symbol > NA
 #'
+#' Convention for the `locus_label` column (used as "Label" in main.tex tables
+#' and as node labels in network plots): an editorial shorthand, NOT an
+#' authoritative gene name. It is the MaizeGDB locus_symbol when that symbol
+#' is informative; otherwise it is a curated mnemonic that does not imply
+#' naming orthodoxy (e.g., `engd2` for Zm00001eb112470 is named after the
+#' Arabidopsis ortholog AT1G56050/ENGD-2; `borr` for Zm00001eb192330 is named
+#' after the Arabidopsis ortholog AT4G39630/BORR). If reviewers ask about the
+#' labeling convention this comment should be promoted to a sentence in the
+#' Methods or table captions.
+#'
 #' Output:
 #' - data/locus_labels_master.csv - Full consolidated table
 #' - data/locus_labels_gaps.csv - Genes needing manual curation
