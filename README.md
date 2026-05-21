@@ -4,7 +4,7 @@
 
 # inv4m
 
-Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; **F2 hybrid panel for Figure 2 ✅ done 2026-05-14** (PA2024 NIL-derived hybrid trial); **ZEAL NIL panel Inv4m supp figure ✅ done 2026-05-15** (Fig.~S2: DTA, DTS, PH across 5 mexicana/huehuetenangensis ancestry groups via parsim LMM with strict ancestry/BC2/NIL nesting; Methods + Results + caption already in main.tex on Overleaf). **Next priorities:** review Figure 6 (WGCNA module perturbation) layout/style, then address Rubén's full feedback and coauthor suggestions. Remaining Phase 6 cleanup: JMJ paralog per-paralog expression supplementary inclusion, **new supplementary figure showing teosinte single-copy evidence for the jmj2-9 cluster** (structural / microsynteny evidence to complement Figure 7), **integrate ZEAL panel results into the Discussion** (multi-donor flowering replication argument; clarify PH null and absence of ZEAL yield trait), **PA2024 W22 × NIL hybrid trial integration** (= Figure 2 panel B; analysis + figure + Methods + brief Discussion already exist; missing = dedicated Results paragraph in §3.2, Discussion expansion to integrate with ZEAL framing, and W22 tester identity inserted into the existing text), Overleaf PNG re-upload (Figure 2 + Fig.~S2 ZEAL panel `inv4mZEAL.png`), bibtex audit, copyedit. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
+Analysis pipeline for the maize chromosomal inversion Inv4m: **modulation of flowering time, plant height, and growth regulation gene networks**. Manuscript text complete; Phase 6 figure / table additions complete (PA2024 hybrid panel ✅ 2026-05-14; ZEAL NIL supp figure ✅ 2026-05-15; **gene-name / description revision pass across all body + supplement tables, trans-network figures re-rendered, Section 3.5 citations wired ✅ 2026-05-21**). **Next priorities:** Rubén's full feedback and coauthor suggestions; Discussion integration of ZEAL multi-donor replication + PA2024 hybrid yield framing; JMJ paralog and teosinte single-copy supplementary figures; Overleaf PNG re-upload (`Figure_2_phenotypes.png`, `inv4mZEAL.png`, `Figure_4_C_trans_network.png`, `supp_novel_trans_network_full.png`); bibtex audit of new citations (`zhang2015b`, `gan2014`, `song2018`) + carry-over (`bates2015`, `kuznetsova2017`, `fransz2016`, `desmarais2017`, `minow2021`); copyedit. See `agent/inversion_paper/HANDOVER_inversion_paper_revision.md` for the active task list.
 
 **[View Analysis Reports](https://sawers-rellan-labs.github.io/inv4m/)**
 
@@ -55,6 +55,28 @@ This repository contains R/Rmarkdown analysis notebooks for studying the Inv4m i
 | Annotation assembly | GO/KEGG/LION enrichment panels | [`Annotation_assembly.Rmd`](https://sawers-rellan-labs.github.io/inv4m/phosphorus_paper/Annotation_assembly.html) | ✅ |
 
 ## Inversion Paper: Revision Status
+
+### Gene-name / description revision pass (2026-05-21)
+
+Comprehensive naming consistency pass across body and supplement tables; trans-network supplementary figures re-rendered. Master list at `data/locus_labels_master.csv` is the single source of truth (write-locked).
+
+| Change | Old | New | Source |
+|---|---|---|---|
+| Rename `roc4-1` | `roc4-1` (mis-curated as cyclophilin paralog) | `borr` | MaizeGDB Pfam Borealin (PF10512); Arabidopsis ortholog AT4G39630 BORR; chromosomal passenger complex kinetochore component |
+| Simplify `roc4-2` | `roc4-2` | `roc4` | Now the only cyclophilin in the DEG set; Pfam Pro\_isomerase (PF00160) |
+| Fix typo `dwy1` | `dwy1` | `dyw1` | MaizeGDB Pfam DYW\_deaminase (PF14432) |
+| `smo4` description | "SUMO E1 uba-2 like" (wrong) | "Ribosome biogenesis protein NOP53" | MaizeGDB; Arabidopsis SMO4 / NOP53 homolog (`zhang2015b`) |
+| `prd4` description | "Phosphatidylinositol N-acetyglucosaminlytransferase" (wrong) | "Protein PAIR1 (putative recombination initiation defect4)" | MaizeGDB |
+| `zfrvt` description | (blank) | "Non-LTR retroelement reverse transcriptase (zf-RVT)" | MaizeGDB UniProt Q8W233 + Pfam zf-RVT |
+| `engd2` description | (blank / "GTPase-like") | "OBG-type G domain-containing protein" | MaizeGDB; Obg/YchF superfamily (Suwastika 2008/2014); Arabidopsis ortholog AT1G56050 ENGD-2 |
+| `Zm00001eb194180` | "troponin T, skeletal muscle-like" (animal sarcomere, biologically implausible) | (blank) | dropped from master CSV |
+| `Zm00001eb126770` | `cl59140_1` (clone marker) | (blank label) | marker pattern; module-DEG notebooks patched to skip marker symbols via `is_marker` flag |
+
+Plus: filled `desc_pannzer` fallbacks for `hpse3`, `cdi`, `o3l1`, `ppp`, `gst`. Citations added in Section 3.5 trans-network prose: `zhang2015b` (SMO4), `gan2014` (Arabidopsis JMJ flowering), `song2018` (rice OsJMJ703). Suwastika 2008/2014 (Obg/YchF family) recorded in handover but not yet inserted in body.
+
+Supplement structural updates: new `tab:DEGs_distro` + `tab::gxe` tables; trans-network table split by region and sorted by FDR; "Locus" column header → "**Label**" (convention recorded in `scripts/utils/consolidate_locus_labels.R`: editorial shorthand, not naming orthodoxy); `---` placeholders removed from empty cells; `+` sign added to positive log2FC; all Gene IDs italicized. LD-linked gene filter (FDR < 0.005 with the Inv4m tagging SNP) extended from network construction to FT/PH candidate selection — removes `ychf` and `tip4c` from Table 2.
+
+Figures re-rendered with updated labels (sandbox disabled for webshot/PhantomJS): `Figure_4_C_trans_network.png` (Fig.~4 panel C, jmj4 neighborhood) and `supp_novel_trans_network_full.png` (Fig.~S11, full novel MST).
 
 ### Peer review edits applied (2026-02-24)
 
