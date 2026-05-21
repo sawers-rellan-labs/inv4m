@@ -670,64 +670,24 @@ if (nrow(novel_edges) > 0) {
 
 # Full Novel MST — Static Figure (Supplementary)
 
-```{r novel_mst_static, fig.width=14, fig.height=14}
+```{r novel_mst_static}
 if (nrow(novel_edges) > 0) {
-  library(ggraph)
-  library(tidygraph)
+  library(htmlwidgets)
+  library(webshot)
 
-  # Strip HTML italic tags added by format_network_nodes
-  novel_nodes_clean <- novel_nodes %>%
-    mutate(
-      display_label = gsub("</?i>", "", label),
-      node_color    = color.border,
-      node_alpha    = ifelse(upregulated, 1, 0.35)
-    )
+  vn_novel_full <- visualize_mst(novel_edges_prep, novel_nodes,
+                                  effects_df, font_size = 22)
 
-  g_novel_full <- graph_from_data_frame(
-    d        = novel_edges_prep %>% dplyr::select(from, to, r, std_dist, mi),
-    directed = FALSE,
-    vertices = novel_nodes_clean %>%
-      dplyr::select(id, display_label, node_color, node_alpha, region, upregulated)
-  )
-  g_novel_mst <- mst(g_novel_full, weights = E(g_novel_full)$std_dist)
+  out_png  <- file.path(paths$figures, "supp_novel_trans_network_full.png")
+  tmp_html <- tempfile(fileext = ".html")
 
-  tg <- as_tbl_graph(g_novel_mst) %>%
-    activate(edges) %>%
-    mutate(r = E(g_novel_mst)$r)
+  saveWidget(vn_novel_full, tmp_html, selfcontained = TRUE)
+  webshot(tmp_html, file = out_png, vwidth = 1400, vheight = 1400,
+          zoom = 2, delay = 1.5)
+  unlink(tmp_html)
 
-  region_colors <- c(
-    "inv4m" = "#551A8B",
-    "flank" = "#FF1493",
-    "out"   = "#FFD700"
-  )
-  region_labels <- c(
-    "inv4m" = "Inv4m region",
-    "flank" = "Flanking region",
-    "out"   = "Outside inversion"
-  )
-
-  p_novel_full <- ggraph(tg, layout = "kk") +
-    geom_edge_link(aes(width = abs(r)), color = "gray60", alpha = 0.6) +
-    geom_node_point(aes(fill = region, alpha = upregulated),
-                    shape = 21, size = 7, color = "gray30") +
-    geom_node_text(aes(label = display_label),
-                   repel = TRUE, size = 3.5, fontface = "italic",
-                   max.overlaps = Inf) +
-    scale_fill_manual(values = region_colors, labels = region_labels,
-                      name = "Genomic region") +
-    scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.3),
-                       labels = c("TRUE" = "Upregulated", "FALSE" = "Downregulated"),
-                       name = "Direction in Inv4m") +
-    scale_edge_width(range = c(0.4, 2), name = "|r|") +
-    theme_graph(base_size = 14) +
-    theme(legend.position = "right")
-
-  ggsave(
-    file.path(paths$figures, "supp_novel_trans_network_full.png"),
-    p_novel_full, width = 14, height = 14, dpi = 300
-  )
-
-  print(p_novel_full)
+  cat("Saved:", out_png, "\n")
+  vn_novel_full
 }
 ```
 
