@@ -178,6 +178,99 @@ print(p_hub)
 
 ---
 
+# Supplementary Figure — sec6 Leaf Trajectory
+
+```{r supp_sec6_trajectory, fig.width=10, fig.height=5}
+library(ggtext)
+
+psu_voom <- readRDS(file.path(paths$intermediate,
+                               "normalized_expression_voom_object_leaf_trt.rds"))
+expr_mat  <- psu_voom$E
+full_meta <- psu_voom$targets %>%
+  as.data.frame() %>%
+  rownames_to_column("sample_id") %>%
+  mutate(Genotype = recode(Genotype, "B73" = "CTRL"))
+
+sec6_gene <- "Zm00001eb194380"
+
+sec6_df <- tibble(
+  sample_id = colnames(expr_mat),
+  log2CPM   = expr_mat[sec6_gene, ]
+) %>%
+  left_join(full_meta %>% select(sample_id, Genotype, leaf_tissue, Treatment),
+            by = "sample_id") %>%
+  mutate(leaf = factor(leaf_tissue))
+
+sec6_centered <- sec6_df %>%
+  group_by(Genotype) %>%
+  mutate(centered_log2CPM = log2CPM - mean(log2CPM)) %>%
+  ungroup()
+
+summary_raw <- sec6_df %>%
+  group_by(Genotype, leaf) %>%
+  summarise(mean_expr = mean(log2CPM),
+            se_expr   = sd(log2CPM) / sqrt(n()),
+            .groups   = "drop")
+
+summary_centered <- sec6_centered %>%
+  group_by(Genotype, leaf) %>%
+  summarise(mean_expr = mean(centered_log2CPM),
+            se_expr   = sd(centered_log2CPM) / sqrt(n()),
+            .groups   = "drop")
+
+geno_colors <- c("CTRL" = "gold", "Inv4m" = "purple4")
+
+p_raw <- ggplot(summary_raw,
+                aes(x = leaf, y = mean_expr, color = Genotype, group = Genotype)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_expr - se_expr, ymax = mean_expr + se_expr),
+                width = 0.2) +
+  geom_jitter(data = sec6_df,
+              aes(x = leaf, y = log2CPM, color = Genotype),
+              alpha = 0.4, size = 1.5, width = 0.1, inherit.aes = FALSE) +
+  scale_color_manual(values = geno_colors) +
+  theme_minimal(base_size = 14) +
+  labs(x     = "Leaf",
+       y     = expression(log[2] * "(CPM)"),
+       title = "*sec6* (*Zm00001eb194380*)",
+       subtitle = "Raw expression",
+       color = NULL) +
+  theme(plot.title = element_markdown())
+
+p_centered <- ggplot(summary_centered,
+                     aes(x = leaf, y = mean_expr, color = Genotype, group = Genotype)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_expr - se_expr, ymax = mean_expr + se_expr),
+                width = 0.2) +
+  geom_jitter(data = sec6_centered,
+              aes(x = leaf, y = centered_log2CPM, color = Genotype),
+              alpha = 0.4, size = 1.5, width = 0.1, inherit.aes = FALSE) +
+  scale_color_manual(values = geno_colors) +
+  theme_minimal(base_size = 14) +
+  labs(x        = "Leaf",
+       y        = expression("Centered " * log[2] * "(CPM)"),
+       title    = "*sec6* (*Zm00001eb194380*)",
+       subtitle = "Centered per genotype",
+       color    = NULL) +
+  theme(plot.title = element_markdown())
+
+p_sec6 <- p_raw + p_centered +
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "A") &
+  theme(legend.position = "top")
+
+ggsave(
+  file.path(paths$figures, "sec6_leaf_trajectory.png"),
+  p_sec6, width = 10, height = 5, dpi = 300
+)
+
+print(p_sec6)
+```
+
+---
+
 # Session Info
 
 ```{r session_info}
