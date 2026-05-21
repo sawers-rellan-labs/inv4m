@@ -946,6 +946,12 @@ cat("Edges:", nrow(novel_edges), "\n")
 # Supplementary Table — Novel Trans-coexpression Network Genes
 
 ```{r novel_network_table}
+master_desc <- read.csv(
+  file.path(paths$data, "locus_labels_master.csv"),
+  na.strings = c("NA", "")
+) %>%
+  dplyr::select(gene, desc_pannzer, desc_merged_master = desc_merged)
+
 # Join novel_nodes (region) with gene annotations and DEG stats
 novel_table_df <- novel_nodes %>%
   dplyr::select(id, region) %>%
@@ -957,16 +963,18 @@ novel_table_df <- novel_nodes %>%
       dplyr::select(gene, locus_label, desc_merged, logFC, adj.P.Val),
     by = c("id" = "gene")
   ) %>%
+  left_join(master_desc, by = c("id" = "gene")) %>%
   mutate(
+    description = dplyr::coalesce(desc_merged, desc_merged_master, desc_pannzer),
     tex_gene  = paste0("\\textit{", id, "}"),
     tex_label = ifelse(!is.na(locus_label),
                        paste0("\\textit{", locus_label, "}"), "---"),
-    tex_desc  = ifelse(!is.na(desc_merged),
-                       gsub("%", "\\\\%", desc_merged), "---"),
+    tex_desc  = ifelse(!is.na(description),
+                       gsub("%", "\\\\%", description), "---"),
     tex_lfc   = sprintf("%.2f", logFC),
     tex_fdr   = formatC(adj.P.Val, format = "e", digits = 2)
   ) %>%
-  arrange(region, logFC)
+  arrange(region, adj.P.Val)
 
 inv4m_rows   <- novel_table_df %>% filter(region == "inv4m")
 outside_rows <- novel_table_df %>% filter(region != "inv4m")
