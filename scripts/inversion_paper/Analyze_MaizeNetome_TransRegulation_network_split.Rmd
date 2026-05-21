@@ -703,12 +703,12 @@ if (nrow(novel_edges) > 0) {
 
 **Purpose**: Extract the jmj4-centered subgraph from the novel network MST.
 This preserves the MST structure while focusing on jmj4, engd2, and their
-targets (kan1, sec6, nii2, roc4-2, etc.).
+targets (kan1, sec6, nii2, roc4, etc.).
 
 ```{r jmj4_neighborhood}
 # Define the jmj4 neighborhood genes (from manual selection of novel MST)
 jmj4_neighborhood_labels <- c(
-  "jmj4", "engd2", "roc4-2", "kan1", "sec6", "nii2", "tet2", "flz22", "plat1"
+  "jmj4", "engd2", "roc4", "kan1", "sec6", "nii2", "tet2", "flz22", "plat1"
 )
 
 # Genes with only assembly IDs (no locus labels)
