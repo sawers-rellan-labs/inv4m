@@ -784,8 +784,8 @@ The dataset-specific edges are statistically well-supported in our experiment (P
 
 The Reference network included known regulatory relationships involving \textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC = +2.99$), a DNA replication factor, and \textit{outer cell layer2} (\textit{ocl2}, \textit{Zm00001eb428740}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor involved in epidermal cell differentiation.
 Notably, the Reference network also recovered edges involving multiple genes with documented plant architecture phenotypes in other plant systems.
-The histone demethylase \jmjii (\textit{Zm00001eb191790}; $\log_2 FC = -3.49$) and its paralog \textit{jmj21} (\textit{Zm00001eb190750}; $\log_2 FC = +2.28$) connect to trans targets, consistent with the flowering time and plant height effects of their orthologs in Arabidopsis and Brachypodium \cite{TODO_jmj_arabidopsis, TODO_jmj_brachypodium}.
-\textit{smo4} (\textit{Zm00001eb192850}; $\log_2 FC = -1.98$), encoding the SUMO-activating enzyme E1 subunit UBA2, also appears in the Reference network; its Arabidopsis ortholog produces dwarf plants when mutated \cite{TODO_smo4_arabidopsis}.
+The histone demethylase \jmjii (\textit{Zm00001eb191790}; $\log_2 FC = -3.49$) and its paralog \textit{jmj21} (\textit{Zm00001eb190750}; $\log_2 FC = +2.28$) connect to trans targets, consistent with the flowering time and developmental phenotypes documented for JmjC histone demethylase orthologs in Arabidopsis \cite{gan2014} and rice \cite{song2018}.
+\textit{smo4} (\textit{Zm00001eb192850}; $\log_2 FC = -1.98$), encoding a Ribosome biogenesis protein NOP53 homolog, also appears in the Reference network; its Arabidopsis ortholog \textit{SMALL ORGAN 4} (\textit{SMO4}) regulates cell proliferation rate during organ growth, and \textit{smo4} mutants exhibit reduced organ size \cite{zhang2015b}.
 A fourth Reference-network gene, \textit{Zm00001eb192330} ($\log_2 FC = +5.05$), carries a Borealin Pfam domain (PF10512) consistent with the Arabidopsis ortholog AT4G39630 (\textit{BORR}, Borealin-related), encoding a chromosomal passenger complex kinetochore component involved in cell division; the maize gene was provisionally labeled \textit{roc4-1} in our internal annotation and is being reannotated to reflect its Borealin identity.
 
 The dataset-specific network identified a previously uncharacterized \jmjiv neighborhood subgraph (Fig~\ref{fig::transnetwork}A, right panel).
@@ -1721,7 +1721,7 @@ Donor lineages that do not carry the \invfour inverted karyotype (parviglumis, \
 Zm00001eb191790 & \textit{jmj2} & 21.9 & $-3.49$ & JUMONJI-transcription factor 2 \\
 Zm00001eb191820 & \textit{jmj4} & 19.7 & $-2.84$ & JUMONJI-transcription factor 4 \\
 Zm00001eb189910 & \textit{metrs1} & 17.5 & $-2.86$ & Methionyl-tRNA synthetase \\
-Zm00001eb192850 &  & 17.5 & $-1.98$ & SUMO-activating enzyme subunit uba-2 ... \\
+Zm00001eb192850 & \textit{smo4} & 17.5 & $-1.98$ & Ribosome biogenesis protein NOP53 \\
 Zm00001eb192630 &  & 15.8 & $-1.69$ & CCT-alpha \\
 Zm00001eb188070 & \textit{arf1} & 15.8 & $-2.78$ & ADP-ribosylation factor \\
 Zm00001eb188750 & \textit{hsp70-17} & 14.2 & $-6.48$ & Heat shock 70 kDa protein 17 \\
@@ -1975,7 +1975,7 @@ $\log_2$FC and FDR are from the genotype DEG analysis.}
 \midrule
   \textit{Zm00001eb191790} & \textit{jmj2} & JUMONJI-transcription factor 2 & -3.49 & 1.17e-22 \\
   \textit{Zm00001eb191820} & \textit{jmj4} & JUMONJI-transcription factor 4 & -2.84 & 1.91e-20 \\
-  \textit{Zm00001eb192850} & \textit{smo4} & SUMO-activating enzyme subunit uba-2 like & -1.98 & 3.14e-18 \\
+  \textit{Zm00001eb192850} & \textit{smo4} & Ribosome biogenesis protein NOP53 & -1.98 & 3.14e-18 \\
   \textit{Zm00001eb194380} & \textit{sec6} & Exocyst complex component Sec6 & 2.87 & 2.93e-17 \\
   \textit{Zm00001eb192630} & \textit{ccta} & CCT-alpha & -1.69 & 1.58e-16 \\
   \textit{Zm00001eb190670} & \textit{zfrvt} & Non-LTR retroelement reverse transcriptase (zf-RVT) & 1.97 & 2.27e-16 \\

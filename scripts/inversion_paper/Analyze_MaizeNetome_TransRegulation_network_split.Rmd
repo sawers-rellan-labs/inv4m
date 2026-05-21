@@ -965,7 +965,7 @@ novel_table_df <- novel_nodes %>%
   ) %>%
   left_join(master_desc, by = c("id" = "gene")) %>%
   mutate(
-    description = dplyr::coalesce(desc_merged, desc_merged_master, desc_pannzer),
+    description = dplyr::coalesce(desc_merged_master, desc_merged, desc_pannzer),
     tex_gene  = paste0("\\textit{", id, "}"),
     tex_label = ifelse(!is.na(locus_label),
                        paste0("\\textit{", locus_label, "}"), "---"),
