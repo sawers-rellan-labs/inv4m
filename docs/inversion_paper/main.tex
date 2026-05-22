@@ -1113,7 +1113,7 @@ y_{ijk} = \mu + \text{Rep}_i + \text{Genotype}_j + f(\text{row}_k, \text{col}_k)
 
 where $\mu$ is the overall mean, $\text{Rep}_i$ is the replicate effect, $\text{Genotype}_j$ is the genotype effect, and $f(\text{row}_k, \text{col}_k)$ is a smooth bivariate spatial surface estimated via penalized spline ANOVA (PSANOVA).
 Phosphorus treatment is \textit{not} included in this stage so its variance remains in the corrected values for proper modeling in the second stage.
-For the PA2024 hybrid trial, the 41 segregating NIL$_{xxxx}$ lines were treated as a random-effect cohort and the eight named entries (\texttt{B73}, \texttt{Oh43}, \texttt{Inv4\_\{B73, MEX, Mi21, PT\}}, and the two hybrid checks) as fixed effects via \texttt{addCheck = TRUE}; for the PA2022 NIL trial only CTRL and \invfour genotypes are present so both were treated as fixed.
+For the PA2024 hybrid trial, the 41 segregating NIL lines were treated as a random-effect cohort and the eight named entries (\texttt{B73}, \texttt{Oh43}, \texttt{Inv4\_\{B73, MEX, Mi21, PT\}}, and the two hybrid checks) as fixed effects via \texttt{addCheck = TRUE}.
 Per-plot spatially-corrected values were extracted with \texttt{getCorrected()} from the resulting fit.
 
 In the second stage, we tested for \invfour effects on the spatially-corrected values using a linear model with genotype and phosphorus treatment as fixed factors:
