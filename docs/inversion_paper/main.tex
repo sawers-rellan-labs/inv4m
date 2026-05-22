@@ -641,22 +641,22 @@ Candidates}}
 \subsection{WGCNA shows that \invfour introgression disrupts extant coexpression modules of the B73 genomic background}
 
 To assess whether \invfour causes network-level perturbations beyond individual DEGs, we performed weighted gene coexpression network analysis (WGCNA) \citep{shahan2018} on the 465 \invfour DEGs, using a consensus bootstrap approach (Methods).
-Of the 465 DEGs, 405 were assigned to 13 named modules (Fig~\ref{fig:wgcna}A), of which five had stable bootstrap support (LFP $>$ 0.70; Supplementary Fig.~\ref{fig::module_support}). 
+Of the 465 DEGs, 405 were assigned to 13 named modules (Fig~\ref{fig:networks}A), of which five had stable bootstrap support (LFP $>$ 0.70; Supplementary Fig.~\ref{fig::module_support}). 
 Gene Ontology enrichment confirmed the modules as biologically coherent (Supplementary Fig.~\ref{fig::module_go}). 
 The pink module --- which contains \jmjii and \jmjiv --- was enriched for ribosome biogenesis, negative regulation of gene expression (epigenetic), and positive regulation of growth, with the epigenetic and growth terms driven by the JMJ cluster itself (Table~\ref{tab::pink_module}). 
 The greenyellow module was enriched for developmental cell growth and DNA replication, and contains \textit{sec6} ($\log_2\text{FC} = +2.87$), an exocyst component identified as a plant-height GWAS candidate \citep{peiffer2014}, and \textit{pcna2} ($\log_2\text{FC} = +2.99$), a DNA-replication factor (Table~\ref{tab::greenyellow_module}). 
 The purple module contained the plant-height GWAS candidate
 \textit{exo}/\textit{phi1} ($\log_2\text{FC} = -2.39$; Table~\ref{tab:FT_PH_candidates}) and was enriched for brassinosteroid signaling regulation and negative regulation of chromatin silencing.
 
-To test whether modules show genotype-specific connectivity loss beyond sample-to-sample variability, we applied a genotype label permutation test on intramodular connectivity ($\Delta k_{Within}$; Methods). Five of 13 modules reached significance (brown, tan, purple, blue, pink; FDR $<$ 0.05; Fig~\ref{fig:wgcna}B, Table~\ref{tab::preservation}), with brown showing the largest effect.
-As a topological control, we repeated the entire pipeline on an orthogonal ``Leaf Gradient'' reference network built from genes varying along the leaf developmental gradient. None of its five modules reached significance under the same permutation test (Fig~\ref{fig:wgcna}B, bottom facet; Table~\ref{tab::preservation_lg}), isolating the connectivity loss as a \invfour-specific effect rather than a genome-wide attenuation of coexpression.
+To test whether modules show genotype-specific connectivity loss beyond sample-to-sample variability, we applied a genotype label permutation test on intramodular connectivity ($\Delta k_{Within}$; Methods). Five of 13 modules reached significance (brown, tan, purple, blue, pink; FDR $<$ 0.05; Fig~\ref{fig:networks}B, Table~\ref{tab::preservation}), with brown showing the largest effect.
+As a topological control, we repeated the entire pipeline on an orthogonal ``Leaf Gradient'' reference network built from genes varying along the leaf developmental gradient. None of its five modules reached significance under the same permutation test (Fig~\ref{fig:networks}B, bottom facet; Table~\ref{tab::preservation_lg}), isolating the connectivity loss as a \invfour-specific effect rather than a genome-wide attenuation of coexpression.
 
 The pink module illustrates the pattern. 
-Both JMJ genes retained their hub rank within the module but lost $\sim$80\% of their absolute connectivity ($k_{Within}$ falling from $\sim$3.2 in CTRL to $\sim$0.6 in \invfour; Fig~\ref{fig:wgcna}C), consistent with their downregulation attenuating, rather than rewiring, the gene pairs they normally coordinate. 
+Both JMJ genes retained their hub rank within the module but lost $\sim$80\% of their absolute connectivity ($k_{Within}$ falling from $\sim$3.2 in CTRL to $\sim$0.6 in \invfour; Fig~\ref{fig:networks}C), consistent with their downregulation attenuating, rather than rewiring, the gene pairs they normally coordinate. 
 The exocyst component \textit{sec6}, by contrast, went from $k_{Within} = 0.81$ in CTRL to effectively zero in \invfour, suggesting that its upregulation decouples it from native coexpression partners. 
 This bidirectional pattern --- connectivity loss for downregulated chromatin regulators, decoupling for upregulated targets --- is consistent with the JMJ cluster acting as a regulatory hub whose perturbation propagates through the transcriptome.
 %To assess whether the \invfour introgression causes network-level perturbations beyond individual DEGs, we performed weighted gene coexpression network analysis (WGCNA) \citep{shahan2018} using a consensus approach.
-%We constructed reference networks from the expression of the 465 \invfour DEGs restricted to CTRL samples using 1000 bootstrap iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35), identifying modules robust to analytical choices (Fig~\ref{fig:wgcna}A).
+%We constructed reference networks from the expression of the 465 \invfour DEGs restricted to CTRL samples using 1000 bootstrap iterations with 80\% gene subsampling and variable \textit{minModuleSize} (10 to 35), identifying modules robust to analytical choices (Fig~\ref{fig:networks}A).
 %Because the input gene set comprises DEGs, some degree of connectivity change between genotypes is expected; the informative comparisons are therefore the relative magnitude of disruption across modules, the identity of genes showing the largest hub-to-peripheral transitions, and the biological coherence of the most affected modules.
 %We note that 8 of the 13 modules (including magenta, FDR $= 0.383$) show no significant genotype-specific connectivity change under the label-permutation test (Table~\ref{tab::preservation}), demonstrating that the connectivity loss is not a uniform artifact of the input gene set.
 
@@ -673,19 +673,19 @@ This bidirectional pattern --- connectivity loss for downregulated chromatin reg
 %The purple module (LFP $= 0.74$, $n = 22$), which contains the plant height GWAS candidate \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like phosphate-induced protein; \textit{Zm00001eb194020}; $\log_2 \text{FC} = -2.39$; Table~\ref{tab:FT_PH_candidates}), showed enrichment for brassinosteroid signaling regulation ($p = 0.022$) and negative regulation of chromatin silencing ($p = 0.016$).
 %The brassinosteroid term was driven by a single additional module member, \textit{s2p} (\textit{Zm00001eb158090}; $\log_2 \text{FC} = -0.34$; FDR $= 0.018$), encoding an endopeptidase S2P.
 
-%Comparison of intramodular connectivity ($k_{Within}$) between genotypes showed systematic disruption in \invfour samples (Fig~\ref{fig:wgcna}B).
+%Comparison of intramodular connectivity ($k_{Within}$) between genotypes showed systematic disruption in \invfour samples (Fig~\ref{fig:networks}B).
 %\texttt{modulePreservation()} analysis \cite{langfelder2011} with 1000 permutations classified 12 of 13 modules as moderately preserved ($Z_{summary}$ 2 to 10), meaning their internal rank structure of intramodular connectivity was partially maintained despite the introgression, while one module (salmon) was not preserved ($Z_{summary} < 2$; Table~\ref{tab::preservation}).
-%To test whether the absolute connectivity change in each module is specifically driven by \invfour genotype rather than by sample-to-sample variability, we carried out a genotype label permutation test: for each module we computed the null distribution of $\Delta k_{Within}$ under 1000 random shuffles of the CTRL/\invfour labels and FDR-corrected the observed value against this null (Fig.~\ref{fig:wgcna}B; Table~\ref{tab::preservation}).
+%To test whether the absolute connectivity change in each module is specifically driven by \invfour genotype rather than by sample-to-sample variability, we carried out a genotype label permutation test: for each module we computed the null distribution of $\Delta k_{Within}$ under 1000 random shuffles of the CTRL/\invfour labels and FDR-corrected the observed value against this null (Fig.~\ref{fig:networks}B; Table~\ref{tab::preservation}).
 %Five of the 13 Genotype Response modules reached significance (brown, tan, purple, blue, pink; FDR $<$ 0.05), with brown showing the largest effect ($\Delta k_{Within} = -2.36$, $Z_{\Delta k} = -3.74$, FDR $< 10^{-3}$).
 %Thus, although the relative hub structure within modules is partially retained, absolute connectivity is significantly diminished for a subset of DEG modules that together span most of the growth-regulation terms highlighted below.
 
 %As a topological control, we repeated the entire consensus pipeline on an orthogonal ``Leaf Gradient'' reference network built from genes selected by their expression dynamics along the leaf developmental gradient rather than by differential expression between genotypes (Methods, Table~\ref{tab::preservation_lg}).
-%The 5 Leaf Gradient modules (sky, peach, jade, coral, lavender) all reached stable bootstrap support (LFP $\geq 0.81$; Fig.~\ref{fig::module_support}) and showed strong rank preservation ($Z_{connectivity}$ 4.5 to 10.7), yet \textit{none} reached significance under the genotype label permutation test (all FDR $>$ 0.2; Fig.~\ref{fig:wgcna}B, bottom facet; Table~\ref{tab::preservation_lg}), even though their raw mean $\Delta k_{Within}$ values were large (from $-1.36$ to $-13.82$).
+%The 5 Leaf Gradient modules (sky, peach, jade, coral, lavender) all reached stable bootstrap support (LFP $\geq 0.81$; Fig.~\ref{fig::module_support}) and showed strong rank preservation ($Z_{connectivity}$ 4.5 to 10.7), yet \textit{none} reached significance under the genotype label permutation test (all FDR $>$ 0.2; Fig.~\ref{fig:networks}B, bottom facet; Table~\ref{tab::preservation_lg}), even though their raw mean $\Delta k_{Within}$ values were large (from $-1.36$ to $-13.82$).
 %The permutation null absorbs this absolute connectivity change because the Leaf Gradient hubs were selected to vary with leaf stage rather than with genotype, so random splits of the samples produce comparable magnitudes.
 %This negative control isolates a genotype-specific connectivity weakening restricted to the subset of \invfour DEG modules above, rather than a genome-wide attenuation of coexpression.
 
 %The pink module illustrates this pattern: despite high bootstrap support in CTRL (LFP $= 0.72$) and moderate structural preservation ($Z_{summary} = 5.8$, $Z_{connectivity} = 6.4$), it showed a genotype-specific connectivity loss (mean $\Delta k_{Within} = -1.36$, $Z_{\Delta k} = -2.28$, FDR $= 0.034$; Table~\ref{tab::preservation}) with 100\% of genes losing connectivity.
-%Hub gene analysis showed that \jmjiv, a top-connected gene in CTRL ($k_{Within} = 3.17$), retained a similar rank within the pink module but lost 81\% of its absolute connectivity in \invfour ($k_{Within} = 0.61$; Fig~\ref{fig:wgcna}C).
+%Hub gene analysis showed that \jmjiv, a top-connected gene in CTRL ($k_{Within} = 3.17$), retained a similar rank within the pink module but lost 81\% of its absolute connectivity in \invfour ($k_{Within} = 0.61$; Fig~\ref{fig:networks}C).
 %Similarly, \jmjii showed $k_{Within} = 3.33$ in CTRL versus $0.59$ in \invfour (82\% reduction).
 %Rather than transitioning from central to peripheral, these JMJ genes---like the rest of the pink module ($Z_{connectivity} = 6.4$, all 30 genes losing connectivity)---experienced a global weakening of their coexpression, consistent with their downregulation attenuating (rather than rewiring) the gene pairs they normally coordinate.
 
@@ -710,14 +710,14 @@ Text to the right of each ridge shows the top Gene Ontology Biological Process t
 Nodes within the \invfour introgression are purple, flanking nodes are pink, and targets elsewhere in the genome are gold.
 Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants.
 Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.}
-\label{fig:wgcna}
+\label{fig:networks}
 \end{figure*}
 
 
 \subsection{Trans-regulatory network analysis detects potential \invfour epigenetic regulators belonging to a growth related module }
 
 To investigate the potential trans-regulatory effects of the \invfour chromosomal inversion, we constructed a coexpression network linking DEGs within the introgressed region (potential regulators) to differentially expressed genes located elsewhere in the genome (trans targets).
-We validated these coexpression relationships against the MaizeNetome database, which catalogs experimentally-supported regulatory interactions in maize (Fig~\ref{fig:wgcna}C).
+We validated these coexpression relationships against the MaizeNetome database, which catalogs experimentally-supported regulatory interactions in maize (Fig~\ref{fig:networks}C).
 
 The trans-regulatory network comprised 135 genes connected by 552 coexpression edges.
 Of the 103 potential regulator genes within or flanking the introgression, 33 were located within the \invfour proper and 70 in the flanking regions.
@@ -729,7 +729,7 @@ The dataset-specific edges are statistically well-supported in our experiment (P
 The Reference network included known regulatory relationships involving \textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC = +2.99$), a DNA replication factor, and \textit{outer cell layer2} (\textit{ocl2}, \textit{Zm00001eb428740}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor involved in epidermal cell differentiation.
 Notably, the Reference network also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets, supporting a conserved regulatory role for this histone demethylase.
 
-The dataset-specific network identified a previously uncharacterized \jmjiv neighborhood subgraph (Fig~\ref{fig:wgcna}C).
+The dataset-specific network identified a previously uncharacterized \jmjiv neighborhood subgraph (Fig~\ref{fig:networks}C).
 \jmjiv ($\log_2 FC = -2.84$) showed strong coexpression with \textit{Exocyst complex component SEC6} (\textit{sec6}; $\log_2 FC = +2.87$), which functions in vesicle trafficking and cell plate formation during cytokinesis.
 This connection suggests that the JMJ cluster may influence cell division through pathways beyond direct chromatin modification of target gene promoters.
 %Gene Ontology enrichment analysis of genes within \invfour proper (Fig~\ref{fig::transnetwork}B) found significant over-representation of negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.2 \times 10^{-4}$, fold enrichment = 90.4) and positive regulation of growth (GO:0045927; $p = 1.3 \times 10^{-3}$, fold enrichment = 37.7).
@@ -802,7 +802,7 @@ Bottom track shows genomic positions of individual cluster members.}
 %First, we delimited \invfour by comparing the genome sequences of a Mi21-containing NIL and B73.
 %We found the inversion to span 15 Mb in B73, with breakpoints bounded by chromosomal knob repeat regions (Fig~\ref{fig::design}C, Table~\ref{tab:breakpoints}).
 %Second, \invfour produces significant effects on flowering time and plant height whose magnitude and direction vary across environments (Fig~\ref{fig:phenotypes}, Supplementary Table~\ref{tab::gxe}).
-%Third, \invfour disrupts gene networks related to growth regulation as evidenced by WGCNA and trans-coexpression analysis (Table~\ref{tab::preservation}, Fig~\ref{fig:wgcna}C).
+%Third, \invfour disrupts gene networks related to growth regulation as evidenced by WGCNA and trans-coexpression analysis (Table~\ref{tab::preservation}, Fig~\ref{fig:networks}C).
 %Fourth, a \textit{Jumonji} histone demethylase cluster emerges as the most statistically robust signal among differentially expressed genes (Fig~\ref{fig:jmj_cluster}).
 
 \subsection*{Repeat-mediated breakpoints suggest an ectopic recombination origin}
@@ -877,9 +877,9 @@ The height effect on adult plants reflects internode elongation rather than addi
 Together with the cross-environment flowering acceleration --- consistent in both Pennsylvania and North Carolina --- and the environment-dependent height effect, these observations position the JMJ cluster as a candidate driver of a coordinated developmental program coupling chromatin regulation, meristem geometry, and post-floral-transition growth.
  
 The JMJ dosage reduction does not act in isolation.
-Of thirteen coexpression modules built from the 465 DEGs, five show genotype-specific connectivity loss in \invfour under a label-permutation test (Fig~\ref{fig:wgcna}), including the pink module to which the JMJ cluster belongs.
+Of thirteen coexpression modules built from the 465 DEGs, five show genotype-specific connectivity loss in \invfour under a label-permutation test (Fig~\ref{fig:networks}), including the pink module to which the JMJ cluster belongs.
 JMJ genes retain similar within-module rank in CTRL and \invfour but lose 81--82\% of their absolute connectivity, consistent with reduced expression attenuating rather than rewiring the gene pairs they normally coordinate.
-A \textit{trans}-coexpression network independently connects the JMJ cluster to growth-related targets outside the inversion, including \textit{pcna2} (a DNA-replication factor) and \textit{sec6} (an exocyst component and plant-height GWAS candidate \citep{peiffer2014}), both upregulated in \invfour (Fig~\ref{fig:wgcna}C).
+A \textit{trans}-coexpression network independently connects the JMJ cluster to growth-related targets outside the inversion, including \textit{pcna2} (a DNA-replication factor) and \textit{sec6} (an exocyst component and plant-height GWAS candidate \citep{peiffer2014}), both upregulated in \invfour (Fig~\ref{fig:networks}C).
 Twenty-one DEGs in the introgression had identical coding sequence between B73 and Mi21, and twenty of these were in the flanking region rather than within \invfour proper (Fisher $p = 0.00013$), implicating \textit{trans}-regulatory effects originating from divergent loci elsewhere in the introgression --- the kind of cascade a chromatin regulator can plausibly produce.
 Two additional WGCNA modules reinforce the growth-network interpretation: the greenyellow module includes \textit{sec6} and \textit{pcna2} together with the cell-polarity regulator \textit{ropgef14}; the purple module includes \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like), another plant-height GWAS candidate \citep{liu2023, peiffer2014} that in \textit{Arabidopsis} mediates brassinosteroid-responsive cell expansion \citep{farrar2003, collgarcia2004, schroeder2009}.
 
@@ -961,7 +961,7 @@ This caveat applies broadly to eQTL studies and to inversion analyses across tax
 
 %The JMJ dosage reduction described above raised the question of whether it is associated with broader transcriptional reorganization.
 %WGCNA analysis of the PA2022 leaf transcriptome identified 13 modules, of which 5 (brown, tan, purple, blue, pink) showed a genotype-specific connectivity loss in \invfour relative to CTRL under the label-permutation test (FDR $< 0.05$; Table~\ref{tab::preservation}).
-%The JMJ cluster, like the rest of the pink module, experienced substantial absolute connectivity loss in \invfour ($k_{Within}$ fell from $3.17$--$3.33$ in CTRL to $0.59$--$0.61$ in \invfour; Fig~\ref{fig:wgcna}C) despite the module's rank structure being partially preserved ($Z_{connectivity} = 6.4$; Table~\ref{tab::preservation}), consistent with the dosage reduction attenuating---rather than rewiring---their coexpression.
+%The JMJ cluster, like the rest of the pink module, experienced substantial absolute connectivity loss in \invfour ($k_{Within}$ fell from $3.17$--$3.33$ in CTRL to $0.59$--$0.61$ in \invfour; Fig~\ref{fig:networks}C) despite the module's rank structure being partially preserved ($Z_{connectivity} = 6.4$; Table~\ref{tab::preservation}), consistent with the dosage reduction attenuating---rather than rewiring---their coexpression.
 %The pink module, where jmj2 belongs, is enriched for ribosome biogenesis and growth regulation (Table~\ref{tab::pink_module}), and showed connectivity loss in all 30 genes (mean $\Delta k_{Within} = -1.36$, $p_{adj} = 2.6 \times 10^{-6}$) despite moderate structural preservation ($Z_{summary} = 5.8$).
 %The trans coexpression network independently linked JMJ genes to cell proliferation factors including \textit{pcna2} and \textit{sec6} (Fig~\ref{fig::transnetwork}A), with edges assigned only when JMJ was the strongest correlated potential regulator within the 15 Mb inversion (see Methods).
 
@@ -1119,8 +1119,8 @@ For each trait we fit a linear mixed model with \invfour as a two level fixed fa
 y_{ijkl} = \mu + \beta\,\mathrm{Inv4m}_{ijkl} + u_{\text{ancestry},i} + u_{\text{BC2},ij} + u_{\text{NIL},ijk} + \varepsilon_{ijkl}
 \end{eqnarray}
 
-Models were fit with \texttt{lme4}~\cite{bates2015} via \texttt{lmerTest}~\cite{kuznetsova2017} for Satterthwaite degrees of freedom.
-A pre flight diagnostic showed that intermediate pedigree levels (donor accession, F1, BC1) carry zero additional variance once ancestry (above) and BC2 (below) are accounted for, so we report the parsimonious 3 random effect specification; the full slash nested 6 random effect model gave identical \invfour fixed effect estimates with singular fits at the intermediate levels.
+Models were fit with \texttt{lme4}~\cite{bates2015} via \texttt{lmerTest}~\cite{kuznetsova2017} for Satterthwaite degrees of freedom. 
+Intermediate pedigree levels (donor accession, F1, BC1) carry zero additional variance once ancestry (above) and BC2 (below) are accounted for, so we report the parsimonious 3 random effect specification; the full slash nested 6 random effect model gave identical \invfour fixed effect estimates with singular fits at the intermediate levels.
 We additionally validated the parametric inference with a within BC2 permutation test (1000 permutations of \invfour labels within each BC2 family); permutation $p$ values agreed with Satterthwaite $p$ values within rounding.
 Per trait $p$ values were adjusted for multiple testing across the 3 trait family (DTA, DTS, PH) using the Benjamini Hochberg method \cite{benjamini1995}.
 For visualization (Supplementary Fig.~\ref{fig::zeal_inv4m}), lineage corrected trait values were computed by subtracting the ancestry and BC2 random effect BLUPs but retaining the NIL random effect, $\tilde{y}_{ijkl} = y_{ijkl} - \hat{u}_{\text{ancestry},i} - \hat{u}_{\text{BC2},ij}$, so that the within arm spread reflects the line to line NIL variation the model uses for inference.
@@ -2016,7 +2016,7 @@ Most Genotype Response modules achieve moderate to stable support, and all Leaf 
 \textbf{(A)} Biological Process GO term enrichment for each CTRL WGCNA consensus module.
 Module labels include gene counts in parentheses.
 Notable enrichments include chromatin organization (blue module), translation (brown), and cellular response to stress (yellow).
-\textbf{(B)} GO enrichment of the \invfour trans coexpression network from Fig.~\ref{fig:wgcna}C, stratified by gene location (flanking introgression vs.\ \invfour proper) and regulation direction.
+\textbf{(B)} GO enrichment of the \invfour trans coexpression network from Fig.~\ref{fig:networks}C, stratified by gene location (flanking introgression vs.\ \invfour proper) and regulation direction.
 Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.
 In both panels, bubble size indicates gene count and color indicates enrichment significance ($-\log_{10}(p)$); GO terms were reduced using rrvgo semantic similarity to eliminate redundancy.}
 \label{fig::module_go}
@@ -2030,11 +2030,11 @@ In both panels, bubble size indicates gene count and color indicates enrichment 
 \centering
 \includegraphics[width=\linewidth]{figs/supp_hub_connectivity.png}
 \caption{\textbf{Intramodular hub-gene connectivity in CTRL vs.\ \invfour.}
-Each point shows one of the top five hub genes (by CTRL $k_{Within}$) in each WGCNA consensus module; point color corresponds to module identity as in Fig.~\ref{fig:wgcna}.
+Each point shows one of the top five hub genes (by CTRL $k_{Within}$) in each WGCNA consensus module; point color corresponds to module identity as in Fig.~\ref{fig:networks}.
 The x-axis is intramodular connectivity in the CTRL consensus network and the y-axis is connectivity in the \invfour consensus network; points below the dashed identity line have lost connectivity in the \invfour karyotype.
 Point size encodes $|\log_2\text{FC}|$ from the genotype DEG analysis.
 Gene labels show curated names where available; \textit{jmj2} is shown in bold italic.
-This figure complements Fig.~\ref{fig:wgcna}B, which summarizes module-level connectivity loss as a permutation-based $z$-score.}
+This figure complements Fig.~\ref{fig:networks}B, which summarizes module-level connectivity loss as a permutation-based $z$-score.}
 \label{fig::hub_connectivity}
 \end{figure*}
 
@@ -2042,7 +2042,7 @@ This figure complements Fig.~\ref{fig:wgcna}B, which summarizes module-level con
 
 
 \begin{table}[!ht]
-\caption{\textbf{WGCNA module preservation statistics for the Genotype Response (Inv4m DEG) reference network.} Modules sorted by FDR from the genotype label permutation test used in Fig.~\ref{fig:wgcna}B (1000 shuffles of the CTRL/\invfour labels). $\Delta k_{Within}$ is the mean intramodular connectivity change (\invfour $-$ CTRL); $Z_{\Delta k}$ is that observed value expressed as a $z$-score relative to the permutation null. $Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $Z_{summary} < 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. $Z_{connectivity}$ quantifies rank preservation of intramodular connectivity; $Z_{density}$ quantifies preservation of average connectivity strength. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
+\caption{\textbf{WGCNA module preservation statistics for the Genotype Response (Inv4m DEG) reference network.} Modules sorted by FDR from the genotype label permutation test used in Fig.~\ref{fig:networks}B (1000 shuffles of the CTRL/\invfour labels). $\Delta k_{Within}$ is the mean intramodular connectivity change (\invfour $-$ CTRL); $Z_{\Delta k}$ is that observed value expressed as a $z$-score relative to the permutation null. $Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $Z_{summary} < 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. $Z_{connectivity}$ quantifies rank preservation of intramodular connectivity; $Z_{density}$ quantifies preservation of average connectivity strength. LFP = Largest Fragment Proportion (bootstrap support in CTRL).}
 \label{tab::preservation}
 \centering
 \small
@@ -2069,7 +2069,7 @@ turquoise & 55 & 6.5 & 5.6 & 6.1 & -0.28 & -0.14 & 0.441 & 0.54 \\
 
 
 \begin{table}[!ht]
-\caption{\textbf{WGCNA module preservation statistics for the Leaf Gradient topological control set.} Modules sorted by FDR from the genotype label permutation test used in Fig.~\ref{fig:wgcna}B (1000 shuffles of the CTRL/\invfour labels). $\Delta k_{Within}$ is the mean intramodular connectivity change (\invfour $-$ CTRL); $Z_{\Delta k}$ is that observed value expressed as a $z$-score relative to the permutation null. $Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $Z_{summary} < 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. $Z_{connectivity}$ quantifies rank preservation of intramodular connectivity; $Z_{density}$ quantifies preservation of average connectivity strength. LFP = Largest Fragment Proportion (bootstrap support in CTRL). The Leaf Gradient set groups genes by expression along the leaf developmental gradient and serves as an orthogonal control for the Genotype Response modules in Table~\ref{tab::preservation}.}
+\caption{\textbf{WGCNA module preservation statistics for the Leaf Gradient topological control set.} Modules sorted by FDR from the genotype label permutation test used in Fig.~\ref{fig:networks}B (1000 shuffles of the CTRL/\invfour labels). $\Delta k_{Within}$ is the mean intramodular connectivity change (\invfour $-$ CTRL); $Z_{\Delta k}$ is that observed value expressed as a $z$-score relative to the permutation null. $Z_{density}$, $Z_{connectivity}$, and $Z_{summary}$ from \texttt{modulePreservation()} with 1000 permutations \cite{langfelder2011}: $Z_{summary} < 2$ = not preserved, $2$--$10$ = moderate, $> 10$ = strong. $Z_{connectivity}$ quantifies rank preservation of intramodular connectivity; $Z_{density}$ quantifies preservation of average connectivity strength. LFP = Largest Fragment Proportion (bootstrap support in CTRL). The Leaf Gradient set groups genes by expression along the leaf developmental gradient and serves as an orthogonal control for the Genotype Response modules in Table~\ref{tab::preservation}.}
 \label{tab::preservation_lg}
 \centering
 \small
@@ -2170,7 +2170,7 @@ Node fill indicates genomic location: purple (\invfour region), pink (flanking i
 Colored fill indicates upregulation in \invfour; white fill with colored border indicates downregulation.
 Edge width is proportional to mutual information.
 Gene labels are shown in italics.
-This figure shows the complete novel network; the \jmjiv neighborhood subgraph is detailed in Fig.~\ref{fig:wgcna}C.}
+This figure shows the complete novel network; the \jmjiv neighborhood subgraph is detailed in Fig.~\ref{fig:networks}C.}
 \label{fig::trans_novel_full}
 \end{figure*}
 
