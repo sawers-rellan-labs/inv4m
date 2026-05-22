@@ -1306,6 +1306,7 @@ Signed weighted networks were constructed using soft-thresholding power selected
 Both CTRL and \invfour conditions independently converged on $\beta = 18$, which was used as a shared power for all downstream analyses to ensure comparability.
 
 Reference coexpression modules were defined from CTRL samples using the consensus network approach of \cite{shahan2018}, which uses gene subsampling to identify relationships that are stable across parameter choices.
+The Leaf Gradient reference network was constructed using the same consensus pipeline applied to an independent gene set of 218 panicoid grass photosynthesis ($n = 163$) and senescence ($n = 55$) genes \cite{ojedarivera2026}, providing a topological control with comparable module count and gene number for the genotype-label permutation test.
 In each of 1000 iterations, 80\% of genes were randomly subsampled without replacement and WGCNA clustering was performed with \textit{minModuleSize} uniformly sampled from 10 to 35 to avoid parameterization bias.
 Following \cite{shahan2018}, the consensus co-clustering matrix $C$ was computed as:
 \begin{equation}
