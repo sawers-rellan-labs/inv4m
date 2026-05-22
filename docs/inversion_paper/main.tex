@@ -714,28 +714,10 @@ Edge polarity reflects the sign of mutual information: arrows indicate positive 
 \end{figure*}
 
 
-%\begin{figure*}[!ht]
-%\centering
-%\includegraphics[width= 0.85\linewidth]{figs/transnetwork.png}
-%\caption{\textbf{Trans coexpression network connecting \invfour DEGs to genome-wide targets.}
-%\textbf{(A)} Minimum spanning tree visualization of co-expression relationships between DEGs within the \invfour introgression (purple) and target genes located elsewhere in the genome (yellow).
-%Node fill indicates direction of differential expression: filled nodes are upregulated and open nodes are downregulated in \invfour plants.
-%Edge polarity reflects the sign of mutual information: arrows indicate positive coexpression and bars indicate negative coexpression.
-%\textit{Left:} Reference edges present in the MaizeNetome database, representing known regulatory relationships.
-%The network includes \textit{proliferating cell nuclear antigen2} (\textit{pcna2}), \textit{outer cell layer2} (\textit{ocl2}), and \jmjii.
-%\textit{Right:} Dataset-specific edges detected in the \invfour network but absent from MaizeNetome, showing the \jmjiv neighborhood subgraph that includes \textit{Exocyst complex component SEC6} (\textit{sec6}).
-%\textbf{(B)} Gene Ontology enrichment analysis of the trans coexpression network, stratified by gene location (flanking introgression vs. \invfour proper) and regulation direction.
-%Bubble size indicates gene count; color indicates enrichment significance ($-\log_{10}(p)$).
-%Gene labels identify representative members of enriched terms.
-%Notable enrichments include negative regulation of gene expression (epigenetic) and positive regulation of growth among \invfour-downregulated genes.}
-%\label{fig::transnetwork}
-%\end{figure*}
-
-
 \subsection{Trans-regulatory network analysis detects potential \invfour epigenetic regulators belonging to a growth related module }
 
 To investigate the potential trans-regulatory effects of the \invfour chromosomal inversion, we constructed a coexpression network linking DEGs within the introgressed region (potential regulators) to differentially expressed genes located elsewhere in the genome (trans targets).
-We validated these coexpression relationships against the MaizeNetome database, which catalogs experimentally-supported regulatory interactions in maize (Fig~\ref{fig::transnetwork}A).
+We validated these coexpression relationships against the MaizeNetome database, which catalogs experimentally-supported regulatory interactions in maize (Fig~\ref{fig:wgcna}C).
 
 The trans-regulatory network comprised 135 genes connected by 552 coexpression edges.
 Of the 103 potential regulator genes within or flanking the introgression, 33 were located within the \invfour proper and 70 in the flanking regions.
@@ -747,7 +729,7 @@ The dataset-specific edges are statistically well-supported in our experiment (P
 The Reference network included known regulatory relationships involving \textit{proliferating cell nuclear antigen2} (\textit{pcna2}; $\log_2 FC = +2.99$), a DNA replication factor, and \textit{outer cell layer2} (\textit{ocl2}, \textit{Zm00001eb428740}; $\log_2 FC = -2.66$), a HD-ZIP IV transcription factor involved in epidermal cell differentiation.
 Notably, the Reference network also contained edges connecting \jmjii ($\log_2 FC = -3.49$) to trans targets, supporting a conserved regulatory role for this histone demethylase.
 
-The dataset-specific network identified a previously uncharacterized \jmjiv neighborhood subgraph (Fig~\ref{fig::transnetwork}A, right panel).
+The dataset-specific network identified a previously uncharacterized \jmjiv neighborhood subgraph (Fig~\ref{fig:wgcna}C).
 \jmjiv ($\log_2 FC = -2.84$) showed strong coexpression with \textit{Exocyst complex component SEC6} (\textit{sec6}; $\log_2 FC = +2.87$), which functions in vesicle trafficking and cell plate formation during cytokinesis.
 This connection suggests that the JMJ cluster may influence cell division through pathways beyond direct chromatin modification of target gene promoters.
 %Gene Ontology enrichment analysis of genes within \invfour proper (Fig~\ref{fig::transnetwork}B) found significant over-representation of negative regulation of gene expression, epigenetic (GO:0045814; $p = 2.2 \times 10^{-4}$, fold enrichment = 90.4) and positive regulation of growth (GO:0045927; $p = 1.3 \times 10^{-3}$, fold enrichment = 37.7).
@@ -897,7 +879,7 @@ Together with the cross-environment flowering acceleration --- consistent in bot
 The JMJ dosage reduction does not act in isolation.
 Of thirteen coexpression modules built from the 465 DEGs, five show genotype-specific connectivity loss in \invfour under a label-permutation test (Fig~\ref{fig:wgcna}), including the pink module to which the JMJ cluster belongs.
 JMJ genes retain similar within-module rank in CTRL and \invfour but lose 81--82\% of their absolute connectivity, consistent with reduced expression attenuating rather than rewiring the gene pairs they normally coordinate.
-A \textit{trans}-coexpression network independently connects the JMJ cluster to growth-related targets outside the inversion, including \textit{pcna2} (a DNA-replication factor) and \textit{sec6} (an exocyst component and plant-height GWAS candidate \citep{peiffer2014}), both upregulated in \invfour (Fig~\ref{fig::transnetwork}).
+A \textit{trans}-coexpression network independently connects the JMJ cluster to growth-related targets outside the inversion, including \textit{pcna2} (a DNA-replication factor) and \textit{sec6} (an exocyst component and plant-height GWAS candidate \citep{peiffer2014}), both upregulated in \invfour (Fig~\ref{fig:wgcna}C).
 Twenty-one DEGs in the introgression had identical coding sequence between B73 and Mi21, and twenty of these were in the flanking region rather than within \invfour proper (Fisher $p = 0.00013$), implicating \textit{trans}-regulatory effects originating from divergent loci elsewhere in the introgression --- the kind of cascade a chromatin regulator can plausibly produce.
 Two additional WGCNA modules reinforce the growth-network interpretation: the greenyellow module includes \textit{sec6} and \textit{pcna2} together with the cell-polarity regulator \textit{ropgef14}; the purple module includes \textit{exo}/\textit{phi1} (EXORDIUM/Phi-1-like), another plant-height GWAS candidate \citep{liu2023, peiffer2014} that in \textit{Arabidopsis} mediates brassinosteroid-responsive cell expansion \citep{farrar2003, collgarcia2004, schroeder2009}.
 
