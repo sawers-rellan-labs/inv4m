@@ -6,9 +6,39 @@
 
 ---
 
-## NEXT SESSION PROMPT
+## NEXT SESSION PROMPT (2026-05-26 → next session)
 
-Read `agent/inversion_paper/STATE.md`. It is the single living state doc (rewritten, not appended), with the active priority, Phase 6 row table, master CSV rename log, and conventions. Older session snapshots are in `agent/_trash/inversion_paper/` — historical only.
+**Read in this order before doing anything:**
+
+1. `agent/inversion_paper/STATE.md` — living state doc. Status snapshot at top: Pass 1 ✅ done, Pass 2 🔶 partial (RE003 ✅, RE004 ✅, RE022 ✅, RE008/RE027/RE030 ⏳), Pass 3 🔶 partial (mapping-rate ✅, Iso-seq parked, RG010 pending, SAM hypothesis pending). The **11-point "Important context the agent must carry forward"** block at the bottom of STATE.md is load-bearing — read it.
+2. `~/.claude/projects/.../memory/feedback_avoid_conflation.md` — user's #1 collaboration rule + the anti-oversell directive + the no-pre-reveal-coinage clarification + the Mi21-March-2026 timing + the JMJ subfamily distinctions + the network-analyses-as-candidate-evaluation-tools framing + the no-honest-framing-rhetoric rule. Re-read in full.
+3. `agent/inversion_paper/prearxiv_revision/HANDOVER_prearxiv_revision.md` — methodology; status snapshot near top reflects today's progress. The Pass 1 narrative includes a note that the abandoned `user_edits_vs_may04.md` draft sits in `agent/_trash/`; don't reach back for it.
+4. `agent/inversion_paper/prearxiv_revision/jmj_discussion_comparison_for_ruben.md` — input artifact for the §JMJ restoration discussion with Ruben. Includes the candidate landscape (jmj2/4 cluster + jmj21 + sec6 + tet2), what was lost in Ruben's RE030, style flags, and three end-state options.
+
+**Active priorities for the day** (ordered by what's blocking what):
+
+1. **§JMJ restoration decision** (RE030 broader). Read the comparison memo. The user wants the pre-Ruben §JMJ subsection (currently commented out at L917–L942) restored — it has the multi-copy → dosage-increase scaffold + methodological honesty + hedged "one candidate among many" framing. Decide: full restore vs hybrid (keep Ruben's Bellegarde 2025 / IPT3 reasoning, drop the hype phrases). This drives several downstream items.
+2. **RE008 Intro pre-reveals at L157 + L162 + L165.** Verdict pending on `substantive revision of our understanding` (Jeff JRI005 endorsed, RRA agreed; cutting overrides their agreement — document the call). L165↔L948 duplication still present.
+3. **RE027** "exactly the mirror-image" at L811 — one-word soften to "consistent with".
+4. **Pass 2 typo sweep**: `withing` → `within` at L134; `acknlowledge` → `acknowledge` at L901.
+5. **Iso-seq question**: if Jeff has responded with a specific dataset pointer, look there; otherwise commit to the parsimony case in the §JMJ Discussion.
+6. **RG010 synthesis paragraph** — restore-with-neofunctionalization vs leave-cut decision.
+7. **SAM hypothesis framing** (JS008 + JRI013): adopt Jeff's wording at current L315 area.
+
+**Hard rules to carry forward (memorize before acting):**
+
+- Anti-oversell governs all framing. Hedged language ("candidate among several", "consistent with", "raises the possibility", "we cannot exclude"). Never definite-the constructions for unmeasured inferences.
+- Distinguish "user's own unrevised earlier prose" from "Ruben's late additions" before attributing — example: the `regulatory hub whose perturbation propagates` phrase was the user's own pre-Ruben text (commit `02ceac9`), not Ruben's.
+- JMJ subfamilies are not interchangeable: jmj2/4/6/9 (KDM5/JARID1, H3K4 demethylase) vs jmj21 (JHDM2, H3K9 demethylase, IBM1 ortholog). The dosage story is about the former cluster only.
+- kWithin label-permutation test is **module-level**, not per-gene. Per-gene kWithin values are descriptive observations only.
+- The Mi21 NIL assembly only became available March 2026. Reviewer concerns about "should have used a highland reference" are limitations caveats, not grounds for re-analysis.
+- Don't use the term "pre-reveal" — it was an agent overgeneralization, not a real rule. The actual rules are the specific phrasings + the unmeasured-claim test.
+- Don't speculate about reviewer-rejection risk at named journals.
+- Don't frame the user's work as "dishonest" or use "honest framing" rhetoric. The user has been hedging carefully.
+
+**Tag `anchorhead01` = commit `dc5342a`** is the Pass 1 frozen line-number anchor. If Pass 2 edits drift line numbers materially (more than ~10 lines), re-tag and update the catalogs.
+
+Older session snapshots are in `agent/_trash/inversion_paper/` — historical only.
 
 ---
 
