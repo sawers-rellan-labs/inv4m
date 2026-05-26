@@ -112,9 +112,9 @@ E-mail: frodrig4@ncsu.edu, rrellan@ncsu.edu}
 
 \section{Introduction}
 \lettrine[lines=2]{\color{color2}C}{hromosomal} inversions are among the most striking and widespread forms of structural variation, segregating in natural populations of plants, animals, fungi, and humans \citep{Wellenreuther2018-an, kirkpatrick2006, kirkpatrick2010}.
-By suppressing recombination between standard and inverted haplotypes, inversions can maintain coadapted allele complexes as single inherited units --- a mechanism originally proposed by Dobzhansky
-\citep{dobzhansky1971genetics} and now central to theories of local adaptation, supergene maintenance, and incipient speciation \citep{kirkpatrick2006, kirkpatrick2010, Lowry2010-fn}.
-A growing body of work establishes that megabase-scale inversions are repeatedly associated with environmental clines and adaptive phenotypes across diverse taxa.
+By suppressing recombination between standard and inverted haplotypes, inversions can maintain coadapted allele complexes as single inherited units,  a mechanism originally proposed by
+\cite{dobzhansky1971genetics} and now central to theories of local adaptation, supergene maintenance, and incipient speciation \citep{kirkpatrick2006, kirkpatrick2010, Lowry2010-fn}.
+A growing body of work establishes that megabase scale inversions are repeatedly associated with environmental clines and adaptive phenotypes across diverse taxa.
 Yet despite their evolutionary prominence, the genes within inversions that actually drive their phenotypic effects remain unidentified in most systems: the same recombination suppression that allows inversions to maintain coadapted complexes also confounds genetic dissection of the loci they contain.
 
 Maize (\textit{Zea mays spp. maize}) and its wild relatives are a powerful system to tackling this problem.
@@ -132,8 +132,8 @@ earlier and yield more above 2000~masl, while the same allele delays
 flowering and reduces yield below 1000~masl \citep{crow2020}.
 
 Despite strong evidence linking \invfour to local adaptation, the physiological processes and environmental factors underlying its adaptive role and the genetic mechanisms by which genes withing the inversion drive its adaptive phenotypic effect have remained unclear.
-Population-genetic scans, association studies, and growth chamber expression analyses have implicated candidate regions but have not converged on causal loci.
-Previous research has shown that \invfour-highland upregulates photosynthesis genes in response to cold at the seedling stage \cite{crow2020} and is associated with earlier flowering in the Mexican highlands, which likely enhances fitness in environments with limited growth-degree accumulation throughout the year \cite{romero_navarro2017-cn}.
+Population genetic scans, association studies, and growth chamber expression analyses have implicated candidate regions but have not converged on causal loci.
+Previous research has shown that \invfour-highland upregulates photosynthesis genes in response to cold at the seedling stage \cite{crow2020} and is associated with earlier flowering in the Mexican highlands, which likely enhances fitness in environments with limited growth degree accumulation throughout the year \cite{romero_navarro2017-cn, eagles1994, giauffret2000}.
 \cite{crow2020} identified differentially expressed genes between
 \invfour haplotypes in cold-stressed seedlings under growth chamber
 conditions, with transcriptomic effects enriched for photosynthesis and
@@ -143,14 +143,14 @@ networks, have not been established.
 More broadly, the effects of \invfour introgression on gene expression and phenotype in temperate field environments have not been directly tested.
 
 Here we close this gap with a multi-level characterization of \invfour that combines careful control of genetic background, phenotyping across multiple common gardens to capture genotype-by-environment effects, and detailed expression analysis to dissect regulatory architecture.
-We introgressed the highland inverted haplotype from the Mexican traditional variety Mi21 \citep{Hayano-Kanashiro2009-ao} into B73 \citep{Schnable2009-jq}, a temperate maize inbred line through eight generations of backcrossing, generating BC$_8$S$_2$ Near Isogenic Lines (NILs)
-We phenotyped these NILs across three field environment-year combinations in Pennsylvania and North Carolina, measured shoot apical meristem morphology in growth chamber seedlings, and used RNA-seq from field experiments  to dissect the regulatory architecture of the \invfour effect using weighted gene coexpression network analysis and \textit{trans}-regulatory network reconstruction.
-
-Combining long-read assemblies of highland materials with our Mi21 NIL, we precisely delimited \invfour breakpoints, which overlap chromosomal knob repeat arrays consistent with an ectopic recombination origin. 
-\invfour modulated flowering time and plant height across our field environments, with genotype-by-environment interactions congruent with antagonistic selection, and produces elongated shoot apical meristems in seedlings, a developmental signature of accelerated flowering \citep{danilevskaya2008, wu2008, leiboff2015, thompson2015}.
-We then traced the strongest gene expression difference to a cluster of
-JUMONJI histone demethylases (JMJ).
-We assembled the genome of (Mi21) \invfour and using other highland genomes containing \invfour including teosinte (TIL18), a highland landrace (Palomero Toluque\~no), and the CIMMYT tropical inbreds CML457 and CML459 to show that \invfour carries a single ancestral copy of JMJ while temperate inbreds like B73 carries a tandem repeat expansion of five JMJ paralogs.
+We introgressed the highland inverted haplotype from the Mexican traditional variety Mi21 \citep{Hayano-Kanashiro2009-ao} into B73 \citep{Schnable2009-jq}, a temperate maize inbred line through eight generations of backcrossing, generating BC$_8$S$_2$ Near Isogenic Lines (NILs).
+First we used long read assemblies of highland materials and the Mi21 NIL to precisely delimit \invfour breakpoints.
+We found that \invfour breakpoints overlap chromosomal knob repeat arrays consistent with an ectopic recombination origin.
+We phenotyped these NILs across three field environment-year combinations in Pennsylvania and North Carolina, measured shoot apical meristem morphology in growth chamber seedlings, and used RNA-seq from field experiments to dissect the regulatory architecture of the \invfour effect using weighted gene coexpression network analysis and \textit{trans}-regulatory network reconstruction.
+\invfour modulated flowering time and plant height across our field environments, with genotype-by-environment interactions congruent with antagonistic selection, and produced elongated shoot apical meristems in seedlings, a developmental signature of accelerated flowering \citep{danilevskaya2008, wu2008, leiboff2015, thompson2015}.
+We then traced the most significant gene expression difference to a cluster of JUMONJI histone demethylases (JMJ).
+At the \invfour locus, microsynteny across teosinte \textit{mexicana}, three highland maize references (the landrace Palomero Toluqueño and the CIMMYT highland inbreds CML457 and CML459), and the Mi21 NIL carrying the highland \invfour introgression showed a single JMJ copy in every case, while the B73 reference carries a tandem expansion of five paralogs (Fig.~\ref{fig:jmj_cluster}~B).
+The single copy state is shared across teosinte lineages, while the multicopy state predominates in cultivated maize, where most assemblies in MaizeGDB show expansion relative to the teosinte configuration (Supplementary Fig.~\ref{fig::jmj_teosinte}).
 This finding highlights the importance of new genome assemblies of relevant materials to study local adaptation in maize and other species.
 Co-expression analysis revealed that the introgression rewires native B73 networks: JMJ genes lose hub connectivity in growth-related coexpression modules, and a \textit{trans}-regulatory network connects the JMJ cluster to cell-proliferation genes including \textit{pcna2} and \textit{sec6}, pointing to a working hypothesis in which JMJ dosage modulates growth and flowering time through chromatin modification.
 
@@ -197,7 +197,7 @@ Solid purple lines mark inversion breakpoints; dashed black lines mark the estim
 %Around the 225~Mb mark, regions corresponding to reported 4L cytogenetic knobs can be observed in \mex and B73 while absent in PT.
 \textbf{(C)} AnchorWave \cite{song2022} whole-genome alignment dotplots of Mi21 NIL chromosome~4 versus TIL18 (teosinte \mex), PT (highland maize), and B73 (reference).
 Collinear anchors in blue, inverted in red.
-The dashed rectangle on the B73 panel marks the estimated introgression extent ($\sim$141--170~Mb in Mi21; $\sim$158--191~Mb in B73 coordinates), determined from positional offset analysis of the alignment.
+The dashed rectangle on the B73 panel marks the estimated introgression extent ($\sim$141--170~Mb in Mi21 NIL; $\sim$158--191~Mb in B73 coordinates), determined from positional offset analysis of the alignment.
 \textbf{(D)} Sequence self-similarity dotplots, using LAST \cite{kielbasa2011}, for the inversion breakpoint segments as defined in Table~\ref{tab:breakpoints}.
 Forward matches in red, reverse in blue.
 Rectangles indicate tandem repeats.
@@ -312,7 +312,7 @@ Plant height showed a positive but non significant donor effect in the ZEAL pane
 
 \subsection{Inv4m seedlings have elongated shoot apical meristems}
 
-To investigate whether these macroscopic phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
+To investigate whether these whole plant phenotypes were associated with changes in meristem organization, we examined shoot apical meristems (SAMs) from two-week-old seedlings grown in controlled environment chambers (Fig~\ref{fig:phenotypes}B,C).
 \invfour seedlings showed a 9\% increase in SAM height with width unchanged, and elevated shape metrics ($h/r$ and $h/r^2$) confirmed the elongation --- a developmental signature consistent with the larger, more elongated meristems previously associated with accelerated flowering \citep{danilevskaya2008, wu2008, leiboff2015, thompson2015}.
 
 \begin{figure*}[!ht]
@@ -782,7 +782,7 @@ Right: PA2022 field data across 4 leaf positions.
 Dashed red line indicates expected \invfour expression under copy number scaling (CTRL/5), assuming the single remaining \jmjiv copy produces 1/5 of the total cluster output.
 Red asterisks denote significant deviation from expectation (linear contrast $t$-test, FDR $<$ 0.05: *, $<$ 0.01: **, $<$ 0.001: ***).
 \textbf{(B)} Microsynteny of the JUMONJI gene cluster across five \textit{Zea} genomes.
-From top to bottom: the teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}), the highland landrace Palomero Toluque\~{n}o (PT), and the tropical inbred lines CML457 and CML459 each contain a single \textit{jmj6} ortholog, while B73 (bottom) has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6}, \jmjii, \jmjiv).
+From top to bottom: the teosinte TIL18 (\textit{Z. mays} ssp. \textit{mexicana}), the highland landrace Palomero Toluque\~{n}o (PT), and the CIMMYT highland inbreds CML457 and CML459 each contain a single \textit{jmj6} ortholog, while B73 (bottom) has an expanded tandem array of five paralogs (\textit{jmj9}, $\psi$?, \textit{jmj6}, \jmjii, \jmjiv).
 Purple ribbons indicate syntenic relationships between \textit{jmj} loci; gray ribbons show conserved flanking genes.
 Coordinates in Mb.
 \textbf{(C)} Transcript structure and annotation of the B73 \textit{jmj} cluster.
@@ -845,7 +845,8 @@ Whether the cross-taxon parallels imply a shared mechanism at the root of \invfo
 \subsection*{A JUMONJI histone demethylase cluster as the candidate driver of \invfour phenotypes}
  
 Among the 465 genes differentially expressed between \invfour and CTRL plants, a cluster of JUMONJI histone demethylases provides the most consistent signal across our field data and the independent growth chamber experiments of \cite{crow2020} (Fig~\ref{fig:jmj_cluster}A).
-Microsynteny across five \textit{Zea} genomes places the expansion of this cluster --- five paralogs in B73, against a single \textit{jmj6} ortholog in highland teosinte (TIL18), the highland landrace Palomero Toluque\~{n}o, and the tropical inbreds CML457 and CML459 --- in the temperate B73 lineage rather than the highland inverted allele (Fig~\ref{fig:jmj_cluster}B).
+Microsynteny across five \textit{Zea} genomes places the expansion of this cluster in the temperate B73 lineage rather than the highland inverted allele (Fig~\ref{fig:jmj_cluster}B).
+B73 carries five paralogs, while highland teosinte (TIL18), the highland landrace Palomero Toluqueño, and the CIMMYT highland inbreds CML457 and CML459 each retain a single \textit{jmj6} ortholog.
 At this locus, then, the highland configuration is the ancestral state.
 The 5:1 copy-number difference accounts for most of the apparent downregulation of the cluster in \invfour plants, but field expression falls significantly below the simple dosage expectation across leaf stages (49--61\% of CTRL/5), pointing to an additional layer of regulatory suppression.
 Growth-chamber expression deviated less consistently from dosage (48--83\%, 4 of 9 tissues significant), suggesting that the regulatory suppression beyond copy number is environment-dependent.
@@ -1143,7 +1144,7 @@ Agreement between methods was assessed by $R^2$ and slope deviation from unity.
 
 \subsection{Mi21 NIL genome assembly and scaffolding}
 
-To obtain a reference-quality genome for the \invfour donor parent, we performed \textit{de novo} assembly of the Mi21 near-isogenic line from PacBio HiFi sequencing data.
+To obtain a reference-quality genome for the \invfour donor parent haplotype, we performed \textit{de novo} assembly of the Mi21 near-isogenic line from PacBio HiFi sequencing data.
 Two barcoded HiFi libraries (bc2051, $\sim$9$\times$ coverage; bc2052, $\sim$5$\times$ coverage) were combined for a total of $\sim$14$\times$ genome coverage.
 Primary contigs were assembled with hifiasm v0.25.0 \cite{cheng2021hifiasm} using the \texttt{-l0} flag to disable purge duplication, yielding 740 contigs totaling 2.21~Gb with a contig N50 of 13.7~Mb.
 
@@ -1175,7 +1176,7 @@ To confirm the orientation of \invfour in the Mi21 NIL assembly and delimit brea
 CDS anchor sequences were extracted from each reference GFF3 with \texttt{anchorwave gff2seq} and mapped to both reference and query assemblies using minimap2 \cite{li2018minimap2} (\texttt{-x splice -k 12 -p 0.4 -N 20}).
 CDS-anchor dotplots were filtered to uniquely-mapped anchors (MAPQ~$\geq$~60) and dominant scaffold pairings to reduce multi-mapping noise from duplicated gene families (Fig~\ref{fig::design}C).
 
-To examine microsynteny at the JMJ cluster, we performed pairwise ortholog detection between B73 and Mi21 using jcvi/MCScan \cite{tang2008jcvi} with LAST \cite{kielbasa2011} alignments (\texttt{--cscore=.99}, \texttt{--minspan=30}).
+To examine microsynteny at the JMJ cluster, we performed pairwise ortholog detection between B73 and the Mi21 NIL assembly using jcvi/MCScan \cite{tang2008jcvi} with LAST \cite{kielbasa2011} alignments (\texttt{--cscore=.99}, \texttt{--minspan=30}).
 The resulting synteny blocks confirmed that all B73 JMJ paralogs at the locus map to a single Mi21 gene (Mi21\_Zm00001eb191820), consistent with a single-copy state in the inverted haplotype (Fig~\ref{fig:jmj_cluster}B).
 
 \subsection{Tissue sampling, RNA extraction, and sequencing}
@@ -1243,8 +1244,8 @@ R scripts and expression data are available at the \href{https://github.com/sawe
 \subsection{CDS sequence divergence analysis}
 
 To test whether expression differences in the introgression are explained by coding sequence divergence between haplotypes, we compared CDS percent identity with differential expression magnitude for genes in the shared introgression.
-CDS sequences for B73 (NAM v5) and Mi21 were aligned using LAST \cite{kielbasa2011} as part of the microsynteny pipeline described above.
-For each B73 gene in the shared introgression with a reciprocal best hit in Mi21, we retained the highest-scoring alignment and computed CDS divergence as $100 - \text{\% identity}$.
+CDS sequences for B73 (NAM v5) and the Mi21 NIL were aligned using LAST \cite{kielbasa2011} as part of the microsynteny pipeline described above.
+For each B73 gene in the shared introgression with a reciprocal best hit in Mi21 NIL, we retained the highest-scoring alignment and computed CDS divergence as $100 - \text{\% identity}$.
 We restricted the analysis to CDS alignments because upstream regulatory regions in maize are frequently interrupted by polymorphic transposon insertions that make percent identity unreliable for non-coding sequences \cite{liang2022}.
 Of the 512 expressed genes in the shared introgression, 254 had ortholog alignments and were included in the analysis (107 inside \invfour, 147 in the flanking introgression).
 We fit five linear models predicting $|\log_2\text{FC}|$ as a function of CDS divergence, region (inside \invfour vs flanking), their interaction, each term alone, and an intercept-only null, and selected the best model by BIC (Table~\ref{tab::divergence_models}).
