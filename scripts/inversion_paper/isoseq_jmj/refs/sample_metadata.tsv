@@ -1,0 +1,13 @@
+sample	tissue	genotype	is_b73_inbred	flnc_reads
+EM1	embryo	B73	yes	339048
+EM2	embryo	Ki11	no	254342
+EM3	embryo	Ki11xB73	no	305307
+EM4	embryo	B73xKi11	no	444580
+END1	endosperm	B73	yes	284678
+END2	endosperm	Ki11	no	290122
+END3	endosperm	Ki11xB73	no	232168
+END4	endosperm	B73xKi11	no	288205
+R1	root	B73	yes	362431
+R2	root	Ki11	no	225208
+R3	root	Ki11xB73	no	287485
+R4	root	B73xKi11	no	426238

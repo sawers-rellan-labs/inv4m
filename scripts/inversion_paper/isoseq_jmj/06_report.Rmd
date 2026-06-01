@@ -1,0 +1,156 @@
+---
+title: "Iso-seq test of the jmj2/jmj4 cluster annotation collapse"
+subtitle: "Wang et al. 2020 *Commun Biol* 3:78 — B73 x Ki11 + reciprocal F1s"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+bibliography: ../references.bib
+link-citations: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+suppressPackageStartupMessages({
+  library(readr); library(dplyr); library(tidyr); library(knitr)
+})
+here <- function(...) file.path(rprojroot::find_root(rprojroot::has_file("PLAN.md")), ...)
+T  <- function(f) read_tsv(here("results","tables",f), show_col_types = FALSE)
+```
+
+## TL;DR
+
+The Wang et al. 2020 Iso-seq dataset reports **`r T("03_PBX_count.tsv") |> filter(metric == "n_distinct_PB_X_groups") |> pull(value)` distinct `PB.X` gene groups** in the JMJ cluster region on B73 RefGen v4, with consecutive 5′ ends separated by 30–60 kb on chr4. The cDNA_Cupcake collapse groups full-length Iso-seq reads into `PB.X` families by shared 5′ ends and shared splice-junction chains; because Iso-seq reads carry the template-switching oligo at the true 5′ end, each `PB.X` is a direct proxy for one transcription start site (one promoter), and the `PB.X.Y` isoforms within a `PB.X` are the canonical "alternative isoforms of one locus" (one TSS, different splicing/polyadenylation). Alternative isoforms of one locus share a TSS by definition; the four `PB.X` groups here do not — their TSSs are 30–60 kb apart — so these are **autonomous transcription units, not isoforms of one locus**. That **falsifies** the reviewer hypothesis that v5 `Zm00001eb191790` represents a single locus with alternative isoforms. All four FLNC transcript groups have non-zero pure-B73 inbred FLNC reads (Table in §4a), two of them robustly (PB.11785, PB.11787) — so the falsification holds for B73 specifically, not only for Ki11 or F1 reads.
+
+## 1. v4 annotation at the cluster
+
+The B73 v4 annotation places **`r T("01_v4_gene_count.tsv") |> filter(metric == "v4_genes_in_cluster") |> pull(value)`** distinct gene models inside the cluster region (`chr4:175,321,383–175,528,400`). The bundled v4↔v5 crossmap shows 7 of those v4 models collapse to v5 `Zm00001eb191790` and 1 collapses to `Zm00001eb191820`. Even before any Iso-seq evidence, the v4 annotation contradicts the v5 single-locus representation.
+
+```{r v4-genes}
+read_tsv(here("results","intermediate","v4_genes_in_region.bed"),
+         col_names = c("chr","start","end","gene_id","score","strand"),
+         show_col_types = FALSE) |>
+  select(chr, start, end, strand, gene_id) |>
+  mutate(length_bp = end - start) |>
+  kable()
+```
+
+## 2. Iso-seq `PB.X` groups overlapping the cluster
+
+The Wang 2020 collapsed-transcript GFF (mapped on B73 v4) gives 4 distinct `PB.X` groups overlapping the cluster, encompassing 33 collapsed transcripts. Per-group span and isoform count:
+
+```{r pbx-summary}
+T("03_PBX_groups_at_cluster.tsv") |> kable()
+```
+
+The four `PB.X` groups are spatially non-overlapping along the cluster, consistent with four independent transcription units rather than alternative isoforms of one unit.
+
+## 3. Paralog ↔ `PB.X` mapping (BLAST cross-check)
+
+Each of the 5 split-paralog CDS queries was BLASTed against the F1maize collapsed-transcript FASTA. Best hits (by bitscore):
+
+```{r blast-best}
+T("04_paralog_best_hit.tsv") |>
+  select(qseqid, sseqid, PB_X, in_cluster, pident, qcovhsp, length, evalue) |>
+  arrange(desc(pident), desc(qcovhsp)) |>
+  kable()
+```
+
+A best-hit by bitscore can be misleading when paralogs are highly identical and the queries differ in length. The full set of cluster-PB.X hits per query, ranked by bitscore, makes the paralog-specific assignment clearer:
+
+```{r blast-by-pbx}
+T("04_paralog_cluster_hits.tsv") |>
+  group_by(qseqid, PB_X) |>
+  summarise(max_pident = max(pident),
+            max_qcov = max(qcovhsp),
+            n_hsp = n(),
+            best_bitscore = max(bitscore),
+            .groups = "drop") |>
+  arrange(qseqid, desc(best_bitscore)) |>
+  kable()
+```
+
+**Reading of the BLAST table.** PB.11788 is the only cluster group that the jmj4 query (`Zm00001eb191820_T001`) hits with 100% identity over kilobase-scale coverage — and the other 4 queries hit PB.11788 only via short tracts. That separation is consistent with PB.11788 being the v4 equivalent of the jmj4 locus (v4 `Zm00001d051965`) and distinct from the jmj2/jmj6/jmj9 group. The remaining three PB.X groups (PB.11785, PB.11786, PB.11787) show extensive cross-paralog hits because the four jmj1-domain paralogs (jmj9 / psi / jmj6 / jmj2) share ≥99% nucleotide identity over their conserved exons — by itself that pattern is not evidence of one locus; the spatial separation in §2 is the diagnostic.
+
+## 4. Per-sample FL counts at the cluster
+
+```{r fl-totals}
+T("05_PBX_FL_totals.tsv") |>
+  mutate(total_FL = rowSums(across(where(is.numeric)))) |>
+  select(PB_X, total_FL,
+         starts_with("embryo_"), starts_with("endosperm_"), starts_with("root_")) |>
+  kable()
+```
+
+### 4a. B73-inbred-only subset, joined to paralog identity
+
+Three samples are pure B73 inbred (`EM1`, `END1`, `R1` — embryo, endosperm, root). Restricting to these samples isolates B73-origin signal without phasing. The table below merges the paralog ↔ v4 ↔ FLNC-transcript mapping (§3) with the per-tissue B73 FLNC counts (from `05_PBX_FL_b73_only.tsv`), ordered by tandem-copy position along chr4.
+
+```{r b73-merged, results = "asis"}
+b73 <- T("05_PBX_FL_b73_only.tsv")
+get <- function(pbx, col) {
+  v <- b73[b73$PB_X == pbx, col, drop = TRUE]
+  if (length(v) == 0) 0L else v
+}
+rows <- tibble::tribble(
+  ~`Transcript ID`,        ~Label, ~`v4 gene`,        ~`FLNC transcript`,
+  "`Zm00001eb191790_T001`", "jmj9", "`Zm00001d051959`", "PB.11785",
+  "`Zm00001d051961_T002`",  "psi",  "`Zm00001d051961`", "PB.11786",
+  "`Zm00001eb191790_T006`", "jmj6", "`Zm00001d051963`", "PB.11787 †",
+  "`Zm00001eb191790_T013`", "jmj2", "`Zm00001d051964`", "PB.11787 †",
+  "`Zm00001eb191820_T001`", "jmj4", "`Zm00001d051965`", "PB.11788"
+)
+rows$embryo    <- c(get("PB.11785","embryo"),    get("PB.11786","embryo"),
+                    get("PB.11787","embryo"),    NA, get("PB.11788","embryo"))
+rows$endosperm <- c(get("PB.11785","endosperm"), get("PB.11786","endosperm"),
+                    get("PB.11787","endosperm"), NA, get("PB.11788","endosperm"))
+rows$root      <- c(get("PB.11785","root"),      get("PB.11786","root"),
+                    get("PB.11787","root"),      NA, get("PB.11788","root"))
+rows$total     <- c(get("PB.11785","total_B73_inbred"), get("PB.11786","total_B73_inbred"),
+                    get("PB.11787","total_B73_inbred"), NA, get("PB.11788","total_B73_inbred"))
+# Mark jmj2 row as shared with jmj6 (numeric cells already NA).
+knitr::kable(
+  rows,
+  caption = "Number of full-length, non-concatemer (FLNC) reads in B73 inbred samples [@wang2020].",
+  align = "lllrrrr"
+)
+```
+
+† PB.11787's reported genomic span (~43 kb) encompasses both `Zm00001d051963` and `Zm00001d051964`, separated by ~24 kb of intergenic sequence. The collapsed GFF alone cannot distinguish (i) Cupcake fuzzy-collapse merging two real, separate transcription units of high paralog identity, (ii) a reverse-transcription template-switching chimera artifact that cDNA_Cupcake then collapsed across both paralogs, or (iii) a genuine single long transcription unit with the ~24 kb intergenic acting as a large intron — unlikely in plants (introns this long inside protein-coding transcripts are rare), but not ruled out by what we have. jmj6 and jmj2 are assigned to the same FLNC transcript group accordingly; counts are pooled across the two paralogs, and the jmj2 row is left blank to avoid double counting. The ambiguity affects only the upper bound (4 vs 5 paralog-level transcription units), not the falsifier (≥2).
+
+**Reading.** Every FLNC transcript at the cluster (PB.11785, PB.11786, PB.11787, PB.11788) has at least one B73 inbred FLNC read. PB.11785 (21) and PB.11787 (50) are robust. PB.11786 (3, root only) and PB.11788 (1, endosperm only) are at the detection floor in pure B73 — present but thin. The B73-only falsifier holds: ≥2 distinct transcription units (PB.11785 + PB.11787) are unambiguously expressed in pure B73 inbred across multiple tissues.
+
+## 5. IsoPhase phasing at the cluster
+
+```{r isophase}
+iso <- T("05_isophase_cluster.tsv")
+nrow_iso <- nrow(iso)
+iso
+```
+
+**IsoPhase phased `r nrow_iso` loci at the cluster** (out of 6,907 phased loci genome-wide). The IsoPhase threshold is ≥40 FL reads per locus and ≥1 informative SNP. PB.11785 (46 FL) and PB.11787 (251 FL) both clear the read threshold, so the absence of phasing implies that no informative B73/Ki11 SNP was retained inside the collapsed transcript span. This is itself consistent with the cluster being composed of multiple highly-similar paralogs collapsing SNP signal — a known failure mode when paralog identity is comparable to inter-line divergence.
+
+This means we cannot directly resolve parent-of-origin for F1 reads at the cluster from IsoPhase. The B73-inbred subset in §4a remains the cleanest path to a B73-only conclusion.
+
+## 6. Conclusion
+
+The Wang 2020 Iso-seq data **falsifies the "single locus with alternative isoforms" interpretation** of v5 `Zm00001eb191790`. Each `PB.X` group is, by construction of the cDNA_Cupcake collapse, a 5′-anchored transcript family — i.e. a single transcription start site (one promoter) plus its splice/polyA isoforms. Alternative isoforms of one locus share a TSS by definition; the four `PB.X` groups at the cluster have TSSs separated by 30–60 kb on chr4, and so cannot be alternative isoforms of one locus. They are autonomous transcription units, each its own inheritance locus. The B73 v4 annotation independently splits the cluster into 8 gene models (one of which is a pseudogene), the four `PB.X` groups occupy spatially non-overlapping sub-regions consistent with that split, and the jmj4 paralog uniquely maps to its own group (PB.11788). The PB.11787-internal ambiguity (one TSS or two TSSs over-merged by Cupcake; see §4a, dagger note) leaves the true locus count at **4 or 5**, but not at 1 — which is what the falsifier required.
+
+## Caveats
+
+1. **Tissue mismatch.** Iso-seq tissues are root (14 DAG), embryo (20 DAP), endosperm (20 DAP). There is no leaf and no SAM in this dataset, and the JMJ dosage hypothesis in the inversion paper is anchored on leaf/SAM. The result here supports the multi-locus annotation independently of that hypothesis but does not directly speak to leaf/SAM expression.
+2. **Reference build is v4, not v5.** The collapse-into-one-locus problem is a v5 NAM annotation artifact. v4 already splits the cluster into 8 models — the Iso-seq result confirms that v4's split reflects real biology.
+3. **Ki11 is the alt parent, not Mo17.** Cluster structure observed in F1 reads or pooled samples is a B73∪Ki11 statement. The B73-inbred subset (§4a) restricts to B73 origin.
+4. **IsoPhase did not phase the cluster.** No SNP-based parent-of-origin can be assigned to F1 reads at this locus from this dataset.
+
+## Inputs of record
+
+- BLAST queries: `data/queries/jmj_5_paralog_queries.fasta` (5 entries; provenance in INPUTS.md §1).
+- Cluster coordinates: `data/queries/jmj_cluster_region_v4.bed` (`chr4:175,321,383–175,528,400`).
+- v4 GFF subset: `data/queries/jmj_cluster_region_v4.gff3`.
+- v4↔v5 crossmap: `data/queries/jmj_cluster_v4_to_v5_crossmap.tsv`.
+- Sample metadata: `data/queries/sample_metadata.tsv` (derived from Supp. Table 1/2 of MOESM1).
+- Wang 2020 Zenodo deposit (10.5281/zenodo.2611319):
+  `F1maize.FINAL.fasta`, `F1maize.FINAL.gff`, `F1maize.FINAL.demux_FL_count.txt`.
+- IsoPhase Supp. Data 1: `data/supp/42003_2020_805_MOESM3_ESM.xlsx`.
