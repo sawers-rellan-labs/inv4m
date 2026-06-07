@@ -68,7 +68,7 @@ body <- paste0(vapply(seq_len(nrow(tab)), function(i) row_tex(tab[i, ]), charact
 caption <- paste0(
   "\\textbf{Full-length (Iso-seq) transcript evidence for the five B73 \\jmjii/\\jmjiv ",
   "cluster paralogs.} Reanalysis of the Wang et al. 2020 maize Iso-seq atlas ",
-  "(collapsed transcripts mapped on B73 RefGen\\_v4) \\citep{wang2020}. Each v5 ",
+  "(collapsed transcripts mapped on B73 RefGen\\_v4) \\citep{wang2020b}. Each v5 ",
   "candidate is mapped to its v4 gene model and to the collapsed full-length, ",
   "non-concatemer (FLNC) group (\\texttt{PB.X}); columns give the FLNC read count ",
   "in the three B73 inbred samples (embryo, endosperm, root) and the number of ",
