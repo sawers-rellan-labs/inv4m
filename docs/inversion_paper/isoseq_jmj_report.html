@@ -1662,6 +1662,8 @@ the cluster</a>
 <ul>
 <li><a href="#a.-b73-inbred-only-subset-joined-to-paralog-identity" id="toc-a.-b73-inbred-only-subset-joined-to-paralog-identity">4a.
 B73-inbred-only subset, joined to paralog identity</a></li>
+<li><a href="#b.-the-%CF%88-copy-pb.11786-is-a-transcribed-pseudogene" id="toc-b.-the-ψ-copy-pb.11786-is-a-transcribed-pseudogene">4b. The ψ
+copy (PB.11786) is a transcribed pseudogene</a></li>
 </ul></li>
 <li><a href="#isophase-phasing-at-the-cluster" id="toc-isophase-phasing-at-the-cluster">5. IsoPhase phasing at the
 cluster</a></li>
@@ -2293,6 +2295,75 @@ only) and PB.11788 (1, endosperm only) are at the detection floor in
 pure B73 — present but thin. The B73-only falsifier holds: ≥2 distinct
 transcription units (PB.11785 + PB.11787) are unambiguously expressed in
 pure B73 inbred across multiple tissues.</p>
+</div>
+<div id="b.-the-ψ-copy-pb.11786-is-a-transcribed-pseudogene" class="section level3">
+<h3>4b. The ψ copy (PB.11786) is a transcribed pseudogene</h3>
+<p>ψ maps to PB.11786 (§3, §4a) and is transcribed in B73 (3 root FLNC
+reads), but its full-length transcript does not encode an intact JMJ
+protein. Translating the PB.11786 transcript from the conserved JMJ
+start codon (<code>ATGATGGGAACAGAG</code>, which sits in a normal 5′
+position, ~219 bp into PB.11786.1) gives an open reading frame that
+terminates at a premature stop after 243 codons (stop at codon 244),
+versus the ~1227-codon ORF of the intact paralogs (jmj9, jmj2,
+jmj6).</p>
+<p>The premature stop is <strong>encoded in the B73 NAM v5 reference
+genome</strong>, not an artifact of the v4 Iso-seq read or the
+cDNA_Cupcake collapse. The exon carrying the stop is present in the v5
+assembly at 100% identity; the stop codon <code>TAG</code> sits at
+chr4:177,445,822–177,445,824 (+ strand). At the homologous position the
+intact paralog reads through in a different frame: a single-base
+difference just upstream (ψ lacks one base relative to jmj9) shifts the
+frame so a shared downstream sequence is read as <code>…TTT TAG…</code>
+(stop) in ψ but <code>…CTT TTA GAG…</code> (Leu–Leu–Glu) in jmj9 —
+i.e. a frameshift-induced premature termination.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>ψ (PB.11786)</th>
+<th>intact paralog (e.g. jmj9 / PB.11785)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>start codon</td>
+<td>conserved JMJ ATG, normal position</td>
+<td>conserved JMJ ATG</td>
+</tr>
+<tr class="even">
+<td>ORF length</td>
+<td>243 codons, then stop</td>
+<td>~1227 codons</td>
+</tr>
+<tr class="odd">
+<td>premature stop</td>
+<td><code>TAG</code>, B73 v5 chr4:177,445,822–177,445,824</td>
+<td>none (reads through)</td>
+</tr>
+<tr class="even">
+<td>5′UTR (PB.11786.1)</td>
+<td>~219 bp</td>
+<td>~120–180 bp</td>
+</tr>
+</tbody>
+</table>
+<p>Combined with ψ’s lack of a clean v5 transcript model and its
+near-floor B73 expression (§4a), this establishes ψ as a
+<strong>transcribed pseudogene</strong>: it retains a promoter and
+conserved start codon but cannot produce the full-length demethylase.
+This is the pseudogene referred to in §1 and §6.</p>
+<p><em>Method note.</em> ψ has no v5 transcript model, so its spliced
+coding sequence was reconstructed from the v5 genomic sequence
+(conserved-ATG-anchored) using PB.11786’s exon structure; the stop codon
+and its flanking 33 bp were then confirmed verbatim against the B73 NAM
+v5 assembly (<code>Zm-B73-REFERENCE-NAM-5.0</code>, chr4). The exact
+codon index inherits PB.11786’s (v4) splice structure; the premature
+stop itself is genome-encoded in v5.</p>
 </div>
 </div>
 <div id="isophase-phasing-at-the-cluster" class="section level2">

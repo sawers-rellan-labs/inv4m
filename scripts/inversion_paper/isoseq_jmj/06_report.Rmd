@@ -6,7 +6,7 @@ output:
     toc: true
     toc_depth: 3
     df_print: paged
-bibliography: ../references.bib
+bibliography: references.bib
 link-citations: true
 ---
 
@@ -120,6 +120,23 @@ knitr::kable(
 † PB.11787's reported genomic span (~43 kb) encompasses both `Zm00001d051963` and `Zm00001d051964`, separated by ~24 kb of intergenic sequence. The collapsed GFF alone cannot distinguish (i) Cupcake fuzzy-collapse merging two real, separate transcription units of high paralog identity, (ii) a reverse-transcription template-switching chimera artifact that cDNA_Cupcake then collapsed across both paralogs, or (iii) a genuine single long transcription unit with the ~24 kb intergenic acting as a large intron — unlikely in plants (introns this long inside protein-coding transcripts are rare), but not ruled out by what we have. jmj6 and jmj2 are assigned to the same FLNC transcript group accordingly; counts are pooled across the two paralogs, and the jmj2 row is left blank to avoid double counting. The ambiguity affects only the upper bound (4 vs 5 paralog-level transcription units), not the falsifier (≥2).
 
 **Reading.** Every FLNC transcript at the cluster (PB.11785, PB.11786, PB.11787, PB.11788) has at least one B73 inbred FLNC read. PB.11785 (21) and PB.11787 (50) are robust. PB.11786 (3, root only) and PB.11788 (1, endosperm only) are at the detection floor in pure B73 — present but thin. The B73-only falsifier holds: ≥2 distinct transcription units (PB.11785 + PB.11787) are unambiguously expressed in pure B73 inbred across multiple tissues.
+
+### 4b. The ψ copy (PB.11786) is a transcribed pseudogene
+
+ψ maps to PB.11786 (§3, §4a) and is transcribed in B73 (3 root FLNC reads), but its full-length transcript does not encode an intact JMJ protein. Translating the PB.11786 transcript from the conserved JMJ start codon (`ATGATGGGAACAGAG`, which sits in a normal 5′ position, ~219 bp into PB.11786.1) gives an open reading frame that terminates at a premature stop after 243 codons (stop at codon 244), versus the ~1227-codon ORF of the intact paralogs (jmj9, jmj2, jmj6).
+
+The premature stop is **encoded in the B73 NAM v5 reference genome**, not an artifact of the v4 Iso-seq read or the cDNA_Cupcake collapse. The exon carrying the stop is present in the v5 assembly at 100% identity; the stop codon `TAG` sits at chr4:177,445,822–177,445,824 (+ strand). At the homologous position the intact paralog reads through in a different frame: a single-base difference just upstream (ψ lacks one base relative to jmj9) shifts the frame so a shared downstream sequence is read as `…TTT TAG…` (stop) in ψ but `…CTT TTA GAG…` (Leu–Leu–Glu) in jmj9 — i.e. a frameshift-induced premature termination.
+
+| | ψ (PB.11786) | intact paralog (e.g. jmj9 / PB.11785) |
+|---|---|---|
+| start codon | conserved JMJ ATG, normal position | conserved JMJ ATG |
+| ORF length | 243 codons, then stop | ~1227 codons |
+| premature stop | `TAG`, B73 v5 chr4:177,445,822–177,445,824 | none (reads through) |
+| 5′UTR (PB.11786.1) | ~219 bp | ~120–180 bp |
+
+Combined with ψ's lack of a clean v5 transcript model and its near-floor B73 expression (§4a), this establishes ψ as a **transcribed pseudogene**: it retains a promoter and conserved start codon but cannot produce the full-length demethylase. This is the pseudogene referred to in §1 and §6.
+
+*Method note.* ψ has no v5 transcript model, so its spliced coding sequence was reconstructed from the v5 genomic sequence (conserved-ATG-anchored) using PB.11786's exon structure; the stop codon and its flanking 33 bp were then confirmed verbatim against the B73 NAM v5 assembly (`Zm-B73-REFERENCE-NAM-5.0`, chr4). The exact codon index inherits PB.11786's (v4) splice structure; the premature stop itself is genome-encoded in v5.
 
 ## 5. IsoPhase phasing at the cluster
 
